@@ -1,0 +1,92 @@
+{
+  "sources": [
+    {
+      "name": "macOS 15",
+      "description": "High framerate videos from macOS 15 Sequoia",
+      "manifestUrl": "https://sylvan.apple.com/itunes-assets/Aerials126/v4/82/2e/34/822e344c-f5d2-878c-3d56-508d5b09ed61/resources-15-0-2.tar",
+      "type": "macOS",
+      "scenes": ["nature", "city", "space", "sea"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    },
+    {
+      "name": "macOS 26",
+      "description": "High framerate videos from macOS 26",
+      "manifestUrl": "https://sylvan.apple.com/itunes-assets/Aerials126/v4/82/2e/34/822e344c-f5d2-878c-3d56-508d5b09ed61/resources-26-0-1.tar",
+      "type": "macOS",
+      "scenes": ["nature", "city", "space", "sea"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    },
+    {
+      "name": "macOS 14",
+      "description": "High framerate videos from macOS 14 Sonoma",
+      "manifestUrl": "https://sylvan.apple.com/itunes-assets/Aerials126/v4/82/2e/34/822e344c-f5d2-878c-3d56-508d5b09ed61/resources-14-0-10.tar",
+      "type": "macOS",
+      "scenes": ["nature", "city", "space", "sea"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    },
+    {
+      "name": "tvOS 16",
+      "description": "Apple TV screensavers from tvOS 16",
+      "manifestUrl": "https://sylvan.apple.com/Aerials/resources-16.tar",
+      "type": "tvOS12",
+      "scenes": ["nature", "city", "space", "sea"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": true
+    },
+    {
+      "name": "tvOS 13",
+      "description": "Apple TV screensavers from tvOS 13",
+      "manifestUrl": "https://sylvan.apple.com/Aerials/resources-13.tar",
+      "type": "tvOS12",
+      "scenes": ["nature", "city", "space", "sea"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": true
+    },
+    {
+      "name": "tvOS 12",
+      "description": "Apple TV screensavers from tvOS 12",
+      "manifestUrl": "https://sylvan.apple.com/Aerials/resources.tar",
+      "type": "tvOS12",
+      "scenes": ["nature", "city", "space"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    },
+    {
+      "name": "tvOS 11",
+      "description": "Apple TV screensavers from tvOS 11",
+      "manifestUrl": "https://sylvan.apple.com/Aerials/2x/entries.json",
+      "type": "tvOS11",
+      "scenes": ["nature", "city"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    },
+    {
+      "name": "tvOS 10",
+      "description": "Apple TV screensavers from tvOS 10",
+      "manifestUrl": "http://a1.phobos.apple.com/us/r1000/000/Features/atv/AutumnResources/videos/entries.json",
+      "type": "tvOS10",
+      "scenes": ["nature", "city"],
+      "isCachable": true,
+      "license": "",
+      "more": "",
+      "enabled": false
+    }
+  ]
+}

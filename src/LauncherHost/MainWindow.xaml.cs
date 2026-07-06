@@ -1,0 +1,1087 @@
+using Microsoft.UI.Composition;
+using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Input;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using System.Text.Json;
+using Windows.Foundation;
+using PluginContract;
+using WinRT;
+using LauncherHost.Controls;
+using LauncherHost.Core;
+using LauncherHost.Services;
+
+namespace LauncherHost;
+
+public sealed partial class MainWindow : Window
+{
+    DesktopAcrylicController? _acrylicController;
+    SystemBackdropConfiguration? _configurationSource;
+    LocalizationService _loc = null!;
+    ConfigStore _config = null!;
+    HostHandle _hostHandle = null!;
+    AcrylicBrushProvider _acrylicProvider = null!;
+    List<IPlugin> _plugins = new();
+    List<PluginContract.IPluginSettings> _pluginSettings = new();
+    bool _editMode;
+    const double Pad = 32;
+    const double PagerReserve = 56;
+    const string LayoutStore = "layout";
+    const string SettingsWidgetId = "host.settings";
+    const string LayoutSchema = "3";
+    bool _restorePositions;
+    FrameworkElement? _dragTarget;
+    int _dragOrigCol, _dragOrigRow, _dragOrigColSpan, _dragOrigRowSpan;
+    Canvas? _dragCanvas;
+    Popup? _dragPopup;
+    int _dragTargetPage;
+    long _edgeEnterTick;
+    int _edgeTarget;
+    double _dragOffsetX, _dragOffsetY;
+    FrameworkElement? _settingsTile;
+    readonly List<DesktopPage> _pages = new();
+    readonly Dictionary<FrameworkElement, DesktopPage> _elementPage = new();
+    readonly Dictionary<FrameworkElement, string> _elementIds = new();
+    readonly Dictionary<FrameworkElement, Action> _tapActions = new();
+    readonly Dictionary<string, List<WidgetSlot>> _pluginWidgets = new();
+
+    readonly Queue<(string title, string message, bool escalate)> _notifQueue = new();
+    Popup? _notifPopup;
+    DispatcherQueueTimer? _notifTimer;
+    bool _notifActive;
+
+    sealed class WidgetSlot
+    {
+        public required IWidget Widget { get; init; }
+        public FrameworkElement? Element { get; set; }
+    }
+
+    public MainWindow()
+    {
+        try
+        {
+            InitializeComponent();
+
+            LogService.Info("MainWindow initializing");
+
+            _acrylicProvider = new AcrylicBrushProvider();
+            _config = new ConfigStore();
+            _loc = new LocalizationService(_config.Get("host", "language") ?? "zh-cn");
+            _hostHandle = new HostHandle(_loc, _acrylicProvider, _config);
+
+            SetupWindow();
+            SetupAcrylicBackdrop();
+            _hostHandle.NotificationRequested += OnNotificationRequested;
+            _hostHandle.LiveTheme = () => ((FrameworkElement)Content).ActualTheme;
+
+            Pager.SelectionChanged += (_, _) =>
+            {
+                if (Pips.SelectedPageIndex != Pager.SelectedIndex)
+                    Pips.SelectedPageIndex = Pager.SelectedIndex;
+            };
+            Pips.SelectedIndexChanged += (_, _) =>
+            {
+                if (Pager.SelectedIndex != Pips.SelectedPageIndex)
+                    Pager.SelectedIndex = Pips.SelectedPageIndex;
+            };
+
+            ((FrameworkElement)Content).Loaded += (_, _) =>
+            {
+                ApplyStoredTheme();
+                LogService.Info("Loading plugins");
+                LoadPlugins();
+                RelayoutGrid();
+                LogService.Info("MainWindow initialized successfully");
+            };
+
+            ((FrameworkElement)Content).SizeChanged += (_, _) => RelayoutGrid();
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "MainWindow initialization failed");
+            throw;
+        }
+    }
+
+    (double w, double h) Avail()
+    {
+        var content = (FrameworkElement)Content;
+        return (content.ActualWidth - Pad * 2, content.ActualHeight - Pad - PagerReserve);
+    }
+
+    void ApplyGeometry(DesktopPage page)
+    {
+        var (availW, availH) = Avail();
+        if (availW <= 0 || availH <= 0) return;
+
+        page.Layout.Recalculate(availW, availH);
+        var left = Pad + (availW - page.Layout.GridWidth) / 2;
+        var top = Pad + (availH - page.Layout.GridHeight) / 2;
+        page.WidgetGrid.Margin = new Thickness(left, top, 0, 0);
+        page.Overlay.Margin = new Thickness(left, top, 0, 0);
+    }
+
+    void RelayoutGrid(bool reflow = true)
+    {
+        if (_dragTarget != null) return;
+        var (availW, availH) = Avail();
+        if (availW <= 0 || availH <= 0) return;
+
+        foreach (var page in _pages)
+        {
+            ApplyGeometry(page);
+            if (reflow)
+            {
+                page.Layout.Reflow();
+                page.Layout.ReapplyMargins();
+            }
+            page.Layout.DrawGridOverlay(page.Overlay, _editMode);
+            page.Overlay.Visibility = _editMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    // ---- page management ----
+
+    DesktopPage AddPage()
+    {
+        var page = new DesktopPage();
+        _pages.Add(page);
+        Pager.Items.Add(page.Root);
+        Pips.NumberOfPages = _pages.Count;
+        ApplyGeometry(page);
+        return page;
+    }
+
+    DesktopPage GetOrCreatePage(int index)
+    {
+        while (_pages.Count <= index) AddPage();
+        return _pages[Math.Max(0, index)];
+    }
+
+    int PageIndexOf(FrameworkElement fe)
+        => _elementPage.TryGetValue(fe, out var p) ? _pages.IndexOf(p) : 0;
+
+    DesktopPage PageOf(FrameworkElement fe)
+        => _elementPage.TryGetValue(fe, out var p) ? p : _pages[0];
+
+    FrameworkElement? ContentOf(FrameworkElement fe)
+        => _elementPage.TryGetValue(fe, out var p) ? p.Layout.GetContent(fe) : null;
+
+    void EnsureTrailingEmptyPage()
+    {
+        while (_pages.Count > 1 && _pages[^1].IsEmpty && _pages[^2].IsEmpty)
+            RemoveLastPage();
+        if (_pages.Count == 0 || !_pages[^1].IsEmpty)
+            AddPage();
+    }
+
+    void RemoveLastPage()
+    {
+        _pages.RemoveAt(_pages.Count - 1);
+        Pager.Items.RemoveAt(Pager.Items.Count - 1);
+        Pips.NumberOfPages = _pages.Count;
+        if (Pager.SelectedIndex >= _pages.Count)
+            Pager.SelectedIndex = _pages.Count - 1;
+    }
+
+    void SetupWindow()
+    {
+        var presenter = AppWindow.Presenter as OverlappedPresenter
+            ?? throw new InvalidOperationException("OverlappedPresenter not available");
+
+        presenter.SetBorderAndTitleBar(false, false);
+        presenter.IsMaximizable = false;
+        presenter.IsMinimizable = false;
+        presenter.IsResizable = false;
+
+        AppWindow.TitleBar.ExtendsContentIntoTitleBar = true;
+        AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
+
+        AppWindow.SetIcon("Assets/AppIcon.ico");
+        AppWindow.SetPresenter(AppWindowPresenterKind.FullScreen);
+
+        LogService.Info("Window setup complete");
+    }
+
+    void SetupAcrylicBackdrop()
+    {
+        if (!DesktopAcrylicController.IsSupported())
+        {
+            LogService.Warn("DesktopAcrylicController not supported");
+            return;
+        }
+
+        DispatcherQueue.EnsureSystemDispatcherQueue();
+
+        _configurationSource = new SystemBackdropConfiguration { IsInputActive = true };
+        Activated += OnActivated;
+        Closed += OnClosed;
+        ((FrameworkElement)Content).ActualThemeChanged += OnThemeChanged;
+
+        ApplyTheme();
+
+        _acrylicController = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Thin };
+        _acrylicController.AddSystemBackdropTarget(
+            this.As<ICompositionSupportsSystemBackdrop>());
+        _acrylicController.SetSystemBackdropConfiguration(_configurationSource);
+
+        LogService.Info("Acrylic backdrop set up (Thin)");
+    }
+
+    void ApplyStoredTheme()
+    {
+        var stored = _config.Get("host", "theme") ?? "Default";
+        ((FrameworkElement)Content).RequestedTheme = stored switch
+        {
+            "Light" => ElementTheme.Light,
+            "Dark" => ElementTheme.Dark,
+            _ => ElementTheme.Default
+        };
+    }
+
+    void LoadPlugins()
+    {
+        _restorePositions = _config.Get(LayoutStore, "schema") == LayoutSchema;
+
+        GetOrCreatePage(0);
+        AddSettingsTile();
+
+        var pluginsDir = "Plugins";
+        var result = PluginLoader.LoadAll(pluginsDir, _hostHandle);
+
+        foreach (var error in result.Errors)
+            LogService.Error(error);
+
+        _plugins = result.Plugins;
+        _pluginSettings = result.Settings;
+
+        if (_plugins.Count == 0)
+        {
+            LogService.Warn("No plugins loaded");
+            return;
+        }
+
+        foreach (var plugin in _plugins)
+        {
+            var typeName = plugin.GetType().Name;
+            var slots = new List<WidgetSlot>();
+            foreach (var widget in plugin.GetWidgets())
+                slots.Add(new WidgetSlot { Widget = widget });
+            _pluginWidgets[typeName] = slots;
+
+            if (IsPluginEnabled(typeName))
+                ShowPlugin(typeName);
+        }
+
+        EnsureTrailingEmptyPage();
+
+        _config.Set(LayoutStore, "schema", LayoutSchema);
+        _restorePositions = true;
+
+        RegisterHostAgent();
+    }
+
+    void RegisterHostAgent()
+    {
+        var tools = new List<AgentTool>
+        {
+            new() { Name = "list_plugins", Description = "列出所有已加载插件及其启用状态。" },
+            new()
+            {
+                Name = "set_theme",
+                Description = "设置界面主题。",
+                ParametersJsonSchema = """{"type":"object","properties":{"theme":{"type":"string","enum":["default","light","dark"]}},"required":["theme"]}"""
+            },
+            new()
+            {
+                Name = "set_language",
+                Description = "设置界面语言。",
+                ParametersJsonSchema = """{"type":"object","properties":{"language":{"type":"string","enum":["zh-cn","en-us"]}},"required":["language"]}"""
+            },
+            new()
+            {
+                Name = "set_edit_mode",
+                Description = "开启或关闭桌面编辑模式。",
+                ParametersJsonSchema = """{"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"]}"""
+            },
+            new()
+            {
+                Name = "enable_plugin",
+                Description = "按插件名称启用某个插件（显示其小组件）。",
+                ParametersJsonSchema = """{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}"""
+            },
+            new()
+            {
+                Name = "disable_plugin",
+                Description = "按插件名称停用某个插件（隐藏其小组件）。",
+                ParametersJsonSchema = """{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}"""
+            },
+            new()
+            {
+                Name = "set_notify_seconds",
+                Description = "设置通知横幅升级为全屏强制提醒前的等待秒数。",
+                ParametersJsonSchema = """{"type":"object","properties":{"seconds":{"type":"integer","minimum":1}},"required":["seconds"]}"""
+            },
+        };
+
+        var handlers = new Dictionary<string, Func<string, string>>
+        {
+            ["list_plugins"] = _ =>
+            {
+                var list = _plugins.Select(p => new
+                {
+                    name = p.DisplayName,
+                    id = p.GetType().Name,
+                    enabled = IsPluginEnabled(p.GetType().Name)
+                });
+                return JsonSerializer.Serialize(new { ok = true, plugins = list });
+            },
+            ["set_theme"] = args =>
+            {
+                var theme = HostJson.Str(args, "theme") ?? "default";
+                var value = theme.ToLowerInvariant() switch
+                {
+                    "light" => "Light",
+                    "dark" => "Dark",
+                    _ => "Default"
+                };
+                _config.Set("host", "theme", value);
+                ApplyStoredTheme();
+                return JsonSerializer.Serialize(new { ok = true, theme = value });
+            },
+            ["set_language"] = args =>
+            {
+                var lang = HostJson.Str(args, "language") ?? "zh-cn";
+                _config.Set("host", "language", lang);
+                _loc.SetCulture(lang);
+                return JsonSerializer.Serialize(new { ok = true, language = lang });
+            },
+            ["set_edit_mode"] = args =>
+            {
+                var on = HostJson.Bool(args, "enabled") ?? false;
+                _editMode = on;
+                SetEditMode(on);
+                return JsonSerializer.Serialize(new { ok = true, editMode = on });
+            },
+            ["enable_plugin"] = args => TogglePluginByName(HostJson.Str(args, "name"), true),
+            ["disable_plugin"] = args => TogglePluginByName(HostJson.Str(args, "name"), false),
+            ["set_notify_seconds"] = args =>
+            {
+                var s = HostJson.Int(args, "seconds");
+                if (s is not > 0) return "{\"ok\":false,\"error\":\"invalid_seconds\"}";
+                _config.Set("host", "notify_escalate_seconds", s.Value.ToString());
+                return JsonSerializer.Serialize(new { ok = true, seconds = s.Value });
+            },
+        };
+
+        _hostHandle.RegisterAgentCapability(new HostAgentCapability(DispatcherQueue, tools, handlers));
+    }
+
+    string TogglePluginByName(string? name, bool enable)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "{\"ok\":false,\"error\":\"name_required\"}";
+        var plugin = _plugins.FirstOrDefault(p =>
+            p.DisplayName == name || p.GetType().Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (plugin == null) return "{\"ok\":false,\"error\":\"plugin_not_found\"}";
+
+        var typeName = plugin.GetType().Name;
+        if (enable) ShowPlugin(typeName); else HidePlugin(typeName);
+        return JsonSerializer.Serialize(new { ok = true, name = plugin.DisplayName, enabled = enable });
+    }
+
+    static class HostJson
+    {
+        public static string? Str(string json, string key)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty(key, out var v))
+                    return v.ValueKind == JsonValueKind.String ? v.GetString() : v.ToString();
+            }
+            catch { }
+            return null;
+        }
+
+        public static int? Int(string json, string key)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty(key, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n)) return n;
+                    if (v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), out var s)) return s;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        public static bool? Bool(string json, string key)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty(key, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.True) return true;
+                    if (v.ValueKind == JsonValueKind.False) return false;
+                    if (v.ValueKind == JsonValueKind.String && bool.TryParse(v.GetString(), out var b)) return b;
+                }
+            }
+            catch { }
+            return null;
+        }
+    }
+
+    void AddSettingsTile()
+    {
+        var button = new Button
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Background = (Brush)_hostHandle.GetWidgetBackgroundBrush(),
+            Content = new FontIcon { Glyph = "\uE713", FontSize = 28 }
+        };
+        button.Click += OnSettingsClick;
+
+        var pos = ReadSavedPosition(SettingsWidgetId);
+        var page = GetOrCreatePage(pos?.page ?? 0);
+        var defaultCol = Math.Max(0, page.Layout.SubColumns - 1);
+        var container = page.Layout.AddElement(button, 1, 1, pos?.col ?? defaultCol, pos?.row ?? 0);
+        _settingsTile = container;
+        _elementPage[container] = page;
+        _elementIds[container] = SettingsWidgetId;
+        _tapActions[container] = OpenSettings;
+        RegisterElement(container);
+    }
+
+    bool IsPluginEnabled(string typeName)
+        => (_config.Get(LayoutStore, $"enabled.{typeName}") ?? "true") == "true";
+
+    void ShowPlugin(string typeName)
+    {
+        if (_pluginWidgets.TryGetValue(typeName, out var slots))
+        {
+            foreach (var slot in slots)
+            {
+                var pos = ReadSavedPosition(slot.Widget.Id);
+                var pageIdx = pos?.page ?? (slot.Element != null ? PageIndexOf(slot.Element) : 0);
+                var page = GetOrCreatePage(pageIdx);
+
+                if (slot.Element == null)
+                {
+                    slot.Element = page.Layout.AddWidget(slot.Widget, pos?.col, pos?.row);
+                    _elementIds[slot.Element] = slot.Widget.Id;
+                }
+                else
+                {
+                    page.Layout.ShowElement(slot.Element, pos?.col, pos?.row);
+                }
+                _elementPage[slot.Element] = page;
+                RegisterElement(slot.Element);
+            }
+        }
+        _config.Set(LayoutStore, $"enabled.{typeName}", "true");
+        EnsureTrailingEmptyPage();
+        LogService.Info($"ShowPlugin: {typeName}");
+    }
+
+    void HidePlugin(string typeName)
+    {
+        if (_pluginWidgets.TryGetValue(typeName, out var slots))
+        {
+            foreach (var slot in slots)
+            {
+                if (slot.Element == null) continue;
+                UnregisterElement(slot.Element);
+                PageOf(slot.Element).Layout.HideElement(slot.Element);
+            }
+        }
+        _config.Set(LayoutStore, $"enabled.{typeName}", "false");
+        EnsureTrailingEmptyPage();
+        LogService.Info($"HidePlugin: {typeName}");
+    }
+
+    (int page, int col, int row)? ReadSavedPosition(string id)
+    {
+        if (!_restorePositions) return null;
+        var raw = _config.Get(LayoutStore, id);
+        if (raw == null) return null;
+        var parts = raw.Split(',');
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], out var page) &&
+            int.TryParse(parts[1], out var col) &&
+            int.TryParse(parts[2], out var row))
+            return (page, col, row);
+        return null;
+    }
+
+    void PersistPosition(FrameworkElement fe)
+    {
+        if (_elementIds.TryGetValue(fe, out var id))
+            _config.Set(LayoutStore, id, $"{PageIndexOf(fe)},{Grid.GetColumn(fe)},{Grid.GetRow(fe)}");
+    }
+
+    void RegisterElement(FrameworkElement fe)
+    {
+        fe.PointerEntered += OnWidgetPointerEntered;
+        fe.PointerExited += OnWidgetPointerExited;
+
+        var content = ContentOf(fe);
+        if (content != null)
+            content.IsHitTestVisible = !_editMode;
+
+        EnableDrag(fe, _editMode);
+    }
+
+    void UnregisterElement(FrameworkElement fe)
+    {
+        fe.PointerEntered -= OnWidgetPointerEntered;
+        fe.PointerExited -= OnWidgetPointerExited;
+
+        var content = ContentOf(fe);
+        if (content != null)
+            content.IsHitTestVisible = true;
+
+        EnableDrag(fe, false);
+    }
+
+    void EnableDrag(FrameworkElement fe, bool on)
+    {
+        if (on)
+        {
+            fe.ManipulationMode = ManipulationModes.TranslateX | ManipulationModes.TranslateY;
+            fe.ManipulationStarted += OnWidgetDragStarted;
+            fe.ManipulationDelta += OnWidgetDragDelta;
+            fe.ManipulationCompleted += OnWidgetDragCompleted;
+            fe.Tapped += OnContainerTapped;
+        }
+        else
+        {
+            fe.ManipulationMode = ManipulationModes.System;
+            fe.ManipulationStarted -= OnWidgetDragStarted;
+            fe.ManipulationDelta -= OnWidgetDragDelta;
+            fe.ManipulationCompleted -= OnWidgetDragCompleted;
+            fe.Tapped -= OnContainerTapped;
+        }
+    }
+
+    void OnContainerTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        e.Handled = true;
+
+        if (_editMode)
+        {
+            if (ReferenceEquals(fe, _settingsTile) && _tapActions.TryGetValue(fe, out var act))
+                act();
+            return;
+        }
+
+        if (_tapActions.TryGetValue(fe, out var action))
+            action();
+    }
+
+    void OnWidgetPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (_editMode || sender is not FrameworkElement fe) return;
+        AnimateScale(fe, 1.04, TimeSpan.FromMilliseconds(250), EasingMode.EaseOut);
+    }
+
+    void OnWidgetPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (_editMode || sender is not FrameworkElement fe) return;
+        AnimateScale(fe, 1.0, TimeSpan.FromMilliseconds(167), EasingMode.EaseIn);
+    }
+
+    void AnimateScale(FrameworkElement fe, double to, TimeSpan duration, EasingMode easing)
+    {
+        if (fe.RenderTransform is not ScaleTransform st) return;
+        var story = new Storyboard();
+        var animX = new DoubleAnimation
+        {
+            To = to, Duration = new Duration(duration),
+            EasingFunction = new CubicEase { EasingMode = easing }
+        };
+        var animY = new DoubleAnimation
+        {
+            To = to, Duration = new Duration(duration),
+            EasingFunction = new CubicEase { EasingMode = easing }
+        };
+        Storyboard.SetTarget(animX, st);
+        Storyboard.SetTargetProperty(animX, "ScaleX");
+        Storyboard.SetTarget(animY, st);
+        Storyboard.SetTargetProperty(animY, "ScaleY");
+        story.Children.Add(animX);
+        story.Children.Add(animY);
+        story.Begin();
+    }
+
+    void OnSettingsClick(object sender, RoutedEventArgs e) => OpenSettings();
+
+    async void OpenSettings()
+    {
+        var dialog = new SettingsDialog(
+            _loc, _config, _plugins, _pluginSettings,
+            _editMode,
+            mode =>
+            {
+                _editMode = mode;
+                SetEditMode(mode);
+            },
+            (typeName, enabled) =>
+            {
+                if (enabled) ShowPlugin(typeName);
+                else HidePlugin(typeName);
+            },
+            async () =>
+            {
+                var confirm = new ContentDialog
+                {
+                    Title = "确认退出",
+                    Content = "确定要退出启动器吗？",
+                    PrimaryButtonText = "退出",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = Content.XamlRoot
+                };
+                var result = await confirm.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                    Application.Current.Exit();
+            },
+            async () =>
+            {
+                var confirm = new ContentDialog
+                {
+                    Title = "确认重置",
+                    Content = "将清空全部设置、布局与插件数据（待办、位置、页面等），并关闭启动器。此操作不可撤销，确定继续吗？",
+                    PrimaryButtonText = "重置并退出",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = Content.XamlRoot
+                };
+                var result = await confirm.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    LogService.Info("User requested full reset");
+                    _config.ResetAll();
+                    Application.Current.Exit();
+                }
+            });
+
+        dialog.XamlRoot = Content.XamlRoot;
+        var result = await dialog.ShowAsync();
+        ApplyStoredTheme();
+    }
+
+    void SetEditMode(bool enabled)
+    {
+        foreach (var page in _pages)
+        {
+            page.Layout.DrawGridOverlay(page.Overlay, enabled);
+            page.Overlay.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+
+            foreach (var container in page.Layout.Containers)
+            {
+                if (page.Layout.GetContent(container) is { } content)
+                    content.IsHitTestVisible = !enabled;
+                EnableDrag(container, enabled);
+            }
+        }
+
+        SetPagerSwipe(!enabled);
+    }
+
+    void SetPagerSwipe(bool enabled)
+    {
+        var sv = FindChild<ScrollViewer>(Pager);
+        if (sv != null)
+            sv.HorizontalScrollMode = enabled ? ScrollMode.Enabled : ScrollMode.Disabled;
+    }
+
+    static T? FindChild<T>(DependencyObject root) where T : class
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t) return t;
+            var found = FindChild<T>(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    // ---- edge-to-flip (drag to screen edge → auto move to next/prev page) ----
+
+    const double EdgeZone = 80;       // logical pixels from left/right edge
+    const long EdgeDelay = 800;        // ms before flip triggers
+
+    void OnWidgetDragStarted(object sender, ManipulationStartedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+
+        var page = PageOf(fe);
+        _dragTarget = fe;
+        _dragTargetPage = _pages.IndexOf(page);
+        _dragOrigCol = Grid.GetColumn(fe);
+        _dragOrigRow = Grid.GetRow(fe);
+        _dragOrigColSpan = Grid.GetColumnSpan(fe);
+        _dragOrigRowSpan = Grid.GetRowSpan(fe);
+
+        _dragOffsetX = e.Position.X;
+        _dragOffsetY = e.Position.Y;
+
+        _edgeEnterTick = 0;
+        _edgeTarget = -1;
+
+        // lift onto transparent overlay canvas
+        if (_dragPopup == null)
+        {
+            _dragCanvas = new Canvas { Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)) };
+            _dragPopup = new Popup { XamlRoot = Content.XamlRoot, IsLightDismissEnabled = false };
+            _dragPopup.Child = _dragCanvas;
+        }
+        _dragCanvas!.Width = ((FrameworkElement)Content).ActualWidth;
+        _dragCanvas!.Height = ((FrameworkElement)Content).ActualHeight;
+
+        var root = (FrameworkElement)Content;
+        var transform = fe.TransformToVisual(root);
+        var pos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+        page.Layout.HideElement(fe);
+        _dragCanvas.Children.Add(fe);
+        Canvas.SetLeft(fe, pos.X);
+        Canvas.SetTop(fe, pos.Y);
+
+        fe.RenderTransform = new ScaleTransform { CenterX = 0.5, CenterY = 0.5, ScaleX = 1.06, ScaleY = 1.06 };
+        fe.Opacity = 0.92;
+        _dragPopup.IsOpen = true;
+    }
+
+    void OnWidgetDragDelta(object sender, ManipulationDeltaRoutedEventArgs e)
+    {
+        if (_dragTarget is null || _dragCanvas is null) return;
+        e.Handled = true;
+
+        var fe = _dragTarget;
+        var cx = Canvas.GetLeft(fe) + e.Delta.Translation.X + _dragOffsetX;
+        var cy = Canvas.GetTop(fe) + e.Delta.Translation.Y + _dragOffsetY;
+        Canvas.SetLeft(fe, cx - _dragOffsetX);
+        Canvas.SetTop(fe, cy - _dragOffsetY);
+
+        if (!_editMode) return;
+
+        var winW = _dragCanvas.Width;
+        var winH = _dragCanvas.Height;
+        if (winW <= 1) { winW = ((FrameworkElement)Content).ActualWidth; winH = ((FrameworkElement)Content).ActualHeight; }
+        var now = Environment.TickCount64;
+        var pageIdx = _dragTargetPage;
+        bool leftEdge = cx < EdgeZone;
+        bool rightEdge = cx > winW - EdgeZone;
+
+        if (leftEdge && pageIdx > 0)
+        {
+            if (_edgeTarget != pageIdx - 1) { _edgeTarget = pageIdx - 1; _edgeEnterTick = now; }
+            else if (now - _edgeEnterTick >= EdgeDelay)
+            {
+                Pager.SelectedIndex = _edgeTarget;
+                _dragTargetPage = _edgeTarget;
+                _edgeTarget = -1;
+            }
+        }
+        else if (rightEdge)
+        {
+            GetOrCreatePage(pageIdx + 1);
+            if (_edgeTarget != pageIdx + 1) { _edgeTarget = pageIdx + 1; _edgeEnterTick = now; }
+            else if (now - _edgeEnterTick >= EdgeDelay)
+            {
+                Pager.SelectedIndex = _edgeTarget;
+                _dragTargetPage = _edgeTarget;
+                _edgeTarget = -1;
+            }
+        }
+        else
+        {
+            _edgeTarget = -1;
+        }
+    }
+
+    void OnWidgetDragCompleted(object sender, ManipulationCompletedRoutedEventArgs e)
+    {
+        _edgeTarget = -1;
+
+        if (_dragTarget is not { } fe || _dragCanvas is null || _dragPopup is null) return;
+
+        _dragCanvas.Children.Remove(fe);
+        _dragPopup.IsOpen = false;
+
+        fe.RenderTransform = new ScaleTransform { CenterX = 0.5, CenterY = 0.5 };
+        fe.Opacity = 1.0;
+
+        var page = GetOrCreatePage(_dragTargetPage);
+        var layout = page.Layout;
+
+        var cx = Canvas.GetLeft(fe) + _dragOffsetX;
+        var cy = Canvas.GetTop(fe) + _dragOffsetY;
+
+        var gridX = cx - page.WidgetGrid.Margin.Left;
+        var gridY = cy - page.WidgetGrid.Margin.Top;
+        var sub = layout.SubCell;
+
+        var deltaCol = (int)Math.Round(gridX / sub, MidpointRounding.AwayFromZero);
+        var deltaRow = (int)Math.Round(gridY / sub, MidpointRounding.AwayFromZero);
+
+        var targetCol = Math.Clamp(deltaCol, 0, layout.SubColumns - _dragOrigColSpan);
+        var targetRow = Math.Clamp(deltaRow, 0, layout.SubRows - _dragOrigRowSpan);
+
+        string outcome;
+        page.Layout.ShowElement(fe, null, null);
+        if (layout.TryPlace(fe, targetCol, targetRow, _dragOrigColSpan, _dragOrigRowSpan))
+        {
+            outcome = "placed";
+        }
+        else
+        {
+            var swap = layout.GetSingleSwapTarget(fe, targetCol, targetRow, _dragOrigColSpan, _dragOrigRowSpan);
+            if (swap != null)
+            {
+                Grid.SetColumn(swap, Grid.GetColumn(fe));
+                Grid.SetRow(swap, Grid.GetRow(fe));
+                Grid.SetColumn(fe, targetCol);
+                Grid.SetRow(fe, targetRow);
+                PersistPosition(swap);
+                outcome = "swapped";
+            }
+            else
+            {
+                Grid.SetColumn(fe, targetCol);
+                Grid.SetRow(fe, targetRow); // can't place at desired spot but keep what ShowElement picked
+                outcome = "placed";
+            }
+        }
+
+        _elementPage[fe] = page;
+        PersistPosition(fe);
+        layout.ReapplyMargins();
+        EnsureTrailingEmptyPage();
+
+        _dragTarget = null;
+        LogService.Info($"DragEnd: overlay → page={_dragTargetPage} target=({targetCol},{targetRow}) [{outcome}]");
+    }
+
+    // ---- notifications (queue + banner + escalate to full-screen) ----
+
+    void OnNotificationRequested(string title, string message, bool escalate)
+    {
+        _notifQueue.Enqueue((title, message, escalate));
+        if (!_notifActive)
+            ShowNextNotification();
+    }
+
+    int EscalateSeconds()
+    {
+        var raw = _config.Get("host", "notify_escalate_seconds");
+        return int.TryParse(raw, out var s) && s > 0 ? s : 10;
+    }
+
+    void ShowNextNotification()
+    {
+        if (_notifQueue.Count == 0) { _notifActive = false; return; }
+        if (Content?.XamlRoot == null) { _notifActive = false; return; }
+
+        _notifActive = true;
+        var (title, message, escalate) = _notifQueue.Dequeue();
+
+        var contentFe = (FrameworkElement)Content;
+        var theme = contentFe.ActualTheme;
+        var banner = BuildBanner(title, message, isFullScreen: false, theme);
+
+        double w = contentFe.ActualWidth, h = contentFe.ActualHeight;
+        var raw = Content.XamlRoot.Size;
+        LogService.Info($"Notification show: content={w:F0}x{h:F0}epx xamlRootSize={raw.Width:F0}x{raw.Height:F0} scale={Content.XamlRoot.RasterizationScale:F2}");
+
+        var host = new Grid { Width = w, Height = h };
+        host.Children.Add(banner);
+
+        _notifPopup = new Popup { XamlRoot = Content.XamlRoot, IsLightDismissEnabled = false, Child = host };
+        _notifPopup.IsOpen = true;
+        FadeInElement(banner);
+
+        _notifTimer?.Stop();
+        _notifTimer = DispatcherQueue.CreateTimer();
+        _notifTimer.Interval = TimeSpan.FromSeconds(EscalateSeconds());
+        _notifTimer.IsRepeating = false;
+        _notifTimer.Tick += (_, _) =>
+        {
+            _notifTimer?.Stop();
+            if (escalate) EscalateNotification(title, message, theme);
+            else DismissNotification();
+        };
+        _notifTimer.Start();
+    }
+
+    void EscalateNotification(string title, string message, ElementTheme theme)
+    {
+        if (_notifPopup?.Child is not Grid host) return;
+        host.Children.Clear();
+        host.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xB0, 0x00, 0x00, 0x00));
+
+        var card = BuildBanner(title, message, isFullScreen: true, theme);
+        card.HorizontalAlignment = HorizontalAlignment.Center;
+        card.VerticalAlignment = VerticalAlignment.Center;
+        host.Children.Add(card);
+
+        var visual = ElementCompositionPreview.GetElementVisual(card);
+        visual.Scale = new System.Numerics.Vector3(0.6f, 0.6f, 1f);
+        var size = card.ActualSize;
+        var comp = visual.Compositor;
+        var scale = comp.CreateVector3KeyFrameAnimation();
+        scale.InsertKeyFrame(1f, new System.Numerics.Vector3(1f, 1f, 1f));
+        scale.Duration = TimeSpan.FromMilliseconds(260);
+        var opacity = comp.CreateScalarKeyFrameAnimation();
+        opacity.InsertKeyFrame(0f, 0f);
+        opacity.InsertKeyFrame(1f, 1f);
+        opacity.Duration = TimeSpan.FromMilliseconds(220);
+        card.Loaded += (_, _) =>
+        {
+            var v = ElementCompositionPreview.GetElementVisual(card);
+            v.CenterPoint = new System.Numerics.Vector3(card.ActualSize.X / 2f, card.ActualSize.Y / 2f, 0f);
+            v.StartAnimation("Scale", scale);
+            v.StartAnimation("Opacity", opacity);
+        };
+    }
+
+    void DismissNotification()
+    {
+        _notifTimer?.Stop();
+        _notifTimer = null;
+        if (_notifPopup != null)
+        {
+            _notifPopup.IsOpen = false;
+            _notifPopup = null;
+        }
+        ShowNextNotification();
+    }
+
+    FrameworkElement BuildBanner(string title, string message, bool isFullScreen, ElementTheme theme)
+    {
+        var tint = theme == ElementTheme.Light
+            ? Windows.UI.Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
+            : Windows.UI.Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B);
+        var primary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+        var secondary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Windows.UI.Color.FromArgb(0x99, 0x00, 0x00, 0x00))
+            : new SolidColorBrush(Windows.UI.Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
+        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = isFullScreen ? 28 : 16,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = primary
+        });
+        text.Children.Add(new TextBlock
+        {
+            Text = message,
+            FontSize = isFullScreen ? 18 : 13,
+            Foreground = secondary,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var dismiss = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE711", FontSize = 14 },
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        dismiss.Click += (_, _) => DismissNotification();
+
+        var layout = new Grid { ColumnSpacing = 12 };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(text, 0);
+        Grid.SetColumn(dismiss, 1);
+        layout.Children.Add(text);
+        layout.Children.Add(dismiss);
+
+        return new Border
+        {
+            Background = new AcrylicBrush { TintColor = tint, TintOpacity = 0.85, FallbackColor = tint },
+            CornerRadius = new CornerRadius(isFullScreen ? 16 : 10),
+            Padding = new Thickness(isFullScreen ? 40 : 20, isFullScreen ? 32 : 14, isFullScreen ? 24 : 14, isFullScreen ? 32 : 14),
+            Margin = isFullScreen ? new Thickness(0) : new Thickness(0, 24, 0, 0),
+            MinWidth = isFullScreen ? 360 : 320,
+            MaxWidth = isFullScreen ? 560 : 460,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = isFullScreen ? VerticalAlignment.Center : VerticalAlignment.Top,
+            Child = layout
+        };
+    }
+
+    static void FadeInElement(UIElement element)
+    {
+        var visual = ElementCompositionPreview.GetElementVisual(element);
+        var comp = visual.Compositor;
+        var anim = comp.CreateScalarKeyFrameAnimation();
+        anim.InsertKeyFrame(0f, 0f);
+        anim.InsertKeyFrame(1f, 1f);
+        anim.Duration = TimeSpan.FromMilliseconds(200);
+        visual.StartAnimation("Opacity", anim);
+    }
+
+    void OnActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (_configurationSource != null)
+            _configurationSource.IsInputActive =
+                args.WindowActivationState != WindowActivationState.Deactivated;
+    }
+
+    void OnClosed(object sender, WindowEventArgs args)
+    {
+        LogService.Info("Window closing");
+        foreach (var plugin in _plugins)
+            plugin.Shutdown();
+
+        _acrylicController?.Dispose();
+        _acrylicController = null;
+        _configurationSource = null;
+
+        Activated -= OnActivated;
+        Closed -= OnClosed;
+        if (Content is FrameworkElement fe2)
+            fe2.ActualThemeChanged -= OnThemeChanged;
+    }
+
+    void OnThemeChanged(FrameworkElement sender, object args) => ApplyTheme();
+
+    void ApplyTheme()
+    {
+        if (_configurationSource != null && Content is FrameworkElement fe)
+        {
+            var theme = fe.ActualTheme == ElementTheme.Dark
+                ? SystemBackdropTheme.Dark
+                : SystemBackdropTheme.Light;
+            _configurationSource.Theme = theme;
+            _hostHandle?.NotifyTheme(
+                fe.ActualTheme == ElementTheme.Dark ? ElementTheme.Dark : ElementTheme.Light);
+        }
+
+        if (_hostHandle != null && _settingsTile != null &&
+            ContentOf(_settingsTile) is Control settingsButton)
+            settingsButton.Background = (Brush)_hostHandle.GetWidgetBackgroundBrush();
+    }
+}

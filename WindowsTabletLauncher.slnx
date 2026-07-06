@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LauncherHost/LauncherHost.csproj" />
+    <Project Path="src/PluginContract/PluginContract.csproj" />
+  </Folder>
+  <Folder Name="/src/Plugins/">
+    <Project Path="src/Plugins/ClockPlugin/ClockPlugin.csproj" />
+  </Folder>
+</Solution>

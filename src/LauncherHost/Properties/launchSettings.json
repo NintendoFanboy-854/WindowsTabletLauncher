@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "LauncherHost (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "LauncherHost (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
