@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using PluginContract;
+using SharedUtils;
 using Windows.UI;
 
 namespace SedentaryPlugin;
@@ -14,7 +15,8 @@ public sealed class SedentaryWidget : UserControl
     readonly IHostHandle _host;
     readonly Func<SedentaryStats> _state;
     readonly Action _onReset;
-    readonly PluginOverlay _overlay = new();
+    readonly BasePluginOverlay _overlay = new();
+    InfoBar? _infoBar;
 
     Border _root = null!;
     Ellipse _dot = null!;
@@ -120,4 +122,45 @@ public sealed class SedentaryWidget : UserControl
     }
 
     internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+
+    public void ShowInfoBar(int minutes)
+    {
+        if (_infoBar != null) return;
+        _infoBar = new InfoBar
+        {
+            Message = $"你已经连续坐了 {minutes} 分钟，起来活动一下吧！",
+            Severity = InfoBarSeverity.Warning,
+            IsOpen = true,
+            ActionButton = new Button { Content = "我起来了" }
+        };
+        ((Button)_infoBar.ActionButton).Click += (_, _) => { _onReset(); HideInfoBar(); };
+        _infoBar.CloseButtonClick += (_, _) => HideInfoBar();
+
+        var parent = _root.Parent as Panel;
+        parent?.Children.Add(_infoBar);
+    }
+
+    public void HideInfoBar()
+    {
+        if (_infoBar == null) return;
+        _infoBar.IsOpen = false;
+        var parent = _infoBar.Parent as Panel;
+        parent?.Children.Remove(_infoBar);
+        _infoBar = null;
+    }
+
+    public void ShowTeachingTipIfNeeded()
+    {
+        if (_root.XamlRoot == null) return;
+        var tip = new TeachingTip
+        {
+            Target = _root,
+            Title = "久坐提醒",
+            Subtitle = "当你连续久坐超过阈值时，这里会提醒你起身活动。点击圆点可查看详细数据。",
+            IsLightDismissEnabled = true,
+            PreferredPlacement = TeachingTipPlacementMode.Bottom
+        };
+        tip.Closed += (_, _) => { };
+        _root.Loaded += (_, _) => { tip.IsOpen = true; };
+    }
 }

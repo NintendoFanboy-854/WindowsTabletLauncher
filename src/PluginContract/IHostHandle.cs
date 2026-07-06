@@ -13,4 +13,7 @@ public interface IHostHandle
 
     void Log(string message);
     void LogError(string message);
+
+    IReadOnlyList<(string pluginId, string key, string value)> GetAllConfigs(string keyPrefix) =>
+        Array.Empty<(string, string, string)>();
 }

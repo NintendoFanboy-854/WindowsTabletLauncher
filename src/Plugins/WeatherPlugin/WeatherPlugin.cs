@@ -135,7 +135,6 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
             var m = (modeCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "auto";
             _host.SetConfig(PluginId, "location_mode", m);
             manualPanel.Visibility = m == "manual" ? Visibility.Visible : Visibility.Collapsed;
-            if (m == "auto") _widget?.ResetLocationCache();
             _widget?.Refresh();
         };
 
@@ -281,7 +280,6 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
                 if (mode != "manual")
                 {
                     _host.SetConfig(PluginId, "location_mode", "auto");
-                    _widget?.ResetLocationCache();
                     _widget?.Refresh();
                     return AgentJson.Serialize(new { ok = true, mode = "auto" });
                 }

@@ -25,7 +25,6 @@ public sealed class WeatherWidget : UserControl
     TextBlock _details = null!;
 
     string? _adcode;
-    string? _ipAdcode;
     Live? _lastLive;
     Forecast? _lastForecast;
 
@@ -108,8 +107,6 @@ public sealed class WeatherWidget : UserControl
 
     public void Refresh() => _ = RefreshAsync();
 
-    public void ResetLocationCache() => _ipAdcode = null;
-
     async Task RefreshAsync()
     {
         var mode = _host.GetConfig(nameof(WeatherPlugin), "location_mode") ?? "auto";
@@ -121,9 +118,8 @@ public sealed class WeatherWidget : UserControl
         }
         else
         {
-            if (_ipAdcode == null)
-                _ipAdcode = (await _service.GetIpLocationAsync())?.Adcode;
-            adcode = _ipAdcode;
+            var ipResult = await _service.GetIpLocationAsync();
+            adcode = ipResult?.Adcode;
         }
 
         if (string.IsNullOrWhiteSpace(adcode))

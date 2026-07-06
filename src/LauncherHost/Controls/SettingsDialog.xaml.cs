@@ -13,8 +13,13 @@ public sealed partial class SettingsDialog : ContentDialog
     readonly ConfigStore _config;
     readonly Action<bool> _onEditMode;
     readonly Action<string, bool> _onPluginToggle;
+    readonly Action<string, int> _onPageChange;
+    int _pageCount;
+    bool _editMode;
+    bool _rebuilding;
     readonly Func<Task> _onExit;
     readonly Func<Task> _onReset;
+    readonly List<ComboBox> _pageCombos = new();
 
     public SettingsDialog(
         LocalizationService loc,
@@ -22,8 +27,10 @@ public sealed partial class SettingsDialog : ContentDialog
         IReadOnlyList<IPlugin> plugins,
         IReadOnlyList<IPluginSettings> pluginSettings,
         bool editMode,
+        int pageCount,
         Action<bool> onEditMode,
         Action<string, bool> onPluginToggle,
+        Action<string, int> onPageChange,
         Func<Task> onExit,
         Func<Task> onReset)
     {
@@ -32,6 +39,9 @@ public sealed partial class SettingsDialog : ContentDialog
         _config = config;
         _onEditMode = onEditMode;
         _onPluginToggle = onPluginToggle;
+        _onPageChange = onPageChange;
+        _editMode = editMode;
+        _pageCount = pageCount;
         _onExit = onExit;
         _onReset = onReset;
 
@@ -41,6 +51,7 @@ public sealed partial class SettingsDialog : ContentDialog
         SetupTheme();
         SetupEditMode(editMode);
         SetupNotify();
+        SetupSettingsPageCombo();
         SetupNavigation(plugins, pluginSettings);
 
         EditModeToggle.Toggled += (_, _) => _onEditMode(EditModeToggle.IsOn);
@@ -58,6 +69,23 @@ public sealed partial class SettingsDialog : ContentDialog
             Hide();
             await _onReset();
         };
+    }
+
+    /// <summary>Called by MainWindow when page count changes (edit mode on/off).</summary>
+    public void RefreshPageCombos(int pageCount, bool editMode)
+    {
+        _rebuilding = true;
+        _pageCount = pageCount;
+        foreach (var combo in _pageCombos)
+        {
+            var savedIdx = combo.SelectedIndex;
+            combo.Items.Clear();
+            for (int i = 0; i < _pageCount; i++)
+                combo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
+            combo.IsEnabled = editMode;
+            combo.SelectedIndex = Math.Clamp(savedIdx, 0, _pageCount - 1);
+        }
+        _rebuilding = false;
     }
 
     void SetupLanguage()
@@ -120,6 +148,25 @@ public sealed partial class SettingsDialog : ContentDialog
         };
     }
 
+    void SetupSettingsPageCombo()
+    {
+        SettingsPageCombo.IsEnabled = _editMode;
+        var currentPage = int.TryParse(_config.Get(LayoutStore, "page.host.settings"), out var cp) ? cp : 0;
+        for (int i = 0; i < _pageCount; i++)
+            SettingsPageCombo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
+        SettingsPageCombo.SelectedIndex = Math.Clamp(currentPage, 0, _pageCount - 1);
+
+        SettingsPageCombo.SelectionChanged += (_, _) =>
+        {
+            if (_rebuilding) return;
+            if (SettingsPageCombo.SelectedItem is not ComboBoxItem ci || ci.Tag is not int p) return;
+            _config.Set(LayoutStore, "page.host.settings", p.ToString());
+            _onPageChange("host.settings", p);
+        };
+
+        _pageCombos.Add(SettingsPageCombo);
+    }
+
     void SetupNavigation(
         IReadOnlyList<IPlugin> plugins,
         IReadOnlyList<IPluginSettings> pluginSettings)
@@ -131,6 +178,7 @@ public sealed partial class SettingsDialog : ContentDialog
         {
             var typeName = plugin.GetType().Name;
             var enabled = (_config.Get(LayoutStore, $"enabled.{typeName}") ?? "true") == "true";
+            var currentPage = int.TryParse(_config.Get(LayoutStore, $"page.{typeName}"), out var cp) ? cp : 0;
 
             var header = new Grid { Padding = new Thickness(0, 2, 0, 2) };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -158,23 +206,44 @@ public sealed partial class SettingsDialog : ContentDialog
             header.Children.Add(name);
             header.Children.Add(toggle);
 
-            FrameworkElement detail;
+            var detailStack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 4, 0, 0) };
+
+            var pageCombo = new ComboBox
+            {
+                Header = "所在页面",
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MinWidth = 120,
+                IsEnabled = _editMode
+            };
+            for (int i = 0; i < _pageCount; i++)
+                pageCombo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
+            pageCombo.SelectedIndex = Math.Clamp(currentPage, 0, _pageCount - 1);
+
+            pageCombo.SelectionChanged += (_, _) =>
+            {
+                if (_rebuilding) return;
+                if (pageCombo.SelectedItem is not ComboBoxItem ci || ci.Tag is not int p) return;
+                _config.Set(LayoutStore, $"page.{typeName}", p.ToString());
+                if (enabled) _onPageChange(typeName, p);
+            };
+            detailStack.Children.Add(pageCombo);
+            _pageCombos.Add(pageCombo);
+
             var settings = pluginSettings.FirstOrDefault(s => s.PluginId == typeName);
             if (settings != null)
             {
-                detail = (FrameworkElement)settings.CreateSettingsControl();
+                detailStack.Children.Add((FrameworkElement)settings.CreateSettingsControl());
             }
             else
             {
-                detail = new TextBlock
+                detailStack.Children.Add(new TextBlock
                 {
                     Text = "此插件无设置项",
-                    Opacity = 0.5,
-                    Margin = new Thickness(0, 4, 0, 4)
-                };
+                    Opacity = 0.5
+                });
             }
 
-            NavList.Items.Add(new ListViewItem { Content = header, Tag = detail });
+            NavList.Items.Add(new ListViewItem { Content = header, Tag = detailStack });
         }
 
         NavList.SelectionChanged += (_, _) =>

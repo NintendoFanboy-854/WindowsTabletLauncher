@@ -58,6 +58,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PluginContract\PluginContract.csproj" />
+    <ProjectReference Include="..\SharedUtils\SharedUtils.csproj" />
   </ItemGroup>
 
   <ItemGroup>

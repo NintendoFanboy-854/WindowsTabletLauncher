@@ -32,6 +32,29 @@ public class ConfigStore
 
     public JsonObject LoadAll(string pluginId) => Load(pluginId);
 
+    public IReadOnlyList<(string pluginId, string key, string value)> GetAll()
+    {
+        var result = new List<(string, string, string)>();
+        try
+        {
+            foreach (var file in Directory.GetFiles(_configDir, "*.json"))
+            {
+                var pluginId = Path.GetFileNameWithoutExtension(file);
+                var json = Load(pluginId);
+                foreach (var (key, node) in json)
+                {
+                    if (node is not null)
+                        result.Add((pluginId, key, node.ToString()));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "ConfigStore.GetAll failed");
+        }
+        return result;
+    }
+
     public void SaveAll(string pluginId, JsonObject data) => Save(pluginId, data);
 
     public void ResetAll()

@@ -7,11 +7,13 @@ using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI;
 
-namespace TodoPlugin;
+namespace SharedUtils;
 
-internal sealed class PluginOverlay
+public class BasePluginOverlay
 {
     Popup? _popup;
+    protected FrameworkElement? Card { get; private set; }
+    protected Grid? Scrim { get; private set; }
 
     public bool IsOpen => _popup?.IsOpen == true;
 
@@ -20,9 +22,6 @@ internal sealed class PluginOverlay
         if (source.XamlRoot == null || IsOpen) return;
 
         var theme = source.ActualTheme;
-
-        // Use effective (logical) pixels from the window content, NOT XamlRoot.Size
-        // (which can be physical pixels on scaled displays).
         var root = source.XamlRoot.Content as FrameworkElement;
         double w = root?.ActualWidth > 0 ? root.ActualWidth : source.XamlRoot.Size.Width;
         double h = root?.ActualHeight > 0 ? root.ActualHeight : source.XamlRoot.Size.Height;
@@ -44,43 +43,9 @@ internal sealed class PluginOverlay
             Background = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
         };
         scrim.Tapped += (_, _) => Close();
+        Scrim = scrim;
 
-        var back = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE72B", FontSize = 16 },
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
-            Width = 40,
-            Height = 40,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        back.Click += (_, _) => Close();
-
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 16) };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        Grid.SetColumn(back, 0);
-        header.Children.Add(back);
-
-        var titleBlock = new TextBlock
-        {
-            Text = title,
-            FontSize = 24,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = primary,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        };
-        Grid.SetColumn(titleBlock, 1);
-        header.Children.Add(titleBlock);
-
-        // spacer to balance the back button width, so the title is truly centered
-        var spacer = new Border { Width = 40 };
-        Grid.SetColumn(spacer, 2);
-        header.Children.Add(spacer);
+        var header = BuildHeader(title, primary);
 
         var outer = new StackPanel { Spacing = 16 };
         outer.Children.Add(header);
@@ -105,6 +70,7 @@ internal sealed class PluginOverlay
         };
         card.Tapped += (_, e) => e.Handled = true;
         scrim.Children.Add(card);
+        Card = card;
 
         _popup = new Popup { XamlRoot = source.XamlRoot, IsLightDismissEnabled = false, Child = scrim };
         _popup.IsOpen = true;
@@ -132,14 +98,50 @@ internal sealed class PluginOverlay
             s.Duration = TimeSpan.FromMilliseconds(220);
             cv.StartAnimation("Scale", s);
         };
+
+        OnOpened();
     }
 
-    public void Close()
+    protected virtual FrameworkElement BuildHeader(string title, SolidColorBrush primary)
     {
+        var back = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE72B", FontSize = 16 },
+            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            Width = 40,
+            Height = 40,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        back.Click += (_, _) => Close();
+
+        var header = new StackPanel { Orientation = Orientation.Horizontal };
+        header.Children.Add(back);
+        header.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 24,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = primary,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0)
+        });
+        return header;
+    }
+
+    protected virtual void OnOpened() { }
+
+    public virtual void Close()
+    {
+        OnClosing();
         if (_popup != null)
         {
             _popup.IsOpen = false;
             _popup = null;
         }
+        Scrim = null;
+        Card = null;
     }
+
+    protected virtual void OnClosing() { }
 }

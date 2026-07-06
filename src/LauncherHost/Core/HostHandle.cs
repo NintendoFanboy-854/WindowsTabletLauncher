@@ -55,6 +55,18 @@ public class HostHandle : IHostHandle
 
     internal IReadOnlyList<IAgentCapability> GetCapabilities() => _capabilities;
 
+    public IReadOnlyList<(string pluginId, string key, string value)> GetAllConfigs(string keyPrefix)
+    {
+        var result = new List<(string, string, string)>();
+        var all = _config.GetAll();
+        foreach (var (pluginId, key, value) in all)
+        {
+            if (string.IsNullOrEmpty(keyPrefix) || key.StartsWith(keyPrefix, StringComparison.OrdinalIgnoreCase))
+                result.Add((pluginId, key, value));
+        }
+        return result;
+    }
+
     internal void NotifyTheme(ElementTheme theme)
     {
         _currentTheme = theme;

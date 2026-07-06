@@ -34,12 +34,14 @@ public sealed class TodoItem
     public List<Subtask> Subtasks { get; set; } = new();
 
     public string List { get; set; } = "默认";      // which named list this belongs to
+    public DateTime? CompletedDate { get; set; }     // when this item was completed
 }
 
 public sealed class TodoStore
 {
     const string PluginId = nameof(TodoPlugin);
     public const string DefaultList = "默认";
+    public const string InboxList = "收件箱";
     static readonly JsonSerializerOptions Opts = new() { PropertyNameCaseInsensitive = true };
 
     readonly IHostHandle _host;
@@ -49,8 +51,8 @@ public sealed class TodoStore
     public event Action? Changed;
 
     public string[] ListNames
-        => new[] { DefaultList }.Concat(
-            Items.Select(i => i.List).Where(s => !string.IsNullOrWhiteSpace(s) && s != DefaultList).Distinct().OrderBy(s => s)).ToArray();
+        => new[] { InboxList, DefaultList }.Concat(
+            Items.Select(i => i.List).Where(s => !string.IsNullOrWhiteSpace(s) && s != DefaultList && s != InboxList).Distinct().OrderBy(s => s)).ToArray();
 
     public TodoStore(IHostHandle host)
     {
@@ -96,7 +98,25 @@ public sealed class TodoStore
         return item;
     }
 
-    public void Toggle(TodoItem item) { item.Done = !item.Done; Save(); }
+    public void ToggleSubtask(TodoItem item, Subtask st, bool autoComplete)
+    {
+        st.Done = !st.Done;
+        if (autoComplete && !item.Done && item.Subtasks.Count > 0 && item.Subtasks.All(s => s.Done))
+        {
+            item.Done = true;
+            item.CompletedDate = DateTime.Today;
+            _host.Log($"Todo: auto-completed '{item.Text}' (all subtasks done)");
+        }
+        Save();
+    }
+
+    public void Toggle(TodoItem item)
+    {
+        item.Done = !item.Done;
+        if (item.Done) item.CompletedDate = DateTime.Today;
+        else item.CompletedDate = null;
+        Save();
+    }
 
     public void Delete(TodoItem item) { Items.Remove(item); Save(); }
 

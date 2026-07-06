@@ -3,6 +3,16 @@
 $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot
 
+Write-Host "=== Build PluginContract (Release) ===" -ForegroundColor Cyan
+
+$contractProj = "$Root\src\PluginContract\PluginContract.csproj"
+dotnet build $contractProj -c Release
+
+Write-Host "=== Build SharedUtils (Release) ===" -ForegroundColor Cyan
+
+$sharedProj = "$Root\src\SharedUtils\SharedUtils.csproj"
+dotnet build $sharedProj -c Release
+
 Write-Host "=== Build ClockPlugin (Release) ===" -ForegroundColor Cyan
 
 $pluginProj = "$Root\src\Plugins\ClockPlugin\ClockPlugin.csproj"
@@ -54,7 +64,6 @@ dotnet publish $hostProj `
     -c Release `
     -o $output `
     --self-contained true `
-    -p:WindowsAppSDKSelfContained=true `
     -p:PublishTrimmed=false `
     -p:DebugType=none `
     -p:DebugSymbols=false

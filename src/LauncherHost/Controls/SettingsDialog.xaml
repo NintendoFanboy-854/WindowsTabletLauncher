@@ -53,6 +53,7 @@
                         Minimum="1"
                         Maximum="120"
                         SpinButtonPlacementMode="Inline" />
+                    <ComboBox x:Name="SettingsPageCombo" Header="设置按钮所在页面" HorizontalAlignment="Left" MinWidth="120" />
 
                     <Button
                         x:Name="ResetButton"

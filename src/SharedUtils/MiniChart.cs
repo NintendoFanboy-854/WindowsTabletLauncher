@@ -5,10 +5,9 @@ using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
 using Windows.UI;
 
-namespace SedentaryPlugin;
+namespace SharedUtils;
 
-// Tiny self-drawn charts using WinUI Shapes only (no external libraries).
-internal static class MiniChart
+public static class MiniChart
 {
     public static FrameworkElement Bars(IReadOnlyList<(string label, double value)> data, Brush bar, Brush text, double barAreaHeight = 120)
     {

@@ -2,9 +2,11 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 using Windows.UI;
 
 namespace PomodoroPlugin;
@@ -16,7 +18,7 @@ public sealed class PomodoroWidget : UserControl
     readonly IHostHandle _host;
     readonly DispatcherQueue _dispatcher;
     readonly DispatcherQueueTimer _timer;
-    readonly PluginOverlay _overlay = new();
+    readonly BasePluginOverlay _overlay = new();
 
     Border _root = null!;
     TextBlock _phaseText = null!;
@@ -27,6 +29,11 @@ public sealed class PomodoroWidget : UserControl
     TextBlock? _ovTime;
     TextBlock? _ovPhase;
     Button? _ovStartPause;
+    Button? _ovSkip;
+    MediaPlayerElement? _whiteNoisePlayer;
+    Popup? _immersivePopup;
+    TextBlock? _immTime;
+    readonly int[] _hourlySeconds = new int[24];
 
     Phase _phase = Phase.Focus;
     bool _running;
@@ -65,6 +72,7 @@ public sealed class PomodoroWidget : UserControl
     int LongBreakEvery => GetInt("long_break_every", 4);
     bool AutoStart => (_host.GetConfig(nameof(PomodoroPlugin), "auto_start") ?? "true") == "true";
     bool SoundOn => (_host.GetConfig(nameof(PomodoroPlugin), "sound") ?? "true") == "true";
+    bool AllowPauseCfg => (_host.GetConfig(nameof(PomodoroPlugin), "allow_pause") ?? "true") == "true";
     string Task => _host.GetConfig(nameof(PomodoroPlugin), "task") ?? "";
 
     int GetInt(string key, int def)
@@ -72,11 +80,34 @@ public sealed class PomodoroWidget : UserControl
 
     int CurrentPhaseSeconds => (_phase == Phase.Focus ? FocusMin : (_isLongBreak ? LongBreakMin : BreakMin)) * 60;
 
-    void PlayChime()
+    void PlayChime() { if (!SoundOn) return; try { MessageBeep(0x00000040); } catch { } }
+
+    internal void SetWhiteNoise(string name)
     {
-        if (!SoundOn) return;
-        try { MessageBeep(0x00000040); } catch { }
+        _host.SetConfig(nameof(PomodoroPlugin), "white_noise", name);
+        if (_whiteNoisePlayer == null) return;
+        var media = ToMedia(name);
+        if (media != null)
+        {
+            _whiteNoisePlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(media));
+            _whiteNoisePlayer.AutoPlay = true;
+            _whiteNoisePlayer.MediaPlayer.IsLoopingEnabled = true;
+            _whiteNoisePlayer.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _whiteNoisePlayer.Source = null;
+            _whiteNoisePlayer.Visibility = Visibility.Collapsed;
+        }
     }
+
+    static string? ToMedia(string name) => name.ToLowerInvariant() switch
+    {
+        "rain" => "ms-appx:///Assets/whitenoise_rain.mp3",
+        "fire" => "ms-appx:///Assets/whitenoise_fire.mp3",
+        "cafe" => "ms-appx:///Assets/whitenoise_cafe.mp3",
+        _ => null
+    };
 
     void BuildUi()
     {
@@ -115,6 +146,8 @@ public sealed class PomodoroWidget : UserControl
     {
         if (!_running) return;
         _remaining--;
+        var now = DateTime.Now;
+        _hourlySeconds[now.Hour] += 1;
         if (_remaining <= 0)
             PhaseComplete();
         UpdateViews();
@@ -126,7 +159,7 @@ public sealed class PomodoroWidget : UserControl
         if (_phase == Phase.Focus)
         {
             _focusCount++;
-            PomodoroPlugin.AddCompletion(_host);
+            PomodoroPlugin.AddCompletion(_host, Task, FocusMin);
             _isLongBreak = LongBreakEvery > 0 && _focusCount % LongBreakEvery == 0;
             _phase = Phase.Break;
             _remaining = (_isLongBreak ? LongBreakMin : BreakMin) * 60;
@@ -141,23 +174,42 @@ public sealed class PomodoroWidget : UserControl
             _host.ShowNotification("番茄钟", "休息结束，开始下一个专注。");
             _running = AutoStart;
         }
+
+        if (!_running)
+            SetScreen(false);
+
+        if (_running && _phase == Phase.Focus)
+            SetScreen(true);
     }
+
+    void SetScreen(bool on)
+    {
+        PluginInstance?.SetScreenOn(on);
+    }
+
+    PomodoroPlugin? GetPlugin() => PluginInstance;
+    internal static PomodoroPlugin? PluginInstance { get; set; }
 
     void ToggleStartPause()
     {
+        if (!_running && !AllowPauseCfg) return;
         _running = !_running;
+        SetScreen(_running && _phase == Phase.Focus);
         UpdateViews();
     }
 
     internal void Pause()
     {
+        if (!AllowPauseCfg) return;
         _running = false;
+        SetScreen(false);
         UpdateViews();
     }
 
     internal void Resume()
     {
         _running = true;
+        if (_phase == Phase.Focus) SetScreen(true);
         UpdateViews();
     }
 
@@ -175,6 +227,7 @@ public sealed class PomodoroWidget : UserControl
         }
         _remaining = CurrentPhaseSeconds;
         _running = false;
+        SetScreen(false);
         UpdateViews();
     }
 
@@ -182,6 +235,7 @@ public sealed class PomodoroWidget : UserControl
     {
         _running = false;
         _remaining = CurrentPhaseSeconds;
+        SetScreen(false);
         UpdateViews();
     }
 
@@ -191,12 +245,11 @@ public sealed class PomodoroWidget : UserControl
         _isLongBreak = false;
         _remaining = Math.Max(1, minutes) * 60;
         _running = true;
+        SetScreen(true);
         _host.Log($"Pomodoro: start focus {minutes}min");
         UpdateViews();
     }
 
-    // Re-apply focus/break durations from config (used when settings or the
-    // full-screen editor changes them); only resets the clock when idle.
     public void ApplyDurations()
     {
         if (!_running)
@@ -241,14 +294,18 @@ public sealed class PomodoroWidget : UserControl
             if (_ovTime != null) _ovTime.Text = Format(_remaining);
             if (_ovStartPause != null) _ovStartPause.Content = _running ? "暂停" : "开始";
         }
+
+        if (_immersivePopup?.IsOpen == true && _immTime != null)
+            _immTime.Text = Format(_remaining);
     }
 
     void OpenDetail()
     {
+        if (_overlay.IsOpen) return;
         var theme = ((FrameworkElement)this).ActualTheme;
         var (primary, secondary) = Brushes(theme);
 
-        var body = new StackPanel { Spacing = 20, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Center };
+        var body = new StackPanel { Spacing = 20, MinWidth = 340, HorizontalAlignment = HorizontalAlignment.Center };
 
         _ovPhase = new TextBlock { Text = _phase == Phase.Focus ? "专注" : "休息", FontSize = 20, Foreground = secondary, HorizontalAlignment = HorizontalAlignment.Center };
         _ovTime = new TextBlock { Text = Format(_remaining), FontSize = 72, FontWeight = FontWeights.SemiLight, Foreground = primary, HorizontalAlignment = HorizontalAlignment.Center };
@@ -257,15 +314,20 @@ public sealed class PomodoroWidget : UserControl
 
         _ovStartPause = new Button { Content = _running ? "暂停" : "开始", MinWidth = 100 };
         _ovStartPause.Click += (_, _) => ToggleStartPause();
-        var skip = new Button { Content = "跳过", MinWidth = 100 };
-        skip.Click += (_, _) => Skip();
+        if (!AllowPauseCfg && !_running) _ovStartPause.IsEnabled = false;
+
+        _ovSkip = new Button { Content = "跳过", MinWidth = 100 };
+        _ovSkip.Click += (_, _) => Skip();
         var reset = new Button { Content = "重置", MinWidth = 100 };
         reset.Click += (_, _) => ResetTimer();
+        var immersive = new Button { Content = "沉浸", MinWidth = 100 };
+        immersive.Click += (_, _) => EnterImmersive();
 
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, HorizontalAlignment = HorizontalAlignment.Center };
         controls.Children.Add(_ovStartPause);
-        controls.Children.Add(skip);
+        controls.Children.Add(_ovSkip);
         controls.Children.Add(reset);
+        controls.Children.Add(immersive);
         body.Children.Add(controls);
 
         var taskBox = new TextBox { Header = "当前专注任务", PlaceholderText = "在做什么…", Text = Task, HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -277,6 +339,28 @@ public sealed class PomodoroWidget : UserControl
         durations.Children.Add(MakeDurationBox("休息时长", "break_min", BreakMin));
         body.Children.Add(durations);
 
+        // white noise
+        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
+        var wnLabel = new TextBlock { Text = "白噪音", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary };
+        body.Children.Add(wnLabel);
+        var wnCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        wnCombo.Items.Add(new ComboBoxItem { Content = "关闭", Tag = "none" });
+        wnCombo.Items.Add(new ComboBoxItem { Content = "雨声", Tag = "rain" });
+        wnCombo.Items.Add(new ComboBoxItem { Content = "篝火", Tag = "fire" });
+        wnCombo.Items.Add(new ComboBoxItem { Content = "咖啡馆", Tag = "cafe" });
+        var currentWN = _host.GetConfig(nameof(PomodoroPlugin), "white_noise") ?? "none";
+        wnCombo.SelectedIndex = currentWN switch { "rain" => 1, "fire" => 2, "cafe" => 3, _ => 0 };
+        wnCombo.SelectionChanged += (_, _) =>
+        {
+            if (wnCombo.SelectedItem is ComboBoxItem ci && ci.Tag is string tag)
+                SetWhiteNoise(tag);
+        };
+        body.Children.Add(wnCombo);
+
+        _whiteNoisePlayer = new MediaPlayerElement { Visibility = Visibility.Collapsed, Height = 40, HorizontalAlignment = HorizontalAlignment.Stretch };
+        body.Children.Add(_whiteNoisePlayer);
+        if (currentWN != "none") SetWhiteNoise(currentWN);
+
         // stats
         body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
         var last7 = PomodoroPlugin.Last7(_host);
@@ -285,8 +369,96 @@ public sealed class PomodoroWidget : UserControl
         var chartData = last7.Select(d => (d.date.ToString("MM-dd"), (double)d.count)).ToList();
         body.Children.Add(MiniChart.Bars(chartData, new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
 
+        // hourly distribution
+        var hourlyMins = _hourlySeconds.Select(v => v / 60.0).ToArray();
+        var hourLabels = Enumerable.Range(0, 24).Select(h => $"{h:D2}").ToList();
+        var hasData = hourlyMins.Any(v => v > 0);
+        if (hasData)
+        {
+            body.Children.Add(new TextBlock { Text = "今日专注分布", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+            var barList = hourLabels.Select((l, i) => (l, hourlyMins[i])).ToList();
+            body.Children.Add(MiniChart.Bars(barList, new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)), secondary, 80));
+        }
+
+        // recent sessions
+        var sessions = PomodoroPlugin.GetSessions(_host);
+        var recent = sessions.OrderByDescending(s => s.Timestamp).Take(10).ToList();
+        if (recent.Count > 0)
+        {
+            body.Children.Add(new TextBlock { Text = "最近专注记录", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+            foreach (var s in recent)
+            {
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                row.Children.Add(new TextBlock { Text = s.Timestamp.ToString("HH:mm"), FontSize = 12, Foreground = secondary, Width = 48 });
+                row.Children.Add(new TextBlock { Text = s.Task.Length > 20 ? s.Task[..20] + "…" : s.Task, FontSize = 12, Foreground = primary });
+                row.Children.Add(new TextBlock { Text = $"{s.FocusMin}min", FontSize = 12, Foreground = secondary });
+                body.Children.Add(row);
+            }
+        }
+
         _overlay.Show(this, "番茄钟", body, _host.Log);
         UpdateViews();
+    }
+
+    internal void EnterImmersive()
+    {
+        if (_immersivePopup?.IsOpen == true) return;
+        var theme = ((FrameworkElement)this).ActualTheme;
+
+        var scrim = new Grid
+        {
+            Width = ActualWidth > 0 ? ActualWidth : 1440,
+            Height = ActualHeight > 0 ? ActualHeight : 960,
+            Background = new SolidColorBrush(Color.FromArgb(0xEE, 0, 0, 0))
+        };
+
+        _immTime = new TextBlock
+        {
+            Text = Format(_remaining),
+            FontSize = 120,
+            FontWeight = FontWeights.Thin,
+            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var exitBtn = new Button
+        {
+            Content = "退出沉浸",
+            Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)),
+            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 0, 48),
+            FontSize = 14
+        };
+        exitBtn.Click += (_, _) => ExitImmersive();
+
+        var stack = new StackPanel();
+        stack.Children.Add(_immTime);
+        stack.Children.Add(exitBtn);
+        scrim.Children.Add(stack);
+        scrim.Tapped += (_, _) => ExitImmersive();
+
+        _immersivePopup = new Microsoft.UI.Xaml.Controls.Primitives.Popup
+        {
+            XamlRoot = XamlRoot,
+            IsLightDismissEnabled = false,
+            Child = scrim
+        };
+        _immersivePopup.IsOpen = true;
+        UpdateViews();
+    }
+
+    internal void ExitImmersive()
+    {
+        if (_immersivePopup != null)
+        {
+            _immersivePopup.IsOpen = false;
+            _immersivePopup = null;
+        }
+        _immTime = null;
     }
 
     NumberBox MakeDurationBox(string header, string key, int value)

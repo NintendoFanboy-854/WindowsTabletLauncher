@@ -13,7 +13,7 @@ public sealed class TodoWidget : UserControl
     readonly IHostHandle _host;
     readonly TodoStore _store;
     readonly Action<TodoItem> _onToggle;
-    readonly PluginOverlay _overlay = new();
+    readonly TodoOverlay _overlay = new();
 
     Border _root = null!;
     StackPanel _preview = null!;
@@ -151,6 +151,36 @@ public sealed class TodoWidget : UserControl
         _ => ""
     };
 
+    static Color PriorityColor(Priority p) => p switch
+    {
+        Priority.High => Color.FromArgb(0xFF, 0xF4, 0x43, 0x36),
+        Priority.Medium => Color.FromArgb(0xFF, 0xFF, 0x98, 0x00),
+        Priority.Low => Color.FromArgb(0xFF, 0x9E, 0x9E, 0x9E),
+        _ => Color.FromArgb(0, 0, 0, 0)
+    };
+
+    bool AutoCompleteSub => (_host.GetConfig(nameof(TodoPlugin), "auto_complete_on_subtasks") ?? "true") == "true";
+
+    void ShareList()
+    {
+        var items = _store.ItemsInList(_currentList).Where(i => !i.Done).ToList();
+        var sb = new System.Text.StringBuilder();
+        foreach (var i in items)
+        {
+            var tag = i.Priority switch { Priority.High => "!!", Priority.Medium => "!", Priority.Low => "·", _ => "" };
+            var dl = i.Deadline is { } d ? $" — 截止 {d:MM-dd HH:mm}" : "";
+            sb.AppendLine($"{tag} {i.Text}{dl}");
+        }
+        var result = sb.ToString();
+        try
+        {
+            Windows.ApplicationModel.DataTransfer.DataPackage dp = new();
+            dp.SetText(result);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+        }
+        catch { }
+    }
+
     // ---- full-screen (Fluent Design fixed-size master-detail) ----
 
     void OpenDetail()
@@ -261,12 +291,24 @@ public sealed class TodoWidget : UserControl
         Grid.SetColumn(rightPanel, 1);
         cols.Children.Add(rightPanel);
 
-        // clear completed — bottom row spanning both columns
-        var clearBtn = new Button { Content = "清除已完成", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        // bottom toolbar
+        var bottomRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
+
+        var clearBtn = new Button { Content = "清除已完成", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
         clearBtn.Click += (_, _) => { _store.ClearCompleted(_currentList); RebuildTaskList(); };
-        Grid.SetRow(clearBtn, 2);
-        Grid.SetColumnSpan(clearBtn, 2);
-        cols.Children.Add(clearBtn);
+        bottomRow.Children.Add(clearBtn);
+
+        var statsBtn = new Button { Content = "统计", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        statsBtn.Click += (_, _) => OpenStats();
+        bottomRow.Children.Add(statsBtn);
+
+        var shareBtn = new Button { Content = "分享", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        shareBtn.Click += (_, _) => ShareList();
+        bottomRow.Children.Add(shareBtn);
+
+        Grid.SetRow(bottomRow, 2);
+        Grid.SetColumnSpan(bottomRow, 2);
+        cols.Children.Add(bottomRow);
 
         _overlay.Show(this, "待办事项", cols, _host.Log);
         RebuildTaskList();
@@ -356,6 +398,29 @@ public sealed class TodoWidget : UserControl
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+            var pcolor = PriorityColor(item.Priority);
+            if (pcolor != Color.FromArgb(0, 0, 0, 0))
+            {
+                var workloadBar = new Border { Background = new SolidColorBrush(pcolor), Width = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Stretch, Margin = new Thickness(0, 0, 4, 0) };
+                Grid.SetColumn(workloadBar, 0);
+                Grid.SetRowSpan(workloadBar, 2);
+                // Wrap in a grid to add the color bar
+                var wrap = new Grid { ColumnSpacing = 6 };
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                Grid.SetColumn(workloadBar, 0);
+                wrap.Children.Add(workloadBar);
+                Grid.SetColumn(check, 1); Grid.SetColumn(txt, 2);
+                line1.Children.Clear();
+                wrap.Children.Add(check); wrap.Children.Add(txt);
+                row.Children.Add(wrap);
+            }
+            else
+            {
+                row.Children.Add(line1);
+            }
+
             var dlv = DeadlineShort(item);
             if (dlv != null || meta.Length > 0)
             {
@@ -367,12 +432,9 @@ public sealed class TodoWidget : UserControl
                 }
                 if (meta.Length > 0) subItems.Children.Add(ext);
                 Grid.SetColumn(subItems, 1); Grid.SetRow(subItems, 1);
-                row.Children.Add(line1);
+                if (pcolor != Color.FromArgb(0, 0, 0, 0))
+                    row.Children.Add(line1);
                 row.Children.Add(subItems);
-            }
-            else
-            {
-                row.Children.Add(line1);
             }
 
             var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(4, 6, 4, 6) };
@@ -500,13 +562,29 @@ public sealed class TodoWidget : UserControl
         stack.Children.Add(Sep());
         var ss = new StackPanel { Spacing = 8 };
         ss.Children.Add(SectHead("子任务", secondary));
+
+        if (item.Subtasks.Count > 0)
+        {
+            var doneCount = item.Subtasks.Count(s => s.Done);
+            var totalCount = item.Subtasks.Count;
+            var progRow = new Grid { ColumnSpacing = 8 };
+            progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var pb = new ProgressBar { Value = (double)doneCount / totalCount * 100, Minimum = 0, Maximum = 100, Height = 6, Foreground = doneCount == totalCount ? new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xAF, 0x50)) : new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)) };
+            Grid.SetColumn(pb, 0);
+            progRow.Children.Add(pb);
+            var progressText = new TextBlock { Text = $"{doneCount}/{totalCount}", FontSize = 12, Foreground = secondary, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(progressText, 1);
+            progRow.Children.Add(progressText);
+            ss.Children.Add(progRow);
+        }
         foreach (var st in item.Subtasks.ToList())
         {
             var sr = new Grid { ColumnSpacing = 4 };
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var ch = new CheckBox { IsChecked = st.Done, Content = st.Text, FontSize = 13 };
-            ch.Click += (_, _) => { st.Done = ch.IsChecked == true; _store.Save(); };
+            ch.Click += (_, _) => { st.Done = ch.IsChecked == true; if (AutoCompleteSub && item.Subtasks.All(s => s.Done)) { item.Done = true; item.CompletedDate = DateTime.Today; } _store.Save(); RebuildDetail(); };
             Grid.SetColumn(ch, 0);
             var sd = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 10 }, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Width = 28, Height = 28, Padding = new Thickness(0) };
             sd.Click += (_, _) => { item.Subtasks.Remove(st); _store.Save(); RebuildDetail(); };
@@ -559,4 +637,51 @@ public sealed class TodoWidget : UserControl
     };
 
     internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+
+    void OpenStats()
+    {
+        var items = _store.ItemsInList(_currentList);
+        var today = DateTime.Today;
+        var todayDone = items.Count(i => i.Done && i.CompletedDate?.Date == today);
+        var totalDoneThisWeek = items.Count(i => i.Done && i.CompletedDate?.Date >= today.AddDays(-6));
+        var weekly = Enumerable.Range(0, 7).Select(offset =>
+        {
+            var d = today.AddDays(-offset);
+            return (d.ToString("MM-dd"), (double)items.Count(i => i.Done && i.CompletedDate?.Date == d));
+        }).Reverse().ToList();
+        var overdue = items.Count(i => !i.Done && i.Deadline is { } dl && dl < DateTime.Now);
+
+        var (primary, secondary) = Brushes(((FrameworkElement)this).ActualTheme);
+        var body = new StackPanel { Spacing = 12, MinWidth = 320 };
+        body.Children.Add(new TextBlock { Text = "待办统计", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = primary });
+
+        var grid = new Grid { ColumnSpacing = 24 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        void AddStat(int col, string label, string value)
+        {
+            var s = new StackPanel { Spacing = 2 };
+            s.Children.Add(new TextBlock { Text = value, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = primary });
+            s.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary, Opacity = 0.7 });
+            Grid.SetColumn(s, col);
+            grid.Children.Add(s);
+        }
+
+        AddStat(0, "今日完成", todayDone.ToString());
+        AddStat(1, "本周完成", totalDoneThisWeek.ToString());
+        AddStat(2, "逾期", overdue.ToString());
+        AddStat(3, "总计", items.Count.ToString());
+        body.Children.Add(grid);
+
+        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
+        body.Children.Add(new TextBlock { Text = "近 7 天完成趋势", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary });
+        body.Children.Add(SharedUtils.MiniChart.Line(weekly, new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)), secondary));
+
+        if (_overlay.IsOpen) _overlay.Close();
+        var statsOverlay = new SharedUtils.BasePluginOverlay();
+        statsOverlay.Show(this, "待办统计", body, _host.Log);
+    }
 }

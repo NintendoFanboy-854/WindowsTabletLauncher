@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 
 namespace SedentaryPlugin;
 
@@ -34,26 +35,32 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     int _persistCounter;
 
     public string DisplayName => "久坐提醒";
-
     public string PluginId => nameof(SedentaryPlugin);
 
     public void Initialize(IHostHandle host)
     {
         _host = host;
-
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _monitor = _dispatcher.CreateTimer();
         _monitor.Interval = TimeSpan.FromSeconds(PollSeconds);
         _monitor.IsRepeating = true;
         _monitor.Tick += (_, _) => Poll();
         _monitor.Start();
+
+        var firstRun = (_host.GetConfig(PluginId, "first_run") ?? "true") == "true";
+        if (firstRun)
+        {
+            _host.SetConfig(PluginId, "first_run", "false");
+        }
     }
 
     public IReadOnlyList<IWidget> GetWidgets()
     {
         _widget ??= new SedentaryWidget(_host, StatsSnapshot, ResetActive);
         _widget.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
-        return new[] { new SedentaryWidgetInfo(_host, _widget) };
+
+        var firstRun = (_host.GetConfig(PluginId, "first_run") ?? "true") == "true";
+        return new[] { new SedentaryWidgetInfo(_host, _widget, firstRun) };
     }
 
     public void Shutdown() { _monitor?.Stop(); SaveHistory(); }
@@ -71,9 +78,9 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     bool InActiveWindow(DateTime now)
     {
         int s = ActiveStart, e = ActiveEnd;
-        if (s == e) return true;         // full day
+        if (s == e) return true;
         if (s < e) return now.Hour >= s && now.Hour < e;
-        return now.Hour >= s || now.Hour < e; // wraps midnight
+        return now.Hour >= s || now.Hour < e;
     }
 
     SedentaryStats StatsSnapshot()
@@ -101,7 +108,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
 
         if (idleMs >= BreakMin * 60_000L)
         {
-            if (_activeSeconds >= 300) _breaksToday++;   // counts as a real break
+            if (_activeSeconds >= 300) _breaksToday++;
             _activeSeconds = 0;
         }
         else if (idleMs < PollSeconds * 1000L)
@@ -116,11 +123,10 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
                 if (tick - _lastReminderTick >= CooldownMin * 60_000L)
                 {
                     _lastReminderTick = tick;
-                    _host.Log($"Sedentary: reminder at {_activeSeconds / 60}min continuous");
-                    _host.ShowNotification(
-                        "久坐提醒",
-                        $"你已经连续坐了 {_activeSeconds / 60} 分钟，起来活动一下吧。",
-                        escalate: true);
+                    var mins = _activeSeconds / 60;
+                    _host.Log($"Sedentary: reminder at {mins}min continuous");
+                    _host.ShowNotification("久坐提醒", $"你已经连续坐了 {mins} 分钟，起来活动一下吧。", escalate: true);
+                    _widget?.ShowInfoBar(mins);
                 }
             }
         }
@@ -134,10 +140,9 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         if (_activeSeconds >= 300) _breaksToday++;
         _activeSeconds = 0;
         _lastReminderTick = Environment.TickCount64;
+        _widget?.HideInfoBar();
         _widget?.Refresh();
     }
-
-    // ---- daily history: date(yyyy-MM-dd) -> total sitting minutes ----
 
     Dictionary<string, int> LoadHistory()
     {
@@ -151,8 +156,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         var h = LoadHistory();
         h[_today.ToString("yyyy-MM-dd")] = _todaySeconds / 60;
-        foreach (var k in h.Keys.Where(k => DateTime.TryParse(k, out var d) && (DateTime.Today - d).TotalDays > 60).ToList())
-            h.Remove(k);
+        StatsHelper.PruneOldEntries(h, 60);
         _host.SetConfig(PluginId, "history", JsonSerializer.Serialize(h));
     }
 
@@ -178,11 +182,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    struct LASTINPUTINFO
-    {
-        public uint cbSize;
-        public uint dwTime;
-    }
+    struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
 
     [DllImport("user32.dll")]
     static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
@@ -219,11 +219,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline,
             Value = int.TryParse(_host.GetConfig(PluginId, key), out var v) && v > 0 ? v : def
         };
-        box.ValueChanged += (_, _) =>
-        {
-            if (!double.IsNaN(box.Value))
-                _host.SetConfig(PluginId, key, ((int)box.Value).ToString());
-        };
+        box.ValueChanged += (_, _) => { if (!double.IsNaN(box.Value)) _host.SetConfig(PluginId, key, ((int)box.Value).ToString()); };
         return box;
     }
 
@@ -231,18 +227,8 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         new AgentTool { Name = "query_sitting_time", Description = "获取连续久坐时长、今日累计久坐时长与提醒阈值。" },
         new AgentTool { Name = "reset_sitting", Description = "重置连续久坐计时（用户已起身活动）。" },
-        new AgentTool
-        {
-            Name = "set_sedentary_enabled",
-            Description = "开启或关闭久坐监控。",
-            ParametersJsonSchema = """{"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"]}"""
-        },
-        new AgentTool
-        {
-            Name = "set_sedentary_threshold",
-            Description = "设置久坐提醒阈值（分钟）。",
-            ParametersJsonSchema = """{"type":"object","properties":{"minutes":{"type":"integer","minimum":1}},"required":["minutes"]}"""
-        },
+        new AgentTool { Name = "set_sedentary_enabled", Description = "开启或关闭久坐监控。", ParametersJsonSchema = """{"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"]}""" },
+        new AgentTool { Name = "set_sedentary_threshold", Description = "设置久坐提醒阈值（分钟）。", ParametersJsonSchema = """{"type":"object","properties":{"minutes":{"type":"integer","minimum":1}},"required":["minutes"]}""" },
         new AgentTool { Name = "query_sedentary_stats", Description = "获取久坐统计：连续久坐、今日分钟、起身次数、分时数据、近7天。" }
     };
 
@@ -252,13 +238,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         switch (tool)
         {
             case "query_sitting_time":
-                return Task.FromResult(AgentJson.Serialize(new
-                {
-                    continuousMinutes = _activeSeconds / 60,
-                    todayMinutes = _todaySeconds / 60,
-                    thresholdMinutes = ThresholdMin,
-                    enabled = Enabled
-                }));
+                return Task.FromResult(AgentJson.Serialize(new { continuousMinutes = _activeSeconds / 60, todayMinutes = _todaySeconds / 60, thresholdMinutes = ThresholdMin, enabled = Enabled }));
 
             case "reset_sitting":
                 if (_dispatcher.HasThreadAccess) ResetActive();
@@ -296,8 +276,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
                 }));
             }
 
-            default:
-                return Task.FromResult(AgentJson.Error("unknown_tool"));
+            default: return Task.FromResult(AgentJson.Error("unknown_tool"));
         }
     }
 
@@ -305,12 +284,10 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         readonly IHostHandle _host;
         readonly SedentaryWidget _control;
+        readonly bool _firstRun;
 
-        public SedentaryWidgetInfo(IHostHandle host, SedentaryWidget control)
-        {
-            _host = host;
-            _control = control;
-        }
+        public SedentaryWidgetInfo(IHostHandle host, SedentaryWidget control, bool firstRun)
+        { _host = host; _control = control; _firstRun = firstRun; }
 
         public string Id => "sedentary.dot";
         public int Columns => 1;
@@ -322,6 +299,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         public object CreateControl()
         {
             _control.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+            if (_firstRun) _control.ShowTeachingTipIfNeeded();
             return _control;
         }
     }

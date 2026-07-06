@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     ConfigStore _config = null!;
     HostHandle _hostHandle = null!;
     AcrylicBrushProvider _acrylicProvider = null!;
+    DashboardPage? _dashboard;
     List<IPlugin> _plugins = new();
     List<PluginContract.IPluginSettings> _pluginSettings = new();
     bool _editMode;
@@ -39,12 +40,8 @@ public sealed partial class MainWindow : Window
     bool _restorePositions;
     FrameworkElement? _dragTarget;
     int _dragOrigCol, _dragOrigRow, _dragOrigColSpan, _dragOrigRowSpan;
-    Canvas? _dragCanvas;
-    Popup? _dragPopup;
-    int _dragTargetPage;
-    long _edgeEnterTick;
-    int _edgeTarget;
-    double _dragOffsetX, _dragOffsetY;
+    DesktopPage? _dragOrigPage;
+    double _dragTotalX, _dragTotalY;
     FrameworkElement? _settingsTile;
     readonly List<DesktopPage> _pages = new();
     readonly Dictionary<FrameworkElement, DesktopPage> _elementPage = new();
@@ -80,6 +77,7 @@ public sealed partial class MainWindow : Window
             SetupAcrylicBackdrop();
             _hostHandle.NotificationRequested += OnNotificationRequested;
             _hostHandle.LiveTheme = () => ((FrameworkElement)Content).ActualTheme;
+            _dashboard = new DashboardPage(_hostHandle);
 
             Pager.SelectionChanged += (_, _) =>
             {
@@ -161,8 +159,9 @@ public sealed partial class MainWindow : Window
 
     DesktopPage GetOrCreatePage(int index)
     {
-        while (_pages.Count <= index) AddPage();
-        return _pages[Math.Max(0, index)];
+        var idx = Math.Clamp(index, 0, int.MaxValue);
+        while (_pages.Count <= idx) AddPage();
+        return _pages[idx];
     }
 
     int PageIndexOf(FrameworkElement fe)
@@ -173,23 +172,6 @@ public sealed partial class MainWindow : Window
 
     FrameworkElement? ContentOf(FrameworkElement fe)
         => _elementPage.TryGetValue(fe, out var p) ? p.Layout.GetContent(fe) : null;
-
-    void EnsureTrailingEmptyPage()
-    {
-        while (_pages.Count > 1 && _pages[^1].IsEmpty && _pages[^2].IsEmpty)
-            RemoveLastPage();
-        if (_pages.Count == 0 || !_pages[^1].IsEmpty)
-            AddPage();
-    }
-
-    void RemoveLastPage()
-    {
-        _pages.RemoveAt(_pages.Count - 1);
-        Pager.Items.RemoveAt(Pager.Items.Count - 1);
-        Pips.NumberOfPages = _pages.Count;
-        if (Pager.SelectedIndex >= _pages.Count)
-            Pager.SelectedIndex = _pages.Count - 1;
-    }
 
     void SetupWindow()
     {
@@ -280,8 +262,6 @@ public sealed partial class MainWindow : Window
                 ShowPlugin(typeName);
         }
 
-        EnsureTrailingEmptyPage();
-
         _config.Set(LayoutStore, "schema", LayoutSchema);
         _restorePositions = true;
 
@@ -328,6 +308,11 @@ public sealed partial class MainWindow : Window
                 Name = "set_notify_seconds",
                 Description = "设置通知横幅升级为全屏强制提醒前的等待秒数。",
                 ParametersJsonSchema = """{"type":"object","properties":{"seconds":{"type":"integer","minimum":1}},"required":["seconds"]}"""
+            },
+            new()
+            {
+                Name = "query_dashboard",
+                Description = "获取数据复盘综合统计：番茄数、待办数、久坐数据汇总。"
             },
         };
 
@@ -379,9 +364,65 @@ public sealed partial class MainWindow : Window
                 _config.Set("host", "notify_escalate_seconds", s.Value.ToString());
                 return JsonSerializer.Serialize(new { ok = true, seconds = s.Value });
             },
+            ["query_dashboard"] = _ => BuildDashboardJson(),
         };
 
         _hostHandle.RegisterAgentCapability(new HostAgentCapability(DispatcherQueue, tools, handlers));
+    }
+
+    string BuildDashboardJson()
+    {
+        var all = _hostHandle.GetAllConfigs("");
+        var pmStats = all.FirstOrDefault(c => c.pluginId == "PomodoroPlugin" && c.key == "stats").value;
+        var todoItems = all.FirstOrDefault(c => c.pluginId == "TodoPlugin" && c.key == "items").value;
+        var sedHistory = all.FirstOrDefault(c => c.pluginId == "SedentaryPlugin" && c.key == "history").value;
+
+        var pData = new Dictionary<string, int>();
+        if (!string.IsNullOrWhiteSpace(pmStats)) { try { pData = JsonSerializer.Deserialize<Dictionary<string, int>>(pmStats) ?? new(); } catch { } }
+        var todayKey = DateTime.Today.ToString("yyyy-MM-dd");
+        var pmToday = pData.TryGetValue(todayKey, out var pc) ? pc : 0;
+        var pmTotal = pData.Values.Sum();
+
+        int todoTotal = 0, todoDone = 0, todoOverdue = 0;
+        if (!string.IsNullOrWhiteSpace(todoItems))
+        {
+            try
+            {
+                var items = JsonSerializer.Deserialize<List<JsonElement>>(todoItems);
+                if (items != null)
+                {
+                    todoTotal = items.Count;
+                    todoDone = items.Count(i => i.TryGetProperty("Done", out var d) && d.GetBoolean());
+                    foreach (var i in items)
+                    {
+                        if (i.TryGetProperty("Done", out var d) && d.GetBoolean()) continue;
+                        if (i.TryGetProperty("Deadline", out var dl) && dl.ValueKind == JsonValueKind.String && DateTime.TryParse(dl.GetString(), out var dd) && dd < DateTime.Now)
+                            todoOverdue++;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        int sedToday = 0, sedTotal = 0;
+        if (!string.IsNullOrWhiteSpace(sedHistory))
+        {
+            try
+            {
+                var hist = JsonSerializer.Deserialize<Dictionary<string, int>>(sedHistory) ?? new();
+                sedToday = hist.TryGetValue(todayKey, out var sm) ? sm : 0;
+                sedTotal = hist.Values.Sum();
+            }
+            catch { }
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            ok = true,
+            pomodoro = new { today = pmToday, total = pmTotal },
+            todo = new { total = todoTotal, done = todoDone, overdue = todoOverdue },
+            sedentary = new { today_minutes = sedToday, total_minutes = sedTotal }
+        });
     }
 
     string TogglePluginByName(string? name, bool enable)
@@ -453,8 +494,10 @@ public sealed partial class MainWindow : Window
         };
         button.Click += OnSettingsClick;
 
+        var configuredPage = int.TryParse(_config.Get(LayoutStore, "page.host.settings"), out var cp) ? cp : 0;
         var pos = ReadSavedPosition(SettingsWidgetId);
-        var page = GetOrCreatePage(pos?.page ?? 0);
+        var pageIdx = pos?.page ?? Math.Max(0, configuredPage);
+        var page = GetOrCreatePage(pageIdx);
         var defaultCol = Math.Max(0, page.Layout.SubColumns - 1);
         var container = page.Layout.AddElement(button, 1, 1, pos?.col ?? defaultCol, pos?.row ?? 0);
         _settingsTile = container;
@@ -474,7 +517,8 @@ public sealed partial class MainWindow : Window
             foreach (var slot in slots)
             {
                 var pos = ReadSavedPosition(slot.Widget.Id);
-                var pageIdx = pos?.page ?? (slot.Element != null ? PageIndexOf(slot.Element) : 0);
+                var configuredPage = int.TryParse(_config.Get(LayoutStore, $"page.{typeName}"), out var cp) ? cp : -1;
+                var pageIdx = configuredPage >= 0 ? configuredPage : (pos?.page ?? (slot.Element != null ? PageIndexOf(slot.Element) : 0));
                 var page = GetOrCreatePage(pageIdx);
 
                 if (slot.Element == null)
@@ -491,7 +535,6 @@ public sealed partial class MainWindow : Window
             }
         }
         _config.Set(LayoutStore, $"enabled.{typeName}", "true");
-        EnsureTrailingEmptyPage();
         LogService.Info($"ShowPlugin: {typeName}");
     }
 
@@ -504,10 +547,12 @@ public sealed partial class MainWindow : Window
                 if (slot.Element == null) continue;
                 UnregisterElement(slot.Element);
                 PageOf(slot.Element).Layout.HideElement(slot.Element);
+                _elementPage.Remove(slot.Element);
+                _elementIds.Remove(slot.Element);
+                _tapActions.Remove(slot.Element);
             }
         }
         _config.Set(LayoutStore, $"enabled.{typeName}", "false");
-        EnsureTrailingEmptyPage();
         LogService.Info($"HidePlugin: {typeName}");
     }
 
@@ -580,12 +625,7 @@ public sealed partial class MainWindow : Window
         if (sender is not FrameworkElement fe) return;
         e.Handled = true;
 
-        if (_editMode)
-        {
-            if (ReferenceEquals(fe, _settingsTile) && _tapActions.TryGetValue(fe, out var act))
-                act();
-            return;
-        }
+        if (_editMode) return;
 
         if (_tapActions.TryGetValue(fe, out var action))
             action();
@@ -630,18 +670,25 @@ public sealed partial class MainWindow : Window
 
     async void OpenSettings()
     {
-        var dialog = new SettingsDialog(
+        SettingsDialog? dialog = null;
+        dialog = new SettingsDialog(
             _loc, _config, _plugins, _pluginSettings,
             _editMode,
+            _pages.Count,
             mode =>
             {
                 _editMode = mode;
                 SetEditMode(mode);
+                dialog!.RefreshPageCombos(_pages.Count, mode);
             },
             (typeName, enabled) =>
             {
                 if (enabled) ShowPlugin(typeName);
                 else HidePlugin(typeName);
+            },
+            (typeName, pageIdx) =>
+            {
+                MovePluginToPage(typeName, pageIdx);
             },
             async () =>
             {
@@ -683,8 +730,50 @@ public sealed partial class MainWindow : Window
         ApplyStoredTheme();
     }
 
+    void MovePluginToPage(string typeName, int pageIdx)
+    {
+        if (typeName == "host.settings")
+        {
+            MoveSettingsTile(pageIdx);
+            return;
+        }
+        if (!IsPluginEnabled(typeName)) return;
+        HidePlugin(typeName);
+        _config.Set(LayoutStore, $"page.{typeName}", pageIdx.ToString());
+        ShowPlugin(typeName);
+        LogService.Info($"MovePluginToPage: {typeName} → page {pageIdx}");
+    }
+
+    void MoveSettingsTile(int pageIdx)
+    {
+        if (_settingsTile == null) return;
+        var oldPage = PageOf(_settingsTile);
+        UnregisterElement(_settingsTile);
+        oldPage.Layout.HideElement(_settingsTile);
+        _elementPage.Remove(_settingsTile);
+        _elementIds.Remove(_settingsTile);
+        _tapActions.Remove(_settingsTile);
+
+        var page = GetOrCreatePage(pageIdx);
+        page.Layout.ShowElement(_settingsTile);
+        _elementPage[_settingsTile] = page;
+        _elementIds[_settingsTile] = SettingsWidgetId;
+        RegisterElement(_settingsTile);
+        PersistPosition(_settingsTile);
+        _config.Set(LayoutStore, "page.host.settings", pageIdx.ToString());
+        LogService.Info($"MoveSettingsTile: → page {pageIdx}");
+    }
+
     void SetEditMode(bool enabled)
     {
+        var savedIndex = Pager.SelectedIndex;
+
+        if (enabled && _pages.Count > 0 && !_pages[^1].IsEmpty)
+            AddPage();
+
+        if (Pager.SelectedIndex != savedIndex)
+            Pager.SelectedIndex = savedIndex;
+
         foreach (var page in _pages)
         {
             page.Layout.DrawGridOverlay(page.Overlay, enabled);
@@ -692,6 +781,9 @@ public sealed partial class MainWindow : Window
 
             foreach (var container in page.Layout.Containers)
             {
+                if (_elementIds.TryGetValue(container, out var id) && id.StartsWith("host.settings"))
+                    continue;
+
                 if (page.Layout.GetContent(container) is { } content)
                     content.IsHitTestVisible = !enabled;
                 EnableDrag(container, enabled);
@@ -699,6 +791,26 @@ public sealed partial class MainWindow : Window
         }
 
         SetPagerSwipe(!enabled);
+
+        if (!enabled) PruneEmptyPages();
+
+        if (Pager.SelectedIndex != savedIndex && savedIndex < _pages.Count)
+            Pager.SelectedIndex = savedIndex;
+        if (Pips.SelectedPageIndex != savedIndex && savedIndex < _pages.Count)
+            Pips.SelectedPageIndex = savedIndex;
+    }
+
+    void PruneEmptyPages()
+    {
+        while (_pages.Count > 0 && _pages[^1].IsEmpty)
+        {
+            _pages.RemoveAt(_pages.Count - 1);
+            Pager.Items.RemoveAt(Pager.Items.Count - 1);
+        }
+        if (_pages.Count == 0) AddPage();
+        Pips.NumberOfPages = _pages.Count;
+        if (Pager.SelectedIndex >= _pages.Count)
+            Pager.SelectedIndex = _pages.Count - 1;
     }
 
     void SetPagerSwipe(bool enabled)
@@ -721,132 +833,64 @@ public sealed partial class MainWindow : Window
         return null;
     }
 
-    // ---- edge-to-flip (drag to screen edge → auto move to next/prev page) ----
-
-    const double EdgeZone = 80;       // logical pixels from left/right edge
-    const long EdgeDelay = 800;        // ms before flip triggers
+    // ---- inline drag via TranslateTransform (no Popup/Canvas virtual layer) ----
 
     void OnWidgetDragStarted(object sender, ManipulationStartedRoutedEventArgs e)
     {
-        if (sender is not FrameworkElement fe) return;
+        if (!_editMode || sender is not FrameworkElement fe) return;
 
-        var page = PageOf(fe);
         _dragTarget = fe;
-        _dragTargetPage = _pages.IndexOf(page);
+        _dragOrigPage = PageOf(fe);
         _dragOrigCol = Grid.GetColumn(fe);
         _dragOrigRow = Grid.GetRow(fe);
         _dragOrigColSpan = Grid.GetColumnSpan(fe);
         _dragOrigRowSpan = Grid.GetRowSpan(fe);
 
-        _dragOffsetX = e.Position.X;
-        _dragOffsetY = e.Position.Y;
+        _dragTotalX = 0;
+        _dragTotalY = 0;
 
-        _edgeEnterTick = 0;
-        _edgeTarget = -1;
-
-        // lift onto transparent overlay canvas
-        if (_dragPopup == null)
-        {
-            _dragCanvas = new Canvas { Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)) };
-            _dragPopup = new Popup { XamlRoot = Content.XamlRoot, IsLightDismissEnabled = false };
-            _dragPopup.Child = _dragCanvas;
-        }
-        _dragCanvas!.Width = ((FrameworkElement)Content).ActualWidth;
-        _dragCanvas!.Height = ((FrameworkElement)Content).ActualHeight;
-
-        var root = (FrameworkElement)Content;
-        var transform = fe.TransformToVisual(root);
-        var pos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
-
-        page.Layout.HideElement(fe);
-        _dragCanvas.Children.Add(fe);
-        Canvas.SetLeft(fe, pos.X);
-        Canvas.SetTop(fe, pos.Y);
-
-        fe.RenderTransform = new ScaleTransform { CenterX = 0.5, CenterY = 0.5, ScaleX = 1.06, ScaleY = 1.06 };
-        fe.Opacity = 0.92;
-        _dragPopup.IsOpen = true;
+        fe.RenderTransform = new TranslateTransform { X = 0, Y = 0 };
+        fe.Opacity = 0.88;
+        Canvas.SetZIndex(fe, 999);
     }
 
     void OnWidgetDragDelta(object sender, ManipulationDeltaRoutedEventArgs e)
     {
-        if (_dragTarget is null || _dragCanvas is null) return;
+        if (_dragTarget is null || !_editMode) return;
         e.Handled = true;
 
-        var fe = _dragTarget;
-        var cx = Canvas.GetLeft(fe) + e.Delta.Translation.X + _dragOffsetX;
-        var cy = Canvas.GetTop(fe) + e.Delta.Translation.Y + _dragOffsetY;
-        Canvas.SetLeft(fe, cx - _dragOffsetX);
-        Canvas.SetTop(fe, cy - _dragOffsetY);
+        _dragTotalX += e.Delta.Translation.X;
+        _dragTotalY += e.Delta.Translation.Y;
 
-        if (!_editMode) return;
-
-        var winW = _dragCanvas.Width;
-        var winH = _dragCanvas.Height;
-        if (winW <= 1) { winW = ((FrameworkElement)Content).ActualWidth; winH = ((FrameworkElement)Content).ActualHeight; }
-        var now = Environment.TickCount64;
-        var pageIdx = _dragTargetPage;
-        bool leftEdge = cx < EdgeZone;
-        bool rightEdge = cx > winW - EdgeZone;
-
-        if (leftEdge && pageIdx > 0)
-        {
-            if (_edgeTarget != pageIdx - 1) { _edgeTarget = pageIdx - 1; _edgeEnterTick = now; }
-            else if (now - _edgeEnterTick >= EdgeDelay)
-            {
-                Pager.SelectedIndex = _edgeTarget;
-                _dragTargetPage = _edgeTarget;
-                _edgeTarget = -1;
-            }
-        }
-        else if (rightEdge)
-        {
-            GetOrCreatePage(pageIdx + 1);
-            if (_edgeTarget != pageIdx + 1) { _edgeTarget = pageIdx + 1; _edgeEnterTick = now; }
-            else if (now - _edgeEnterTick >= EdgeDelay)
-            {
-                Pager.SelectedIndex = _edgeTarget;
-                _dragTargetPage = _edgeTarget;
-                _edgeTarget = -1;
-            }
-        }
-        else
-        {
-            _edgeTarget = -1;
-        }
+        var tt = (TranslateTransform)_dragTarget.RenderTransform;
+        tt.X = _dragTotalX;
+        tt.Y = _dragTotalY;
     }
 
     void OnWidgetDragCompleted(object sender, ManipulationCompletedRoutedEventArgs e)
     {
-        _edgeTarget = -1;
+        if (_dragTarget is not { } fe || _dragOrigPage is null) return;
 
-        if (_dragTarget is not { } fe || _dragCanvas is null || _dragPopup is null) return;
-
-        _dragCanvas.Children.Remove(fe);
-        _dragPopup.IsOpen = false;
-
-        fe.RenderTransform = new ScaleTransform { CenterX = 0.5, CenterY = 0.5 };
         fe.Opacity = 1.0;
+        Canvas.SetZIndex(fe, 0);
+        fe.RenderTransform = new ScaleTransform { CenterX = 0.5, CenterY = 0.5 };
 
-        var page = GetOrCreatePage(_dragTargetPage);
+        var page = _dragOrigPage;
         var layout = page.Layout;
-
-        var cx = Canvas.GetLeft(fe) + _dragOffsetX;
-        var cy = Canvas.GetTop(fe) + _dragOffsetY;
-
-        var gridX = cx - page.WidgetGrid.Margin.Left;
-        var gridY = cy - page.WidgetGrid.Margin.Top;
         var sub = layout.SubCell;
 
-        var deltaCol = (int)Math.Round(gridX / sub, MidpointRounding.AwayFromZero);
-        var deltaRow = (int)Math.Round(gridY / sub, MidpointRounding.AwayFromZero);
+        var deltaCol = (int)Math.Round(_dragTotalX / sub, MidpointRounding.AwayFromZero);
+        var deltaRow = (int)Math.Round(_dragTotalY / sub, MidpointRounding.AwayFromZero);
 
-        var targetCol = Math.Clamp(deltaCol, 0, layout.SubColumns - _dragOrigColSpan);
-        var targetRow = Math.Clamp(deltaRow, 0, layout.SubRows - _dragOrigRowSpan);
+        var targetCol = Math.Clamp(_dragOrigCol + deltaCol, 0, layout.SubColumns - _dragOrigColSpan);
+        var targetRow = Math.Clamp(_dragOrigRow + deltaRow, 0, layout.SubRows - _dragOrigRowSpan);
 
         string outcome;
-        page.Layout.ShowElement(fe, null, null);
-        if (layout.TryPlace(fe, targetCol, targetRow, _dragOrigColSpan, _dragOrigRowSpan))
+        if (targetCol == _dragOrigCol && targetRow == _dragOrigRow)
+        {
+            outcome = "no_move";
+        }
+        else if (layout.TryPlace(fe, targetCol, targetRow, _dragOrigColSpan, _dragOrigRowSpan))
         {
             outcome = "placed";
         }
@@ -864,19 +908,17 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                Grid.SetColumn(fe, targetCol);
-                Grid.SetRow(fe, targetRow); // can't place at desired spot but keep what ShowElement picked
-                outcome = "placed";
+                Grid.SetColumn(fe, _dragOrigCol);
+                Grid.SetRow(fe, _dragOrigRow);
+                outcome = "blocked";
             }
         }
 
-        _elementPage[fe] = page;
-        PersistPosition(fe);
         layout.ReapplyMargins();
-        EnsureTrailingEmptyPage();
-
+        PersistPosition(fe);
         _dragTarget = null;
-        LogService.Info($"DragEnd: overlay → page={_dragTargetPage} target=({targetCol},{targetRow}) [{outcome}]");
+        _dragOrigPage = null;
+        LogService.Info($"DragEnd: orig=({_dragOrigCol},{_dragOrigRow}) delta=({deltaCol},{deltaRow}) target=({targetCol},{targetRow}) [{outcome}]");
     }
 
     // ---- notifications (queue + banner + escalate to full-screen) ----
@@ -1080,8 +1122,13 @@ public sealed partial class MainWindow : Window
                 fe.ActualTheme == ElementTheme.Dark ? ElementTheme.Dark : ElementTheme.Light);
         }
 
-        if (_hostHandle != null && _settingsTile != null &&
-            ContentOf(_settingsTile) is Control settingsButton)
-            settingsButton.Background = (Brush)_hostHandle.GetWidgetBackgroundBrush();
+        if (_hostHandle != null)
+        {
+            foreach (var kv in _elementIds)
+            {
+                if (kv.Value.StartsWith("host.settings") && ContentOf(kv.Key) is Control settingsButton)
+                    settingsButton.Background = (Brush)_hostHandle.GetWidgetBackgroundBrush();
+            }
+        }
     }
 }
