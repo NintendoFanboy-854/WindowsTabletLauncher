@@ -64,6 +64,8 @@ public class ConfigStore
             if (Directory.Exists(_configDir))
                 foreach (var file in Directory.GetFiles(_configDir, "*.json"))
                     File.Delete(file);
+            var memoryPath = Path.Combine(Path.GetDirectoryName(_configDir)!, "memory.json");
+            if (File.Exists(memoryPath)) File.Delete(memoryPath);
             LogService.Info("ConfigStore: all config files deleted (reset)");
         }
         catch (Exception ex)

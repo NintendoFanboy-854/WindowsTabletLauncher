@@ -16,6 +16,7 @@ using PluginContract;
 using WinRT;
 using LauncherHost.Controls;
 using LauncherHost.Core;
+using LauncherHost.Core.Agent;
 using LauncherHost.Services;
 
 namespace LauncherHost;
@@ -29,6 +30,9 @@ public sealed partial class MainWindow : Window
     HostHandle _hostHandle = null!;
     AcrylicBrushProvider _acrylicProvider = null!;
     DashboardPage? _dashboard;
+    AgentService? _agentService;
+    AgentSession? _agentSession;
+    MemoryStore? _agentMemory;
     List<IPlugin> _plugins = new();
     List<PluginContract.IPluginSettings> _pluginSettings = new();
     bool _editMode;
@@ -78,6 +82,7 @@ public sealed partial class MainWindow : Window
             _hostHandle.NotificationRequested += OnNotificationRequested;
             _hostHandle.LiveTheme = () => ((FrameworkElement)Content).ActualTheme;
             _dashboard = new DashboardPage(_hostHandle);
+            _agentService = new AgentService(_hostHandle);
 
             Pager.SelectionChanged += (_, _) =>
             {
@@ -95,6 +100,32 @@ public sealed partial class MainWindow : Window
                 ApplyStoredTheme();
                 LogService.Info("Loading plugins");
                 LoadPlugins();
+                _agentService!.RefreshTools();
+
+                _agentSession = new AgentSession(_agentService, (Grid)Content);
+
+                AgentInput.PlaceholderText = _hostHandle.Translate("agent.placeholder");
+                AgentSendBtn.Content = _hostHandle.Translate("agent.send");
+
+                AgentSendBtn.Click += (_, _) =>
+                {
+                    var text = AgentInput.Text.Trim();
+                    if (string.IsNullOrEmpty(text)) return;
+                    AgentInput.Text = "";
+                    _agentSession!.Send(text, (FrameworkElement)Content);
+                };
+
+                AgentInput.KeyDown += (_, e) =>
+                {
+                    if (e.Key == Windows.System.VirtualKey.Enter)
+                    {
+                        var text = AgentInput.Text.Trim();
+                        if (string.IsNullOrEmpty(text)) return;
+                        AgentInput.Text = "";
+                        _agentSession!.Send(text, (FrameworkElement)Content);
+                    }
+                };
+
                 RelayoutGrid();
                 LogService.Info("MainWindow initialized successfully");
             };
@@ -209,12 +240,21 @@ public sealed partial class MainWindow : Window
 
         ApplyTheme();
 
+        ApplyBackdropController();
+
+        LogService.Info("Backdrop set up");
+    }
+
+    void ApplyBackdropController()
+    {
+        _acrylicController?.Dispose();
+        _acrylicController = null;
+
         _acrylicController = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Thin };
         _acrylicController.AddSystemBackdropTarget(
             this.As<ICompositionSupportsSystemBackdrop>());
-        _acrylicController.SetSystemBackdropConfiguration(_configurationSource);
-
-        LogService.Info("Acrylic backdrop set up (Thin)");
+        _acrylicController.SetSystemBackdropConfiguration(_configurationSource!);
+        LogService.Info("Backdrop: Acrylic Thin");
     }
 
     void ApplyStoredTheme()
@@ -314,6 +354,33 @@ public sealed partial class MainWindow : Window
                 Name = "query_dashboard",
                 Description = "获取数据复盘综合统计：番茄数、待办数、久坐数据汇总。"
             },
+            new()
+            {
+                Name = "set_memory",
+                Description = "写入一条持久记忆（key-value）。用户要求记住信息时使用。",
+                ParametersJsonSchema = """{"type":"object","properties":{"key":{"type":"string"},"value":{"type":"string"}},"required":["key","value"]}"""
+            },
+            new()
+            {
+                Name = "get_memory",
+                Description = "获取全部持久记忆。"
+            },
+            new()
+            {
+                Name = "clear_memory",
+                Description = "清空全部持久记忆。"
+            },
+            new()
+            {
+                Name = "set_expand_cot",
+                Description = "展开/折叠思维链与工具调用。",
+                ParametersJsonSchema = """{"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"]}"""
+            },
+            new()
+            {
+                Name = "exit_launcher",
+                Description = "退出启动器（需用户在弹窗确认）。"
+            },
         };
 
         var handlers = new Dictionary<string, Func<string, string>>
@@ -365,9 +432,58 @@ public sealed partial class MainWindow : Window
                 return JsonSerializer.Serialize(new { ok = true, seconds = s.Value });
             },
             ["query_dashboard"] = _ => BuildDashboardJson(),
+            ["set_memory"] = args =>
+            {
+                var key = HostJson.Str(args, "key");
+                var value = HostJson.Str(args, "value");
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+                    return "{\"ok\":false,\"error\":\"key_value_required\"}";
+                _agentMemory ??= new MemoryStore();
+                _agentMemory.SetFact(key, value);
+                return JsonSerializer.Serialize(new { ok = true });
+            },
+            ["get_memory"] = args =>
+            {
+                _agentMemory ??= new MemoryStore();
+                return JsonSerializer.Serialize(new { ok = true, memories = _agentMemory.Facts.Select(f => new { key = f.Key, value = f.Value }) });
+            },
+            ["clear_memory"] = args =>
+            {
+                _agentMemory ??= new MemoryStore();
+                _agentMemory.Clear();
+                return JsonSerializer.Serialize(new { ok = true });
+            },
+            ["set_expand_cot"] = args =>
+            {
+                var on = HostJson.Bool(args, "enabled") ?? false;
+                _config.Set("host", "agent_expand_cot", on ? "true" : "false");
+                _agentService!.NotifyExpandCotChanged();
+                return JsonSerializer.Serialize(new { ok = true, expandCot = on });
+            },
+            ["exit_launcher"] = args =>
+            {
+                _ = ExitLauncherAsync();
+                return JsonSerializer.Serialize(new { ok = true, message = "exit_dialog_shown" });
+            },
         };
 
         _hostHandle.RegisterAgentCapability(new HostAgentCapability(DispatcherQueue, tools, handlers));
+    }
+
+    async Task ExitLauncherAsync()
+    {
+        var confirm = new ContentDialog
+        {
+            Title = "确认退出",
+            Content = "确定要退出启动器吗？",
+            PrimaryButtonText = "退出",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = Content.XamlRoot
+        };
+        var result = await confirm.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+            Application.Current.Exit();
     }
 
     string BuildDashboardJson()
@@ -720,10 +836,13 @@ public sealed partial class MainWindow : Window
                 if (result == ContentDialogResult.Primary)
                 {
                     LogService.Info("User requested full reset");
+                    foreach (var p in _pluginSettings)
+                        p.ResetConfig(_hostHandle);
                     _config.ResetAll();
                     Application.Current.Exit();
                 }
-            });
+            },
+            () => _agentService!.NotifyExpandCotChanged());
 
         dialog.XamlRoot = Content.XamlRoot;
         var result = await dialog.ShowAsync();

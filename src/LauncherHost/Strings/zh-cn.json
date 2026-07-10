@@ -1,4 +1,11 @@
 {
     "clock.time_format": "HH:mm:ss",
-    "clock.widget_name": "时钟"
+    "clock.widget_name": "时钟",
+    "agent.placeholder": "问AI...",
+    "agent.send": "发送",
+    "agent.thinking_done": "思考完毕",
+    "agent.tool_done": "完成: ",
+    "agent.ready": "就绪。输入问题开始。",
+    "agent.error": "错误: ",
+    "agent.busy": "正在思考..."
 }

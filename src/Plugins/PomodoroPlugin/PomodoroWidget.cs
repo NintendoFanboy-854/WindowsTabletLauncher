@@ -30,9 +30,6 @@ public sealed class PomodoroWidget : UserControl
     TextBlock? _ovPhase;
     Button? _ovStartPause;
     Button? _ovSkip;
-    MediaPlayerElement? _whiteNoisePlayer;
-    Popup? _immersivePopup;
-    TextBlock? _immTime;
     readonly int[] _hourlySeconds = new int[24];
 
     Phase _phase = Phase.Focus;
@@ -81,33 +78,6 @@ public sealed class PomodoroWidget : UserControl
     int CurrentPhaseSeconds => (_phase == Phase.Focus ? FocusMin : (_isLongBreak ? LongBreakMin : BreakMin)) * 60;
 
     void PlayChime() { if (!SoundOn) return; try { MessageBeep(0x00000040); } catch { } }
-
-    internal void SetWhiteNoise(string name)
-    {
-        _host.SetConfig(nameof(PomodoroPlugin), "white_noise", name);
-        if (_whiteNoisePlayer == null) return;
-        var media = ToMedia(name);
-        if (media != null)
-        {
-            _whiteNoisePlayer.Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(media));
-            _whiteNoisePlayer.AutoPlay = true;
-            _whiteNoisePlayer.MediaPlayer.IsLoopingEnabled = true;
-            _whiteNoisePlayer.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            _whiteNoisePlayer.Source = null;
-            _whiteNoisePlayer.Visibility = Visibility.Collapsed;
-        }
-    }
-
-    static string? ToMedia(string name) => name.ToLowerInvariant() switch
-    {
-        "rain" => "ms-appx:///Assets/whitenoise_rain.mp3",
-        "fire" => "ms-appx:///Assets/whitenoise_fire.mp3",
-        "cafe" => "ms-appx:///Assets/whitenoise_cafe.mp3",
-        _ => null
-    };
 
     void BuildUi()
     {
@@ -295,8 +265,6 @@ public sealed class PomodoroWidget : UserControl
             if (_ovStartPause != null) _ovStartPause.Content = _running ? "暂停" : "开始";
         }
 
-        if (_immersivePopup?.IsOpen == true && _immTime != null)
-            _immTime.Text = Format(_remaining);
     }
 
     void OpenDetail()
@@ -320,14 +288,10 @@ public sealed class PomodoroWidget : UserControl
         _ovSkip.Click += (_, _) => Skip();
         var reset = new Button { Content = "重置", MinWidth = 100 };
         reset.Click += (_, _) => ResetTimer();
-        var immersive = new Button { Content = "沉浸", MinWidth = 100 };
-        immersive.Click += (_, _) => EnterImmersive();
-
         var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, HorizontalAlignment = HorizontalAlignment.Center };
         controls.Children.Add(_ovStartPause);
         controls.Children.Add(_ovSkip);
         controls.Children.Add(reset);
-        controls.Children.Add(immersive);
         body.Children.Add(controls);
 
         var taskBox = new TextBox { Header = "当前专注任务", PlaceholderText = "在做什么…", Text = Task, HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -338,28 +302,6 @@ public sealed class PomodoroWidget : UserControl
         durations.Children.Add(MakeDurationBox("专注时长", "focus_min", FocusMin));
         durations.Children.Add(MakeDurationBox("休息时长", "break_min", BreakMin));
         body.Children.Add(durations);
-
-        // white noise
-        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
-        var wnLabel = new TextBlock { Text = "白噪音", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary };
-        body.Children.Add(wnLabel);
-        var wnCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
-        wnCombo.Items.Add(new ComboBoxItem { Content = "关闭", Tag = "none" });
-        wnCombo.Items.Add(new ComboBoxItem { Content = "雨声", Tag = "rain" });
-        wnCombo.Items.Add(new ComboBoxItem { Content = "篝火", Tag = "fire" });
-        wnCombo.Items.Add(new ComboBoxItem { Content = "咖啡馆", Tag = "cafe" });
-        var currentWN = _host.GetConfig(nameof(PomodoroPlugin), "white_noise") ?? "none";
-        wnCombo.SelectedIndex = currentWN switch { "rain" => 1, "fire" => 2, "cafe" => 3, _ => 0 };
-        wnCombo.SelectionChanged += (_, _) =>
-        {
-            if (wnCombo.SelectedItem is ComboBoxItem ci && ci.Tag is string tag)
-                SetWhiteNoise(tag);
-        };
-        body.Children.Add(wnCombo);
-
-        _whiteNoisePlayer = new MediaPlayerElement { Visibility = Visibility.Collapsed, Height = 40, HorizontalAlignment = HorizontalAlignment.Stretch };
-        body.Children.Add(_whiteNoisePlayer);
-        if (currentWN != "none") SetWhiteNoise(currentWN);
 
         // stats
         body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
@@ -398,67 +340,6 @@ public sealed class PomodoroWidget : UserControl
 
         _overlay.Show(this, "番茄钟", body, _host.Log);
         UpdateViews();
-    }
-
-    internal void EnterImmersive()
-    {
-        if (_immersivePopup?.IsOpen == true) return;
-        var theme = ((FrameworkElement)this).ActualTheme;
-
-        var scrim = new Grid
-        {
-            Width = ActualWidth > 0 ? ActualWidth : 1440,
-            Height = ActualHeight > 0 ? ActualHeight : 960,
-            Background = new SolidColorBrush(Color.FromArgb(0xEE, 0, 0, 0))
-        };
-
-        _immTime = new TextBlock
-        {
-            Text = Format(_remaining),
-            FontSize = 120,
-            FontWeight = FontWeights.Thin,
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        var exitBtn = new Button
-        {
-            Content = "退出沉浸",
-            Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)),
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(0, 0, 0, 48),
-            FontSize = 14
-        };
-        exitBtn.Click += (_, _) => ExitImmersive();
-
-        var stack = new StackPanel();
-        stack.Children.Add(_immTime);
-        stack.Children.Add(exitBtn);
-        scrim.Children.Add(stack);
-        scrim.Tapped += (_, _) => ExitImmersive();
-
-        _immersivePopup = new Microsoft.UI.Xaml.Controls.Primitives.Popup
-        {
-            XamlRoot = XamlRoot,
-            IsLightDismissEnabled = false,
-            Child = scrim
-        };
-        _immersivePopup.IsOpen = true;
-        UpdateViews();
-    }
-
-    internal void ExitImmersive()
-    {
-        if (_immersivePopup != null)
-        {
-            _immersivePopup.IsOpen = false;
-            _immersivePopup = null;
-        }
-        _immTime = null;
     }
 
     NumberBox MakeDurationBox(string header, string key, int value)

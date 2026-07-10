@@ -145,6 +145,15 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
         return panel;
     }
 
+    void IPluginSettings.ResetConfig(IHostHandle host)
+    {
+        host.SetConfig(PluginId, "time_format", "HH:mm:ss");
+        host.SetConfig(PluginId, "show_seconds", "true");
+        host.SetConfig(PluginId, "show_lunar", "false");
+        host.SetConfig(PluginId, "world_zones", "[]");
+        _widget?.ApplySettings();
+    }
+
     IReadOnlyList<AgentTool> IAgentCapability.GetTools() => new[]
     {
         new AgentTool

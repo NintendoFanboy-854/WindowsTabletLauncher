@@ -157,6 +157,23 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
         return panel;
     }
 
+    void IPluginSettings.ResetConfig(IHostHandle host)
+    {
+        host.SetConfig(PluginId, "focus_min", "25");
+        host.SetConfig(PluginId, "break_min", "5");
+        host.SetConfig(PluginId, "long_break_min", "15");
+        host.SetConfig(PluginId, "long_break_every", "4");
+        host.SetConfig(PluginId, "auto_start", "true");
+        host.SetConfig(PluginId, "sound", "true");
+        host.SetConfig(PluginId, "allow_pause", "true");
+        host.SetConfig(PluginId, "keep_screen_on", "true");
+        host.SetConfig(PluginId, "task", "");
+        host.SetConfig(PluginId, "stats", "");
+        host.SetConfig(PluginId, "sessions", "");
+        host.SetConfig(PluginId, "white_noise", "none");
+        _widget?.ApplyDurations();
+    }
+
     NumberBox MakeNumber(string header, string key, int def)
     {
         var box = new NumberBox
@@ -187,10 +204,9 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
         new AgentTool { Name = "query_pomodoro_stats", Description = "获取番茄钟统计：今日完成数、近7天每日完成数、累计总数、累计分钟。" },
         new AgentTool { Name = "query_pomodoro_sessions", Description = "获取最近N条番茄专注记录（任务、时长、时间）。", ParametersJsonSchema = """{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100}}}""" },
         new AgentTool { Name = "query_pomodoro_distribution", Description = "获取近30天专注时间分时分布（24小时各小时分钟数）。" },
-        new AgentTool { Name = "set_white_noise", Description = "设置白噪音类型：rain/fire/cafe/none。", ParametersJsonSchema = """{"type":"object","properties":{"name":{"type":"string","enum":["rain","fire","cafe","none"]}},"required":["name"]}""" },
-        new AgentTool { Name = "query_white_noise", Description = "查询当前白噪音状态和类型。" },
-        new AgentTool { Name = "enter_immersive", Description = "进入沉浸模式（大字体倒计时）。" },
-        new AgentTool { Name = "exit_immersive", Description = "退出沉浸模式。" },
+        new AgentTool { Name = "set_white_noise", Description = "白噪音功能暂不可用。" },
+        new AgentTool { Name = "query_white_noise", Description = "查询白噪音状态（暂不可用）。" },
+
     };
 
     Task<string> IAgentCapability.InvokeAsync(string tool, string argumentsJson)
@@ -260,22 +276,10 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
             }
 
             case "set_white_noise":
-            {
-                var name = AgentJson.GetString(argumentsJson, "name") ?? "none";
-                return OnUi(() => { _widget?.SetWhiteNoise(name.ToLowerInvariant()); return AgentJson.Serialize(new { ok = true, whiteNoise = name }); });
-            }
+                return Task.FromResult(AgentJson.Serialize(new { ok = true, notice = "白噪音暂不可用" }));
 
             case "query_white_noise":
-            {
-                var current = _host.GetConfig(PluginId, "white_noise") ?? "none";
-                return Task.FromResult(AgentJson.Serialize(new { ok = true, whiteNoise = current }));
-            }
-
-            case "enter_immersive":
-                return OnUi(() => { _widget?.EnterImmersive(); return AgentJson.Serialize(new { ok = true }); });
-
-            case "exit_immersive":
-                return OnUi(() => { _widget?.ExitImmersive(); return AgentJson.Serialize(new { ok = true }); });
+                return Task.FromResult(AgentJson.Serialize(new { ok = true, whiteNoise = "unavailable" }));
 
             default:
                 return Task.FromResult(AgentJson.Error("unknown_tool"));

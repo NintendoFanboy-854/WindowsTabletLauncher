@@ -140,6 +140,15 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         return panel;
     }
 
+    void IPluginSettings.ResetConfig(IHostHandle host)
+    {
+        host.SetConfig(PluginId, "items", "[]");
+        host.SetConfig(PluginId, "auto_complete_on_subtasks", "true");
+        host.SetConfig(PluginId, "hide_done", "false");
+        host.SetConfig(PluginId, "default_view", "list");
+        _widget?.OnStoreChanged();
+    }
+
     IReadOnlyList<AgentTool> IAgentCapability.GetTools() => new[]
     {
         new AgentTool { Name = "list_todo", Description = "获取全部待办，可选按日期过滤。", ParametersJsonSchema = """{"type":"object","properties":{"date":{"type":"string","description":"yyyy-MM-dd 过滤指定日期"}}}""" },

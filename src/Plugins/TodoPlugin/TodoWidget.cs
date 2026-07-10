@@ -2,6 +2,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using PluginContract;
 using Windows.UI;
 using Windows.UI.Text;
@@ -96,21 +97,36 @@ public sealed class TodoWidget : UserControl
 
         foreach (var item in list)
         {
-            var row = new Grid();
+            var row = new Grid { ColumnSpacing = 4 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var overdue = !item.Done && item.Deadline is { } dl && dl < DateTime.Now;
-            var prefix = PriorityTag(item.Priority);
+
+            var dotColor = PriorityColor(item.Priority);
+            if (dotColor != Color.FromArgb(0, 0, 0, 0))
+            {
+                var dot = new Ellipse
+                {
+                    Width = 8, Height = 8,
+                    Fill = new SolidColorBrush(dotColor),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(dot, 0);
+                row.Children.Add(dot);
+            }
+
             var title = new TextBlock
             {
-                Text = (item.Done ? "\u2713 " : "\u25CB ") + prefix + item.Text + (item.Repeat != RepeatKind.None ? " \u21BB" : ""),
+                Text = (item.Done ? "\u2713 " : "\u25CB ") + item.Text + (item.Repeat != RepeatKind.None ? " \u21BB" : ""),
                 FontSize = 14,
                 Foreground = item.Done ? secondary : primary,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                TextDecorations = item.Done ? TextDecorations.Strikethrough : TextDecorations.None
+                TextDecorations = item.Done ? TextDecorations.Strikethrough : TextDecorations.None,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(title, 0);
+            Grid.SetColumn(title, 1);
             row.Children.Add(title);
 
             var ddl = DeadlineShort(item);
@@ -124,7 +140,7 @@ public sealed class TodoWidget : UserControl
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = overdue ? new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A)) : secondary
                 };
-                Grid.SetColumn(ddlText, 1);
+                Grid.SetColumn(ddlText, 2);
                 row.Children.Add(ddlText);
             }
 
@@ -398,28 +414,7 @@ public sealed class TodoWidget : UserControl
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var pcolor = PriorityColor(item.Priority);
-            if (pcolor != Color.FromArgb(0, 0, 0, 0))
-            {
-                var workloadBar = new Border { Background = new SolidColorBrush(pcolor), Width = 4, CornerRadius = new CornerRadius(2), VerticalAlignment = VerticalAlignment.Stretch, Margin = new Thickness(0, 0, 4, 0) };
-                Grid.SetColumn(workloadBar, 0);
-                Grid.SetRowSpan(workloadBar, 2);
-                // Wrap in a grid to add the color bar
-                var wrap = new Grid { ColumnSpacing = 6 };
-                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                Grid.SetColumn(workloadBar, 0);
-                wrap.Children.Add(workloadBar);
-                Grid.SetColumn(check, 1); Grid.SetColumn(txt, 2);
-                line1.Children.Clear();
-                wrap.Children.Add(check); wrap.Children.Add(txt);
-                row.Children.Add(wrap);
-            }
-            else
-            {
-                row.Children.Add(line1);
-            }
+            row.Children.Add(line1);
 
             var dlv = DeadlineShort(item);
             if (dlv != null || meta.Length > 0)
@@ -432,12 +427,19 @@ public sealed class TodoWidget : UserControl
                 }
                 if (meta.Length > 0) subItems.Children.Add(ext);
                 Grid.SetColumn(subItems, 1); Grid.SetRow(subItems, 1);
-                if (pcolor != Color.FromArgb(0, 0, 0, 0))
-                    row.Children.Add(line1);
                 row.Children.Add(subItems);
             }
 
-            var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(4, 6, 4, 6) };
+            var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6) };
+            var selColor = item.Priority switch
+            {
+                Priority.High => Color.FromArgb(0x33, 0xE0, 0x3A, 0x3A),
+                Priority.Medium => Color.FromArgb(0x33, 0xFF, 0x98, 0x00),
+                _ => Color.FromArgb(0x10, 0x62, 0xA0, 0xE0)
+            };
+            lvi.Resources["ListViewItemBackgroundSelected"] = new SolidColorBrush(selColor);
+            lvi.Resources["ListViewItemBackgroundSelectedPointerOver"] = new SolidColorBrush(selColor) { Opacity = 1.5 };
+            lvi.Resources["ListViewItemBackgroundSelectedPressed"] = new SolidColorBrush(selColor) { Opacity = 2.0 };
             _taskList.Items.Add(lvi);
             if (ReferenceEquals(item, _selected)) toSelect = lvi;
         }

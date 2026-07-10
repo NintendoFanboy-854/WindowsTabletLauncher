@@ -1,7 +1,10 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using LauncherHost.Core.Agent;
 using LauncherHost.Services;
+using Windows.UI;
 
 namespace LauncherHost.Controls;
 
@@ -19,6 +22,7 @@ public sealed partial class SettingsDialog : ContentDialog
     bool _rebuilding;
     readonly Func<Task> _onExit;
     readonly Func<Task> _onReset;
+    readonly Action? _onExpandCotChanged;
     readonly List<ComboBox> _pageCombos = new();
 
     public SettingsDialog(
@@ -32,7 +36,8 @@ public sealed partial class SettingsDialog : ContentDialog
         Action<string, bool> onPluginToggle,
         Action<string, int> onPageChange,
         Func<Task> onExit,
-        Func<Task> onReset)
+        Func<Task> onReset,
+        Action? onExpandCotChanged = null)
     {
         InitializeComponent();
         _loc = loc;
@@ -44,6 +49,7 @@ public sealed partial class SettingsDialog : ContentDialog
         _pageCount = pageCount;
         _onExit = onExit;
         _onReset = onReset;
+        _onExpandCotChanged = onExpandCotChanged;
 
         XamlRoot = App.MainWindow!.Content.XamlRoot;
 
@@ -52,6 +58,10 @@ public sealed partial class SettingsDialog : ContentDialog
         SetupEditMode(editMode);
         SetupNotify();
         SetupSettingsPageCombo();
+        SetupApiKey();
+        SetupModelCombo();
+        SetupThinkingCombo();
+        SetupExpandCot();
         SetupNavigation(plugins, pluginSettings);
 
         EditModeToggle.Toggled += (_, _) => _onEditMode(EditModeToggle.IsOn);
@@ -165,6 +175,75 @@ public sealed partial class SettingsDialog : ContentDialog
         };
 
         _pageCombos.Add(SettingsPageCombo);
+    }
+
+    void SetupApiKey()
+    {
+        var current = _config.Get("host", "agent_api_key") ?? "";
+        ApiKeyBox.Text = current;
+        ApiKeyBox.LostFocus += (_, _) =>
+            _config.Set("host", "agent_api_key", ApiKeyBox.Text.Trim());
+
+        var memory = new MemoryStore();
+        MemoryLabel.Text = $"AI 记忆: {memory.Facts.Count} 条";
+
+        ViewMemoryBtn.Click += (_, _) =>
+        {
+            if (MemoryScroll.Visibility == Visibility.Visible)
+            {
+                MemoryScroll.Visibility = Visibility.Collapsed;
+                return;
+            }
+            var mem = new MemoryStore();
+            var facts = mem.Facts;
+            MemoryContent.Text = facts.Count == 0 ? "无记忆" : string.Join("\n", facts.Select(f => f.Key + ": " + f.Value));
+            MemoryScroll.Visibility = Visibility.Visible;
+        };
+
+        ClearMemoryBtn.Click += (_, _) =>
+        {
+            new MemoryStore().Clear();
+            MemoryLabel.Text = "AI 记忆: 0 条";
+            MemoryScroll.Visibility = Visibility.Collapsed;
+        };
+    }
+
+    void SetupModelCombo()
+    {
+        var model = _config.Get("host", "agent_model") ?? "deepseek-v4-pro";
+        foreach (ComboBoxItem item in ModelCombo.Items)
+        {
+            if ((string)item.Tag == model) { ModelCombo.SelectedItem = item; break; }
+        }
+        ModelCombo.SelectionChanged += (_, _) =>
+        {
+            if (ModelCombo.SelectedItem is ComboBoxItem item)
+                _config.Set("host", "agent_model", (string)item.Tag);
+        };
+    }
+
+    void SetupThinkingCombo()
+    {
+        var thinking = _config.Get("host", "agent_thinking") ?? "none";
+        foreach (ComboBoxItem item in ThinkingCombo.Items)
+        {
+            if ((string)item.Tag == thinking) { ThinkingCombo.SelectedItem = item; break; }
+        }
+        ThinkingCombo.SelectionChanged += (_, _) =>
+        {
+            if (ThinkingCombo.SelectedItem is ComboBoxItem item)
+                _config.Set("host", "agent_thinking", (string)item.Tag);
+        };
+    }
+
+    void SetupExpandCot()
+    {
+        ExpandCotToggle.IsOn = (_config.Get("host", "agent_expand_cot") ?? "false") == "true";
+        ExpandCotToggle.Toggled += (_, _) =>
+        {
+            _config.Set("host", "agent_expand_cot", ExpandCotToggle.IsOn ? "true" : "false");
+            _onExpandCotChanged?.Invoke();
+        };
     }
 
     void SetupNavigation(

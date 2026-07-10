@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using Windows.UI;
 
 namespace WeatherPlugin;
 
@@ -10,8 +11,6 @@ public sealed record Favorite(string Adcode, string Name);
 
 public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 {
-    internal const string DefaultKey = "816fe7f02a7cb11ebaa2f0a4c67981be";
-
     IHostHandle _host = null!;
     AmapWeatherService _service = null!;
     WeatherWidget? _widget;
@@ -37,8 +36,7 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 
     internal static string ResolveKey(IHostHandle host)
     {
-        var k = host.GetConfig(nameof(WeatherPlugin), "api_key");
-        return string.IsNullOrWhiteSpace(k) ? DefaultKey : k;
+        return host.GetConfig(nameof(WeatherPlugin), "api_key") ?? "";
     }
 
     internal static List<Favorite> GetFavorites(IHostHandle host)
@@ -73,17 +71,21 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         var panel = new StackPanel { Spacing = 12, Margin = new Thickness(0, 8, 0, 4) };
 
+        var keyExpander = new Expander { Header = "高德 API Key", IsExpanded = false };
         var keyBox = new TextBox
         {
-            Header = "高德 API Key",
-            Text = ResolveKey(_host)
+            PlaceholderText = "请输入高德 API Key",
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
+        var currentKey = ResolveKey(_host);
+        if (!string.IsNullOrWhiteSpace(currentKey)) keyBox.Text = currentKey;
         keyBox.LostFocus += (_, _) =>
         {
             _host.SetConfig(PluginId, "api_key", keyBox.Text.Trim());
             _widget?.Refresh();
         };
-        panel.Children.Add(keyBox);
+        keyExpander.Content = keyBox;
+        panel.Children.Add(keyExpander);
 
         var modeCombo = new ComboBox { Header = "定位方式" };
         var autoItem = new ComboBoxItem { Content = "自动探测（IP）", Tag = "auto" };
@@ -196,6 +198,17 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
         return panel;
     }
 
+    void IPluginSettings.ResetConfig(IHostHandle host)
+    {
+        host.SetConfig(PluginId, "api_key", "");
+        host.SetConfig(PluginId, "favorites", "[]");
+        host.SetConfig(PluginId, "refresh_min", "30");
+        host.SetConfig(PluginId, "location_mode", "auto");
+        host.SetConfig(PluginId, "adcode", "");
+        host.SetConfig(PluginId, "location_name", "");
+        _widget?.Refresh();
+    }
+
     async Task InitProvincesAsync(ComboBox provinceCombo, string? savedAdcode)
     {
         var provinces = await _service.GetProvincesAsync();
@@ -245,9 +258,14 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
         },
         new AgentTool
         {
-            Name = "switch_city",
-            Description = "切换天气显示到指定城市（按城市名）。",
-            ParametersJsonSchema = """{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}"""
+            Name = "query_weather_by_ip",
+            Description = "通过IP自动定位查询当前设备所在地的天气（不改变widget显示的城市）。"
+        },
+        new AgentTool
+        {
+            Name = "query_weather_by_city",
+            Description = "查询指定城市的天气（不改变widget显示的城市）。",
+            ParametersJsonSchema = """{"type":"object","properties":{"city":{"type":"string"},"includeForecast":{"type":"boolean","description":"是否包含天气预报"}},"required":["city"]}"""
         }
     };
 
@@ -319,6 +337,37 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
                 _host.SetConfig(PluginId, "location_name", resolved.Value.name);
                 _widget?.Refresh();
                 return AgentJson.Serialize(new { ok = true, adcode = resolved.Value.adcode, name = resolved.Value.name });
+            }
+
+            case "query_weather_by_ip":
+            {
+                var ipResult = await _service.GetIpLocationAsync();
+                if (ipResult == null) return AgentJson.Error("ip_locate_failed");
+                var liveByIp = await _service.GetLiveAsync(ipResult.Adcode);
+                return liveByIp == null ? AgentJson.Error("fetch_failed")
+                    : AgentJson.Serialize(new { ok = true, city = ipResult.City, weather = liveByIp });
+            }
+
+            case "query_weather_by_city":
+            {
+                var city = AgentJson.GetString(argumentsJson, "city");
+                if (string.IsNullOrWhiteSpace(city)) return AgentJson.Error("city_required");
+                var resolved = await _service.ResolveLocationAsync(city.Trim());
+                if (resolved == null) return AgentJson.Error("city_not_found");
+                var live = await _service.GetLiveAsync(resolved.Value.adcode);
+                if (live == null) return AgentJson.Error("fetch_failed");
+                var includeFc = AgentJson.GetBool(argumentsJson, "includeForecast") ?? false;
+                object result;
+                if (includeFc)
+                {
+                    var fc = await _service.GetForecastAsync(resolved.Value.adcode);
+                    result = new { ok = true, city = resolved.Value.name, weather = live, forecast = fc };
+                }
+                else
+                {
+                    result = new { ok = true, city = resolved.Value.name, weather = live };
+                }
+                return AgentJson.Serialize(result);
             }
 
             default:

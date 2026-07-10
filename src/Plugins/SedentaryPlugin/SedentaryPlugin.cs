@@ -209,6 +209,19 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         return panel;
     }
 
+    void IPluginSettings.ResetConfig(IHostHandle host)
+    {
+        host.SetConfig(PluginId, "enabled", "true");
+        host.SetConfig(PluginId, "threshold_min", "60");
+        host.SetConfig(PluginId, "cooldown_min", "10");
+        host.SetConfig(PluginId, "break_min", "5");
+        host.SetConfig(PluginId, "active_start", "9");
+        host.SetConfig(PluginId, "active_end", "22");
+        host.SetConfig(PluginId, "history", "");
+        host.SetConfig(PluginId, "first_run", "true");
+        _widget?.Refresh();
+    }
+
     NumberBox MakeNumber(string header, string key, int def, int max)
     {
         var box = new NumberBox

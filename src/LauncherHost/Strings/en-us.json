@@ -1,4 +1,11 @@
 {
     "clock.time_format": "HH:mm:ss",
-    "clock.widget_name": "Clock"
+    "clock.widget_name": "Clock",
+    "agent.placeholder": "Ask AI...",
+    "agent.send": "Send",
+    "agent.thinking_done": "Thinking done",
+    "agent.tool_done": "Done: ",
+    "agent.ready": "Ready. Type a question.",
+    "agent.error": "Error: ",
+    "agent.busy": "Thinking..."
 }

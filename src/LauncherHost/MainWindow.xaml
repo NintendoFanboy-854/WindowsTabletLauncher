@@ -10,9 +10,24 @@
     <Grid>
         <FlipView x:Name="Pager" Background="Transparent" />
 
-        <PipsPager x:Name="Pips"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Bottom"
-                   Margin="0,0,0,16" />
+        <StackPanel
+            x:Name="BottomBar"
+            Orientation="Horizontal"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,16"
+            Spacing="16">
+            <PipsPager x:Name="Pips" />
+            <TextBox x:Name="AgentInput"
+                     PlaceholderText="问AI..."
+                     Width="240"
+                     VerticalAlignment="Center" />
+            <Button x:Name="AgentSendBtn"
+                    Content="发送"
+                    FontSize="12"
+                    Width="48" Height="32"
+                    Padding="0"
+                    VerticalAlignment="Center" />
+        </StackPanel>
     </Grid>
 </Window>
