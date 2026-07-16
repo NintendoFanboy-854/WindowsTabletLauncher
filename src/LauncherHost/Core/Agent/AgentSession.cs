@@ -38,6 +38,7 @@ public sealed class AgentSession
 
     TextBlock? _curThinkingPh;
     TextBlock? _curToolPh;
+    TextBlock? _waitingStatusTb;
     bool _thinkingActive;
     bool _toolActive;
     static readonly SolidColorBrush RetryTint = new(Color.FromArgb(0x12, 0x40, 0x90, 0xFF));
@@ -69,12 +70,143 @@ public sealed class AgentSession
                 _curThinkingPh.Text = frame + " 思考中...";
             if (_toolActive && _curToolPh != null && _curToolPh.Visibility == Visibility.Visible)
                 _curToolPh.Text = frame + " 调用工具...";
+            if (_waitingStatusTb != null)
+                _waitingStatusTb.Text = frame + " 等待回应中…";
         };
         _spinnerTimer.Start();
         _spinnerRunning = true;
         _service.ExpandCotChanged += ApplyExpandMode;
         _service.OnAgentRetry += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = RetryTint; });
         _service.OnAgentRetryExhausted += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = null; });
+    }
+
+    public sealed record AudioBubbleRefs(
+        Button PlayBtn, TextBlock DurText, TextBlock TransTb, MediaPlayer Player);
+
+    public AudioBubbleRefs? CreateRecordingBubble()
+    {
+        try
+        {
+            var theme = _parentGrid.ActualTheme;
+            var secondary = theme == ElementTheme.Light
+                ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+                : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+            var bgColor = Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC);
+
+            EnsureBubble(_parentGrid,
+                theme == ElementTheme.Light
+                    ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+                    : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)),
+                secondary);
+
+            var playBtn = new Button
+            {
+                Width = 32, Height = 32, Padding = new Thickness(0),
+                Content = new FontIcon { Glyph = "\uE1D6", FontSize = 14 },
+                VerticalAlignment = VerticalAlignment.Center,
+                IsEnabled = false
+            };
+            var durText = new TextBlock
+            {
+                Text = "0:00", FontSize = 11, Foreground = secondary, Opacity = 0.7,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var player = new MediaPlayer();
+
+            var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            audioRow.Children.Add(playBtn);
+            audioRow.Children.Add(durText);
+
+            var bubbleStack = new StackPanel { Spacing = 4 };
+            bubbleStack.Children.Add(audioRow);
+
+            var transTb = new TextBlock
+            {
+                Text = "...", FontSize = 11, Opacity = 0.7,
+                Foreground = secondary, TextWrapping = TextWrapping.Wrap
+            };
+            bubbleStack.Children.Add(transTb);
+
+            var bubble = new Border
+            {
+                CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(48, 4, 0, 4), HorizontalAlignment = HorizontalAlignment.Right,
+                Background = new SolidColorBrush(bgColor), Child = bubbleStack, MaxWidth = 360
+            };
+            _msgStack!.Children.Add(bubble);
+            LogService.Info($"[AgentSession] recording bubble added, msgStackChildren={_msgStack.Children.Count}");
+
+            return new AudioBubbleRefs(playBtn, durText, transTb, player);
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "[AgentSession.CreateRecordingBubble] failed");
+            return null;
+        }
+    }
+
+    public void FinalizeAudioBubble(AudioBubbleRefs refs, byte[] wav, TimeSpan dur)
+    {
+        try
+        {
+            var theme = _parentGrid.ActualTheme;
+            var secondary = theme == ElementTheme.Light
+                ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+                : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
+            refs.DurText.Text = $"{(int)dur.TotalMinutes}:{dur.Seconds:D2}";
+            refs.PlayBtn.IsEnabled = true;
+            ((FontIcon)refs.PlayBtn.Content).Glyph = "\uE102";
+            refs.TransTb.Text = "转录中…";
+
+            var wavCopy = wav;
+            var player = refs.Player;
+
+            refs.PlayBtn.Click += (_, _) =>
+            {
+                if (_activeAudioPlayer != null && _activeAudioPlayer != player)
+                {
+                    _activeAudioPlayer.Pause();
+                    _activeAudioPlayer.Source = null;
+                    _activeAudioPlayer = null;
+                }
+
+                if (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
+                {
+                    player.Pause();
+                    ((FontIcon)refs.PlayBtn.Content).Glyph = "\uE102";
+                }
+                else
+                {
+                    if (player.Source == null)
+                    {
+                        var audioStream = new InMemoryRandomAccessStream();
+                        var writer = new DataWriter(audioStream);
+                        writer.WriteBytes(wavCopy);
+                        writer.StoreAsync().AsTask().GetAwaiter().GetResult();
+                        writer.DetachStream();
+                        player.Source = MediaSource.CreateFromStream(audioStream, "audio/wav");
+                    }
+                    player.Play();
+                    ((FontIcon)refs.PlayBtn.Content).Glyph = "\uE103";
+                    _activeAudioPlayer = player;
+                }
+            };
+
+            player.MediaEnded += (_, _) =>
+            {
+                _dispatcher.TryEnqueue(() =>
+                {
+                    ((FontIcon)refs.PlayBtn.Content).Glyph = "\uE102";
+                    _activeAudioPlayer = null;
+                });
+            };
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "[AgentSession.FinalizeAudioBubble] failed");
+        }
     }
 
     public TextBlock CreateAudioBubble(byte[] wav, string initialTranscription, TimeSpan duration)
@@ -213,13 +345,27 @@ public sealed class AgentSession
     {
         LogService.Info($"[AgentSession.SendAudioToLlm] sending, transLen={transcription?.Length ?? 0}, audioBase64={wav.Length}bytes");
 
+        if (_curBlocks.Count > 0)
+            _allSubTurnBlocks.Add(new List<BlockInfo>(_curBlocks));
+        _curBlocks.Clear();
+        _curBlock = null;
+        _thinkingActive = false;
+        _toolActive = false;
+        _curThinkingPh = null;
+        _curToolPh = null;
+
         var theme = _parentGrid.ActualTheme;
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
         var secondary = theme == ElementTheme.Light
             ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
             : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
+        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 10, Foreground = secondary, Opacity = 0.4, Margin = new Thickness(0, 2, 0, 0) };
+        _msgStack!.Children.Add(_waitingStatusTb);
+        AutoScroll();
+
+        var primary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
 
         var parts = new List<ContentPart>
         {
@@ -252,7 +398,7 @@ public sealed class AgentSession
 
     public async void Send(string input, FrameworkElement source)
     {
-        if (_service.IsBusy) return;
+        if (_service.IsBusy) { LogService.Info("[AgentSession.Send] blocked, service busy"); return; }
         LogService.Info($"[AgentSession.Send] entry bubble={_bubble!=null} spinnerRunning={_spinnerRunning} expand={Expand}");
 
         var theme = source.ActualTheme;
@@ -275,6 +421,9 @@ public sealed class AgentSession
             Child = new TextBlock { Text = input, FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), TextWrapping = TextWrapping.Wrap }
         };
         _msgStack!.Children.Add(userBubble);
+        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 11, Foreground = secondary, Opacity = 0.5, Margin = new Thickness(0, 2, 0, 0) };
+        _msgStack.Children.Add(_waitingStatusTb);
+        AutoScroll();
 
         if (_curBlocks.Count > 0)
             _allSubTurnBlocks.Add(new List<BlockInfo>(_curBlocks));
@@ -360,8 +509,10 @@ public sealed class AgentSession
     void EnsureCurBlock(Brush primary, Brush secondary)
     {
         if (_curBlock != null) return;
+        if (_waitingStatusTb != null) { _msgStack!.Children.Remove(_waitingStatusTb); _waitingStatusTb = null; }
         _curBlock = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4, 48, 4), HorizontalAlignment = HorizontalAlignment.Stretch };
         _msgStack!.Children.Add(_curBlock);
+        AutoScroll();
     }
 
     BlockInfo CreateThinkingBlock(Brush primary, Brush secondary)
