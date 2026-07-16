@@ -2,6 +2,9 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Media.Core;
+using Windows.Media.Playback;
+using Windows.Storage.Streams;
 using LauncherHost.Services;
 using SharedUtils;
 using Windows.UI;
@@ -46,6 +49,8 @@ public sealed class AgentSession
 
     static readonly string[] SpinnerFrames = { "\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F" };
 
+    static MediaPlayer? _activeAudioPlayer;
+
     public AgentSession(AgentService service, Grid parentGrid)
     {
         _service = service;
@@ -70,6 +75,179 @@ public sealed class AgentSession
         _service.ExpandCotChanged += ApplyExpandMode;
         _service.OnAgentRetry += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = RetryTint; });
         _service.OnAgentRetryExhausted += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = null; });
+    }
+
+    public TextBlock CreateAudioBubble(byte[] wav, string initialTranscription, TimeSpan duration)
+    {
+        if (_service.IsBusy)
+        {
+            LogService.Warn("[AgentSession.SendAudio] blocked, service busy");
+            return null!;
+        }
+
+        try
+        {
+        LogService.Info($"[AgentSession.SendAudio] entry, wav={wav.Length}bytes transLen={initialTranscription?.Length ?? 0} dur={duration.TotalSeconds:F1}s msgStack={_msgStack != null} bubble={_bubble != null}");
+
+        var theme = _parentGrid.ActualTheme;
+        var primary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+        var secondary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var bgColor = theme == ElementTheme.Light
+            ? Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC)
+            : Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC);
+
+        EnsureBubble(_parentGrid, primary, secondary);
+        LogService.Info($"[AgentSession.SendAudio] EnsureBubble done, msgStack={_msgStack != null}");
+
+        // audio player
+        var playBtn = new Button
+        {
+            Width = 32, Height = 32, Padding = new Thickness(0),
+            Content = new FontIcon { Glyph = "\uE102", FontSize = 12 },
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var durText = new TextBlock
+        {
+            Text = $"{(int)duration.TotalMinutes}:{duration.Seconds:D2}",
+            FontSize = 11, Foreground = secondary, Opacity = 0.7,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 0)
+        };
+
+        var wavCopy = wav;
+        var player = new MediaPlayer();
+
+        playBtn.Click += (_, _) =>
+        {
+            if (_activeAudioPlayer != null && _activeAudioPlayer != player)
+            {
+                _activeAudioPlayer.Pause();
+                _activeAudioPlayer.Source = null;
+                _activeAudioPlayer = null;
+            }
+
+            if (player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
+            {
+                player.Pause();
+                ((FontIcon)playBtn.Content).Glyph = "\uE102";
+            }
+            else
+            {
+                if (player.Source == null)
+                {
+                    var audioStream = new InMemoryRandomAccessStream();
+                    var writer = new DataWriter(audioStream);
+                    writer.WriteBytes(wavCopy);
+                    writer.StoreAsync().AsTask().GetAwaiter().GetResult();
+                    writer.DetachStream();
+                    player.Source = MediaSource.CreateFromStream(audioStream, "audio/wav");
+                }
+                player.Play();
+                ((FontIcon)playBtn.Content).Glyph = "\uE103";
+                _activeAudioPlayer = player;
+            }
+        };
+
+        player.MediaEnded += (_, _) =>
+        {
+            _dispatcher.TryEnqueue(() =>
+            {
+                ((FontIcon)playBtn.Content).Glyph = "\uE102";
+                _activeAudioPlayer = null;
+            });
+        };
+
+        var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        audioRow.Children.Add(playBtn);
+        audioRow.Children.Add(durText);
+
+        var bubbleStack = new StackPanel { Spacing = 4 };
+        bubbleStack.Children.Add(audioRow);
+
+        var transcriptionTb = new TextBlock
+        {
+            Text = initialTranscription ?? "转录中…",
+            FontSize = 11, Opacity = 0.7, Foreground = secondary,
+            TextWrapping = TextWrapping.Wrap
+        };
+        bubbleStack.Children.Add(transcriptionTb);
+
+        var bubble = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = new Thickness(48, 4, 0, 4),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Background = new SolidColorBrush(bgColor),
+            Child = bubbleStack,
+            MaxWidth = 360
+        };
+        _msgStack!.Children.Add(bubble);
+        LogService.Info($"[AgentSession.SendAudio] user bubble added, msgStackChildren={_msgStack.Children.Count}");
+
+        if (_curBlocks.Count > 0)
+        {
+            LogService.Info($"[AgentSession.SendAudio] archiving {_curBlocks.Count} curBlocks");
+            _allSubTurnBlocks.Add(new List<BlockInfo>(_curBlocks));
+        }
+        _curBlocks.Clear();
+        _curBlock = null;
+        _thinkingActive = false;
+        _toolActive = false;
+        _curThinkingPh = null;
+        _curToolPh = null;
+
+        return transcriptionTb;
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "[AgentSession.CreateAudioBubble] failed");
+            return null!;
+        }
+    }
+
+    public void SendAudioToLlm(byte[] wav, string transcription)
+    {
+        LogService.Info($"[AgentSession.SendAudioToLlm] sending, transLen={transcription?.Length ?? 0}, audioBase64={wav.Length}bytes");
+
+        var theme = _parentGrid.ActualTheme;
+        var primary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+        var secondary = theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
+        var parts = new List<ContentPart>
+        {
+            new("input_audio", new() { ["data"] = $"data:audio/wav;base64,{Convert.ToBase64String(wav)}" })
+        };
+        if (!string.IsNullOrWhiteSpace(transcription))
+            parts.Add(new("text", new() { ["text"] = transcription }));
+
+        _ = _service.SendWithParts(parts,
+            onThinking: d => _dispatcher.TryEnqueue(() => OnThinkingDelta(d, primary, secondary)),
+            onContent: d => _dispatcher.TryEnqueue(() => OnContentDelta(d, primary, secondary)),
+            onToolStart: (name, _) => _dispatcher.TryEnqueue(() => OnToolStartDelta(name, primary, secondary)),
+            onToolResult: (name, _) => _dispatcher.TryEnqueue(() => OnToolDoneDelta(name, primary, secondary)),
+            onError: err => _dispatcher.TryEnqueue(() =>
+            {
+                if (_msgStack != null)
+                {
+                    var errBlock = new Border
+                    {
+                        CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6, 10, 6),
+                        Margin = new Thickness(0, 4, 48, 4), HorizontalAlignment = HorizontalAlignment.Left,
+                        Background = new SolidColorBrush(Color.FromArgb(0x1A, 0xE0, 0x3A, 0x3A)),
+                        Child = new TextBlock { Text = err, FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A)), TextWrapping = TextWrapping.Wrap }
+                    };
+                    _msgStack.Children.Add(errBlock);
+                    AutoScroll();
+                }
+            }));
     }
 
     public async void Send(string input, FrameworkElement source)
@@ -139,6 +317,7 @@ public sealed class AgentSession
             return _curBlocks[^1];
 
         LogService.Info($"[AgentSession] EnsureBlock new type={type} after cur={_curBlocks.Count}");
+        DiscardEmptyBlock();
         CloseLastBlock();
         return type switch
         {
@@ -147,6 +326,18 @@ public sealed class AgentSession
             BlockType.Output => CreateOutputBlock(primary, secondary),
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
+    }
+
+    void DiscardEmptyBlock()
+    {
+        if (_curBlocks.Count == 0 || _curBlock == null) return;
+        var bi = _curBlocks[^1];
+        if (bi.Text.Length == 0 && bi.Container != null)
+        {
+            _curBlock.Children.Remove(bi.Container);
+            if (bi.CollapsedPh != null) _curBlock.Children.Remove(bi.CollapsedPh);
+            _curBlocks.RemoveAt(_curBlocks.Count - 1);
+        }
     }
 
     void CloseLastBlock()
@@ -232,7 +423,7 @@ public sealed class AgentSession
         };
         _curBlock.Children.Add(sv);
 
-        var bi = new BlockInfo { Type = BlockType.Output, Container = host, PrimaryBrush = primary, SecondaryBrush = secondary };
+        var bi = new BlockInfo { Type = BlockType.Output, Container = sv, PrimaryBrush = primary, SecondaryBrush = secondary };
         _curBlocks.Add(bi);
         return bi;
     }
@@ -274,7 +465,7 @@ public sealed class AgentSession
         _toolActive = false;
         bi.Text += delta;
 
-        var host = (Grid)bi.Container;
+        var host = (Grid)((ScrollViewer)bi.Container).Content;
         try
         {
             UIElement rendered = string.IsNullOrEmpty(bi.Text)

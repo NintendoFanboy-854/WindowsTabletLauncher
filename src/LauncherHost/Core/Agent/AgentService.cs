@@ -8,11 +8,12 @@ public sealed class AgentService
     readonly ToolRegistry _toolRegistry;
     readonly MemoryStore _memory = new();
     readonly ConversationHistory _history = new();
-    DeepSeekClient? _client;
+    ChatClient? _client;
     AgentLoop? _currentLoop;
     CancellationTokenSource? _cts;
     string _model = "deepseek-v4-pro";
     string _thinking = "none";
+    string _provider = "deepseek";
 
     public event Action<string>? OnThinking;
     public event Action<string>? OnContent;
@@ -25,6 +26,7 @@ public sealed class AgentService
     public string? LastError { get; private set; }
     public string Model => _model;
     public string Thinking => _thinking;
+    public string Provider => _provider;
     public ConversationHistory History => _history;
 
     public AgentService(IHostHandle host)
@@ -37,9 +39,26 @@ public sealed class AgentService
 
     public void ReloadConfig()
     {
-        _model = _host.GetConfig("host", "agent_model") ?? "deepseek-v4-pro";
-        _thinking = _host.GetConfig("host", "agent_thinking") ?? "none";
+        _provider = _host.GetConfig("host", "agent_provider") ?? "deepseek";
+        _model = _host.GetConfig("host", $"agent_model.{_provider}")
+            ?? _host.GetConfig("host", "agent_model")
+            ?? "deepseek-v4-pro";
+        _thinking = _host.GetConfig("host", $"agent_thinking.{_provider}")
+            ?? _host.GetConfig("host", "agent_thinking")
+            ?? "none";
     }
+
+    string GetApiKey()
+    {
+        var key = _host.GetConfig("host", $"agent_api_key.{_provider}");
+        if (!string.IsNullOrWhiteSpace(key)) return key!;
+        return _host.GetConfig("host", "agent_api_key") ?? "";
+    }
+
+    public string MimoApiKey =>
+        _host.GetConfig("host", "agent_api_key.mimo")
+        ?? _host.GetConfig("host", "mimo_api_key")
+        ?? "";
 
     public bool ExpandCot => (_host.GetConfig("host", "agent_expand_cot") ?? "false") == "true";
     public event Action? ExpandCotChanged;
@@ -50,7 +69,37 @@ public sealed class AgentService
     public void RefreshTools()
     {
         _toolRegistry.Refresh();
-        _host.Log($"Agent: {_toolRegistry.GetActiveToolCount()} tools, model={_model} thinking={_thinking}");
+        _host.Log($"Agent: {_toolRegistry.GetActiveToolCount()} tools, model={_model} thinking={_thinking} provider={_provider}");
+    }
+
+    static bool IsMultimodalModel(string model) => model == "mimo-v2.5";
+
+    public void EnsureClient()
+    {
+        var apiKey = GetApiKey();
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return;
+
+        var oldProvider = _client?.Provider;
+        if (_client != null && _provider == oldProvider && _client.Config.Model == _model
+            && _client.Config.Thinking == _thinking && _client.Config.ApiKey == apiKey)
+            return;
+
+        var supportsMultimodal = IsMultimodalModel(_model);
+        var isMimo = _provider == "mimo";
+
+        var config = new ProviderClientConfig(
+            _provider,
+            isMimo ? "https://api.xiaomimimo.com/v1" : "https://api.deepseek.com",
+            apiKey,
+            _model,
+            _thinking,
+            isMimo ? "api-key" : "authorization",
+            supportsMultimodal,
+            !isMimo);
+
+        _client?.Dispose();
+        _client = new ChatClient(config);
     }
 
     public async Task SendAsync(string userInput,
@@ -60,27 +109,44 @@ public sealed class AgentService
         Action<string, string>? onToolResult = null,
         Action<string>? onError = null)
     {
+        await SendCoreAsync(
+            (loop, ct) => loop.RunAsync(userInput, ct),
+            onThinking, onContent, onToolStart, onToolResult, onError);
+    }
+
+    public async Task SendWithParts(List<ContentPart> parts,
+        Action<string>? onThinking = null,
+        Action<string>? onContent = null,
+        Action<string, string>? onToolStart = null,
+        Action<string, string>? onToolResult = null,
+        Action<string>? onError = null)
+    {
+        await SendCoreAsync(
+            (loop, ct) => loop.RunWithParts(parts, ct),
+            onThinking, onContent, onToolStart, onToolResult, onError);
+    }
+
+    async Task SendCoreAsync(
+        Func<AgentLoop, CancellationToken, Task<string>> run,
+        Action<string>? onThinking,
+        Action<string>? onContent,
+        Action<string, string>? onToolStart,
+        Action<string, string>? onToolResult,
+        Action<string>? onError)
+    {
         if (IsBusy) return;
 
         ReloadConfig();
-        var apiKey = _host.GetConfig("host", "agent_api_key");
-        if (string.IsNullOrWhiteSpace(apiKey))
+        EnsureClient();
+
+        if (_client == null)
         {
-            onError?.Invoke("请先在设置中填写 DeepSeek API Key");
+            onError?.Invoke("请先在设置中填写 API Key");
             return;
         }
 
-        bool needNewClient = _client == null;
-        if (!needNewClient) needNewClient = true;
-
-        if (needNewClient)
-        {
-            try { _client = new DeepSeekClient(apiKey, _model, _thinking); }
-            catch (Exception ex) { onError?.Invoke("API Key 无效: " + ex.Message); return; }
-        }
-
         _cts = new CancellationTokenSource();
-        _currentLoop = new AgentLoop(_client!, _toolRegistry, _memory, apiKey, _history);
+        _currentLoop = new AgentLoop(_client, _toolRegistry, _memory, _history);
 
         _currentLoop.OnThinking += d => { onThinking?.Invoke(d); OnThinking?.Invoke(d); };
         _currentLoop.OnContent += d => { onContent?.Invoke(d); OnContent?.Invoke(d); };
@@ -102,7 +168,7 @@ public sealed class AgentService
 
         try
         {
-            var result = await _currentLoop.RunAsync(userInput, _cts.Token);
+            var result = await run(_currentLoop, _cts.Token);
             _host.Log($"Agent: completed, length={result.Length}");
         }
         catch (OperationCanceledException) { }
@@ -120,6 +186,17 @@ public sealed class AgentService
             _cts = null;
             NotifyBusy();
         }
+    }
+
+    public void SwitchProvider(string provider)
+    {
+        if (IsBusy) return;
+        _provider = provider;
+        _host.SetConfig("host", "agent_provider", provider);
+        ClearHistory();
+        _client?.Dispose();
+        _client = null;
+        _host.Log($"Agent: switched provider to {provider}");
     }
 
     public void Abort()

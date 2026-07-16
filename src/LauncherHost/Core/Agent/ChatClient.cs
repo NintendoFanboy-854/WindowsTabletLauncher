@@ -16,24 +16,32 @@ public record AgentResponse(
     List<AgentToolCall>? ToolCalls,
     bool IsError = false);
 
-public sealed class DeepSeekClient : IDisposable
+public sealed class ChatClient : IDisposable
 {
     readonly HttpClient _http;
-    readonly string _model;
-    readonly string _thinking;
+    readonly ProviderClientConfig _cfg;
     static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public DeepSeekClient(string apiKey, string model = "deepseek-v4-pro", string thinking = "none")
+    public ProviderClientConfig Config => _cfg;
+    public string Provider => _cfg.ProviderName;
+
+    public ChatClient(ProviderClientConfig config)
     {
-        _model = model;
-        _thinking = thinking;
+        _cfg = config;
         _http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-        _http.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", apiKey);
+        if (config.AuthHeaderName == "api-key")
+        {
+            _http.DefaultRequestHeaders.Add("api-key", config.ApiKey);
+        }
+        else
+        {
+            _http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", config.ApiKey);
+        }
     }
 
     public void Dispose() => _http.Dispose();
@@ -45,7 +53,7 @@ public sealed class DeepSeekClient : IDisposable
         Action<string>? onContent,
         CancellationToken ct)
     {
-        var hasThinking = _thinking != "none";
+        var hasThinking = _cfg.Thinking != "none";
         var body = BuildBody(messages, tools, stream: true);
 
         var lastMsg = messages.Count > 0 ? messages[^1] : null;
@@ -67,35 +75,50 @@ public sealed class DeepSeekClient : IDisposable
         }
         if (lastPreview.Length > 100) lastPreview = lastPreview[..100] + "...";
 
-        LogService.Info($"[AgentReq] model={_model} thinking={_thinking} tools={tools?.Count ?? 0} msgs={messages.Count} last=({lastRole}) {lastPreview}");
+        LogService.Info($"[AgentReq] model={_cfg.Model} thinking={_cfg.Thinking} tools={tools?.Count ?? 0} msgs={messages.Count} last=({lastRole}) {lastPreview}");
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.deepseek.com/chat/completions")
+        var url = $"{_cfg.BaseUrl.TrimEnd('/')}/chat/completions";
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")
         };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            LogService.Error($"[AgentErr] HTTP {(int)response.StatusCode}: {errorBody}");
+            LogService.Info($"[AgentReqBody] {body}");
+            response.EnsureSuccessStatusCode();
+        }
 
         using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
+        LogService.Info("[SSE] read started, waiting for chunks...");
         var contentBuilder = new StringBuilder();
         var reasoningBuilder = new StringBuilder();
         var toolCallAccum = new Dictionary<int, (string Id, string Name, StringBuilder Args)>();
+        bool firstChunk = true;
 
         while (true)
         {
             string? line;
             try { line = await reader.ReadLineAsync(ct); }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) { LogService.Info("[SSE] cancelled"); break; }
             catch { break; }
-            if (line == null) break;
+            if (line == null) { LogService.Info("[SSE] connection closed"); break; }
             if (line == "") continue;
             if (!line.StartsWith("data: ")) continue;
             var json = line[6..];
-            if (json == "[DONE]") break;
+            if (json == "[DONE]") { LogService.Info("[SSE] DONE"); break; }
+
+            if (firstChunk)
+            {
+                LogService.Info("[SSE] first chunk received");
+                firstChunk = false;
+            }
 
             try
             {
@@ -200,12 +223,12 @@ public sealed class DeepSeekClient : IDisposable
     {
         var body = new Dictionary<string, object>
         {
-            ["model"] = _model,
+            ["model"] = _cfg.Model,
             ["messages"] = messages,
             ["stream"] = stream,
         };
 
-        if (_thinking == "none")
+        if (_cfg.Thinking == "none")
         {
             body["temperature"] = 0.1;
             body["thinking"] = new { type = "disabled" };
@@ -213,7 +236,8 @@ public sealed class DeepSeekClient : IDisposable
         else
         {
             body["thinking"] = new { type = "enabled" };
-            body["reasoning_effort"] = _thinking;
+            if (_cfg.SupportsThinkingEffort)
+                body["reasoning_effort"] = _cfg.Thinking;
         }
 
         if (tools is { Count: > 0 })
@@ -233,4 +257,133 @@ public sealed class DeepSeekClient : IDisposable
 
         return JsonSerializer.Serialize(body, JsonOpts);
     }
-}
+
+    public static async Task<string?> TranscribeAsync(string apiKey, byte[] wav, CancellationToken ct)
+    {
+        try
+        {
+            var base64 = Convert.ToBase64String(wav);
+            var body = new Dictionary<string, object>
+            {
+                ["model"] = "mimo-v2.5-asr",
+                ["messages"] = new[]
+                {
+                    new
+                    {
+                        role = "user",
+                        content = new[]
+                        {
+                            new
+                            {
+                                type = "input_audio",
+                                input_audio = new { data = $"data:audio/wav;base64,{base64}" }
+                            }
+                        }
+                    }
+                },
+                ["asr_options"] = new { language = "auto" },
+                ["stream"] = false
+            };
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+            http.DefaultRequestHeaders.Add("api-key", apiKey);
+
+            var json = JsonSerializer.Serialize(body, JsonOpts);
+            var resp = await http.PostAsync(
+                "https://api.xiaomimimo.com/v1/chat/completions",
+                new StringContent(json, Encoding.UTF8, "application/json"),
+                ct);
+            resp.EnsureSuccessStatusCode();
+
+            var respText = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(respText);
+            var content = doc.RootElement.GetProperty("choices")[0]
+                .GetProperty("message").GetProperty("content").GetString();
+            return content?.Trim();
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn($"[ChatClient.Transcribe] ASR failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        public static async Task<string?> TranscribeStreamAsync(string apiKey, byte[] wav, Action<string> onDelta, CancellationToken ct)
+        {
+            try
+            {
+                var base64 = Convert.ToBase64String(wav);
+                var body = new Dictionary<string, object>
+                {
+                    ["model"] = "mimo-v2.5-asr",
+                    ["messages"] = new[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            content = new[]
+                            {
+                                new
+                                {
+                                    type = "input_audio",
+                                    input_audio = new { data = $"data:audio/wav;base64,{base64}" }
+                                }
+                            }
+                        }
+                    },
+                    ["asr_options"] = new { language = "auto" },
+                    ["stream"] = true
+                };
+
+                using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+                http.DefaultRequestHeaders.Add("api-key", apiKey);
+
+                var json = JsonSerializer.Serialize(body, JsonOpts);
+                var req = new HttpRequestMessage(HttpMethod.Post, "https://api.xiaomimimo.com/v1/chat/completions")
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                req.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+                using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                resp.EnsureSuccessStatusCode();
+
+                using var stream = await resp.Content.ReadAsStreamAsync(ct);
+                using var reader = new StreamReader(stream);
+                var fullText = new StringBuilder();
+
+                while (true)
+                {
+                    string? line;
+                    try { line = await reader.ReadLineAsync(ct); }
+                    catch (OperationCanceledException) { break; }
+                    catch { break; }
+                    if (line == null) break;
+                    if (line == "" || !line.StartsWith("data: ")) continue;
+                    var data = line[6..];
+                    if (data == "[DONE]") break;
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(data);
+                        var choices = doc.RootElement.GetProperty("choices");
+                        if (choices.GetArrayLength() == 0) continue;
+                        var delta = choices[0].GetProperty("delta");
+                        if (delta.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+                        {
+                            var text = c.GetString() ?? "";
+                            fullText.Append(text);
+                            onDelta(text);
+                        }
+                    }
+                    catch { }
+                }
+                return fullText.ToString().Trim();
+            }
+            catch (Exception ex)
+            {
+                LogService.Warn($"[ChatClient.TranscribeStream] ASR failed: {ex.Message}");
+                return null;
+            }
+        }
+    }

@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     DashboardPage? _dashboard;
     AgentService? _agentService;
     AgentSession? _agentSession;
+    VoiceSession? _voiceSession;
     MemoryStore? _agentMemory;
     List<IPlugin> _plugins = new();
     List<PluginContract.IPluginSettings> _pluginSettings = new();
@@ -103,6 +104,23 @@ public sealed partial class MainWindow : Window
                 _agentService!.RefreshTools();
 
                 _agentSession = new AgentSession(_agentService, (Grid)Content);
+
+                _voiceSession = new VoiceSession(_agentService, DispatcherQueue, _agentSession);
+                var micBgBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0x40, 0x60, 0xA0, 0xFF));
+                _voiceSession.OnStateChanged += state =>
+                {
+                    LogService.Info($"[MainWindow] voice state → {state}");
+                    if (state == VoiceState.Recording)
+                        MicBtn.Background = micBgBrush;
+                    else
+                        MicBtn.ClearValue(Button.BackgroundProperty);
+                };
+
+                MicBtn.Click += (_, _) =>
+                {
+                    LogService.Info($"[MainWindow] mic clicked, voiceState={_voiceSession.State}");
+                    _voiceSession.Toggle();
+                };
 
                 AgentInput.PlaceholderText = _hostHandle.Translate("agent.placeholder");
                 AgentSendBtn.Content = _hostHandle.Translate("agent.send");

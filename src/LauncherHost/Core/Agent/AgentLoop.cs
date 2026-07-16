@@ -7,9 +7,9 @@ public sealed class AgentLoop
 {
     readonly ConversationHistory _history;
     readonly ToolRegistry _toolRegistry;
-    readonly DeepSeekClient _client;
+    readonly ChatClient _client;
     readonly MemoryStore _memory;
-    readonly string _apiKey;
+    readonly string _model;
     int _maxTurns = 10;
     int _retryAttempt;
     const int MaxRetry = 3;
@@ -23,13 +23,13 @@ public sealed class AgentLoop
     public event Action? OnRetry;
     public event Action? OnRetryExhausted;
 
-    public AgentLoop(DeepSeekClient client, ToolRegistry toolRegistry, MemoryStore memory, string apiKey,
+    public AgentLoop(ChatClient client, ToolRegistry toolRegistry, MemoryStore memory,
         ConversationHistory? history = null, string? systemPrompt = null)
     {
         _client = client;
         _toolRegistry = toolRegistry;
         _memory = memory;
-        _apiKey = apiKey;
+        _model = client.Config.Model;
         _history = history ?? new ConversationHistory();
         _history.SystemPrompt = BuildSystemPrompt(systemPrompt ?? DefaultSystemPrompt);
     }
@@ -46,7 +46,17 @@ public sealed class AgentLoop
     public async Task<string> RunAsync(string userInput, CancellationToken ct)
     {
         _history.AddUserMessage(userInput);
+        return await RunLoopAsync(ct);
+    }
 
+    public async Task<string> RunWithParts(List<ContentPart> parts, CancellationToken ct)
+    {
+        _history.AddUserMessage(parts);
+        return await RunLoopAsync(ct);
+    }
+
+    async Task<string> RunLoopAsync(CancellationToken ct)
+    {
         for (int turn = 0; turn < _maxTurns && !ct.IsCancellationRequested; turn++)
         {
             LogService.Info($"[AgentTurn] sub_turn={turn} msgs={_history.Messages.Count}");
@@ -56,7 +66,7 @@ public sealed class AgentLoop
             try
             {
                 response = await _client.SendAndCollectAsync(
-                    _history.ToApiMessages(),
+                    _history.ToApiMessages(_model),
                     tools.Count > 0 ? tools : null,
                     delta => OnThinking?.Invoke(delta),
                     delta => OnContent?.Invoke(delta),
@@ -73,8 +83,8 @@ public sealed class AgentLoop
             {
                 _retryAttempt = 0;
                 _history.AddAssistantMessage(
-                    response.Content,
-                    response.ThinkingContent,
+                    response.Content?.Trim(),
+                    response.ThinkingContent?.Trim(),
                     response.ToolCalls.Select(tc =>
                         new ToolCallInfo(tc.Id, "function", new FunctionCallInfo(tc.Name, tc.Arguments))
                     ).ToList());
@@ -84,16 +94,16 @@ public sealed class AgentLoop
                     OnToolStart?.Invoke(tc.Name, tc.Arguments);
                     var result = await _toolRegistry.InvokeAsync(tc.Name, tc.Arguments);
                     OnToolResult?.Invoke(tc.Name, result);
-                    _history.AddToolResult(tc.Id, tc.Name, result);
+                    _history.AddToolResult(tc.Id, tc.Name, result.Trim());
                 }
             }
             else
             {
-                var finalText = response.Content ?? "";
+                var finalText = (response.Content ?? "").Trim();
                 if (!string.IsNullOrWhiteSpace(finalText))
                 {
                     _retryAttempt = 0;
-                    _history.AddAssistantMessage(finalText, response.ThinkingContent, null);
+                    _history.AddAssistantMessage(finalText, response.ThinkingContent?.Trim(), null);
                     await MaybeCompressAsync();
                     return finalText;
                 }
@@ -122,7 +132,7 @@ public sealed class AgentLoop
     {
         if (_history.EstimateTokenCount() > CompressThreshold)
         {
-            try { await _history.CompressAsync(_apiKey, _memory.ToPromptSection()); }
+            try { await _history.CompressAsync(_client, _memory.ToPromptSection()); }
             catch (Exception ex) { OnError?.Invoke("压缩失败: " + ex.Message); }
         }
     }

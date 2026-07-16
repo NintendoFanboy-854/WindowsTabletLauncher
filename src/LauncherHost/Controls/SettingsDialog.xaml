@@ -57,19 +57,17 @@
                     <Border Margin="0,4,0,0" Padding="0" />
                     <Expander x:Name="AiExpander" Header="AI 设置" IsExpanded="False">
                         <StackPanel Spacing="12" Margin="0,8,0,0">
+                            <ComboBox x:Name="ProviderCombo" Header="服务提供商" HorizontalAlignment="Stretch">
+                                <ComboBoxItem Tag="deepseek">DeepSeek</ComboBoxItem>
+                                <ComboBoxItem Tag="mimo">MiMo</ComboBoxItem>
+                            </ComboBox>
                             <TextBox x:Name="ApiKeyBox" PlaceholderText="sk-…" HorizontalAlignment="Stretch" />
                             <StackPanel Orientation="Horizontal" Spacing="12">
-                                <ComboBox x:Name="ModelCombo" Header="AI 模型" MinWidth="140">
-                                    <ComboBoxItem Tag="deepseek-v4-pro">DeepSeek V4 Pro</ComboBoxItem>
-                                    <ComboBoxItem Tag="deepseek-v4-flash">DeepSeek V4 Flash</ComboBoxItem>
-                                </ComboBox>
-                                <ComboBox x:Name="ThinkingCombo" Header="思考档位" MinWidth="100">
-                                    <ComboBoxItem Tag="none">无</ComboBoxItem>
-                                    <ComboBoxItem Tag="high">High</ComboBoxItem>
-                                    <ComboBoxItem Tag="max">Max</ComboBoxItem>
-                                </ComboBox>
+                                <ComboBox x:Name="ModelCombo" Header="AI 模型" MinWidth="140" />
+                                <ComboBox x:Name="ThinkingCombo" Header="思考档位" MinWidth="100" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ExpandCotToggle" Header="展开思维链与工具调用" />
+                            <ToggleSwitch x:Name="VoiceAutoToggle" Header="语音自动聆听" />
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <TextBlock x:Name="MemoryLabel" Text="AI 记忆: 0 条" FontSize="12" VerticalAlignment="Center" Opacity="0.7" />
                                 <Button x:Name="ViewMemoryBtn" Content="查看" FontSize="11" Width="48" Height="28" Padding="0" />

@@ -11,6 +11,8 @@
 
 ## Build & Run
 
+You MUST use following scripts to build and run the launcher. Do NOT use `dotnet publish` or `dotnet run` directly — they will fail due to WinUI self-contained publish quirks.
+
 ```powershell
 .\build-release.ps1    # Publishes all plugins + self-contained host → bin\Release\
 .\launch.ps1           # Runs bin\Release\LauncherHost.exe (fails if not built)
