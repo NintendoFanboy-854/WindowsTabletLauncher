@@ -16,6 +16,7 @@ public sealed class Subtask
 
 public sealed class TodoItem
 {
+    public string Id { get; set; } = "";
     public string Text { get; set; } = "";
     public bool Done { get; set; }
     public DateTime? Deadline { get; set; }
@@ -48,11 +49,27 @@ public sealed class TodoStore
 
     public List<TodoItem> Items { get; private set; } = new();
 
+    readonly List<string> _lists = new();
+
     public event Action? Changed;
 
+    string[]? _cachedListNames;
+    bool _dirty;
+
+    void InvalidateListNamesCache() => _cachedListNames = null;
+    public void MarkDirty() => _dirty = true;
+
     public string[] ListNames
-        => new[] { InboxList, DefaultList }.Concat(
-            Items.Select(i => i.List).Where(s => !string.IsNullOrWhiteSpace(s) && s != DefaultList && s != InboxList).Distinct().OrderBy(s => s)).ToArray();
+    {
+        get
+        {
+            if (_cachedListNames != null) return _cachedListNames;
+            _cachedListNames = new[] { InboxList, DefaultList }.Concat(_lists)
+                .Concat(Items.Select(i => i.List).Where(s => !string.IsNullOrWhiteSpace(s) && s != DefaultList && s != InboxList))
+                .Distinct().OrderBy(s => s).ToArray();
+            return _cachedListNames;
+        }
+    }
 
     public TodoStore(IHostHandle host)
     {
@@ -66,41 +83,69 @@ public sealed class TodoStore
     void Load()
     {
         var raw = _host.GetConfig(PluginId, "items");
-        if (string.IsNullOrWhiteSpace(raw)) { Items = new(); return; }
-        try
+        if (string.IsNullOrWhiteSpace(raw)) { Items = new(); }
+        else
         {
-            Items = JsonSerializer.Deserialize<List<TodoItem>>(raw, Opts) ?? new();
-            // backfill missing List to default
-            foreach (var i in Items)
-                if (string.IsNullOrWhiteSpace(i.List)) i.List = DefaultList;
-            _host.Log($"Todo: loaded {Items.Count} items");
+            try
+            {
+                Items = JsonSerializer.Deserialize<List<TodoItem>>(raw, Opts) ?? new();
+                foreach (var i in Items)
+                {
+                    if (string.IsNullOrWhiteSpace(i.List)) i.List = DefaultList;
+                    if (string.IsNullOrWhiteSpace(i.Id)) i.Id = Guid.NewGuid().ToString();
+                }
+                _host.Log($"Todo: loaded {Items.Count} items");
+            }
+            catch (Exception ex)
+            {
+                _host.LogError($"Todo: failed to load items: {ex.Message}");
+                Items = new();
+            }
         }
-        catch (Exception ex)
+
+        var listsRaw = _host.GetConfig(PluginId, "lists");
+        if (!string.IsNullOrWhiteSpace(listsRaw))
         {
-            _host.LogError($"Todo: failed to load items: {ex.Message}");
-            Items = new();
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<List<string>>(listsRaw, Opts);
+                if (parsed != null) _lists.AddRange(parsed);
+                _host.Log($"Todo: loaded {_lists.Count} lists");
+            }
+            catch (Exception ex)
+            {
+                _host.LogError($"Todo: failed to load lists: {ex.Message}");
+            }
         }
+        _dirty = false;
     }
 
     public void Save()
     {
-        try { _host.SetConfig(PluginId, "items", JsonSerializer.Serialize(Items)); }
+        if (!_dirty) return;
+        try
+        {
+            _host.SetConfig(PluginId, "items", JsonSerializer.Serialize(Items));
+            _host.SetConfig(PluginId, "lists", JsonSerializer.Serialize(_lists));
+        }
         catch (Exception ex) { _host.LogError($"Todo: failed to save items: {ex.Message}"); }
+        _dirty = false;
         Changed?.Invoke();
     }
 
     public TodoItem Add(string text, string? list = null)
     {
-        var item = new TodoItem { Text = text.Trim(), Done = false, List = list ?? DefaultList };
+        var item = new TodoItem { Id = Guid.NewGuid().ToString(), Text = text.Trim(), Done = false, List = list ?? DefaultList };
         Items.Add(item);
+        _dirty = true; InvalidateListNamesCache();
         _host.Log($"Todo: add '{item.Text}' in list '{item.List}'");
-        Save();
         return item;
     }
 
     public void ToggleSubtask(TodoItem item, Subtask st, bool autoComplete)
     {
         st.Done = !st.Done;
+        _dirty = true;
         if (autoComplete && !item.Done && item.Subtasks.Count > 0 && item.Subtasks.All(s => s.Done))
         {
             item.Done = true;
@@ -113,76 +158,81 @@ public sealed class TodoStore
     public void Toggle(TodoItem item)
     {
         item.Done = !item.Done;
+        _dirty = true;
         if (item.Done) item.CompletedDate = DateTime.Today;
         else item.CompletedDate = null;
         Save();
     }
 
-    public void Delete(TodoItem item) { Items.Remove(item); Save(); }
+    public void Delete(TodoItem item) { Items.Remove(item); _dirty = true; InvalidateListNamesCache(); Save(); }
 
     public void ClearCompleted(string? list = null)
     {
         var n = list != null
             ? Items.RemoveAll(i => i.Done && i.List == list)
             : Items.RemoveAll(i => i.Done);
+        _dirty = true; InvalidateListNamesCache();
         _host.Log($"Todo: cleared {n} completed");
         Save();
     }
 
-    public bool CompleteByText(string text)
-    {
-        var item = Items.FirstOrDefault(i => !i.Done && i.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
-        if (item == null) return false;
-        item.Done = true;
-        Save();
-        return true;
-    }
-
-    public bool UncompleteByText(string text)
-    {
-        var item = Items.FirstOrDefault(i => i.Done && i.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
-        if (item == null) return false;
-        item.Done = false;
-        Save();
-        return true;
-    }
-
-    public bool DeleteByText(string text)
-    {
-        var item = Items.FirstOrDefault(i => i.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
-        if (item == null) return false;
-        Items.Remove(item); Save();
-        return true;
-    }
-
-    public TodoItem? FindByText(string text)
-        => Items.FirstOrDefault(i => i.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
+    public TodoItem? FindById(string id)
+        => Items.FirstOrDefault(i => i.Id == id);
 
     public void MoveToExistingList(TodoItem item, string list)
     {
         item.List = string.IsNullOrWhiteSpace(list) ? DefaultList : list;
+        _dirty = true; InvalidateListNamesCache();
         Save();
     }
 
     public void RenameList(string oldName, string newName)
     {
-        if (oldName == DefaultList) return;
+        if (oldName == DefaultList || oldName == InboxList) return;
+        for (int i = 0; i < _lists.Count; i++)
+        {
+            if (_lists[i] == oldName) _lists[i] = newName;
+        }
         foreach (var i in Items.Where(i => i.List == oldName))
             i.List = newName;
+        _dirty = true; InvalidateListNamesCache();
         Save();
     }
 
-    // sort key for display ordering: overdue → today → future → no deadline, then by priority desc, then by deadline asc
-    public static int SortOrder(TodoItem i)
+    public bool CreateList(string name)
     {
-        var now = DateTime.Now;
-        if (i.Done) return 6;         // done always last
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        if (name == DefaultList || name == InboxList) return false;
+        if (_lists.Contains(name)) return false;
+        _lists.Add(name);
+        _dirty = true; InvalidateListNamesCache();
+        Save();
+        return true;
+    }
+
+    public bool DeleteList(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        if (name == DefaultList || name == InboxList) return false;
+        _lists.Remove(name);
+        var toRemove = Items.Where(i => i.List == name).ToList();
+        foreach (var i in toRemove) Items.Remove(i);
+        _dirty = true; InvalidateListNamesCache();
+        Save();
+        return true;
+    }
+
+    public static int SortOrder(TodoItem i) => SortOrder(i, DateTime.Now);
+
+    public static int SortOrder(TodoItem i, DateTime now)
+    {
+        if (i.Done) return 6;
         if (i.Deadline is { } d)
         {
-            if (d < now) return 0;   // overdue
-            if (d.Date == now.Date) return 1;  // today
-            return 2;                // future
+            if (d < now) return 0;
+            if (d.Date == now.Date) return 1;
+            return 2;
         }
-        return 3;                    // no deadline
+        return 3;
     }
 }

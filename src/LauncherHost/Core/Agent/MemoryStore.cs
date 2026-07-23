@@ -20,13 +20,7 @@ public sealed class MemoryStore
 
     public void SetFact(string key, string value)
     {
-        var existing = _facts.FindIndex(f => f.Key == key);
-        if (existing >= 0) _facts[existing] = (key, value);
-        else _facts.Add((key, value));
-
-        while (_facts.Count > MaxFacts)
-            _facts.RemoveAt(0);
-
+        SetFactInternal(key, value);
         Save();
     }
 
@@ -42,11 +36,22 @@ public sealed class MemoryStore
                     var key = f.GetProperty("key").GetString();
                     var value = f.GetProperty("value").GetString();
                     if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
-                        SetFact(key, value);
+                        SetFactInternal(key, value);
                 }
+                Save();
             }
         }
         catch { }
+    }
+
+    void SetFactInternal(string key, string value)
+    {
+        var existing = _facts.FindIndex(f => f.Key == key);
+        if (existing >= 0) _facts[existing] = (key, value);
+        else _facts.Add((key, value));
+
+        while (_facts.Count > MaxFacts)
+            _facts.RemoveAt(0);
     }
 
     public string ToPromptSection()

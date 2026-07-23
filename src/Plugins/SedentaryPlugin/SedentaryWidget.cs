@@ -22,6 +22,9 @@ public sealed class SedentaryWidget : UserControl
     Ellipse _dot = null!;
     TextBlock _mins = null!;
 
+    Color _lastStatusColor;
+    Brush _statusBrush = new SolidColorBrush();
+
     public SedentaryWidget(IHostHandle host, Func<SedentaryStats> state, Action onReset)
     {
         _host = host;
@@ -66,7 +69,13 @@ public sealed class SedentaryWidget : UserControl
     public void Refresh()
     {
         var s = _state();
-        _dot.Fill = new SolidColorBrush(StatusColor(s.ActiveSeconds, s.ThresholdSeconds));
+        var newColor = StatusColor(s.ActiveSeconds, s.ThresholdSeconds);
+        if (newColor != _lastStatusColor)
+        {
+            _lastStatusColor = newColor;
+            ((SolidColorBrush)_statusBrush).Color = newColor;
+        }
+        _dot.Fill = _statusBrush;
         _mins.Text = $"{s.ActiveSeconds / 60}m";
     }
 
@@ -121,7 +130,7 @@ public sealed class SedentaryWidget : UserControl
         container.Children.Add(grid);
     }
 
-    internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
 
     public void ShowInfoBar(int minutes)
     {
@@ -160,7 +169,21 @@ public sealed class SedentaryWidget : UserControl
             IsLightDismissEnabled = true,
             PreferredPlacement = TeachingTipPlacementMode.Bottom
         };
-        tip.Closed += (_, _) => { };
-        _root.Loaded += (_, _) => { tip.IsOpen = true; };
+
+        if (_root.IsLoaded)
+        {
+            tip.IsOpen = true;
+            return;
+        }
+
+        RoutedEventHandler onLoaded = null!;
+        onLoaded = (_, _) =>
+        {
+            _root.Loaded -= onLoaded;
+            tip.IsOpen = true;
+        };
+        _root.Loaded += onLoaded;
+
+        tip.Closed += (_, _) => _root.Loaded -= onLoaded;
     }
 }

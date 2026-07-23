@@ -17,6 +17,7 @@ public sealed class VoiceSession : IDisposable
     DispatcherQueueTimer? _recordingTimer;
     AgentSession.AudioBubbleRefs? _bubbleRefs;
 
+    readonly object _textLock = new();
     VoiceState _state = VoiceState.Idle;
 
     public event Action<VoiceState>? OnStateChanged;
@@ -112,11 +113,12 @@ public sealed class VoiceSession : IDisposable
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                     await ChatClient.TranscribeStreamAsync(apiKey, wav, delta =>
                     {
-                        fullText.Append(delta);
+                        string current;
+                        lock (_textLock) { fullText.Append(delta); current = fullText.ToString(); }
                         _dispatcher.TryEnqueue(() =>
                         {
                             if (_bubbleRefs != null)
-                                _bubbleRefs.TransTb.Text = fullText.ToString();
+                                _bubbleRefs.TransTb.Text = current;
                         });
                     }, cts.Token);
                     var result = fullText.ToString();

@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-namespace ClockPlugin;
+namespace SharedUtils;
 
-internal static class AgentJson
+public static class AgentJson
 {
     public static string Serialize(object value) => JsonSerializer.Serialize(value);
 

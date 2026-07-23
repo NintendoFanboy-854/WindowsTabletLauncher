@@ -14,6 +14,11 @@ public sealed class DashboardPage
     readonly IHostHandle _host;
     BasePluginOverlay? _overlay;
 
+    static readonly SolidColorBrush _lightPrimary = new(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A));
+    static readonly SolidColorBrush _lightSecondary = new(Color.FromArgb(0x99, 0, 0, 0));
+    static readonly SolidColorBrush _darkPrimary = new(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+    static readonly SolidColorBrush _darkSecondary = new(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+
     public DashboardPage(IHostHandle host)
     {
         _host = host;
@@ -24,12 +29,9 @@ public sealed class DashboardPage
         if (source.XamlRoot == null || _overlay?.IsOpen == true) return;
 
         var theme = source.ActualTheme;
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var (primary, secondary) = theme == ElementTheme.Light
+            ? (_lightPrimary, _lightSecondary)
+            : (_darkPrimary, _darkSecondary);
 
         var body = new StackPanel { Spacing = 24, MinWidth = 480 };
 

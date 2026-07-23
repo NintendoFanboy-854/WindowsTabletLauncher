@@ -67,7 +67,15 @@
                                 <ComboBox x:Name="ThinkingCombo" Header="思考档位" MinWidth="100" />
                             </StackPanel>
                             <ToggleSwitch x:Name="ExpandCotToggle" Header="展开思维链与工具调用" />
-                            <ToggleSwitch x:Name="VoiceAutoToggle" Header="语音自动聆听" />
+                            <ToggleSwitch x:Name="VoiceAutoToggle" Header="语音自动聆听" Visibility="Collapsed" />
+                            <NumberBox x:Name="SilenceFramesBox" Header="无人脸停止聆听(帧)" Minimum="5" Maximum="120" SpinButtonPlacementMode="Inline" Visibility="Collapsed" />
+                            <NumberBox x:Name="CaptureIntervalBox" Header="人脸检测间隔(秒)" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" Visibility="Collapsed" />
+                            <StackPanel x:Name="FaceSection" Spacing="6" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <TextBlock x:Name="FaceStatusLabel" Text="人脸: 未注册" FontSize="12" VerticalAlignment="Center" Opacity="0.7" />
+                                    <Button x:Name="RegisterFaceBtn" Content="注册人脸" FontSize="11" Height="28" Padding="8,0" />
+                                </StackPanel>
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <TextBlock x:Name="MemoryLabel" Text="AI 记忆: 0 条" FontSize="12" VerticalAlignment="Center" Opacity="0.7" />
                                 <Button x:Name="ViewMemoryBtn" Content="查看" FontSize="11" Width="48" Height="28" Padding="0" />

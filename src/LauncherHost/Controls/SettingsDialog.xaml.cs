@@ -1,3 +1,4 @@
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -23,6 +24,11 @@ public sealed partial class SettingsDialog : ContentDialog
     readonly Func<Task> _onExit;
     readonly Func<Task> _onReset;
     readonly Action? _onExpandCotChanged;
+    /* readonly Func<Task<bool>>? _onRegisterFace; */
+    /* readonly Func<string, Task<bool>>? _onReinforceFace; */
+    /* readonly Action<bool>? _onVoiceAutoChanged; */
+    /* readonly Action<string>? _onDeleteFace; */
+    readonly DispatcherQueue _dispatcher;
     readonly List<ComboBox> _pageCombos = new();
     bool _rebuildingAi;
 
@@ -38,7 +44,11 @@ public sealed partial class SettingsDialog : ContentDialog
         Action<string, int> onPageChange,
         Func<Task> onExit,
         Func<Task> onReset,
-        Action? onExpandCotChanged = null)
+        Action? onExpandCotChanged = null
+        /*, Func<Task<bool>>? onRegisterFace = null */
+        /*, Func<string, Task<bool>>? onReinforceFace = null */
+        /*, Action<bool>? onVoiceAutoChanged = null */
+        /*, Action<string>? onDeleteFace = null */)
     {
         InitializeComponent();
         _loc = loc;
@@ -51,6 +61,11 @@ public sealed partial class SettingsDialog : ContentDialog
         _onExit = onExit;
         _onReset = onReset;
         _onExpandCotChanged = onExpandCotChanged;
+        /* _onRegisterFace = onRegisterFace; */
+        /* _onReinforceFace = onReinforceFace; */
+        /* _onVoiceAutoChanged = onVoiceAutoChanged; */
+        /* _onDeleteFace = onDeleteFace; */
+        _dispatcher = DispatcherQueue.GetForCurrentThread();
 
         XamlRoot = App.MainWindow!.Content.XamlRoot;
 
@@ -65,6 +80,7 @@ public sealed partial class SettingsDialog : ContentDialog
         SetupThinkingCombo();
         SetupExpandCot();
         SetupVoiceAuto();
+        /* SetupFaceSection(); */
         SetupNavigation(plugins, pluginSettings);
 
         EditModeToggle.Toggled += (_, _) => _onEditMode(EditModeToggle.IsOn);
@@ -389,9 +405,77 @@ public sealed partial class SettingsDialog : ContentDialog
     void SetupVoiceAuto()
     {
         VoiceAutoToggle.IsOn = (_config.Get("host", "voice_auto") ?? "false") == "true";
+        /* var silenceStr = _config.Get("host", "voice_auto_silence_frames") ?? "10"; */
+        /* SilenceFramesBox.Value = int.TryParse(silenceStr, out var s) ? s : 10; */
+        /* var intervalStr = _config.Get("host", "voice_auto_capture_interval_sec") ?? "2"; */
+        /* CaptureIntervalBox.Value = int.TryParse(intervalStr, out var iv) ? iv : 2; */
+
         VoiceAutoToggle.Toggled += (_, _) =>
+        {
             _config.Set("host", "voice_auto", VoiceAutoToggle.IsOn ? "true" : "false");
+            /* _onVoiceAutoChanged?.Invoke(VoiceAutoToggle.IsOn); */
+        };
+        /* SilenceFramesBox.ValueChanged += (_, _) => */
+        /* { */
+        /*     if (!double.IsNaN(SilenceFramesBox.Value)) */
+        /*         _config.Set("host", "voice_auto_silence_frames", ((int)SilenceFramesBox.Value).ToString()); */
+        /* }; */
+        /* CaptureIntervalBox.ValueChanged += (_, _) => */
+        /* { */
+        /*     if (!double.IsNaN(CaptureIntervalBox.Value)) */
+        /*         _config.Set("host", "voice_auto_capture_interval_sec", ((int)CaptureIntervalBox.Value).ToString()); */
+        /* }; */
     }
+
+    /* void SetupFaceSection() */
+    /* { */
+    /*     RefreshFaceSection(); */
+    /*     _loc.CultureChanged += () => { _dispatcher.TryEnqueue(RefreshFaceSection); }; */
+    /*     RegisterFaceBtn.Click += async (_, _) => */
+    /*     { */
+    /*         if (_onRegisterFace == null) return; */
+    /*         await _onRegisterFace(); */
+    /*         RefreshFaceSection(); */
+    /*     }; */
+    /* } */
+    /* */
+    /* void RefreshFaceSection() */
+    /* { */
+    /*     var namesJson = _config.Get("host", "face_names"); */
+    /*     LogService.Info($"[SettingsDialog] RefreshFace face_names raw: {namesJson ?? "null"}"); */
+    /*     IReadOnlyList<string> names = Array.Empty<string>(); */
+    /*     if (!string.IsNullOrWhiteSpace(namesJson)) */
+    /*     { */
+    /*         var list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(namesJson); */
+    /*         if (list != null) names = list; */
+    /*     } */
+    /*     while (FaceSection.Children.Count > 1) */
+    /*         FaceSection.Children.RemoveAt(1); */
+    /*     if (names.Count == 0) */
+    /*     { */
+    /*         FaceStatusLabel.Text = T("face.not_registered"); */
+    /*     } */
+    /*     else */
+    /*     { */
+    /*         FaceStatusLabel.Text = string.Format(T("face.registered"), names.Count); */
+    /*         foreach (var name in names) */
+    /*         { */
+    /*             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 2, 0, 0) }; */
+    /*             row.Children.Add(new TextBlock { Text = name, FontSize = 12, Opacity = 0.8, VerticalAlignment = VerticalAlignment.Center }); */
+    /*             var reinforceBtn = new Button { Content = T("face.reinforce_btn"), FontSize = 10, Height = 24, Padding = new Thickness(4, 0, 4, 0) }; */
+    /*             var delBtn = new Button { Content = T("face.delete_btn"), FontSize = 10, Height = 24, Padding = new Thickness(4, 0, 4, 0) }; */
+    /*             var capturedName = name; */
+    /*             reinforceBtn.Click += async (_, _) => { if (_onReinforceFace != null) await _onReinforceFace(capturedName); RefreshFaceSection(); }; */
+    /*             delBtn.Click += (_, _) => { _onDeleteFace?.Invoke(capturedName); _dispatcher.TryEnqueue(RefreshFaceSection); }; */
+    /*             row.Children.Add(reinforceBtn); */
+    /*             row.Children.Add(delBtn); */
+    /*             FaceSection.Children.Add(row); */
+    /*         } */
+    /*     } */
+    /*     RegisterFaceBtn.Content = T("face.register_btn"); */
+    /* } */
+    /* */
+    /* string T(string key) => _loc.Translate(key); */
 
     void SetupNavigation(
         IReadOnlyList<IPlugin> plugins,

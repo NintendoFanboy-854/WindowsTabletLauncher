@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 
 namespace ClockPlugin;
 
@@ -54,7 +55,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
     public IReadOnlyList<IWidget> GetWidgets()
     {
         _widget = new ClockWidget(_host);
-        _widget.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+        _widget.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
 
         return new[]
         {
@@ -64,6 +65,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
 
     public void Shutdown()
     {
+        _widget?.Stop();
     }
 
     object IPluginSettings.CreateSettingsControl()
@@ -256,7 +258,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
 
         public object CreateControl()
         {
-            _control.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+            _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
             return _control;
         }
     }

@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
 using SharedUtils;
+using System.Text.Json;
 using Windows.UI;
 
 namespace PomodoroPlugin;
@@ -16,6 +17,7 @@ public sealed class PomodoroWidget : UserControl
     enum Phase { Focus, Break }
 
     readonly IHostHandle _host;
+    readonly PomodoroPlugin _plugin;
     readonly DispatcherQueue _dispatcher;
     readonly DispatcherQueueTimer _timer;
     readonly BasePluginOverlay _overlay = new();
@@ -37,15 +39,19 @@ public sealed class PomodoroWidget : UserControl
     bool _isLongBreak;
     int _remaining;
     int _focusCount;
+    int _tickCounter;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     static extern bool MessageBeep(uint uType);
 
-    public PomodoroWidget(IHostHandle host)
+    public PomodoroWidget(IHostHandle host, PomodoroPlugin plugin)
     {
         _host = host;
+        _plugin = plugin;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _remaining = FocusMin * 60;
+
+        RestoreState();
 
         BuildUi();
 
@@ -70,6 +76,7 @@ public sealed class PomodoroWidget : UserControl
     bool AutoStart => (_host.GetConfig(nameof(PomodoroPlugin), "auto_start") ?? "true") == "true";
     bool SoundOn => (_host.GetConfig(nameof(PomodoroPlugin), "sound") ?? "true") == "true";
     bool AllowPauseCfg => (_host.GetConfig(nameof(PomodoroPlugin), "allow_pause") ?? "true") == "true";
+    bool KeepScreenOnCfg => (_host.GetConfig(nameof(PomodoroPlugin), "keep_screen_on") ?? "true") == "true";
     string Task => _host.GetConfig(nameof(PomodoroPlugin), "task") ?? "";
 
     int GetInt(string key, int def)
@@ -118,6 +125,12 @@ public sealed class PomodoroWidget : UserControl
         _remaining--;
         var now = DateTime.Now;
         _hourlySeconds[now.Hour] += 1;
+        _tickCounter++;
+        if (_tickCounter >= 30)
+        {
+            _tickCounter = 0;
+            PersistState();
+        }
         if (_remaining <= 0)
             PhaseComplete();
         UpdateViews();
@@ -150,21 +163,71 @@ public sealed class PomodoroWidget : UserControl
 
         if (_running && _phase == Phase.Focus)
             SetScreen(true);
+
+        PersistState();
     }
 
     void SetScreen(bool on)
     {
-        PluginInstance?.SetScreenOn(on);
+        _plugin.SetScreenOn(on);
     }
 
-    PomodoroPlugin? GetPlugin() => PluginInstance;
-    internal static PomodoroPlugin? PluginInstance { get; set; }
+    public void PersistState()
+    {
+        _host.SetConfig(nameof(PomodoroPlugin), "phase_state", _phase.ToString());
+        _host.SetConfig(nameof(PomodoroPlugin), "remaining_seconds", _remaining.ToString());
+        _host.SetConfig(nameof(PomodoroPlugin), "focus_count", _focusCount.ToString());
+        _host.SetConfig(nameof(PomodoroPlugin), "is_long_break", _isLongBreak ? "true" : "false");
+        var today = DateTime.Today.ToString("yyyyMMdd");
+        _host.SetConfig(nameof(PomodoroPlugin), "hourly_today", JsonSerializer.Serialize(_hourlySeconds));
+        _host.SetConfig(nameof(PomodoroPlugin), "hourly_date", today);
+    }
+
+    void RestoreState()
+    {
+        _running = false;
+
+        var phaseStr = _host.GetConfig(nameof(PomodoroPlugin), "phase_state");
+        if (!string.IsNullOrEmpty(phaseStr) && Enum.TryParse<Phase>(phaseStr, out var p))
+            _phase = p;
+
+        _isLongBreak = (_host.GetConfig(nameof(PomodoroPlugin), "is_long_break") ?? "") == "true";
+
+        var fcStr = _host.GetConfig(nameof(PomodoroPlugin), "focus_count");
+        if (int.TryParse(fcStr, out var fc) && fc >= 0)
+            _focusCount = fc;
+
+        var remStr = _host.GetConfig(nameof(PomodoroPlugin), "remaining_seconds");
+        if (int.TryParse(remStr, out var rem) && rem > 0)
+            _remaining = rem;
+        if (_remaining <= 0)
+            _remaining = CurrentPhaseSeconds;
+
+        var hourlyDate = _host.GetConfig(nameof(PomodoroPlugin), "hourly_date");
+        if (hourlyDate == DateTime.Today.ToString("yyyyMMdd"))
+        {
+            var hourlyJson = _host.GetConfig(nameof(PomodoroPlugin), "hourly_today");
+            if (!string.IsNullOrEmpty(hourlyJson))
+            {
+                try
+                {
+                    var arr = JsonSerializer.Deserialize<int[]>(hourlyJson);
+                    if (arr is { Length: 24 })
+                        Array.Copy(arr, _hourlySeconds, 24);
+                }
+                catch { }
+            }
+        }
+    }
+
+    public void Stop() => _timer?.Stop();
 
     void ToggleStartPause()
     {
         if (!_running && !AllowPauseCfg) return;
         _running = !_running;
         SetScreen(_running && _phase == Phase.Focus);
+        PersistState();
         UpdateViews();
     }
 
@@ -173,6 +236,7 @@ public sealed class PomodoroWidget : UserControl
         if (!AllowPauseCfg) return;
         _running = false;
         SetScreen(false);
+        PersistState();
         UpdateViews();
     }
 
@@ -180,6 +244,7 @@ public sealed class PomodoroWidget : UserControl
     {
         _running = true;
         if (_phase == Phase.Focus) SetScreen(true);
+        PersistState();
         UpdateViews();
     }
 
@@ -198,6 +263,7 @@ public sealed class PomodoroWidget : UserControl
         _remaining = CurrentPhaseSeconds;
         _running = false;
         SetScreen(false);
+        PersistState();
         UpdateViews();
     }
 
@@ -206,25 +272,40 @@ public sealed class PomodoroWidget : UserControl
         _running = false;
         _remaining = CurrentPhaseSeconds;
         SetScreen(false);
+        PersistState();
         UpdateViews();
     }
 
     public void StartFocus(int minutes)
     {
+        _host.SetConfig(nameof(PomodoroPlugin), "focus_min", minutes.ToString());
         _phase = Phase.Focus;
         _isLongBreak = false;
         _remaining = Math.Max(1, minutes) * 60;
         _running = true;
         SetScreen(true);
         _host.Log($"Pomodoro: start focus {minutes}min");
+        PersistState();
         UpdateViews();
     }
 
     public void ApplyDurations()
     {
-        if (!_running)
-            _remaining = CurrentPhaseSeconds;
+        _remaining = CurrentPhaseSeconds;
         _host.Log($"Pomodoro: apply durations focus={FocusMin} break={BreakMin} running={_running}");
+        UpdateViews();
+    }
+
+    public void ResetState()
+    {
+        _phase = Phase.Focus;
+        _isLongBreak = false;
+        _focusCount = 0;
+        Array.Clear(_hourlySeconds, 0, 24);
+        _remaining = FocusMin * 60;
+        _running = false;
+        SetScreen(false);
+        PersistState();
         UpdateViews();
     }
 
@@ -237,7 +318,15 @@ public sealed class PomodoroWidget : UserControl
             remainingSeconds = Math.Max(0, _remaining),
             running = _running,
             task = Task,
-            focusCount = _focusCount
+            focusCount = _focusCount,
+            focusMin = FocusMin,
+            breakMin = BreakMin,
+            longBreakMin = LongBreakMin,
+            longBreakEvery = LongBreakEvery,
+            autoStart = AutoStart,
+            sound = SoundOn,
+            allowPause = AllowPauseCfg,
+            keepScreenOn = KeepScreenOnCfg
         });
     }
 
@@ -298,11 +387,6 @@ public sealed class PomodoroWidget : UserControl
         taskBox.LostFocus += (_, _) => { _host.SetConfig(nameof(PomodoroPlugin), "task", taskBox.Text.Trim()); UpdateViews(); };
         body.Children.Add(taskBox);
 
-        var durations = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, HorizontalAlignment = HorizontalAlignment.Center };
-        durations.Children.Add(MakeDurationBox("专注时长", "focus_min", FocusMin));
-        durations.Children.Add(MakeDurationBox("休息时长", "break_min", BreakMin));
-        body.Children.Add(durations);
-
         // stats
         body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
         var last7 = PomodoroPlugin.Last7(_host);
@@ -342,25 +426,5 @@ public sealed class PomodoroWidget : UserControl
         UpdateViews();
     }
 
-    NumberBox MakeDurationBox(string header, string key, int value)
-    {
-        var box = new NumberBox
-        {
-            Header = header,
-            Minimum = 1,
-            Maximum = 180,
-            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline,
-            Value = value,
-            MinWidth = 130
-        };
-        box.ValueChanged += (_, _) =>
-        {
-            if (double.IsNaN(box.Value)) return;
-            _host.SetConfig(nameof(PomodoroPlugin), key, ((int)box.Value).ToString());
-            ApplyDurations();
-        };
-        return box;
-    }
-
-    internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
 }

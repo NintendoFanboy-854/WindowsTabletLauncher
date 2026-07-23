@@ -23,20 +23,23 @@ namespace LauncherHost;
 
 public sealed partial class MainWindow : Window
 {
-    DesktopAcrylicController? _acrylicController;
+    ISystemBackdropControllerWithTargets? _backdropController;
     SystemBackdropConfiguration? _configurationSource;
     LocalizationService _loc = null!;
     ConfigStore _config = null!;
     HostHandle _hostHandle = null!;
-    AcrylicBrushProvider _acrylicProvider = null!;
+    ThemeBrushProvider _themeProvider = null!;
     DashboardPage? _dashboard;
     AgentService? _agentService;
     AgentSession? _agentSession;
     VoiceSession? _voiceSession;
+    /* FaceAuthService? _faceAuthService; */
+    /* ContinuousFaceMonitor? _faceMonitor; */
     MemoryStore? _agentMemory;
     List<IPlugin> _plugins = new();
     List<PluginContract.IPluginSettings> _pluginSettings = new();
     bool _editMode;
+    bool _spaceHeld;
     const double Pad = 32;
     const double PagerReserve = 56;
     const string LayoutStore = "layout";
@@ -58,6 +61,7 @@ public sealed partial class MainWindow : Window
     Popup? _notifPopup;
     DispatcherQueueTimer? _notifTimer;
     bool _notifActive;
+    DispatcherQueueTimer? _relayoutDebounceTimer;
 
     sealed class WidgetSlot
     {
@@ -73,17 +77,27 @@ public sealed partial class MainWindow : Window
 
             LogService.Info("MainWindow initializing");
 
-            _acrylicProvider = new AcrylicBrushProvider();
+            _themeProvider = new ThemeBrushProvider();
             _config = new ConfigStore();
             _loc = new LocalizationService(_config.Get("host", "language") ?? "zh-cn");
-            _hostHandle = new HostHandle(_loc, _acrylicProvider, _config);
+            _hostHandle = new HostHandle(_loc, _themeProvider, _config);
 
             SetupWindow();
-            SetupAcrylicBackdrop();
+            SetupBackdrop();
             _hostHandle.NotificationRequested += OnNotificationRequested;
             _hostHandle.LiveTheme = () => ((FrameworkElement)Content).ActualTheme;
             _dashboard = new DashboardPage(_hostHandle);
             _agentService = new AgentService(_hostHandle);
+            _agentService.OnBusyChanged += () =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var busy = _agentService.IsBusy;
+                    MicBtn.IsEnabled = !busy;
+                    AgentInput.IsEnabled = !busy;
+                    AgentSendBtn.IsEnabled = !busy;
+                });
+            };
 
             Pager.SelectionChanged += (_, _) =>
             {
@@ -96,6 +110,8 @@ public sealed partial class MainWindow : Window
                     Pager.SelectedIndex = Pips.SelectedPageIndex;
             };
 
+            Pager.IsTabStop = false;
+
             ((FrameworkElement)Content).Loaded += (_, _) =>
             {
                 ApplyStoredTheme();
@@ -106,20 +122,42 @@ public sealed partial class MainWindow : Window
                 _agentSession = new AgentSession(_agentService, (Grid)Content);
 
                 _voiceSession = new VoiceSession(_agentService, DispatcherQueue, _agentSession);
-                var micBgBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0x40, 0x60, 0xA0, 0xFF));
                 _voiceSession.OnStateChanged += state =>
                 {
                     LogService.Info($"[MainWindow] voice state → {state}");
                     if (state == VoiceState.Recording)
-                        MicBtn.Background = micBgBrush;
-                    else
+                    {
+                        MicBtn.Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+                        MicBtn.Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black);
+                    }
+                    else if (state == VoiceState.Idle)
+                    {
+                        _spaceHeld = false;
                         MicBtn.ClearValue(Button.BackgroundProperty);
+                        MicBtn.ClearValue(Button.ForegroundProperty);
+                    }
                 };
 
                 MicBtn.Click += (_, _) =>
                 {
+                    if (_agentService != null && _agentService.IsBusy) return;
                     LogService.Info($"[MainWindow] mic clicked, voiceState={_voiceSession.State}");
                     _voiceSession.Toggle();
+                };
+
+                /* _faceAuthService = new FaceAuthService(_hostHandle, DispatcherQueue); */
+                /* _ = _faceAuthService.InitializeAsync(); */
+                /* if ((_config.Get("host", "voice_auto") ?? "false") == "true") */
+                /*     StartFaceMonitor(); */
+
+                MicBtn.IsTabStop = false;
+                AgentSendBtn.IsTabStop = false;
+                Pips.IsTabStop = false;
+
+                EditExitBtn.Click += (_, _) =>
+                {
+                    _editMode = false;
+                    SetEditMode(false);
                 };
 
                 AgentInput.PlaceholderText = _hostHandle.Translate("agent.placeholder");
@@ -127,6 +165,7 @@ public sealed partial class MainWindow : Window
 
                 AgentSendBtn.Click += (_, _) =>
                 {
+                    if (_agentService != null && _agentService.IsBusy) return;
                     var text = AgentInput.Text.Trim();
                     if (string.IsNullOrEmpty(text)) return;
                     AgentInput.Text = "";
@@ -137,6 +176,7 @@ public sealed partial class MainWindow : Window
                 {
                     if (e.Key == Windows.System.VirtualKey.Enter)
                     {
+                        if (_agentService != null && _agentService.IsBusy) return;
                         var text = AgentInput.Text.Trim();
                         if (string.IsNullOrEmpty(text)) return;
                         AgentInput.Text = "";
@@ -144,11 +184,62 @@ public sealed partial class MainWindow : Window
                     }
                 };
 
+                var island = ((FrameworkElement)Content).XamlRoot.ContentIsland;
+                var kbd = InputKeyboardSource.GetForIsland(island);
+                kbd.KeyDown += (_, args) =>
+                {
+                    if (args.VirtualKey != Windows.System.VirtualKey.Space) return;
+
+                    var xr = ((FrameworkElement)Content).XamlRoot;
+                    var focused = FocusManager.GetFocusedElement(xr);
+                    if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox) return;
+
+                    args.Handled = true;
+                    if (_voiceSession == null || (_agentService != null && _agentService.IsBusy)) return;
+
+                    var popupOpen = VisualTreeHelper.GetOpenPopups(this).Count > 0;
+                    if (popupOpen) return;
+
+                    if (!_spaceHeld)
+                    {
+                        _spaceHeld = true;
+                        if (_voiceSession.State == VoiceState.Idle)
+                            _voiceSession.Toggle();
+                    }
+                };
+                kbd.KeyUp += (_, args) =>
+                {
+                    if (args.VirtualKey != Windows.System.VirtualKey.Space) return;
+                    args.Handled = true;
+                    if (_voiceSession == null) return;
+                    if (!_spaceHeld) return;
+                    if (_voiceSession.State == VoiceState.Sending)
+                    {
+                        _spaceHeld = false;
+                        return;
+                    }
+                    _spaceHeld = false;
+                    _voiceSession.Toggle();
+                };
+
+                ((FrameworkElement)Content).PointerPressed += (_, _) =>
+                {
+                    ((FrameworkElement)Content).Focus(FocusState.Programmatic);
+                };
+
                 RelayoutGrid();
                 LogService.Info("MainWindow initialized successfully");
             };
 
-            ((FrameworkElement)Content).SizeChanged += (_, _) => RelayoutGrid();
+            _relayoutDebounceTimer = DispatcherQueue.CreateTimer();
+            _relayoutDebounceTimer.Interval = TimeSpan.FromMilliseconds(100);
+            _relayoutDebounceTimer.IsRepeating = false;
+            _relayoutDebounceTimer.Tick += (_, _) => RelayoutGrid();
+            ((FrameworkElement)Content).SizeChanged += (_, _) =>
+            {
+                _relayoutDebounceTimer?.Stop();
+                _relayoutDebounceTimer?.Start();
+            };
         }
         catch (Exception ex)
         {
@@ -241,11 +332,11 @@ public sealed partial class MainWindow : Window
         LogService.Info("Window setup complete");
     }
 
-    void SetupAcrylicBackdrop()
+    void SetupBackdrop()
     {
-        if (!DesktopAcrylicController.IsSupported())
+        if (!MicaController.IsSupported() && !DesktopAcrylicController.IsSupported())
         {
-            LogService.Warn("DesktopAcrylicController not supported");
+            LogService.Warn("Backdrop: neither Mica nor Acrylic supported");
             return;
         }
 
@@ -265,14 +356,28 @@ public sealed partial class MainWindow : Window
 
     void ApplyBackdropController()
     {
-        _acrylicController?.Dispose();
-        _acrylicController = null;
+        _backdropController?.Dispose();
+        _backdropController = null;
 
-        _acrylicController = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Thin };
-        _acrylicController.AddSystemBackdropTarget(
+        if (MicaController.IsSupported())
+        {
+            _backdropController = new MicaController { Kind = MicaKind.BaseAlt };
+            LogService.Info("Backdrop: Mica BaseAlt");
+        }
+        else if (DesktopAcrylicController.IsSupported())
+        {
+            _backdropController = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Thin };
+            LogService.Info("Backdrop: Acrylic Thin");
+        }
+        else
+        {
+            LogService.Warn("Backdrop: neither Mica nor Acrylic supported");
+            return;
+        }
+
+        _backdropController.AddSystemBackdropTarget(
             this.As<ICompositionSupportsSystemBackdrop>());
-        _acrylicController.SetSystemBackdropConfiguration(_configurationSource!);
-        LogService.Info("Backdrop: Acrylic Thin");
+        _backdropController.SetSystemBackdropConfiguration(_configurationSource!);
     }
 
     void ApplyStoredTheme()
@@ -399,6 +504,16 @@ public sealed partial class MainWindow : Window
                 Name = "exit_launcher",
                 Description = "退出启动器（需用户在弹窗确认）。"
             },
+            /* new() */
+            /* { */
+            /*     Name = "register_face", */
+            /*     Description = "引导用户进行人脸注册。调用后会弹出摄像头进行人脸采集和识别模型训练。" */
+            /* }, */
+            /* new() */
+            /* { */
+            /*     Name = "query_face_status", */
+            /*     Description = "查询当前人脸注册状态。返回是否已注册、已注册人脸名单及数量。" */
+            /* }, */
         };
 
         var handlers = new Dictionary<string, Func<string, string>>
@@ -483,6 +598,16 @@ public sealed partial class MainWindow : Window
                 _ = ExitLauncherAsync();
                 return JsonSerializer.Serialize(new { ok = true, message = "exit_dialog_shown" });
             },
+            /* ["register_face"] = args => */
+            /* { */
+            /*     _ = RegisterFaceAsync(); */
+            /*     return JsonSerializer.Serialize(new { ok = true, message = "face_registration_dialog_opened" }); */
+            /* }, */
+            /* ["query_face_status"] = args => */
+            /* { */
+            /*     var names = _faceAuthService?.FaceNames ?? (IReadOnlyList<string>)Array.Empty<string>(); */
+            /*     return JsonSerializer.Serialize(new { ok = true, registered = names.Count > 0, names = names, count = names.Count }); */
+            /* }, */
         };
 
         _hostHandle.RegisterAgentCapability(new HostAgentCapability(DispatcherQueue, tools, handlers));
@@ -503,6 +628,45 @@ public sealed partial class MainWindow : Window
         if (result == ContentDialogResult.Primary)
             Application.Current.Exit();
     }
+
+    /* async Task<bool> RegisterFaceAsync(string? reinforceName = null) */
+    /* { */
+    /*     if (_faceAuthService == null) return false; */
+    /*     var dialog = new FaceRegistrationDialog(_faceAuthService, _hostHandle); */
+    /*     return await dialog.ShowAsync(Content.XamlRoot, reinforceName); */
+    /* } */
+    /* */
+    /* async Task<bool> ReinforceFaceAsync(string name) */
+    /* { */
+    /*     return await RegisterFaceAsync(name); */
+    /* } */
+    /* */
+    /* void StartFaceMonitor() */
+    /* { */
+    /*     if (_faceAuthService == null || _agentService == null || _agentSession == null) return; */
+    /*     if (_faceMonitor != null) return; */
+    /*     var apiKey = _agentService.MimoApiKey; */
+    /*     var silenceStr = _config.Get("host", "voice_auto_silence_frames") ?? "10"; */
+    /*     var silence = int.TryParse(silenceStr, out var s) ? s : 10; */
+    /*     var intervalStr = _config.Get("host", "voice_auto_capture_interval_sec") ?? "2"; */
+    /*     var interval = int.TryParse(intervalStr, out var iv) ? iv : 2; */
+    /*     _faceMonitor = new ContinuousFaceMonitor(_faceAuthService, _agentService, _agentSession); */
+    /*     _faceMonitor.ListeningStateChanged += state => */
+    /*     { */
+    /*         var micAccent = new SolidColorBrush(Windows.UI.Color.FromArgb(0x4D, 0x00, 0x78, 0xD4)); */
+    /*         if (state) MicBtn.Background = micAccent; */
+    /*         else MicBtn.ClearValue(Button.BackgroundProperty); */
+    /*     }; */
+    /*     _ = _faceMonitor.StartAsync(silence, interval, apiKey); */
+    /*     LogService.Info($"[MainWindow] FaceMonitor started (interval={interval}s, silence={silence})"); */
+    /* } */
+    /* */
+    /* void StopFaceMonitor() */
+    /* { */
+    /*     _faceMonitor?.Stop(); */
+    /*     _faceMonitor = null; */
+    /*     LogService.Info("[MainWindow] FaceMonitor stopped"); */
+    /* } */
 
     string BuildDashboardJson()
     {
@@ -719,6 +883,8 @@ public sealed partial class MainWindow : Window
         if (content != null)
             content.IsHitTestVisible = !_editMode;
 
+        fe.IsTabStop = false;
+
         EnableDrag(fe, _editMode);
     }
 
@@ -777,19 +943,23 @@ public sealed partial class MainWindow : Window
         AnimateScale(fe, 1.0, TimeSpan.FromMilliseconds(167), EasingMode.EaseIn);
     }
 
+    static readonly CubicEase _hoverEaseOut = new() { EasingMode = EasingMode.EaseOut };
+    static readonly CubicEase _hoverEaseIn = new() { EasingMode = EasingMode.EaseIn };
+
     void AnimateScale(FrameworkElement fe, double to, TimeSpan duration, EasingMode easing)
     {
         if (fe.RenderTransform is not ScaleTransform st) return;
+        var ease = easing == EasingMode.EaseOut ? _hoverEaseOut : _hoverEaseIn;
         var story = new Storyboard();
         var animX = new DoubleAnimation
         {
             To = to, Duration = new Duration(duration),
-            EasingFunction = new CubicEase { EasingMode = easing }
+            EasingFunction = ease
         };
         var animY = new DoubleAnimation
         {
             To = to, Duration = new Duration(duration),
-            EasingFunction = new CubicEase { EasingMode = easing }
+            EasingFunction = ease
         };
         Storyboard.SetTarget(animX, st);
         Storyboard.SetTargetProperty(animX, "ScaleX");
@@ -861,6 +1031,10 @@ public sealed partial class MainWindow : Window
                 }
             },
             () => _agentService!.NotifyExpandCotChanged());
+            /* , async () => await RegisterFaceAsync() */
+            /* , async (name) => await ReinforceFaceAsync(name) */
+            /* , enabled => { if (enabled) StartFaceMonitor(); else StopFaceMonitor(); } */
+            /* , name => _faceAuthService?.DeleteFace(name) */
 
         dialog.XamlRoot = Content.XamlRoot;
         var result = await dialog.ShowAsync();
@@ -911,6 +1085,9 @@ public sealed partial class MainWindow : Window
         if (Pager.SelectedIndex != savedIndex)
             Pager.SelectedIndex = savedIndex;
 
+        EditExitBtn.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        AgentInput.IsTabStop = !enabled;
+
         foreach (var page in _pages)
         {
             page.Layout.DrawGridOverlay(page.Overlay, enabled);
@@ -918,9 +1095,6 @@ public sealed partial class MainWindow : Window
 
             foreach (var container in page.Layout.Containers)
             {
-                if (_elementIds.TryGetValue(container, out var id) && id.StartsWith("host.settings"))
-                    continue;
-
                 if (page.Layout.GetContent(container) is { } content)
                     content.IsHitTestVisible = !enabled;
                 EnableDrag(container, enabled);
@@ -1199,7 +1373,7 @@ public sealed partial class MainWindow : Window
 
         return new Border
         {
-            Background = new AcrylicBrush { TintColor = tint, TintOpacity = 0.85, FallbackColor = tint },
+            Background = new SolidColorBrush(tint),
             CornerRadius = new CornerRadius(isFullScreen ? 16 : 10),
             Padding = new Thickness(isFullScreen ? 40 : 20, isFullScreen ? 32 : 14, isFullScreen ? 24 : 14, isFullScreen ? 32 : 14),
             Margin = isFullScreen ? new Thickness(0) : new Thickness(0, 24, 0, 0),
@@ -1235,8 +1409,8 @@ public sealed partial class MainWindow : Window
         foreach (var plugin in _plugins)
             plugin.Shutdown();
 
-        _acrylicController?.Dispose();
-        _acrylicController = null;
+        _backdropController?.Dispose();
+        _backdropController = null;
         _configurationSource = null;
 
         Activated -= OnActivated;

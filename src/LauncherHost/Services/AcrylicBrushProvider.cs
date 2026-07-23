@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Media;
 
 namespace LauncherHost.Services;
 
-public class AcrylicBrushProvider
+public class ThemeBrushProvider
 {
     private Brush? _lightBrush;
     private Brush? _darkBrush;
@@ -12,21 +12,13 @@ public class AcrylicBrushProvider
     {
         if (theme == ElementTheme.Dark)
         {
-            _darkBrush ??= new AcrylicBrush
-            {
-                TintColor = Windows.UI.Color.FromArgb(255, 32, 32, 32),
-                TintOpacity = 0.7,
-                FallbackColor = Windows.UI.Color.FromArgb(255, 32, 32, 32)
-            };
+            _darkBrush ??= new SolidColorBrush(
+                Windows.UI.Color.FromArgb(255, 28, 28, 28));
             return _darkBrush;
         }
 
-        _lightBrush ??= new AcrylicBrush
-        {
-            TintColor = Windows.UI.Color.FromArgb(255, 255, 255, 255),
-            TintOpacity = 0.7,
-            FallbackColor = Windows.UI.Color.FromArgb(255, 230, 230, 230)
-        };
+        _lightBrush ??= new SolidColorBrush(
+            Windows.UI.Color.FromArgb(255, 243, 243, 243));
         return _lightBrush;
     }
 }

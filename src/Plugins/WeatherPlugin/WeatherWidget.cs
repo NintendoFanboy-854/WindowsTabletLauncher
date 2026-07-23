@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 using Windows.UI;
 
 namespace WeatherPlugin;
@@ -15,7 +16,7 @@ public sealed class WeatherWidget : UserControl
     readonly AmapWeatherService _service;
     readonly DispatcherQueue _dispatcher;
     readonly DispatcherQueueTimer _timer;
-    readonly PluginOverlay _overlay = new();
+    readonly BasePluginOverlay _overlay = new();
 
     Border _root = null!;
     FontIcon _icon = null!;
@@ -24,14 +25,15 @@ public sealed class WeatherWidget : UserControl
     TextBlock _city = null!;
     TextBlock _details = null!;
 
+    bool _isRefreshing;
     string? _adcode;
     Live? _lastLive;
     Forecast? _lastForecast;
 
-    public WeatherWidget(IHostHandle host)
+    public WeatherWidget(IHostHandle host, AmapWeatherService service)
     {
         _host = host;
-        _service = new AmapWeatherService(() => WeatherPlugin.ResolveKey(_host), _host.LogError);
+        _service = service;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
 
         BuildUi();
@@ -109,6 +111,10 @@ public sealed class WeatherWidget : UserControl
 
     async Task RefreshAsync()
     {
+        if (_isRefreshing) return;
+        _isRefreshing = true;
+        try
+        {
         var mode = _host.GetConfig(nameof(WeatherPlugin), "location_mode") ?? "auto";
         string? adcode;
 
@@ -151,6 +157,8 @@ public sealed class WeatherWidget : UserControl
         _details.Text = $"湿度 {live.Humidity}% · {live.Winddirection}风 {live.Windpower}级";
 
         _lastForecast = await _service.GetForecastAsync(adcode);
+        }
+        finally { _isRefreshing = false; }
     }
 
     async void SwitchCity(string adcode, string name)
@@ -164,7 +172,7 @@ public sealed class WeatherWidget : UserControl
         OpenOverlay();
     }
 
-    // ---- overlay (lightweight scale/fade via shared PluginOverlay) ----
+    // ---- overlay (lightweight scale/fade via shared BasePluginOverlay) ----
 
     void OpenOverlay()
     {
@@ -332,5 +340,7 @@ public sealed class WeatherWidget : UserControl
 
     static string FormatDate(string date) => DateTime.TryParse(date, out var d) ? d.ToString("MM-dd") : date;
 
-    internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+    public void Stop() => _timer?.Stop();
+
+    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
 }

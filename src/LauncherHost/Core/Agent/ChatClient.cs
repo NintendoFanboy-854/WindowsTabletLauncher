@@ -26,6 +26,11 @@ public sealed class ChatClient : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    static readonly HttpClient SharedTranscribeHttp = new()
+    {
+        Timeout = TimeSpan.FromMinutes(2)
+    };
+
     public ProviderClientConfig Config => _cfg;
     public string Provider => _cfg.ProviderName;
 
@@ -285,14 +290,14 @@ public sealed class ChatClient : IDisposable
                 ["stream"] = false
             };
 
-            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-            http.DefaultRequestHeaders.Add("api-key", apiKey);
-
             var json = JsonSerializer.Serialize(body, JsonOpts);
-            var resp = await http.PostAsync(
-                "https://api.xiaomimimo.com/v1/chat/completions",
-                new StringContent(json, Encoding.UTF8, "application/json"),
-                ct);
+            var req = new HttpRequestMessage(HttpMethod.Post, "https://api.xiaomimimo.com/v1/chat/completions")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+            req.Headers.Add("api-key", apiKey);
+
+            var resp = await SharedTranscribeHttp.SendAsync(req, ct);
             resp.EnsureSuccessStatusCode();
 
             var respText = await resp.Content.ReadAsStringAsync(ct);
@@ -335,17 +340,15 @@ public sealed class ChatClient : IDisposable
                     ["stream"] = true
                 };
 
-                using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-                http.DefaultRequestHeaders.Add("api-key", apiKey);
-
                 var json = JsonSerializer.Serialize(body, JsonOpts);
                 var req = new HttpRequestMessage(HttpMethod.Post, "https://api.xiaomimimo.com/v1/chat/completions")
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-                req.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+                req.Headers.Add("api-key", apiKey);
+                req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-                using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                using var resp = await SharedTranscribeHttp.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
                 resp.EnsureSuccessStatusCode();
 
                 using var stream = await resp.Content.ReadAsStreamAsync(ct);

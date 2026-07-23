@@ -95,10 +95,6 @@ Widgets stay in the Grid. Visual movement uses `TranslateTransform`. On completi
 
 `%LocalAppData%\WindowsTabletLauncher\logs\` via `LogService.Info/Warn/Error`. Never `Console.WriteLine`/`Debug.WriteLine`.
 
-## Backdrop
-
-Windows 10 (build < 22000): use `DesktopAcrylicController` (`DesktopAcrylicKind.Thin`). All widgets get brush via `_host.GetWidgetBackgroundBrush()`.
-
 ## Key Interfaces
 
 - **`IPlugin`**: `DisplayName`, `Initialize(IHostHandle)`, `GetWidgets()`, `Shutdown()`

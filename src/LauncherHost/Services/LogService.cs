@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace LauncherHost.Services;
 
@@ -6,7 +8,8 @@ public static class LogService
 {
     private static readonly string LogDir;
     private static readonly string LogPath;
-    private static readonly object _lock = new();
+    private static readonly ConcurrentQueue<string> _queue = new();
+    private static readonly Timer _flushTimer;
 
     static LogService()
     {
@@ -15,6 +18,7 @@ public static class LogService
             "WindowsTabletLauncher", "logs");
         Directory.CreateDirectory(LogDir);
         LogPath = Path.Combine(LogDir, $"launcher_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+        _flushTimer = new Timer(_ => Flush(), null, TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
     }
 
     public static void Info(string message,
@@ -45,7 +49,21 @@ public static class LogService
     {
         var src = $"{Path.GetFileNameWithoutExtension(file)}.{member}:{line}";
         var entry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] [{src}] {message}{Environment.NewLine}";
-        lock (_lock)
-            File.AppendAllText(LogPath, entry);
+        _queue.Enqueue(entry);
+    }
+
+    private static void Flush()
+    {
+        var sb = new StringBuilder();
+        while (_queue.TryDequeue(out var entry))
+            sb.Append(entry);
+
+        if (sb.Length == 0) return;
+
+        try
+        {
+            File.AppendAllTextAsync(LogPath, sb.ToString());
+        }
+        catch { }
     }
 }

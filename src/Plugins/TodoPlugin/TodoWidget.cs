@@ -4,12 +4,12 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using PluginContract;
-using Windows.UI;
+using SharedUtils;
 using Windows.UI.Text;
 
 namespace TodoPlugin;
 
-public sealed class TodoWidget : UserControl
+public sealed class TodoWidget : UserControl, IDisposable
 {
     readonly IHostHandle _host;
     readonly TodoStore _store;
@@ -24,12 +24,19 @@ public sealed class TodoWidget : UserControl
     ComboBox? _listCombo;
     TodoItem? _selected;
     string _currentList = TodoStore.DefaultList;
+    string _lastTileSnapshot = "";
 
     public TodoWidget(IHostHandle host, TodoStore store, Action<TodoItem> onToggle)
     {
         _host = host;
         _store = store;
         _onToggle = onToggle;
+
+        _currentList = _host.GetConfig(nameof(TodoPlugin), "current_list") ?? TodoStore.DefaultList;
+
+        var savedId = _host.GetConfig(nameof(TodoPlugin), "selected_item_id");
+        if (!string.IsNullOrEmpty(savedId))
+            _selected = _store.Items.FirstOrDefault(i => i.Id == savedId);
 
         BuildUi();
         _store.Changed += OnStoreChanged;
@@ -48,16 +55,13 @@ public sealed class TodoWidget : UserControl
         Content = _root;
     }
 
+    static Brush Res(string key) => (Brush)Application.Current.Resources[key];
+
     void ApplyTheme(ElementTheme theme)
     {
         _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
         RefreshTile();
     }
-
-    static (Brush primary, Brush secondary) Brushes(ElementTheme theme) =>
-        theme == ElementTheme.Light
-            ? (new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A)), new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0)))
-            : (new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF)));
 
     public void OnStoreChanged()
     {
@@ -73,12 +77,22 @@ public sealed class TodoWidget : UserControl
 
     void RefreshTile()
     {
-        var (primary, secondary) = Brushes(((FrameworkElement)this).ActualTheme);
-        _preview.Children.Clear();
-
         var items = _store.ItemsInList(_currentList).AsEnumerable();
         if (HideDone) items = items.Where(i => !i.Done);
+        var list = items.Take(7).ToList();
         var pending = items.Count(i => !i.Done);
+
+        var snapshot = string.Join(",", list.Select(i => $"{i.Id}:{i.Done}:{(int)i.Priority}:{i.Deadline?.Ticks}:{i.Repeat}"))
+            + $"|{pending}|{_store.ListNames.Length}|{_currentList}";
+        if (snapshot == _lastTileSnapshot) return;
+        _lastTileSnapshot = snapshot;
+
+        var primary = Res("TextFillColorPrimaryBrush");
+        var secondary = Res("TextFillColorSecondaryBrush");
+        var tertiary = Res("TextFillColorTertiaryBrush");
+        var critical = Res("SystemFillColorCriticalBrush");
+        _preview.Children.Clear();
+
         var count = _store.ListNames.Length;
         _preview.Children.Add(new TextBlock
         {
@@ -88,10 +102,9 @@ public sealed class TodoWidget : UserControl
             Foreground = secondary
         });
 
-        var list = items.Take(7).ToList();
         if (list.Count == 0)
         {
-            _preview.Children.Add(new TextBlock { Text = "暂无待办", FontSize = 14, Opacity = 0.6, Foreground = secondary });
+            _preview.Children.Add(new TextBlock { Text = "暂无待办", FontSize = 14, Foreground = tertiary });
             return;
         }
 
@@ -104,13 +117,13 @@ public sealed class TodoWidget : UserControl
 
             var overdue = !item.Done && item.Deadline is { } dl && dl < DateTime.Now;
 
-            var dotColor = PriorityColor(item.Priority);
-            if (dotColor != Color.FromArgb(0, 0, 0, 0))
+            var dotBrush = PriorityBrush(item.Priority);
+            if (dotBrush != null)
             {
                 var dot = new Ellipse
                 {
                     Width = 8, Height = 8,
-                    Fill = new SolidColorBrush(dotColor),
+                    Fill = dotBrush,
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 Grid.SetColumn(dot, 0);
@@ -138,7 +151,7 @@ public sealed class TodoWidget : UserControl
                     FontSize = 12,
                     Margin = new Thickness(8, 0, 0, 0),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = overdue ? new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A)) : secondary
+                    Foreground = overdue ? critical : secondary
                 };
                 Grid.SetColumn(ddlText, 2);
                 row.Children.Add(ddlText);
@@ -167,12 +180,12 @@ public sealed class TodoWidget : UserControl
         _ => ""
     };
 
-    static Color PriorityColor(Priority p) => p switch
+    static Brush? PriorityBrush(Priority p) => p switch
     {
-        Priority.High => Color.FromArgb(0xFF, 0xF4, 0x43, 0x36),
-        Priority.Medium => Color.FromArgb(0xFF, 0xFF, 0x98, 0x00),
-        Priority.Low => Color.FromArgb(0xFF, 0x9E, 0x9E, 0x9E),
-        _ => Color.FromArgb(0, 0, 0, 0)
+        Priority.High => Res("SystemFillColorCriticalBrush"),
+        Priority.Medium => Res("SystemFillColorCautionBrush"),
+        Priority.Low => Res("TextFillColorTertiaryBrush"),
+        _ => null
     };
 
     bool AutoCompleteSub => (_host.GetConfig(nameof(TodoPlugin), "auto_complete_on_subtasks") ?? "true") == "true";
@@ -205,36 +218,51 @@ public sealed class TodoWidget : UserControl
         var winW = root?.ActualWidth > 0 ? root.ActualWidth : 1440;
         var winH = root?.ActualHeight > 0 ? root.ActualHeight : 960;
 
-        var cardW = Math.Min(860, winW - 80);
-        var cardH = Math.Min(560, winH - 120);
+        var cardW = Math.Min(winW * 0.65, winW - 80);
+        var cardH = Math.Min(winH * 0.62, winH - 120);
+        var leftW = cardW * 0.35;
+
+        var primary = Res("TextFillColorPrimaryBrush");
+        var secondary = Res("TextFillColorSecondaryBrush");
+        var cardBg = Res("CardBackgroundFillColorDefaultBrush");
+        var subtleBg = Res("SubtleFillColorSecondaryBrush");
 
         var cols = new Grid { Width = cardW, Height = cardH, ColumnSpacing = 24, RowSpacing = 16 };
-        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
+        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(leftW) });
         cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         cols.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         cols.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         cols.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        // -- top row (list switcher + search spanning both columns) --
-        var topRow = new Grid { ColumnSpacing = 12 };
+        // -- top row: list name + buttons spanning both columns --
+        var topRow = new Grid { ColumnSpacing = 8 };
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var listSw = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
-        _listCombo = listSw;
-        void PopLists() { listSw.Items.Clear(); foreach (var n in _store.ListNames) listSw.Items.Add(n); listSw.SelectedItem = _currentList; }
+        var listCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        _listCombo = listCombo;
+        void PopLists() { listCombo.Items.Clear(); foreach (var n in _store.ListNames) listCombo.Items.Add(n); listCombo.SelectedItem = _currentList; }
         PopLists();
-        listSw.Text = _currentList;
-        listSw.TextSubmitted += (_, _) =>
+        listCombo.SelectionChanged += (_, _) => { if (listCombo.SelectedItem is string s && s != _currentList) { _currentList = s; _host.SetConfig(nameof(TodoPlugin), "current_list", s); RebuildTaskList(); } };
+        Grid.SetColumn(listCombo, 0);
+
+        var renameBtn = new Button
         {
-            if (listSw.Items.Contains(listSw.Text)) { _currentList = listSw.Text; RebuildTaskList(); return; }
-            if (string.IsNullOrWhiteSpace(listSw.Text) || _currentList == TodoStore.DefaultList) return;
-            _store.RenameList(_currentList, listSw.Text);
-            _currentList = listSw.Text;
-            RebuildTaskList();
+            Content = new FontIcon { Glyph = "\uE70F", FontSize = 12 },
+            Width = 36, Height = 36, Padding = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center
         };
-        listSw.SelectionChanged += (_, _) => { if (listSw.SelectedItem is string s && s != _currentList) { _currentList = s; RebuildTaskList(); } };
-        Grid.SetColumn(listSw, 0);
+        ToolTipService.SetToolTip(renameBtn, "重命名列表");
+        renameBtn.Click += (_, _) =>
+        {
+            if (_currentList == TodoStore.DefaultList || _currentList == TodoStore.InboxList) return;
+            listCombo.IsEditable = true;
+            listCombo.Focus(FocusState.Programmatic);
+        };
+        Grid.SetColumn(renameBtn, 1);
 
         var newBtn = new Button
         {
@@ -243,11 +271,67 @@ public sealed class TodoWidget : UserControl
             VerticalAlignment = VerticalAlignment.Center
         };
         ToolTipService.SetToolTip(newBtn, "新建列表");
-        newBtn.Click += (_, _) => { var n = "新列表"; _store.Add("占位", n); _store.ClearCompleted(n); _currentList = n; RebuildTaskList(); PopLists(); };
-        Grid.SetColumn(newBtn, 1);
+        newBtn.Click += async (_, _) =>
+        {
+            var input = new TextBox { PlaceholderText = "列表名称…", Width = 200 };
+            var dialog = new ContentDialog
+            {
+                Title = "新建列表",
+                Content = input,
+                PrimaryButtonText = "创建",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot
+            };
+            input.KeyDown += (s, e2) => { if (e2.Key == Windows.System.VirtualKey.Enter) dialog.Hide(); };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary && !string.IsNullOrWhiteSpace(input.Text))
+            {
+                if (_store.CreateList(input.Text.Trim()))
+                {
+                    _currentList = input.Text.Trim();
+                    _host.SetConfig(nameof(TodoPlugin), "current_list", _currentList);
+                    RebuildTaskList();
+                    PopLists();
+                }
+            }
+        };
+        Grid.SetColumn(newBtn, 2);
 
-        topRow.Children.Add(listSw);
+        var delBtn = new Button
+        {
+            Content = new FontIcon { Glyph = "\uE74D", FontSize = 12 },
+            Width = 36, Height = 36, Padding = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTipService.SetToolTip(delBtn, "删除列表");
+        delBtn.Click += async (_, _) =>
+        {
+            if (_currentList == TodoStore.DefaultList || _currentList == TodoStore.InboxList) return;
+            var confirm = new ContentDialog
+            {
+                Title = "删除列表",
+                Content = $"确定删除列表「{_currentList}」及其所有任务吗？此操作不可撤销。",
+                PrimaryButtonText = "删除",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = XamlRoot
+            };
+            if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+            {
+                var deleted = _currentList;
+                _currentList = TodoStore.DefaultList;
+                _host.SetConfig(nameof(TodoPlugin), "current_list", _currentList);
+                _store.DeleteList(deleted);
+                RebuildTaskList();
+                PopLists();
+            }
+        };
+        Grid.SetColumn(delBtn, 3);
+
+        topRow.Children.Add(listCombo);
+        topRow.Children.Add(renameBtn);
         topRow.Children.Add(newBtn);
+        topRow.Children.Add(delBtn);
         Grid.SetRow(topRow, 0);
         Grid.SetColumnSpan(topRow, 2);
         cols.Children.Add(topRow);
@@ -269,9 +353,7 @@ public sealed class TodoWidget : UserControl
         {
             CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1),
-            BorderBrush = ((FrameworkElement)this).ActualTheme == ElementTheme.Light
-                ? new SolidColorBrush(Color.FromArgb(0x10, 0x00, 0x00, 0x00))
-                : new SolidColorBrush(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF)),
+            BorderBrush = Res("DividerStrokeColorDefaultBrush"),
             Child = _taskList
         };
         Grid.SetRow(leftCard, 1);
@@ -285,6 +367,8 @@ public sealed class TodoWidget : UserControl
         {
             if (string.IsNullOrWhiteSpace(inp.Text)) return;
             _selected = _store.Add(inp.Text, _currentList);
+            _store.Save();
+            _host.SetConfig(nameof(TodoPlugin), "selected_item_id", _selected.Id);
             inp.Text = "";
             RebuildTaskList();
         }
@@ -310,15 +394,15 @@ public sealed class TodoWidget : UserControl
         // bottom toolbar
         var bottomRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
 
-        var clearBtn = new Button { Content = "清除已完成", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        var clearBtn = new Button { Content = "清除已完成", FontSize = 13 };
         clearBtn.Click += (_, _) => { _store.ClearCompleted(_currentList); RebuildTaskList(); };
         bottomRow.Children.Add(clearBtn);
 
-        var statsBtn = new Button { Content = "统计", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        var statsBtn = new Button { Content = "统计", FontSize = 13 };
         statsBtn.Click += (_, _) => OpenStats();
         bottomRow.Children.Add(statsBtn);
 
-        var shareBtn = new Button { Content = "分享", FontSize = 13, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = Brushes(((FrameworkElement)this).ActualTheme).secondary };
+        var shareBtn = new Button { Content = "分享", FontSize = 13 };
         shareBtn.Click += (_, _) => ShareList();
         bottomRow.Children.Add(shareBtn);
 
@@ -333,7 +417,10 @@ public sealed class TodoWidget : UserControl
     void RebuildTaskList()
     {
         if (_taskList == null) return;
-        var (primary, secondary) = Brushes(((FrameworkElement)this).ActualTheme);
+        var primary = Res("TextFillColorPrimaryBrush");
+        var secondary = Res("TextFillColorSecondaryBrush");
+        var critical = Res("SystemFillColorCriticalBrush");
+        var groupBg = Res("SubtleFillColorTertiaryBrush");
 
         _taskList.SelectionChanged -= OnTaskSelectionChanged;
         _taskList.Items.Clear();
@@ -346,8 +433,9 @@ public sealed class TodoWidget : UserControl
                 || (i.Tags ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
                 || (i.Note ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
 
+        var now = DateTime.Now;
         var sorted = items
-            .OrderBy(TodoStore.SortOrder)
+            .OrderBy(i => TodoStore.SortOrder(i, now))
             .ThenByDescending(i => (int)i.Priority)
             .ThenBy(i => i.Deadline)
             .ToList();
@@ -357,7 +445,7 @@ public sealed class TodoWidget : UserControl
 
         foreach (var item in sorted)
         {
-            var g = TodoStore.SortOrder(item);
+            var g = TodoStore.SortOrder(item, now);
             if (g != lastGroup)
             {
                 var gh = new Border
@@ -365,16 +453,13 @@ public sealed class TodoWidget : UserControl
                     Margin = new Thickness(0, 8, 0, 4),
                     Padding = new Thickness(8, 6, 8, 6),
                     CornerRadius = new CornerRadius(6),
-                    Background = ((FrameworkElement)this).ActualTheme == ElementTheme.Light
-                        ? new SolidColorBrush(Color.FromArgb(0x08, 0x00, 0x00, 0x00))
-                        : new SolidColorBrush(Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF)),
+                    Background = groupBg,
                     Child = new TextBlock
                     {
-                        Text = GroupTitle(g) + $" · {sorted.Count(i => TodoStore.SortOrder(i) == g)} 项",
+                        Text = GroupTitle(g) + $" · {sorted.Count(i => TodoStore.SortOrder(i, now) == g)} 项",
                         FontSize = 12,
                         FontWeight = FontWeights.Medium,
-                        Foreground = secondary,
-                        Opacity = 0.8
+                        Foreground = secondary
                     }
                 };
                 _taskList.Items.Add(new ListViewItem { Content = gh, IsHitTestVisible = false });
@@ -423,7 +508,7 @@ public sealed class TodoWidget : UserControl
                 if (dlv != null)
                 {
                     var overdue = !item.Done && item.Deadline is { } d && d < DateTime.Now;
-                    subItems.Children.Add(new TextBlock { Text = dlv, FontSize = 11, Foreground = overdue ? new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A)) : secondary });
+                    subItems.Children.Add(new TextBlock { Text = dlv, FontSize = 11, Foreground = overdue ? critical : secondary });
                 }
                 if (meta.Length > 0) subItems.Children.Add(ext);
                 Grid.SetColumn(subItems, 1); Grid.SetRow(subItems, 1);
@@ -431,22 +516,13 @@ public sealed class TodoWidget : UserControl
             }
 
             var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6) };
-            var selColor = item.Priority switch
-            {
-                Priority.High => Color.FromArgb(0x33, 0xE0, 0x3A, 0x3A),
-                Priority.Medium => Color.FromArgb(0x33, 0xFF, 0x98, 0x00),
-                _ => Color.FromArgb(0x10, 0x62, 0xA0, 0xE0)
-            };
-            lvi.Resources["ListViewItemBackgroundSelected"] = new SolidColorBrush(selColor);
-            lvi.Resources["ListViewItemBackgroundSelectedPointerOver"] = new SolidColorBrush(selColor) { Opacity = 1.5 };
-            lvi.Resources["ListViewItemBackgroundSelectedPressed"] = new SolidColorBrush(selColor) { Opacity = 2.0 };
             _taskList.Items.Add(lvi);
             if (ReferenceEquals(item, _selected)) toSelect = lvi;
         }
 
         _taskList.SelectionChanged += OnTaskSelectionChanged;
         if (toSelect != null) _taskList.SelectedItem = toSelect;
-        else _selected = null;
+        else { _selected = null; _host.SetConfig(nameof(TodoPlugin), "selected_item_id", ""); }
         RebuildDetail();
     }
 
@@ -455,16 +531,19 @@ public sealed class TodoWidget : UserControl
     void OnTaskSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selected = (_taskList?.SelectedItem as ListViewItem)?.Tag as TodoItem;
+        _host.SetConfig(nameof(TodoPlugin), "selected_item_id", _selected?.Id ?? "");
         RebuildDetail();
     }
 
     void RebuildDetail()
     {
         if (_detailHost == null) return;
-        var (primary, secondary) = Brushes(((FrameworkElement)this).ActualTheme);
-        var cardBg = ((FrameworkElement)this).ActualTheme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x0A, 0x88, 0x88, 0x88))
-            : new SolidColorBrush(Color.FromArgb(0x0A, 0x88, 0x88, 0x88));
+        var primary = Res("TextFillColorPrimaryBrush");
+        var secondary = Res("TextFillColorSecondaryBrush");
+        var subtleBg = Res("SubtleFillColorSecondaryBrush");
+        var accent = Res("AccentFillColorDefaultBrush");
+        var success = Res("SystemFillColorSuccessBrush");
+        var critical = Res("SystemFillColorCriticalBrush");
 
         if (_selected is not { } item)
         {
@@ -478,7 +557,6 @@ public sealed class TodoWidget : UserControl
                     Text = "选择左侧任务以编辑",
                     FontSize = 14,
                     Foreground = secondary,
-                    Opacity = 0.4,
                     TextAlignment = TextAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 }
@@ -490,7 +568,7 @@ public sealed class TodoWidget : UserControl
         {
             CornerRadius = new CornerRadius(10),
             Padding = new Thickness(24),
-            Background = cardBg
+            Background = subtleBg
         };
 
         var stack = new StackPanel { Spacing = 20 };
@@ -509,14 +587,14 @@ public sealed class TodoWidget : UserControl
         pcb.Items.Add(new ComboBoxItem { Content = "中", Tag = Priority.Medium });
         pcb.Items.Add(new ComboBoxItem { Content = "高", Tag = Priority.High });
         pcb.SelectedIndex = (int)item.Priority;
-        pcb.SelectionChanged += (_, _) => { if (pcb.SelectedItem is ComboBoxItem ci && ci.Tag is Priority p) { item.Priority = p; _store.Save(); } };
+        pcb.SelectionChanged += (_, _) => { if (pcb.SelectedItem is ComboBoxItem ci && ci.Tag is Priority p) { item.Priority = p; _store.MarkDirty(); _store.Save(); } };
         Grid.SetColumn(pcb, 1);
         titleRow.Children.Add(ttl); titleRow.Children.Add(pcb);
         stack.Children.Add(titleRow);
 
         // tags
         var tbx = new TextBox { PlaceholderText = "标签（逗号分隔）", Text = item.Tags ?? "", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch };
-        tbx.LostFocus += (_, _) => { item.Tags = tbx.Text; _store.Save(); };
+        tbx.LostFocus += (_, _) => { item.Tags = tbx.Text; _store.MarkDirty(); _store.Save(); };
         stack.Children.Add(tbx);
 
         stack.Children.Add(Sep());
@@ -530,12 +608,12 @@ public sealed class TodoWidget : UserControl
         {
             if (dp.Date is { } dd) { item.Deadline = dd.Date + tp.Time; item.Reminded = false; }
             else item.Deadline = null;
-            _store.Save();
+            _store.MarkDirty(); _store.Save();
         }
         dp.DateChanged += (_, _) => UpdDdl();
         tp.TimeChanged += (_, _) => UpdDdl();
-        var cdl = new Button { Content = "清除截止", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Foreground = secondary };
-        cdl.Click += (_, _) => { dp.Date = null; item.Deadline = null; item.Reminded = false; _store.Save(); RebuildDetail(); };
+        var cdl = new Button { Content = "清除截止", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left };
+        cdl.Click += (_, _) => { dp.Date = null; item.Deadline = null; item.Reminded = false; _store.MarkDirty(); _store.Save(); RebuildDetail(); };
         var ds = new StackPanel { Spacing = 8 };
         ds.Children.Add(dp); ds.Children.Add(tp); ds.Children.Add(cdl);
         stack.Children.Add(ds);
@@ -546,9 +624,9 @@ public sealed class TodoWidget : UserControl
         foreach (var k in new[] { RepeatKind.None, RepeatKind.Daily, RepeatKind.Weekly, RepeatKind.Monthly, RepeatKind.Workday })
             rcb.Items.Add(new ComboBoxItem { Content = RepeatName(k), Tag = k });
         rcb.SelectedIndex = (int)item.Repeat;
-        rcb.SelectionChanged += (_, _) => { if (rcb.SelectedItem is ComboBoxItem ci && ci.Tag is RepeatKind rk) { item.Repeat = rk; _store.Save(); } };
+        rcb.SelectionChanged += (_, _) => { if (rcb.SelectedItem is ComboBoxItem ci && ci.Tag is RepeatKind rk) { item.Repeat = rk; _store.MarkDirty(); _store.Save(); } };
         var ldb = new NumberBox { Minimum = 0, Maximum = 1440, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, Value = item.LeadMinutes, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "提前（分钟）" };
-        ldb.ValueChanged += (_, _) => { if (!double.IsNaN(ldb.Value)) { item.LeadMinutes = (int)ldb.Value; _store.Save(); } };
+        ldb.ValueChanged += (_, _) => { if (!double.IsNaN(ldb.Value)) { item.LeadMinutes = (int)ldb.Value; _store.MarkDirty(); _store.Save(); } };
         var rs2 = new StackPanel { Spacing = 8 };
         rs2.Children.Add(rcb); rs2.Children.Add(ldb);
         stack.Children.Add(rs2);
@@ -557,7 +635,7 @@ public sealed class TodoWidget : UserControl
 
         // note
         var nb = new TextBox { PlaceholderText = "备注…", Text = item.Note ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 64, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "备注" };
-        nb.LostFocus += (_, _) => { item.Note = nb.Text; _store.Save(); };
+        nb.LostFocus += (_, _) => { item.Note = nb.Text; _store.MarkDirty(); _store.Save(); };
         stack.Children.Add(nb);
 
         // subtasks
@@ -572,7 +650,7 @@ public sealed class TodoWidget : UserControl
             var progRow = new Grid { ColumnSpacing = 8 };
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var pb = new ProgressBar { Value = (double)doneCount / totalCount * 100, Minimum = 0, Maximum = 100, Height = 6, Foreground = doneCount == totalCount ? new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xAF, 0x50)) : new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)) };
+            var pb = new ProgressBar { Value = (double)doneCount / totalCount * 100, Minimum = 0, Maximum = 100, Height = 6, Foreground = doneCount == totalCount ? success : accent };
             Grid.SetColumn(pb, 0);
             progRow.Children.Add(pb);
             var progressText = new TextBlock { Text = $"{doneCount}/{totalCount}", FontSize = 12, Foreground = secondary, VerticalAlignment = VerticalAlignment.Center };
@@ -586,10 +664,10 @@ public sealed class TodoWidget : UserControl
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var ch = new CheckBox { IsChecked = st.Done, Content = st.Text, FontSize = 13 };
-            ch.Click += (_, _) => { st.Done = ch.IsChecked == true; if (AutoCompleteSub && item.Subtasks.All(s => s.Done)) { item.Done = true; item.CompletedDate = DateTime.Today; } _store.Save(); RebuildDetail(); };
+            ch.Click += (_, _) => { st.Done = ch.IsChecked == true; if (AutoCompleteSub && item.Subtasks.All(s => s.Done)) { item.Done = true; item.CompletedDate = DateTime.Today; } _store.MarkDirty(); _store.Save(); RebuildDetail(); };
             Grid.SetColumn(ch, 0);
-            var sd = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 10 }, Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0), Width = 28, Height = 28, Padding = new Thickness(0) };
-            sd.Click += (_, _) => { item.Subtasks.Remove(st); _store.Save(); RebuildDetail(); };
+            var sd = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 10 }, Width = 28, Height = 28, Padding = new Thickness(0) };
+            sd.Click += (_, _) => { item.Subtasks.Remove(st); _store.MarkDirty(); _store.Save(); RebuildDetail(); };
             Grid.SetColumn(sd, 1);
             sr.Children.Add(ch); sr.Children.Add(sd);
             ss.Children.Add(sr);
@@ -599,7 +677,7 @@ public sealed class TodoWidget : UserControl
         sa.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var si = new TextBox { PlaceholderText = "新增子任务…", FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
         var sbtn = new Button { Content = "+", Width = 32, Height = 32, FontSize = 14, Padding = new Thickness(0) };
-        void SDo() { if (string.IsNullOrWhiteSpace(si.Text)) return; item.Subtasks.Add(new Subtask { Text = si.Text.Trim() }); _store.Save(); RebuildDetail(); }
+        void SDo() { if (string.IsNullOrWhiteSpace(si.Text)) return; item.Subtasks.Add(new Subtask { Text = si.Text.Trim() }); _store.MarkDirty(); _store.Save(); RebuildDetail(); }
         sbtn.Click += (_, _) => SDo();
         si.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) SDo(); };
         Grid.SetColumn(si, 0); Grid.SetColumn(sbtn, 1);
@@ -611,21 +689,19 @@ public sealed class TodoWidget : UserControl
         var delBtn = new Button
         {
             Content = "删除任务",
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xCC, 0x33, 0x33)),
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
+            Foreground = critical,
             HorizontalAlignment = HorizontalAlignment.Left,
             FontSize = 13,
             Margin = new Thickness(0, 8, 0, 0)
         };
-        delBtn.Click += (_, _) => { _store.Delete(item); _selected = null; RebuildTaskList(); };
+        delBtn.Click += (_, _) => { _store.Delete(item); _selected = null; _host.SetConfig(nameof(TodoPlugin), "selected_item_id", ""); RebuildTaskList(); };
         stack.Children.Add(delBtn);
 
         card.Child = stack;
         _detailHost.Content = card;
     }
 
-    static Border Sep() => new() { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x18, 0x88, 0x88, 0x88)) };
+    static Border Sep() => new() { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") };
 
     static TextBlock SectHead(string text, Brush color) => new() { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = color, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 4) };
 
@@ -638,7 +714,12 @@ public sealed class TodoWidget : UserControl
         _ => "不重复"
     };
 
-    internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+    public void Dispose()
+    {
+        _store.Changed -= OnStoreChanged;
+    }
+
+    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
 
     void OpenStats()
     {
@@ -653,7 +734,10 @@ public sealed class TodoWidget : UserControl
         }).Reverse().ToList();
         var overdue = items.Count(i => !i.Done && i.Deadline is { } dl && dl < DateTime.Now);
 
-        var (primary, secondary) = Brushes(((FrameworkElement)this).ActualTheme);
+        var primary = Res("TextFillColorPrimaryBrush");
+        var secondary = Res("TextFillColorSecondaryBrush");
+        var accent = Res("AccentFillColorDefaultBrush");
+
         var body = new StackPanel { Spacing = 12, MinWidth = 320 };
         body.Children.Add(new TextBlock { Text = "待办统计", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = primary });
 
@@ -667,7 +751,7 @@ public sealed class TodoWidget : UserControl
         {
             var s = new StackPanel { Spacing = 2 };
             s.Children.Add(new TextBlock { Text = value, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = primary });
-            s.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary, Opacity = 0.7 });
+            s.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary });
             Grid.SetColumn(s, col);
             grid.Children.Add(s);
         }
@@ -678,12 +762,12 @@ public sealed class TodoWidget : UserControl
         AddStat(3, "总计", items.Count.ToString());
         body.Children.Add(grid);
 
-        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
+        body.Children.Add(new Border { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") });
         body.Children.Add(new TextBlock { Text = "近 7 天完成趋势", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary });
-        body.Children.Add(SharedUtils.MiniChart.Line(weekly, new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)), secondary));
+        body.Children.Add(MiniChart.Line(weekly, accent, secondary));
 
         if (_overlay.IsOpen) _overlay.Close();
-        var statsOverlay = new SharedUtils.BasePluginOverlay();
+        var statsOverlay = new BasePluginOverlay();
         statsOverlay.Show(this, "待办统计", body, _host.Log);
     }
 }

@@ -34,7 +34,8 @@ public sealed class HostAgentCapability : IAgentCapability
         }
 
         if (_dispatcher.HasThreadAccess) Run();
-        else _dispatcher.TryEnqueue(Run);
+        else if (!_dispatcher.TryEnqueue(Run))
+            tcs.SetException(new InvalidOperationException("DispatcherQueue rejected the work item"));
         return tcs.Task;
     }
 }

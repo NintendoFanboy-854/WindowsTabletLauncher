@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading;
 
 namespace LauncherHost.Core.Agent;
 
@@ -93,7 +94,7 @@ public class ConversationHistory
 
     public List<object> ToApiMessages(string model = "deepseek-v4-pro")
     {
-        var list = new List<object>();
+        var list = new List<object>(_messages.Count + 1);
         if (!string.IsNullOrWhiteSpace(_systemPrompt))
             list.Add(new { role = "system", content = _systemPrompt });
 
@@ -153,17 +154,20 @@ public class ConversationHistory
 
     public int EstimateTokenCount()
     {
-        var text = string.Join("\n", _messages.Select(m =>
+        var totalChars = 0;
+        foreach (var m in _messages)
         {
-            var parts = m.Content ?? "";
+            totalChars += m.Role.Length + 2;
             if (m.ContentParts is { Count: > 0 })
-                parts = ContentPartsToFallbackText(m.ContentParts, "text");
-            return $"{m.Role}: {parts} {(m.ReasoningContent ?? "")}";
-        }));
-        return (int)(text.Length * 0.65);
+                totalChars += ContentPartsToFallbackText(m.ContentParts, "text").Length;
+            else
+                totalChars += m.Content?.Length ?? 0;
+            totalChars += (m.ReasoningContent?.Length ?? 0) + 1;
+        }
+        return (int)(totalChars * 0.65);
     }
 
-    public async Task CompressAsync(ChatClient flash, string memoryPrompt)
+    public async Task CompressAsync(ChatClient flash, string memoryPrompt, CancellationToken ct)
     {
         var text = string.Join("\n", _messages.TakeLast(30).Select(m =>
         {
@@ -172,7 +176,7 @@ public class ConversationHistory
             return $"{m.Role}: {m.Content ?? (m.ToolCalls != null ? "[工具调用: " + string.Join(",", m.ToolCalls.Select(tc => tc.Function.Name)) + "]" : "(空)")}";
         }));
 
-        var summary = await CompressOneShotAsync(flash, text);
+        var summary = await CompressOneShotAsync(flash, text, ct);
         var last3 = _messages.TakeLast(6).ToList();
         _messages.Clear();
 
@@ -186,7 +190,7 @@ public class ConversationHistory
         _systemPrompt = compressedPrompt;
     }
 
-    async Task<string?> CompressOneShotAsync(ChatClient flash, string text)
+    async Task<string?> CompressOneShotAsync(ChatClient flash, string text, CancellationToken ct)
     {
         var msgs = new List<object>
         {
@@ -194,7 +198,7 @@ public class ConversationHistory
         };
         try
         {
-            var resp = await flash.SendAndCollectAsync(msgs, null, null, null, CancellationToken.None);
+            var resp = await flash.SendAndCollectAsync(msgs, null, null, null, ct);
             return resp.Content?.Trim();
         }
         catch { return null; }

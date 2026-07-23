@@ -31,7 +31,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     int _breaksToday;
     readonly int[] _hourly = new int[24];
     DateTime _today = DateTime.Today;
-    long _lastReminderTick;
+    DateTime _lastReminderTime = DateTime.MinValue;
     int _persistCounter;
 
     public string DisplayName => "久坐提醒";
@@ -47,6 +47,8 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         _monitor.Tick += (_, _) => Poll();
         _monitor.Start();
 
+        RestoreState();
+
         var firstRun = (_host.GetConfig(PluginId, "first_run") ?? "true") == "true";
         if (firstRun)
         {
@@ -57,13 +59,13 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     public IReadOnlyList<IWidget> GetWidgets()
     {
         _widget ??= new SedentaryWidget(_host, StatsSnapshot, ResetActive);
-        _widget.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+        _widget.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
 
         var firstRun = (_host.GetConfig(PluginId, "first_run") ?? "true") == "true";
         return new[] { new SedentaryWidgetInfo(_host, _widget, firstRun) };
     }
 
-    public void Shutdown() { _monitor?.Stop(); SaveHistory(); }
+    public void Shutdown() { _monitor?.Stop(); SaveHistory(); PersistState(); }
 
     int ThresholdMin => GetInt("threshold_min", 60);
     int CooldownMin => GetInt("cooldown_min", 10);
@@ -119,10 +121,10 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
 
             if (_activeSeconds >= ThresholdMin * 60 && InActiveWindow(now))
             {
-                var tick = Environment.TickCount64;
-                if (tick - _lastReminderTick >= CooldownMin * 60_000L)
+                var utcNow = DateTime.UtcNow;
+                if ((utcNow - _lastReminderTime).TotalMinutes >= CooldownMin)
                 {
-                    _lastReminderTick = tick;
+                    _lastReminderTime = utcNow;
                     var mins = _activeSeconds / 60;
                     _host.Log($"Sedentary: reminder at {mins}min continuous");
                     _host.ShowNotification("久坐提醒", $"你已经连续坐了 {mins} 分钟，起来活动一下吧。", escalate: true);
@@ -131,7 +133,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
             }
         }
 
-        if (++_persistCounter >= 8) { _persistCounter = 0; SaveHistory(); }
+        if (++_persistCounter >= 8) { _persistCounter = 0; SaveHistory(); PersistState(); }
         _widget?.Refresh();
     }
 
@@ -139,8 +141,9 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         if (_activeSeconds >= 300) _breaksToday++;
         _activeSeconds = 0;
-        _lastReminderTick = Environment.TickCount64;
+        _lastReminderTime = DateTime.UtcNow;
         _widget?.HideInfoBar();
+        PersistState();
         _widget?.Refresh();
     }
 
@@ -158,6 +161,61 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         h[_today.ToString("yyyy-MM-dd")] = _todaySeconds / 60;
         StatsHelper.PruneOldEntries(h, 60);
         _host.SetConfig(PluginId, "history", JsonSerializer.Serialize(h));
+    }
+
+    void PersistState()
+    {
+        _host.SetConfig(PluginId, "active_seconds", _activeSeconds.ToString());
+        _host.SetConfig(PluginId, "breaks_today", _breaksToday.ToString());
+        _host.SetConfig(PluginId, "breaks_date", DateTime.Today.ToString("yyyyMMdd"));
+        _host.SetConfig(PluginId, "hourly_today", JsonSerializer.Serialize(_hourly));
+        _host.SetConfig(PluginId, "hourly_date", DateTime.Today.ToString("yyyyMMdd"));
+        _host.SetConfig(PluginId, "last_reminder_ticks", _lastReminderTime.Ticks.ToString());
+        _host.SetConfig(PluginId, "today_seconds", _todaySeconds.ToString());
+    }
+
+    void RestoreState()
+    {
+        var actStr = _host.GetConfig(PluginId, "active_seconds");
+        if (int.TryParse(actStr, out var act) && act > 0)
+            _activeSeconds = act;
+
+        var brkDate = _host.GetConfig(PluginId, "breaks_date");
+        if (brkDate == DateTime.Today.ToString("yyyyMMdd"))
+        {
+            var brkStr = _host.GetConfig(PluginId, "breaks_today");
+            if (int.TryParse(brkStr, out var brk) && brk >= 0)
+                _breaksToday = brk;
+        }
+
+        var hlyDate = _host.GetConfig(PluginId, "hourly_date");
+        if (hlyDate == DateTime.Today.ToString("yyyyMMdd"))
+        {
+            var hlyJson = _host.GetConfig(PluginId, "hourly_today");
+            if (!string.IsNullOrEmpty(hlyJson))
+            {
+                try
+                {
+                    var arr = JsonSerializer.Deserialize<int[]>(hlyJson);
+                    if (arr is { Length: 24 })
+                        Array.Copy(arr, _hourly, 24);
+                }
+                catch { }
+            }
+        }
+
+        var lrtStr = _host.GetConfig(PluginId, "last_reminder_ticks");
+        if (long.TryParse(lrtStr, out var ticks) && ticks > 0)
+        {
+            var last = new DateTime(ticks, DateTimeKind.Utc);
+            if ((DateTime.UtcNow - last).TotalMinutes < CooldownMin)
+                _lastReminderTime = last;
+        }
+
+        var history = LoadHistory();
+        var todayKey = _today.ToString("yyyy-MM-dd");
+        if (history.TryGetValue(todayKey, out var todayMinutes))
+            _todaySeconds = todayMinutes * 60;
     }
 
     List<(DateTime date, int minutes)> Last7()
@@ -219,6 +277,12 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         host.SetConfig(PluginId, "active_end", "22");
         host.SetConfig(PluginId, "history", "");
         host.SetConfig(PluginId, "first_run", "true");
+        host.SetConfig(PluginId, "active_seconds", "");
+        host.SetConfig(PluginId, "breaks_today", "");
+        host.SetConfig(PluginId, "breaks_date", "");
+        host.SetConfig(PluginId, "hourly_today", "");
+        host.SetConfig(PluginId, "hourly_date", "");
+        host.SetConfig(PluginId, "last_reminder_ticks", "");
         _widget?.Refresh();
     }
 
@@ -254,14 +318,17 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
                 return Task.FromResult(AgentJson.Serialize(new { continuousMinutes = _activeSeconds / 60, todayMinutes = _todaySeconds / 60, thresholdMinutes = ThresholdMin, enabled = Enabled }));
 
             case "reset_sitting":
-                if (_dispatcher.HasThreadAccess) ResetActive();
-                else _dispatcher.TryEnqueue(ResetActive);
+                if (_dispatcher.HasThreadAccess)
+                    ResetActive();
+                else if (!_dispatcher.TryEnqueue(ResetActive))
+                    return Task.FromResult(AgentJson.Error("dispatcher_rejected"));
                 return Task.FromResult(AgentJson.Serialize(new { ok = true, continuousMinutes = 0 }));
 
             case "set_sedentary_enabled":
             {
                 var on = AgentJson.GetBool(argumentsJson, "enabled") ?? true;
                 _host.SetConfig(PluginId, "enabled", on ? "true" : "false");
+                _widget?.Refresh();
                 return Task.FromResult(AgentJson.Serialize(new { ok = true, enabled = on }));
             }
 
@@ -270,6 +337,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
                 var mins = AgentJson.GetInt(argumentsJson, "minutes");
                 if (mins is not > 0) return Task.FromResult(AgentJson.Error("invalid_minutes"));
                 _host.SetConfig(PluginId, "threshold_min", mins.Value.ToString());
+                _widget?.Refresh();
                 return Task.FromResult(AgentJson.Serialize(new { ok = true, thresholdMinutes = mins.Value }));
             }
 
@@ -311,7 +379,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
 
         public object CreateControl()
         {
-            _control.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+            _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
             if (_firstRun) _control.ShowTeachingTipIfNeeded();
             return _control;
         }

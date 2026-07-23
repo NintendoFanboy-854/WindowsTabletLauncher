@@ -38,6 +38,8 @@ public sealed class HolidayService
             _host.LogError($"Todo/Holiday: query {key} failed ({ex.Message}); fallback workday={result}");
         }
 
+        if (_workdayCache.Count >= 1000)
+            _workdayCache.Clear();
         _workdayCache[key] = result;
         return result;
     }

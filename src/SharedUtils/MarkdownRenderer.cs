@@ -20,6 +20,17 @@ public static class MarkdownRenderer
         .DisableHtml()
         .Build();
 
+    static readonly SolidColorBrush CodeBlockBackgroundBrush = new(Color.FromArgb(0x30, 0, 0, 0));
+    static readonly SolidColorBrush SemiTransparentBorderBrush = new(Color.FromArgb(0x30, 0x88, 0x88, 0x88));
+    static readonly SolidColorBrush QuoteBorderBrush = new(Color.FromArgb(0x60, 0x88, 0x88, 0x88));
+    static readonly SolidColorBrush TableHeaderBrush = new(Color.FromArgb(0x18, 0x88, 0x88, 0x88));
+    static readonly SolidColorBrush InlineCodeBrush = new(Color.FromArgb(0xFF, 0xE0, 0x6C, 0x75));
+    static readonly SolidColorBrush LinkBrush = new(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0));
+    static readonly FontFamily CodeFontFamily = new("Consolas");
+
+    static readonly Dictionary<string, MarkdownDocument> ParseCache = new();
+    static readonly object ParseCacheLock = new();
+
     public static Panel Render(string markdown, Brush primary, Brush secondary, double fontSize = 13)
     {
         var panel = new StackPanel { Spacing = 4 };
@@ -31,7 +42,17 @@ public static class MarkdownRenderer
 
         try
         {
-            var doc = Markdown.Parse(markdown, Pipeline);
+            MarkdownDocument doc;
+            lock (ParseCacheLock)
+            {
+                if (!ParseCache.TryGetValue(markdown, out doc!))
+                {
+                    doc = Markdown.Parse(markdown, Pipeline);
+                    if (ParseCache.Count >= 50)
+                        ParseCache.Clear();
+                    ParseCache[markdown] = doc;
+                }
+            }
             foreach (var block in doc)
                 RenderBlock(block, panel, primary, secondary, fontSize);
         }
@@ -67,7 +88,7 @@ public static class MarkdownRenderer
                 var text = code.Lines.ToString();
                 var border = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(0x30, 0, 0, 0)),
+                    Background = CodeBlockBackgroundBrush,
                     CornerRadius = new CornerRadius(6),
                     Padding = new Thickness(10, 8, 10, 8)
                 };
@@ -75,7 +96,7 @@ public static class MarkdownRenderer
                 {
                     Text = text,
                     FontSize = f - 1,
-                    FontFamily = new FontFamily("Consolas"),
+                    FontFamily = CodeFontFamily,
                     Foreground = secondary,
                     TextWrapping = TextWrapping.Wrap
                 };
@@ -89,28 +110,24 @@ public static class MarkdownRenderer
                 {
                     if (item is ListItemBlock li)
                     {
-                        var grid = new Grid();
-                        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-                        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                        var row = new StackPanel { Orientation = Orientation.Horizontal };
 
-                        var marker = new TextBlock
+                        row.Children.Add(new TextBlock
                         {
                             Text = list.IsOrdered ? $"{++idx}." : "-",
                             FontSize = f,
                             Foreground = secondary,
-                            HorizontalAlignment = HorizontalAlignment.Right,
-                            Margin = new Thickness(0, 0, 8, 0)
-                        };
-                        Grid.SetColumn(marker, 0);
-                        grid.Children.Add(marker);
+                            Width = 24,
+                            Margin = new Thickness(0, 0, 8, 0),
+                            HorizontalTextAlignment = TextAlignment.Right
+                        });
 
                         var content = new StackPanel();
                         foreach (var sub in li)
                             RenderBlock(sub, content, primary, secondary, f);
-                        Grid.SetColumn(content, 1);
-                        grid.Children.Add(content);
+                        row.Children.Add(content);
 
-                        panel.Children.Add(grid);
+                        panel.Children.Add(row);
                     }
                 }
                 break;
@@ -119,7 +136,7 @@ public static class MarkdownRenderer
                 panel.Children.Add(new Border
                 {
                     Height = 1,
-                    Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)),
+                    Background = SemiTransparentBorderBrush,
                     Margin = new Thickness(0, 4, 0, 4)
                 });
                 break;
@@ -127,7 +144,7 @@ public static class MarkdownRenderer
             {
                 var border = new Border
                 {
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(0x60, 0x88, 0x88, 0x88)),
+                    BorderBrush = QuoteBorderBrush,
                     BorderThickness = new Thickness(3, 0, 0, 0),
                     Padding = new Thickness(8, 2, 0, 2),
                     Margin = new Thickness(0, 2, 0, 2)
@@ -163,13 +180,13 @@ public static class MarkdownRenderer
 
                         var cellBorder = new Border
                         {
-                            BorderBrush = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)),
+                            BorderBrush = SemiTransparentBorderBrush,
                             BorderThickness = new Thickness(1),
                             Padding = new Thickness(6, 3, 6, 3),
                             Child = cellTb
                         };
                         if (rowIdx == 0)
-                            cellBorder.Background = new SolidColorBrush(Color.FromArgb(0x18, 0x88, 0x88, 0x88));
+                            cellBorder.Background = TableHeaderBrush;
                         Grid.SetRow(cellBorder, rowIdx);
                         Grid.SetColumn(cellBorder, colIdx);
                         grid.Children.Add(cellBorder);
@@ -237,9 +254,9 @@ public static class MarkdownRenderer
                     var run = new Run
                     {
                         Text = ci.Content,
-                        FontFamily = new FontFamily("Consolas"),
+                        FontFamily = CodeFontFamily,
                         FontSize = 12,
-                        Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x6C, 0x75))
+                        Foreground = InlineCodeBrush
                     };
                     target.Add(run);
                     break;
@@ -247,7 +264,7 @@ public static class MarkdownRenderer
                 case LinkInline link:
                 {
                     var span = new Span();
-                    span.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0));
+                    span.Foreground = LinkBrush;
                     RenderInlines(link, span.Inlines, primary, secondary);
                     target.Add(span);
                     break;

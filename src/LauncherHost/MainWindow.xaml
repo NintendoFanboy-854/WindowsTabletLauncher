@@ -10,6 +10,17 @@
     <Grid>
         <FlipView x:Name="Pager" Background="Transparent" />
 
+        <Button x:Name="EditExitBtn"
+                Width="40" Height="40"
+                Padding="0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="16"
+                CornerRadius="20"
+                Visibility="Collapsed">
+            <FontIcon Glyph="&#xE73E;" FontSize="14" />
+        </Button>
+
         <StackPanel
             x:Name="BottomBar"
             Orientation="Horizontal"

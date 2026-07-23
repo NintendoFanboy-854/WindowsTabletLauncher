@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 
 namespace TodoPlugin;
 
@@ -41,11 +42,15 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
     public IReadOnlyList<IWidget> GetWidgets()
     {
         _widget ??= new TodoWidget(_host, _store, ToggleItem);
-        _widget.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+        _widget.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
         return new[] { new TodoWidgetInfo(_host, _widget) };
     }
 
-    public void Shutdown() => _reminderTimer?.Stop();
+    public void Shutdown()
+    {
+        _reminderTimer?.Stop();
+        _widget?.Dispose();
+    }
 
     Task<string> OnUi(Func<string> action)
     {
@@ -72,7 +77,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
             item.Reminded = false;
             item.Done = false;
             _host.Log($"Todo: recurring '{item.Text}' rolled to {item.Deadline:yyyy-MM-dd HH:mm}");
-            _store.Save();
+            _store.MarkDirty(); _store.Save();
         }
         else
         {
@@ -87,7 +92,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         try
         {
             var now = DateTime.Now;
-            foreach (var item in _store.Items.ToList())
+            foreach (var item in _store.Items)
             {
                 if (item.Done || item.Reminded || item.Deadline is not { } dl) continue;
                 var remindAt = dl.AddMinutes(-item.LeadMinutes);
@@ -105,7 +110,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 {
                     item.Reminded = true;
                 }
-                _store.Save();
+                _store.MarkDirty(); _store.Save();
             }
         }
         catch (Exception ex) { _host.LogError($"Todo: reminder check failed: {ex.Message}"); }
@@ -146,34 +151,36 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         host.SetConfig(PluginId, "auto_complete_on_subtasks", "true");
         host.SetConfig(PluginId, "hide_done", "false");
         host.SetConfig(PluginId, "default_view", "list");
+        host.SetConfig(PluginId, "current_list", "");
+        host.SetConfig(PluginId, "selected_item_id", "");
         _widget?.OnStoreChanged();
     }
 
     IReadOnlyList<AgentTool> IAgentCapability.GetTools() => new[]
     {
-        new AgentTool { Name = "list_todo", Description = "获取全部待办，可选按日期过滤。", ParametersJsonSchema = """{"type":"object","properties":{"date":{"type":"string","description":"yyyy-MM-dd 过滤指定日期"}}}""" },
-        new AgentTool { Name = "add_todo", Description = "新增待办。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"list":{"type":"string"},"inbox":{"type":"boolean"},"priority":{"type":"string","enum":["none","low","medium","high"]},"tags":{"type":"string"},"deadline":{"type":"string"},"leadMinutes":{"type":"integer"},"note":{"type":"string"},"repeat":{"type":"string","enum":["none","daily","weekly","monthly","workday"]}},"required":["text"]}""" },
-        new AgentTool { Name = "complete_todo", Description = "把某条待办标记为完成（按文本匹配）。", ParametersJsonSchema = TextSchema },
-        new AgentTool { Name = "uncomplete_todo", Description = "把某条已完成待办标记为未完成（按文本匹配）。", ParametersJsonSchema = TextSchema },
-        new AgentTool { Name = "delete_todo", Description = "删除某条待办（按文本匹配）。", ParametersJsonSchema = TextSchema },
+        new AgentTool { Name = "list_todo", Description = "获取全部待办，可选按日期过滤。返回每个item包含Id字段供精确操作。", ParametersJsonSchema = """{"type":"object","properties":{"date":{"type":"string","description":"yyyy-MM-dd 过滤指定日期"}}}""" },
+        new AgentTool { Name = "add_todo", Description = "新增待办。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"list":{"type":"string"},"inbox":{"type":"boolean"},"priority":{"type":"string","enum":["none","low","medium","high"]},"tags":{"type":"string"},"deadline":{"type":"string","description":"ISO 8601 date-time, e.g. 2026-07-25 or 2026-07-25T15:00:00","format":"date-time"},"leadMinutes":{"type":"integer"},"note":{"type":"string"},"repeat":{"type":"string","enum":["none","daily","weekly","monthly","workday"]}},"required":["text"]}""" },
+        new AgentTool { Name = "complete_todo", Description = "把某条待办标记为完成。", ParametersJsonSchema = IdSchema },
+        new AgentTool { Name = "uncomplete_todo", Description = "把某条已完成待办标记为未完成。", ParametersJsonSchema = IdSchema },
+        new AgentTool { Name = "delete_todo", Description = "删除某条待办。", ParametersJsonSchema = IdSchema },
         new AgentTool { Name = "clear_completed_todo", Description = "清除所有已完成的待办。" },
-        new AgentTool { Name = "set_todo_deadline", Description = "设置或清除截止时间。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"deadline":{"type":"string"},"leadMinutes":{"type":"integer"}},"required":["text"]}""" },
-        new AgentTool { Name = "set_todo_note", Description = "设置备注。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"note":{"type":"string"}},"required":["text","note"]}""" },
-        new AgentTool { Name = "set_todo_repeat", Description = "设置重复方式。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"repeat":{"type":"string","enum":["none","daily","weekly","monthly","workday"]}},"required":["text","repeat"]}""" },
-        new AgentTool { Name = "set_todo_priority", Description = "设置优先级。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"priority":{"type":"string","enum":["none","low","medium","high"]}},"required":["text","priority"]}""" },
-        new AgentTool { Name = "set_todo_tags", Description = "设置标签。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"tags":{"type":"string"}},"required":["text","tags"]}""" },
-        new AgentTool { Name = "add_subtask", Description = "添加子任务。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"subtask":{"type":"string"}},"required":["text","subtask"]}""" },
-        new AgentTool { Name = "toggle_subtask", Description = "切换子任务完成状态。", ParametersJsonSchema = """{"type":"object","properties":{"text":{"type":"string"},"subtask":{"type":"string"}},"required":["text","subtask"]}""" },
+        new AgentTool { Name = "set_todo_deadline", Description = "设置或清除截止时间。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"deadline":{"type":"string","description":"ISO 8601 date-time, e.g. 2026-07-25 or 2026-07-25T15:00:00; pass empty to clear","format":"date-time"},"leadMinutes":{"type":"integer"}},"required":["id"]}""" },
+        new AgentTool { Name = "set_todo_note", Description = "设置备注。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"note":{"type":"string"}},"required":["id","note"]}""" },
+        new AgentTool { Name = "set_todo_repeat", Description = "设置重复方式。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"repeat":{"type":"string","enum":["none","daily","weekly","monthly","workday"]}},"required":["id","repeat"]}""" },
+        new AgentTool { Name = "set_todo_priority", Description = "设置优先级。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"priority":{"type":"string","enum":["none","low","medium","high"]}},"required":["id","priority"]}""" },
+        new AgentTool { Name = "set_todo_tags", Description = "设置标签。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"tags":{"type":"string"}},"required":["id","tags"]}""" },
+        new AgentTool { Name = "add_subtask", Description = "添加子任务。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"subtask":{"type":"string"}},"required":["id","subtask"]}""" },
+        new AgentTool { Name = "toggle_subtask", Description = "切换子任务完成状态。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"subtask":{"type":"string"}},"required":["id","subtask"]}""" },
         new AgentTool { Name = "list_lists", Description = "列出所有待办列表名称。" },
         new AgentTool { Name = "create_list", Description = "创建一个新的待办列表。", ParametersJsonSchema = """{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}""" },
         new AgentTool { Name = "rename_list", Description = "重命名一个待办列表。", ParametersJsonSchema = """{"type":"object","properties":{"old":{"type":"string"},"new":{"type":"string"}},"required":["old","new"]}""" },
         new AgentTool { Name = "delete_list", Description = "删除一个待办列表及其所有任务。", ParametersJsonSchema = """{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}""" },
         new AgentTool { Name = "query_todo_stats", Description = "获取待办统计数据：今日完成率、逾期数、累计完成、近7天趋势。" },
-        new AgentTool { Name = "move_to_list", Description = "将任务移入指定列表。", ParametersJsonSchema = """{"type":"object","properties":{"taskText":{"type":"string"},"listName":{"type":"string"}},"required":["taskText","listName"]}""" },
+        new AgentTool { Name = "move_to_list", Description = "将任务移入指定列表。", ParametersJsonSchema = """{"type":"object","properties":{"id":{"type":"string"},"listName":{"type":"string"}},"required":["id","listName"]}""" },
         new AgentTool { Name = "share_todo_list", Description = "导出待办清单文本并复制到剪贴板。", ParametersJsonSchema = """{"type":"object","properties":{"listName":{"type":"string"}}}""" },
     };
 
-    const string TextSchema = """{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}""";
+    const string IdSchema = """{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}""";
 
     Task<string> IAgentCapability.InvokeAsync(string tool, string argumentsJson)
     {
@@ -199,26 +206,29 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 {
                     var text = AgentJson.GetString(argumentsJson, "text");
                     if (string.IsNullOrWhiteSpace(text)) return AgentJson.Error("text_required");
+                    var dlStr = AgentJson.GetString(argumentsJson, "deadline");
+                    if (!string.IsNullOrWhiteSpace(dlStr) && !DateTime.TryParse(dlStr, out _))
+                        return AgentJson.Error("invalid_deadline");
                     var list = AgentJson.GetString(argumentsJson, "list");
                     var inbox = AgentJson.GetBool(argumentsJson, "inbox") ?? false;
                     if (inbox && string.IsNullOrWhiteSpace(list)) list = TodoStore.InboxList;
                     var item = _store.Add(text, list ?? TodoStore.DefaultList);
                     ApplyOptionalFields(item, argumentsJson);
-                    _store.Save();
+                    _store.MarkDirty(); _store.Save();
                     return ListJson();
                 });
 
-            case "complete_todo": return OnUi(() => WithText(argumentsJson, t => _store.CompleteByText(t)));
-            case "uncomplete_todo": return OnUi(() => WithText(argumentsJson, t => _store.UncompleteByText(t)));
-            case "delete_todo": return OnUi(() => WithText(argumentsJson, t => _store.DeleteByText(t)));
+            case "complete_todo": return OnUi(() => WithItemById(argumentsJson, item => { item.Done = true; item.CompletedDate = DateTime.Today; _store.MarkDirty(); _store.Save(); }));
+            case "uncomplete_todo": return OnUi(() => WithItemById(argumentsJson, item => { item.Done = false; item.CompletedDate = null; _store.MarkDirty(); _store.Save(); }));
+            case "delete_todo": return OnUi(() => WithItemById(argumentsJson, item => _store.Delete(item)));
             case "clear_completed_todo": return OnUi(() => { _store.ClearCompleted(); return ListJson(); });
 
             case "set_todo_deadline":
                 return OnUi(() =>
                 {
-                    var text = AgentJson.GetString(argumentsJson, "text");
-                    if (string.IsNullOrWhiteSpace(text)) return AgentJson.Error("text_required");
-                    var item = _store.FindByText(text);
+                    var id = AgentJson.GetString(argumentsJson, "id");
+                    if (string.IsNullOrWhiteSpace(id)) return AgentJson.Error("id_required");
+                    var item = _store.FindById(id);
                     if (item == null) return AgentJson.Error("not_found");
                     var dlStr = AgentJson.GetString(argumentsJson, "deadline");
                     if (string.IsNullOrWhiteSpace(dlStr)) item.Deadline = null;
@@ -227,35 +237,35 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                     var lead = AgentJson.GetInt(argumentsJson, "leadMinutes");
                     if (lead is >= 0) item.LeadMinutes = lead.Value;
                     item.Reminded = false;
-                    _store.Save();
+                    _store.MarkDirty(); _store.Save();
                     return ListJson();
                 });
 
-            case "set_todo_note": return OnUi(() => WithItem(argumentsJson, item => { item.Note = AgentJson.GetString(argumentsJson, "note"); _store.Save(); }));
-            case "set_todo_repeat": return OnUi(() => WithItem(argumentsJson, item => { item.Repeat = ParseRepeat(AgentJson.GetString(argumentsJson, "repeat")); _store.Save(); }));
-            case "set_todo_priority": return OnUi(() => WithItem(argumentsJson, item => { item.Priority = (Priority?)Enum.Parse(typeof(Priority), AgentJson.GetString(argumentsJson, "priority") ?? "None", true) ?? Priority.None; _store.Save(); }));
-            case "set_todo_tags": return OnUi(() => WithItem(argumentsJson, item => { item.Tags = AgentJson.GetString(argumentsJson, "tags") ?? ""; _store.Save(); }));
+            case "set_todo_note": return OnUi(() => WithItemById(argumentsJson, item => { item.Note = AgentJson.GetString(argumentsJson, "note"); _store.MarkDirty(); _store.Save(); }));
+            case "set_todo_repeat": return OnUi(() => WithItemById(argumentsJson, item => { item.Repeat = ParseRepeat(AgentJson.GetString(argumentsJson, "repeat")); _store.MarkDirty(); _store.Save(); }));
+            case "set_todo_priority": return OnUi(() => WithItemById(argumentsJson, item => { item.Priority = (Priority?)Enum.Parse(typeof(Priority), AgentJson.GetString(argumentsJson, "priority") ?? "None", true) ?? Priority.None; _store.MarkDirty(); _store.Save(); }));
+            case "set_todo_tags": return OnUi(() => WithItemById(argumentsJson, item => { item.Tags = AgentJson.GetString(argumentsJson, "tags") ?? ""; _store.MarkDirty(); _store.Save(); }));
 
             case "add_subtask":
                 return OnUi(() =>
                 {
-                    var text = AgentJson.GetString(argumentsJson, "text");
+                    var id = AgentJson.GetString(argumentsJson, "id");
                     var sub = AgentJson.GetString(argumentsJson, "subtask");
-                    if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(sub)) return AgentJson.Error("text_required");
-                    var item = _store.FindByText(text);
+                    if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(sub)) return AgentJson.Error("id_required");
+                    var item = _store.FindById(id);
                     if (item == null) return AgentJson.Error("not_found");
                     item.Subtasks.Add(new Subtask { Text = sub.Trim() });
-                    _store.Save();
+                    _store.MarkDirty(); _store.Save();
                     return ListJson();
                 });
 
             case "toggle_subtask":
                 return OnUi(() =>
                 {
-                    var text = AgentJson.GetString(argumentsJson, "text");
+                    var id = AgentJson.GetString(argumentsJson, "id");
                     var sub = AgentJson.GetString(argumentsJson, "subtask");
-                    if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(sub)) return AgentJson.Error("text_required");
-                    var item = _store.FindByText(text);
+                    if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(sub)) return AgentJson.Error("id_required");
+                    var item = _store.FindById(id);
                     if (item == null) return AgentJson.Error("not_found");
                     var st = item.Subtasks.FirstOrDefault(s => s.Text.Contains(sub, StringComparison.OrdinalIgnoreCase));
                     if (st == null) return AgentJson.Error("subtask_not_found");
@@ -271,7 +281,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 {
                     var name = AgentJson.GetString(argumentsJson, "name");
                     if (string.IsNullOrWhiteSpace(name)) return AgentJson.Error("name_required");
-                    _store.Add("占位", name); _store.ClearCompleted(name);
+                    if (!_store.CreateList(name)) return AgentJson.Error("list_exists_or_builtin");
                     return AgentJson.Serialize(new { ok = true, list = name, lists = _store.ListNames });
                 });
 
@@ -291,9 +301,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                     var name = AgentJson.GetString(argumentsJson, "name");
                     if (string.IsNullOrWhiteSpace(name)) return AgentJson.Error("name_required");
                     if (name == TodoStore.DefaultList || name == TodoStore.InboxList) return AgentJson.Error("cannot_delete_builtin");
-                    var items = _store.Items.Where(i => i.List == name).ToList();
-                    foreach (var i in items) _store.Items.Remove(i);
-                    _store.Save();
+                    _store.DeleteList(name);
                     return AgentJson.Serialize(new { ok = true, lists = _store.ListNames });
                 });
 
@@ -325,13 +333,13 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
             case "move_to_list":
                 return OnUi(() =>
                 {
-                    var taskText = AgentJson.GetString(argumentsJson, "taskText");
+                    var id = AgentJson.GetString(argumentsJson, "id");
                     var listName = AgentJson.GetString(argumentsJson, "listName");
-                    if (string.IsNullOrWhiteSpace(taskText) || string.IsNullOrWhiteSpace(listName)) return AgentJson.Error("text_required");
-                    var item = _store.FindByText(taskText);
+                    if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(listName)) return AgentJson.Error("id_required");
+                    var item = _store.FindById(id);
                     if (item == null) return AgentJson.Error("not_found");
                     item.List = listName;
-                    _store.Save();
+                    _store.MarkDirty(); _store.Save();
                     return ListJson();
                 });
 
@@ -355,27 +363,24 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         }
     }
 
-    string WithText(string argsJson, Func<string, bool> op)
+    string WithItemById(string argsJson, Action<TodoItem> op)
     {
-        var text = AgentJson.GetString(argsJson, "text");
-        if (string.IsNullOrWhiteSpace(text)) return AgentJson.Error("text_required");
-        return op(text) ? AgentJson.Serialize(new { ok = true, items = _store.Items }) : AgentJson.Error("not_found");
-    }
-
-    string WithItem(string argsJson, Action<TodoItem> op)
-    {
-        var text = AgentJson.GetString(argsJson, "text");
-        if (string.IsNullOrWhiteSpace(text)) return AgentJson.Error("text_required");
-        var item = _store.FindByText(text);
+        var id = AgentJson.GetString(argsJson, "id");
+        if (string.IsNullOrWhiteSpace(id)) return AgentJson.Error("id_required");
+        var item = _store.FindById(id);
         if (item == null) return AgentJson.Error("not_found");
         op(item);
         return AgentJson.Serialize(new { ok = true, items = _store.Items });
     }
 
-    void ApplyOptionalFields(TodoItem item, string argsJson)
+    string? ApplyOptionalFields(TodoItem item, string argsJson)
     {
         var dlStr = AgentJson.GetString(argsJson, "deadline");
-        if (!string.IsNullOrWhiteSpace(dlStr) && DateTime.TryParse(dlStr, out var dt)) item.Deadline = dt;
+        if (!string.IsNullOrWhiteSpace(dlStr))
+        {
+            if (DateTime.TryParse(dlStr, out var dt)) item.Deadline = dt;
+            else return AgentJson.Error("invalid_deadline");
+        }
         var lead = AgentJson.GetInt(argsJson, "leadMinutes");
         if (lead is >= 0) item.LeadMinutes = lead.Value;
         var note = AgentJson.GetString(argsJson, "note");
@@ -384,6 +389,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         item.Priority = (Priority?)Enum.Parse(typeof(Priority), AgentJson.GetString(argsJson, "priority") ?? "None", true) ?? Priority.None;
         var tags = AgentJson.GetString(argsJson, "tags");
         if (tags != null) item.Tags = tags;
+        return null;
     }
 
     static RepeatKind ParseRepeat(string? s) => (s ?? "none").ToLowerInvariant() switch
@@ -398,6 +404,6 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         public string Id => "todo.main";
         public int Columns => 2; public int Rows => 3;
         public WidgetBackdrop Backdrop => WidgetBackdrop.Acrylic;
-        public object CreateControl() { _control.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush()); return _control; }
+        public object CreateControl() { _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush()); return _control; }
     }
 }

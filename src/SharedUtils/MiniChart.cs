@@ -53,6 +53,7 @@ public static class MiniChart
 
         var canvas = new Canvas { Width = width, Height = height };
         var poly = new Polyline { Stroke = stroke, StrokeThickness = 2 };
+        canvas.Children.Add(poly);
         for (int i = 0; i < n; i++)
         {
             var x = i * stepX;
@@ -67,8 +68,6 @@ public static class MiniChart
             Canvas.SetTop(lbl, height - 16);
             canvas.Children.Add(lbl);
         }
-        canvas.Children.Insert(0, poly);
-
         return new ScrollViewer
         {
             Content = canvas,

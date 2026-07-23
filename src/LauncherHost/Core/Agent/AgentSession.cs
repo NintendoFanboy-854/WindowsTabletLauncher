@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage.Streams;
+using System.Text;
 using LauncherHost.Services;
 using SharedUtils;
 using Windows.UI;
@@ -18,7 +19,7 @@ sealed class BlockInfo
     public BlockType Type;
     public UIElement Container = null!;       // ScrollViewer(think) / TextBlock(tool) / Grid(output)
     public TextBlock? CollapsedPh;
-    public string Text = "";
+    public StringBuilder Text = new();
     public Brush PrimaryBrush = null!;
     public Brush SecondaryBrush = null!;
 }
@@ -43,10 +44,33 @@ public sealed class AgentSession
     bool _toolActive;
     static readonly SolidColorBrush RetryTint = new(Color.FromArgb(0x12, 0x40, 0x90, 0xFF));
 
+    Brush? _primaryBrush;
+    Brush? _secondaryBrush;
+
+    Brush GetPrimaryBrush(ElementTheme theme)
+    {
+        _primaryBrush ??= theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+        return _primaryBrush;
+    }
+
+    Brush GetSecondaryBrush(ElementTheme theme)
+    {
+        _secondaryBrush ??= theme == ElementTheme.Light
+            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        return _secondaryBrush;
+    }
+
     DispatcherQueueTimer? _spinnerTimer;
     int _spinnerIdx;
     int _tickCount;
     bool _spinnerRunning;
+
+    DispatcherQueueTimer? _renderThrottleTimer;
+    bool _renderPending;
+    BlockInfo? _pendingBi;
 
     static readonly string[] SpinnerFrames = { "\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F" };
 
@@ -64,8 +88,6 @@ public sealed class AgentSession
         {
             var frame = SpinnerFrames[_spinnerIdx++ % SpinnerFrames.Length];
             _tickCount++;
-            if (_tickCount % 25 == 0)
-                LogService.Info($"[AgentSession] spinner tick #{_tickCount}");
             if (_thinkingActive && _curThinkingPh != null && _curThinkingPh.Visibility == Visibility.Visible)
                 _curThinkingPh.Text = frame + " 思考中...";
             if (_toolActive && _curToolPh != null && _curToolPh.Visibility == Visibility.Visible)
@@ -73,11 +95,40 @@ public sealed class AgentSession
             if (_waitingStatusTb != null)
                 _waitingStatusTb.Text = frame + " 等待回应中…";
         };
-        _spinnerTimer.Start();
-        _spinnerRunning = true;
+
+        _renderThrottleTimer = _dispatcher.CreateTimer();
+        _renderThrottleTimer.Interval = TimeSpan.FromMilliseconds(30);
+        _renderThrottleTimer.IsRepeating = false;
+        _renderThrottleTimer.Tick += (_, _) =>
+        {
+            if (!_renderPending) return;
+            _renderPending = false;
+            var bi = _pendingBi;
+            if (bi == null || _curBlocks.Count == 0 || bi != _curBlocks[^1]) return;
+            RenderBlock(bi);
+        };
+
         _service.ExpandCotChanged += ApplyExpandMode;
         _service.OnAgentRetry += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = RetryTint; });
         _service.OnAgentRetryExhausted += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = null; });
+    }
+
+    void StartSpinner()
+    {
+        if (!_spinnerRunning && _spinnerTimer != null)
+        {
+            _spinnerTimer.Start();
+            _spinnerRunning = true;
+        }
+    }
+
+    void TryStopSpinner()
+    {
+        if (_spinnerRunning && !_thinkingActive && !_toolActive)
+        {
+            _spinnerTimer?.Stop();
+            _spinnerRunning = false;
+        }
     }
 
     public sealed record AudioBubbleRefs(
@@ -88,9 +139,7 @@ public sealed class AgentSession
         try
         {
             var theme = _parentGrid.ActualTheme;
-            var secondary = theme == ElementTheme.Light
-                ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-                : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+            var secondary = GetSecondaryBrush(theme);
             var bgColor = Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC);
 
             EnsureBubble(_parentGrid,
@@ -104,7 +153,8 @@ public sealed class AgentSession
                 Width = 32, Height = 32, Padding = new Thickness(0),
                 Content = new FontIcon { Glyph = "\uE1D6", FontSize = 14 },
                 VerticalAlignment = VerticalAlignment.Center,
-                IsEnabled = false
+                IsEnabled = false,
+                IsTabStop = false
             };
             var durText = new TextBlock
             {
@@ -151,9 +201,7 @@ public sealed class AgentSession
         try
         {
             var theme = _parentGrid.ActualTheme;
-            var secondary = theme == ElementTheme.Light
-                ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-                : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+            var secondary = GetSecondaryBrush(theme);
 
             refs.DurText.Text = $"{(int)dur.TotalMinutes}:{dur.Seconds:D2}";
             refs.PlayBtn.IsEnabled = true;
@@ -222,12 +270,8 @@ public sealed class AgentSession
         LogService.Info($"[AgentSession.SendAudio] entry, wav={wav.Length}bytes transLen={initialTranscription?.Length ?? 0} dur={duration.TotalSeconds:F1}s msgStack={_msgStack != null} bubble={_bubble != null}");
 
         var theme = _parentGrid.ActualTheme;
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var primary = GetPrimaryBrush(theme);
+        var secondary = GetSecondaryBrush(theme);
         var bgColor = theme == ElementTheme.Light
             ? Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC)
             : Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC);
@@ -240,7 +284,8 @@ public sealed class AgentSession
         {
             Width = 32, Height = 32, Padding = new Thickness(0),
             Content = new FontIcon { Glyph = "\uE102", FontSize = 12 },
-            VerticalAlignment = VerticalAlignment.Center
+            VerticalAlignment = VerticalAlignment.Center,
+            IsTabStop = false
         };
         var durText = new TextBlock
         {
@@ -327,6 +372,9 @@ public sealed class AgentSession
         }
         _curBlocks.Clear();
         _curBlock = null;
+        _renderPending = false;
+        _pendingBi = null;
+        _renderThrottleTimer?.Stop();
         _thinkingActive = false;
         _toolActive = false;
         _curThinkingPh = null;
@@ -349,23 +397,22 @@ public sealed class AgentSession
             _allSubTurnBlocks.Add(new List<BlockInfo>(_curBlocks));
         _curBlocks.Clear();
         _curBlock = null;
+        _renderPending = false;
+        _pendingBi = null;
+        _renderThrottleTimer?.Stop();
         _thinkingActive = false;
         _toolActive = false;
         _curThinkingPh = null;
         _curToolPh = null;
 
         var theme = _parentGrid.ActualTheme;
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var secondary = GetSecondaryBrush(theme);
 
         _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 10, Foreground = secondary, Opacity = 0.4, Margin = new Thickness(0, 2, 0, 0) };
         _msgStack!.Children.Add(_waitingStatusTb);
         AutoScroll();
 
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
+        var primary = GetPrimaryBrush(theme);
 
         var parts = new List<ContentPart>
         {
@@ -374,6 +421,7 @@ public sealed class AgentSession
         if (!string.IsNullOrWhiteSpace(transcription))
             parts.Add(new("text", new() { ["text"] = transcription }));
 
+        StartSpinner();
         _ = _service.SendWithParts(parts,
             onThinking: d => _dispatcher.TryEnqueue(() => OnThinkingDelta(d, primary, secondary)),
             onContent: d => _dispatcher.TryEnqueue(() => OnContentDelta(d, primary, secondary)),
@@ -393,21 +441,20 @@ public sealed class AgentSession
                     _msgStack.Children.Add(errBlock);
                     AutoScroll();
                 }
-            }));
+            })).ContinueWith(t =>
+            {
+                if (t.IsFaulted) LogService.Warn($"[AgentSession] SendWithParts failed: {t.Exception}");
+            }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
-    public async void Send(string input, FrameworkElement source)
+    public async Task Send(string input, FrameworkElement source)
     {
         if (_service.IsBusy) { LogService.Info("[AgentSession.Send] blocked, service busy"); return; }
         LogService.Info($"[AgentSession.Send] entry bubble={_bubble!=null} spinnerRunning={_spinnerRunning} expand={Expand}");
 
         var theme = source.ActualTheme;
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var primary = GetPrimaryBrush(theme);
+        var secondary = GetSecondaryBrush(theme);
 
         EnsureBubble(source, primary, secondary);
 
@@ -429,11 +476,15 @@ public sealed class AgentSession
             _allSubTurnBlocks.Add(new List<BlockInfo>(_curBlocks));
         _curBlocks.Clear();
         _curBlock = null;
+        _renderPending = false;
+        _pendingBi = null;
+        _renderThrottleTimer?.Stop();
         _thinkingActive = false;
         _toolActive = false;
         _curThinkingPh = null;
         _curToolPh = null;
 
+        StartSpinner();
         await _service.SendAsync(
             input,
             onThinking: d => _dispatcher.TryEnqueue(() => { try { LogService.Info($"[AgentSession] onThinking delta len={d.Length}"); OnThinkingDelta(d, primary, secondary); } catch (Exception ex) { LogService.Error(ex, "[AgentSession] onThinking crash"); } }),
@@ -455,7 +506,7 @@ public sealed class AgentSession
                     AutoScroll();
                 }
             }));
-        _dispatcher.TryEnqueue(() => { _thinkingActive = false; _toolActive = false; if (_curBlock != null) _curBlock.Background = null; });
+        _dispatcher.TryEnqueue(() => { _thinkingActive = false; _toolActive = false; TryStopSpinner(); if (_curBlock != null) _curBlock.Background = null; });
     }
 
     // ── Block management ──────────────────────────────────────────
@@ -491,14 +542,22 @@ public sealed class AgentSession
 
     void CloseLastBlock()
     {
+        if (_renderPending && _pendingBi != null && _curBlocks.Count > 0 && _pendingBi == _curBlocks[^1])
+        {
+            _renderThrottleTimer?.Stop();
+            _renderPending = false;
+            RenderBlock(_pendingBi);
+        }
+
         if (_curBlocks.Count == 0) return;
         var bi = _curBlocks[^1];
         _thinkingActive = false;
         _toolActive = false;
         _curThinkingPh = null;
         _curToolPh = null;
+        TryStopSpinner();
 
-        if (bi.Type == BlockType.Thinking && !string.IsNullOrEmpty(bi.Text) && bi.CollapsedPh != null)
+        if (bi.Type == BlockType.Thinking && bi.Text.Length > 0 && bi.CollapsedPh != null)
             bi.CollapsedPh.Text = "思考完毕";
         else if (bi.Type == BlockType.Tool && bi.CollapsedPh != null)
             bi.CollapsedPh.Text = "已调用工具";
@@ -586,27 +645,27 @@ public sealed class AgentSession
         var bi = EnsureBlock(BlockType.Thinking, primary, secondary);
         _thinkingActive = true;
         _toolActive = false;
-        bi.Text += delta;
+        StartSpinner();
+        bi.Text.Append(delta);
 
         var sv = (ScrollViewer)bi.Container;
         if (Expand)
         {
             sv.Visibility = Visibility.Visible;
             if (bi.CollapsedPh != null) bi.CollapsedPh.Visibility = Visibility.Collapsed;
-            try
+
+            if (!_renderPending)
             {
-                var rendered = MarkdownRenderer.Render(bi.Text, secondary, secondary, 11);
-                sv.Content = rendered;
+                _renderPending = true;
+                _pendingBi = bi;
+                _renderThrottleTimer?.Start();
             }
-            catch { }
-            _dispatcher.TryEnqueue(() => { sv.UpdateLayout(); sv.ChangeView(null, double.MaxValue, null); });
         }
         else
         {
             sv.Visibility = Visibility.Collapsed;
             if (bi.CollapsedPh != null) { bi.CollapsedPh.Visibility = Visibility.Visible; }
         }
-        AutoScroll();
     }
 
     void OnContentDelta(string delta, Brush primary, Brush secondary)
@@ -614,24 +673,49 @@ public sealed class AgentSession
         var bi = EnsureBlock(BlockType.Output, primary, secondary);
         _thinkingActive = false;
         _toolActive = false;
-        bi.Text += delta;
+        TryStopSpinner();
+        bi.Text.Append(delta);
 
-        var host = (Grid)((ScrollViewer)bi.Container).Content;
-        try
+        if (!_renderPending)
         {
-            UIElement rendered = string.IsNullOrEmpty(bi.Text)
-                ? new TextBlock { Text = bi.Text, FontSize = 13, Foreground = primary, TextWrapping = TextWrapping.Wrap }
-                : MarkdownRenderer.Render(bi.Text, primary, secondary);
-            host.Children.Clear();
-            host.Children.Add(rendered);
+            _renderPending = true;
+            _pendingBi = bi;
+            _renderThrottleTimer?.Start();
         }
-        catch
+    }
+
+    void RenderBlock(BlockInfo bi)
+    {
+        if (bi.Type == BlockType.Thinking)
         {
-            host.Children.Clear();
-            host.Children.Add(new TextBlock { Text = bi.Text, FontSize = 13, Foreground = primary, TextWrapping = TextWrapping.Wrap });
+            var sv = (ScrollViewer)bi.Container;
+            try
+            {
+                var rendered = MarkdownRenderer.Render(bi.Text.ToString(), bi.SecondaryBrush, bi.SecondaryBrush, 11);
+                sv.Content = rendered;
+            }
+            catch { }
+            _dispatcher.TryEnqueue(() => { sv.ChangeView(null, double.MaxValue, null); });
         }
-        if (bi.Container is ScrollViewer sv)
-            _dispatcher.TryEnqueue(() => { sv.UpdateLayout(); sv.ChangeView(null, double.MaxValue, null); });
+        else if (bi.Type == BlockType.Output)
+        {
+            var sv = (ScrollViewer)bi.Container;
+            var host = (Grid)sv.Content;
+            try
+            {
+                UIElement rendered = bi.Text.Length == 0
+                    ? new TextBlock { Text = bi.Text.ToString(), FontSize = 13, Foreground = bi.PrimaryBrush, TextWrapping = TextWrapping.Wrap }
+                    : MarkdownRenderer.Render(bi.Text.ToString(), bi.PrimaryBrush, bi.SecondaryBrush);
+                host.Children.Clear();
+                host.Children.Add(rendered);
+            }
+            catch
+            {
+                host.Children.Clear();
+                host.Children.Add(new TextBlock { Text = bi.Text.ToString(), FontSize = 13, Foreground = bi.PrimaryBrush, TextWrapping = TextWrapping.Wrap });
+            }
+            _dispatcher.TryEnqueue(() => { sv.ChangeView(null, double.MaxValue, null); });
+        }
         AutoScroll();
     }
 
@@ -641,6 +725,7 @@ public sealed class AgentSession
         var bi = CreateToolBlock(primary, secondary);
         _thinkingActive = false;
         _toolActive = true;
+        StartSpinner();
 
         if (bi.Container is TextBlock toolTb)
             toolTb.Text = "调用: " + name;
@@ -665,7 +750,8 @@ public sealed class AgentSession
         if (_curBlocks.Count == 0) return;
         var bi = _curBlocks[^1];
         if (bi.Type != BlockType.Tool) return;
-        bi.Text = name;
+        bi.Text.Clear();
+        bi.Text.Append(name);
         if (!Expand && bi.CollapsedPh != null)
             bi.CollapsedPh.Text = "已调用工具";
     }
@@ -697,7 +783,7 @@ public sealed class AgentSession
             sv.MaxHeight = expand ? double.PositiveInfinity : (b.Type == BlockType.Thinking ? 72 : 36);
             if (expand && b.Type == BlockType.Thinking && sv.Content is TextBlock && b.Text.Length > 0)
             {
-                try { sv.Content = MarkdownRenderer.Render(b.Text, b.PrimaryBrush, b.SecondaryBrush, 11); }
+                try { sv.Content = MarkdownRenderer.Render(b.Text.ToString(), b.PrimaryBrush, b.SecondaryBrush, 11); }
                 catch { }
             }
         }
@@ -764,7 +850,6 @@ public sealed class AgentSession
         if (_scrollViewer == null) return;
         _scrollViewer.DispatcherQueue.TryEnqueue(() =>
         {
-            _scrollViewer.UpdateLayout();
             _scrollViewer.ChangeView(null, double.MaxValue, null);
         });
     }
@@ -778,6 +863,9 @@ public sealed class AgentSession
         _allSubTurnBlocks.Clear();
         _curThinkingPh = null;
         _curToolPh = null;
+        _renderPending = false;
+        _pendingBi = null;
+        _renderThrottleTimer?.Stop();
     }
 
     public bool IsOpen => _bubble != null;

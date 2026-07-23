@@ -14,6 +14,7 @@ public sealed class AgentLoop
     int _retryAttempt;
     const int MaxRetry = 3;
     const int CompressThreshold = 800_000;
+    CancellationTokenSource? _cts;
 
     public event Action<string>? OnThinking;
     public event Action<string>? OnContent;
@@ -57,7 +58,12 @@ public sealed class AgentLoop
 
     async Task<string> RunLoopAsync(CancellationToken ct)
     {
-        for (int turn = 0; turn < _maxTurns && !ct.IsCancellationRequested; turn++)
+        _cts?.Dispose();
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var token = _cts.Token;
+        try
+        {
+        for (int turn = 0; turn < _maxTurns && !token.IsCancellationRequested; turn++)
         {
             LogService.Info($"[AgentTurn] sub_turn={turn} msgs={_history.Messages.Count}");
             var tools = _toolRegistry.GetToolDefs();
@@ -70,7 +76,7 @@ public sealed class AgentLoop
                     tools.Count > 0 ? tools : null,
                     delta => OnThinking?.Invoke(delta),
                     delta => OnContent?.Invoke(delta),
-                    ct);
+                    token);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -104,7 +110,7 @@ public sealed class AgentLoop
                 {
                     _retryAttempt = 0;
                     _history.AddAssistantMessage(finalText, response.ThinkingContent?.Trim(), null);
-                    await MaybeCompressAsync();
+                    await MaybeCompressAsync(token);
                     return finalText;
                 }
                 if (!string.IsNullOrEmpty(response.ThinkingContent) && ++_retryAttempt < MaxRetry)
@@ -126,18 +132,24 @@ public sealed class AgentLoop
         var error = "达到最大工具调用次数，已中止。";
         OnError?.Invoke(error);
         return error;
+        }
+        finally
+        {
+            _cts?.Dispose();
+            _cts = null;
+        }
     }
 
-    async Task MaybeCompressAsync()
+    async Task MaybeCompressAsync(CancellationToken ct)
     {
         if (_history.EstimateTokenCount() > CompressThreshold)
         {
-            try { await _history.CompressAsync(_client, _memory.ToPromptSection()); }
+            try { await _history.CompressAsync(_client, _memory.ToPromptSection(), ct); }
             catch (Exception ex) { OnError?.Invoke("压缩失败: " + ex.Message); }
         }
     }
 
-    public void Abort() { }
+    public void Abort() => _cts?.Cancel();
 
     static string DefaultSystemPrompt =>
         """

@@ -8,7 +8,7 @@ namespace LauncherHost.Core;
 public class HostHandle : IHostHandle
 {
     private readonly LocalizationService _loc;
-    private readonly AcrylicBrushProvider _acrylicProvider;
+    private readonly ThemeBrushProvider _themeProvider;
     private readonly ConfigStore _config;
     private readonly List<IAgentCapability> _capabilities = new();
 
@@ -19,17 +19,17 @@ public class HostHandle : IHostHandle
 
     private ElementTheme _currentTheme = ElementTheme.Default;
 
-    public HostHandle(LocalizationService loc, AcrylicBrushProvider acrylicProvider, ConfigStore config)
+    public HostHandle(LocalizationService loc, ThemeBrushProvider themeProvider, ConfigStore config)
     {
         _loc = loc;
-        _acrylicProvider = acrylicProvider;
+        _themeProvider = themeProvider;
         _config = config;
     }
 
     public string Translate(string key) => _loc.Translate(key);
 
     public object GetWidgetBackgroundBrush()
-        => _acrylicProvider.GetBrush(LiveTheme?.Invoke() ?? _currentTheme);
+        => _themeProvider.GetBrush(LiveTheme?.Invoke() ?? _currentTheme);
 
     public string? GetConfig(string pluginId, string key) => _config.Get(pluginId, key);
 

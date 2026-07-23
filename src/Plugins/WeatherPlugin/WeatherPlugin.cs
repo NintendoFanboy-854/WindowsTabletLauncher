@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 using Windows.UI;
 
 namespace WeatherPlugin;
@@ -14,6 +15,7 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
     IHostHandle _host = null!;
     AmapWeatherService _service = null!;
     WeatherWidget? _widget;
+    bool _loadingCities;
 
     public string DisplayName => "天气";
 
@@ -27,12 +29,15 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 
     public IReadOnlyList<IWidget> GetWidgets()
     {
-        _widget ??= new WeatherWidget(_host);
-        _widget.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+        _widget ??= new WeatherWidget(_host, _service);
+        _widget.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
         return new[] { new WeatherWidgetInfo(_host, _widget) };
     }
 
-    public void Shutdown() { }
+    public void Shutdown()
+    {
+        _widget?.Stop();
+    }
 
     internal static string ResolveKey(IHostHandle host)
     {
@@ -113,13 +118,23 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 
         provinceCombo.SelectionChanged += async (_, _) =>
         {
+            if (_loadingCities) return;
             if (provinceCombo.SelectedItem is not District province) return;
-            var cities = await _service.GetSubDistrictsAsync(province.Adcode);
-            suppressCity = true;
-            cityCombo.ItemsSource = cities;
-            var match = cities.FirstOrDefault(c => c.Adcode == savedAdcode);
-            if (match != null) cityCombo.SelectedItem = match;
-            suppressCity = false;
+
+            _loadingCities = true;
+            try
+            {
+                var cities = await _service.GetSubDistrictsAsync(province.Adcode);
+                suppressCity = true;
+                cityCombo.ItemsSource = cities;
+                var match = cities.FirstOrDefault(c => c.Adcode == savedAdcode);
+                if (match != null) cityCombo.SelectedItem = match;
+                suppressCity = false;
+            }
+            finally
+            {
+                _loadingCities = false;
+            }
         };
 
         cityCombo.SelectionChanged += (_, _) =>
@@ -211,15 +226,22 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 
     async Task InitProvincesAsync(ComboBox provinceCombo, string? savedAdcode)
     {
-        var provinces = await _service.GetProvincesAsync();
-        provinceCombo.ItemsSource = provinces;
-
-        if (savedAdcode is { Length: >= 2 })
+        try
         {
-            var prefix = savedAdcode.Substring(0, 2);
-            var province = provinces.FirstOrDefault(p => p.Adcode.Length >= 2 && p.Adcode.StartsWith(prefix));
-            if (province != null)
-                provinceCombo.SelectedItem = province;
+            var provinces = await _service.GetProvincesAsync();
+            provinceCombo.ItemsSource = provinces;
+
+            if (savedAdcode is { Length: >= 2 })
+            {
+                var prefix = savedAdcode.Substring(0, 2);
+                var province = provinces.FirstOrDefault(p => p.Adcode.Length >= 2 && p.Adcode.StartsWith(prefix));
+                if (province != null)
+                    provinceCombo.SelectedItem = province;
+            }
+        }
+        catch (Exception ex)
+        {
+            _host.LogError($"[WeatherPlugin] InitProvincesAsync failed: {ex.Message}");
         }
     }
 
@@ -393,7 +415,7 @@ public class WeatherPlugin : IPlugin, IPluginSettings, IAgentCapability
 
         public object CreateControl()
         {
-            _control.SetAcrylicBackground((Brush)_host.GetWidgetBackgroundBrush());
+            _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
             return _control;
         }
     }

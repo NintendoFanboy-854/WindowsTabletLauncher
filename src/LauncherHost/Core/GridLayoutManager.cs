@@ -30,6 +30,10 @@ public class GridLayoutManager
     private readonly Grid _grid;
     private readonly List<FrameworkElement> _widgetElements = new();
     private readonly Dictionary<FrameworkElement, FrameworkElement> _content = new();
+    private readonly List<Line> _vLines = new();
+    private readonly List<Line> _hLines = new();
+    static readonly SolidColorBrush _cellBrush = new(Windows.UI.Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF));
+    static readonly SolidColorBrush _subBrush = new(Windows.UI.Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF));
 
     public GridLayoutManager(Grid grid)
     {
@@ -81,30 +85,42 @@ public class GridLayoutManager
         var step = SubCell;
         var totalW = SubColumns * step;
         var totalH = SubRows * step;
-        var cellBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF));
-        var subBrush = new SolidColorBrush(Windows.UI.Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF));
+        var numV = SubColumns + 1;
+        var numH = SubRows + 1;
 
-        for (int i = 0; i <= SubColumns; i++)
+        while (_vLines.Count < numV)
         {
+            var line = new Line { StrokeThickness = 1 };
+            _vLines.Add(line);
+        }
+        while (_vLines.Count > numV)
+            _vLines.RemoveAt(_vLines.Count - 1);
+
+        while (_hLines.Count < numH)
+        {
+            var line = new Line { StrokeThickness = 1 };
+            _hLines.Add(line);
+        }
+        while (_hLines.Count > numH)
+            _hLines.RemoveAt(_hLines.Count - 1);
+
+        for (int i = 0; i < numV; i++)
+        {
+            var line = _vLines[i];
             var x = i * step;
-            canvas.Children.Add(new Line
-            {
-                X1 = x, Y1 = 0, X2 = x, Y2 = totalH,
-                Stroke = i % 2 == 0 ? cellBrush : subBrush, StrokeThickness = 1
-            });
+            line.X1 = x; line.Y1 = 0; line.X2 = x; line.Y2 = totalH;
+            line.Stroke = i % 2 == 0 ? _cellBrush : _subBrush;
+            canvas.Children.Add(line);
         }
 
-        for (int i = 0; i <= SubRows; i++)
+        for (int i = 0; i < numH; i++)
         {
+            var line = _hLines[i];
             var y = i * step;
-            canvas.Children.Add(new Line
-            {
-                X1 = 0, Y1 = y, X2 = totalW, Y2 = y,
-                Stroke = i % 2 == 0 ? cellBrush : subBrush, StrokeThickness = 1
-            });
+            line.X1 = 0; line.Y1 = y; line.X2 = totalW; line.Y2 = y;
+            line.Stroke = i % 2 == 0 ? _cellBrush : _subBrush;
+            canvas.Children.Add(line);
         }
-
-        LogService.Info($"Grid overlay drawn: sub {SubColumns}×{SubRows} lines, step={step:F1}epx");
     }
 
     public FrameworkElement AddWidget(IWidget widget, int? col = null, int? row = null)

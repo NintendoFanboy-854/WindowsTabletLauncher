@@ -7,6 +7,7 @@ public sealed class ToolRegistry
     readonly IHostHandle _host;
     readonly List<(string PluginId, IAgentCapability Capability)> _caps = new();
     readonly List<ToolDef> _hostTools = new();
+    List<ToolDef>? _cachedToolDefs;
     int _pageCount;
 
     public int PageCount => _pageCount;
@@ -19,6 +20,8 @@ public sealed class ToolRegistry
     public void Refresh()
     {
         _caps.Clear();
+        _hostTools.Clear();
+        _cachedToolDefs = null;
         var handlesCaps = ((HostHandle)GetHostImpl()).GetCapabilities();
         foreach (var cap in handlesCaps)
         {
@@ -44,12 +47,14 @@ public sealed class ToolRegistry
 
     public List<ToolDef> GetToolDefs()
     {
+        if (_cachedToolDefs != null) return _cachedToolDefs;
         var tools = new List<ToolDef>(_hostTools);
         foreach (var (pluginId, cap) in _caps)
         {
             foreach (var t in cap.GetTools())
                 tools.Add(new ToolDef(t.Name, t.Description, t.ParametersJsonSchema));
         }
+        _cachedToolDefs = tools;
         return tools;
     }
 

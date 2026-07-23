@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
+using SharedUtils;
 using Windows.UI;
 
 namespace ClockPlugin;
@@ -16,12 +17,16 @@ public sealed class ClockWidget : UserControl
 
     readonly IHostHandle _host;
     readonly DispatcherQueueTimer _timer;
-    readonly PluginOverlay _overlay = new();
+    readonly BasePluginOverlay _overlay = new();
 
     Border _root = null!;
     TextBlock _timeText = null!;
     TextBlock _dateText = null!;
     TextBlock _lunarText = null!;
+
+    bool _use12;
+    bool _showSeconds;
+    bool _showLunar;
 
     public ClockWidget(IHostHandle host)
     {
@@ -37,12 +42,20 @@ public sealed class ClockWidget : UserControl
         _timer.Tick += OnTick;
         _timer.Start();
 
+        ReadConfig();
         OnTick(null!, null!);
     }
 
-    bool Use12 => (_host.GetConfig(nameof(ClockPlugin), "time_format") ?? "HH:mm:ss").StartsWith("hh");
-    bool ShowSeconds => (_host.GetConfig(nameof(ClockPlugin), "show_seconds") ?? "true") == "true";
-    bool ShowLunar => (_host.GetConfig(nameof(ClockPlugin), "show_lunar") ?? "false") == "true";
+    bool Use12 => _use12;
+    bool ShowSeconds => _showSeconds;
+    bool ShowLunar => _showLunar;
+
+    void ReadConfig()
+    {
+        _use12 = (_host.GetConfig(nameof(ClockPlugin), "time_format") ?? "HH:mm:ss").StartsWith("hh");
+        _showSeconds = (_host.GetConfig(nameof(ClockPlugin), "show_seconds") ?? "true") == "true";
+        _showLunar = (_host.GetConfig(nameof(ClockPlugin), "show_lunar") ?? "false") == "true";
+    }
 
     string TimeFormat()
     {
@@ -98,6 +111,7 @@ public sealed class ClockWidget : UserControl
 
     public void ApplySettings()
     {
+        ReadConfig();
         OnTick(null!, null!);
         ApplyTheme(((FrameworkElement)this).ActualTheme);
     }
@@ -109,12 +123,13 @@ public sealed class ClockWidget : UserControl
     static readonly string[] LunarMonths = { "正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "腊月" };
     static readonly string[] LunarDayTens = { "初", "十", "廿", "三" };
     static readonly string[] LunarDayUnits = { "十", "一", "二", "三", "四", "五", "六", "七", "八", "九" };
+    static readonly ChineseLunisolarCalendar _lunarCalendar = new();
 
     internal static string LunarString(DateTime date)
     {
         try
         {
-            var cal = new ChineseLunisolarCalendar();
+            var cal = _lunarCalendar;
             if (date < cal.MinSupportedDateTime || date > cal.MaxSupportedDateTime) return "";
             int month = cal.GetMonth(date);
             int year = cal.GetYear(date);
@@ -182,5 +197,7 @@ public sealed class ClockWidget : UserControl
         return grid;
     }
 
-    internal void SetAcrylicBackground(Brush brush) => _root.Background = brush;
+    public void Stop() => _timer?.Stop();
+
+    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
 }
