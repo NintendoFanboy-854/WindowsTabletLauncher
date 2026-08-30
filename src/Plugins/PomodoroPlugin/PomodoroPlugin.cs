@@ -336,7 +336,7 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
         public PomodoroWidgetInfo(IHostHandle host, PomodoroWidget control) { _host = host; _control = control; }
         public string Id => "pomodoro.main";
         public int Columns => 2;
-        public int Rows => 2;
+        public int Rows => 1;
         public WidgetBackdrop Backdrop => WidgetBackdrop.Acrylic;
         public object CreateControl() { _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush()); return _control; }
     }

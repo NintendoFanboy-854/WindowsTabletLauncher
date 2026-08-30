@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using SharedUtils;
 using Windows.UI;
 
 namespace WeatherPlugin;
@@ -87,11 +88,9 @@ public sealed class WeatherSettingsPanel : StackPanel
         };
         panel.Children.Add(langBox);
 
-        var testRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var testBtn = new Button { Content = "连接测试", Padding = new Thickness(16, 4, 16, 6) };
-        if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style accent)
-            testBtn.Style = accent;
-        var testResult = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontSize = 12, LineHeight = 17, TextWrapping = TextWrapping.Wrap };
+        var testRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
+        var testBtn = Fluent.Cta("连接测试", null, accent: true);
+        var testResult = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontSize = 12, LineHeight = 16, TextWrapping = TextWrapping.Wrap };
         testBtn.Click += async (_, _) =>
         {
             _service.SetConfig(QWeatherService.KeyHost, hostBox.Text.Trim());
@@ -138,7 +137,7 @@ public sealed class WeatherSettingsPanel : StackPanel
         manualPanel.Visibility = mode == "manual" ? Visibility.Visible : Visibility.Collapsed;
         Children.Add(manualPanel);
 
-        var currentText = new TextBlock { FontSize = 12, LineHeight = 17, Opacity = 0.8, TextWrapping = TextWrapping.Wrap };
+        var currentText = new TextBlock { FontSize = 12, LineHeight = 16, Opacity = 0.8, TextWrapping = TextWrapping.Wrap };
         void UpdateCurrentText()
         {
             var loc = _service.GetLastKnownLocation();
@@ -180,9 +179,9 @@ public sealed class WeatherSettingsPanel : StackPanel
         };
         manualPanel.Children.Add(suggest);
 
-        var hotHeader = new TextBlock { Text = "热门城市", FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
+        var hotHeader = new TextBlock { Text = "热门城市", FontSize = 12, LineHeight = 16, Margin = new Thickness(0, Fluent.SpaceXS, 0, 0) };
         manualPanel.Children.Add(hotHeader);
-        var hotRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var hotRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         manualPanel.Children.Add(hotRow);
 
         _ = LoadHotCitiesAsync(hotRow, UpdateCurrentText);
@@ -207,7 +206,9 @@ public sealed class WeatherSettingsPanel : StackPanel
                 var chip = new ToggleButton
                 {
                     Content = g.Name,
-                    Padding = new Thickness(10, 2, 10, 4),
+                    Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceS, Fluent.SpaceL, Fluent.SpaceS),
+                    MinHeight = Fluent.TouchTarget,
+                    CornerRadius = new CornerRadius(22),
                     FontSize = 12
                 };
                 chip.Click += (_, _) =>
@@ -232,9 +233,10 @@ public sealed class WeatherSettingsPanel : StackPanel
 
     void BuildFavoritesSection()
     {
-        Children.Add(new TextBlock { Text = "收藏城市", FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 0) });
+        Children.Add(new TextBlock { Text = "收藏城市", FontSize = 14, LineHeight = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, Fluent.SpaceXS, 0, 0) });
 
-        var addBtn = new Button { Content = "把当前城市加入收藏", HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 4, 16, 6) };
+        var addBtn = Fluent.Cta("把当前城市加入收藏", null, accent: false);
+        addBtn.HorizontalAlignment = HorizontalAlignment.Stretch;
         addBtn.Click += (_, _) =>
         {
             var loc = _service.GetLastKnownLocation();
@@ -246,7 +248,7 @@ public sealed class WeatherSettingsPanel : StackPanel
         };
         Children.Add(addBtn);
 
-        _favList = new StackPanel { Spacing = 4 };
+        _favList = new StackPanel { Spacing = Fluent.SpaceXS };
         Children.Add(_favList);
         RebuildFavList();
     }
@@ -258,7 +260,7 @@ public sealed class WeatherSettingsPanel : StackPanel
         {
             var row = new Grid
             {
-                ColumnSpacing = 8,
+                ColumnSpacing = Fluent.SpaceS,
                 ColumnDefinitions =
                 {
                     new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
@@ -269,13 +271,7 @@ public sealed class WeatherSettingsPanel : StackPanel
             var label = new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(label, 0);
 
-            var del = new Button
-            {
-                Content = new FontIcon { Glyph = "\uE711", FontSize = 12 },
-                Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(6, 2, 6, 4)
-            };
+            var del = Fluent.IconButton("\uE711", $"删除收藏 {name}", null, "删除", 12);
             var locId = id;
             del.Click += (_, _) =>
             {
@@ -339,8 +335,8 @@ public sealed class WeatherSettingsPanel : StackPanel
             IsClosable = false
         });
 
-        var btn = new Button { Content = "查询用量", Padding = new Thickness(16, 4, 16, 6) };
-        var result = new TextBlock { FontSize = 12, LineHeight = 17, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+        var btn = Fluent.Cta("查询用量", null, accent: false);
+        var result = new TextBlock { FontSize = 12, LineHeight = 16, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
         btn.Click += async (_, _) =>
         {
             btn.IsEnabled = false;

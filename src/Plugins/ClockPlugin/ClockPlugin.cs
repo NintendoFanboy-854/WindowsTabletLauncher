@@ -114,7 +114,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
         var zoneCombo = new ComboBox { Header = "添加时区", HorizontalAlignment = HorizontalAlignment.Stretch };
         foreach (var tz in TimeZoneInfo.GetSystemTimeZones())
             zoneCombo.Items.Add(new ComboBoxItem { Content = tz.DisplayName, Tag = tz.Id });
-        var zoneList = new StackPanel { Spacing = 6 };
+        var zoneList = new StackPanel { Spacing = Fluent.SpaceS };
         void RebuildZones()
         {
             zoneList.Children.Clear();
@@ -127,7 +127,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 var t = new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
                 Grid.SetColumn(t, 0);
-                var del = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 12 }, Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)), BorderThickness = new Thickness(0) };
+                var del = Fluent.IconButton("\uE711", $"删除时区 {name}", null, "删除", 12);
                 del.Click += (_, _) => { var z = GetZones(_host); z.Remove(id); SetZones(_host, z); RebuildZones(); };
                 Grid.SetColumn(del, 1);
                 row.Children.Add(t);

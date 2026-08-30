@@ -32,8 +32,6 @@ public class GridLayoutManager
     private readonly Dictionary<FrameworkElement, FrameworkElement> _content = new();
     private readonly List<Line> _vLines = new();
     private readonly List<Line> _hLines = new();
-    static readonly SolidColorBrush _cellBrush = new(Windows.UI.Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF));
-    static readonly SolidColorBrush _subBrush = new(Windows.UI.Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF));
 
     public GridLayoutManager(Grid grid)
     {
@@ -45,7 +43,8 @@ public class GridLayoutManager
     public FrameworkElement? GetContent(FrameworkElement container)
         => _content.TryGetValue(container, out var c) ? c : null;
 
-    public double Margin => Math.Max(2, CellSize * 0.04);
+    /// <summary>磁贴间距：按 4epx 网格取整（Fluent Layout 规范），最小 4。</summary>
+    public double Margin => Math.Max(4, Math.Round(CellSize * 0.04 / 4) * 4);
 
     public double GridWidth => SubColumns * SubCell;
     public double GridHeight => SubRows * SubCell;
@@ -82,6 +81,15 @@ public class GridLayoutManager
         canvas.Children.Clear();
         if (!visible) return;
 
+        // 主题感知：浅色主题用暗色网格线，深色主题用亮色网格线
+        var dark = canvas.ActualTheme == ElementTheme.Dark;
+        var cellBrush = new SolidColorBrush(dark
+            ? Windows.UI.Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)
+            : Windows.UI.Color.FromArgb(0x22, 0x00, 0x00, 0x00));
+        var subBrush = new SolidColorBrush(dark
+            ? Windows.UI.Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF)
+            : Windows.UI.Color.FromArgb(0x10, 0x00, 0x00, 0x00));
+
         var step = SubCell;
         var totalW = SubColumns * step;
         var totalH = SubRows * step;
@@ -109,7 +117,7 @@ public class GridLayoutManager
             var line = _vLines[i];
             var x = i * step;
             line.X1 = x; line.Y1 = 0; line.X2 = x; line.Y2 = totalH;
-            line.Stroke = i % 2 == 0 ? _cellBrush : _subBrush;
+            line.Stroke = i % 2 == 0 ? cellBrush : subBrush;
             canvas.Children.Add(line);
         }
 
@@ -118,7 +126,7 @@ public class GridLayoutManager
             var line = _hLines[i];
             var y = i * step;
             line.X1 = 0; line.Y1 = y; line.X2 = totalW; line.Y2 = y;
-            line.Stroke = i % 2 == 0 ? _cellBrush : _subBrush;
+            line.Stroke = i % 2 == 0 ? cellBrush : subBrush;
             canvas.Children.Add(line);
         }
     }

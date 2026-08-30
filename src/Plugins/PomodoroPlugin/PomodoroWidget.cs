@@ -24,8 +24,7 @@ public sealed class PomodoroWidget : UserControl
     readonly DispatcherQueueTimer _timer;
     readonly BasePluginOverlay _overlay = new();
 
-    Border _root = null!;
-    Border _hoverLayer = null!;
+    WidgetTile _tile = null!;
     TextBlock _phaseText = null!;
     TextBlock _timeText = null!;
     TextBlock _hintText = null!;
@@ -103,9 +102,7 @@ public sealed class PomodoroWidget : UserControl
         var theme = ((FrameworkElement)this).ActualTheme;
         _phaseText = Fluent.Text("专注", theme, "bodyStrong", Fluent.TextSecondary(theme));
         _phaseText.HorizontalAlignment = HorizontalAlignment.Center;
-        _timeText = Fluent.Text("25:00", theme, "title");
-        _timeText.FontSize = 44;
-        _timeText.LineHeight = 52;
+        _timeText = Fluent.Text("25:00", theme, "numberTile");
         _timeText.HorizontalAlignment = HorizontalAlignment.Center;
         _hintText = Fluent.Text("已暂停", theme, "caption", Fluent.TextTertiary(theme));
         _hintText.HorizontalAlignment = HorizontalAlignment.Center;
@@ -114,42 +111,22 @@ public sealed class PomodoroWidget : UserControl
         _taskText.HorizontalAlignment = HorizontalAlignment.Center;
         _taskText.Visibility = Visibility.Collapsed;
 
-        var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var stack = new StackPanel { Spacing = Fluent.SpaceXS, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         stack.Children.Add(_phaseText);
         stack.Children.Add(_timeText);
         stack.Children.Add(_hintText);
         stack.Children.Add(_taskText);
 
-        _root = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12),
-            Child = stack
-        };
-        _hoverLayer = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Background = Fluent.SubtleHover(theme),
-            Opacity = 0,
-            IsHitTestVisible = false
-        };
+        var content = new Grid { Padding = new Thickness(Fluent.SpaceM) };
+        content.Children.Add(stack);
 
-        var grid = new Grid();
-        grid.Children.Add(_root);
-        grid.Children.Add(_hoverLayer);
-
-        _root.Tapped += (_, _) => OpenDetail();
-        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
-        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
-        Content = grid;
+        _tile = WidgetTile.Create(content, "番茄钟").Tap(OpenDetail);
+        Content = _tile;
     }
 
     void ApplyTheme(ElementTheme theme)
     {
-        _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _root.BorderBrush = Fluent.CardStroke(theme);
-        _root.BorderThickness = new Thickness(1);
-        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _tile.ApplyTheme(theme, (Brush)_host.GetWidgetBackgroundBrush());
         _timeText.Foreground = Fluent.TextPrimary(theme);
         _hintText.Foreground = Fluent.TextTertiary(theme);
         _taskText.Foreground = Fluent.TextSecondary(theme);
@@ -452,7 +429,10 @@ public sealed class PomodoroWidget : UserControl
             }
             if (_ovProgress != null)
             {
-                _ovProgress.Value = ProgressPercent();
+                var pct = ProgressPercent();
+                // 0% 时隐藏，避免被误读为装饰分隔线
+                _ovProgress.Visibility = pct > 0.5 || _running ? Visibility.Visible : Visibility.Collapsed;
+                _ovProgress.Value = pct;
                 var t = ((FrameworkElement)this).ActualTheme;
                 _ovProgress.Foreground = _phase == Phase.Focus ? Fluent.Accent() : Fluent.Success(t);
             }
@@ -470,37 +450,34 @@ public sealed class PomodoroWidget : UserControl
         if (_overlay.IsOpen) return;
         var theme = ((FrameworkElement)this).ActualTheme;
 
-        var body = new StackPanel { Spacing = 12, HorizontalAlignment = HorizontalAlignment.Center };
+        // 两列自适应（横屏）：左=计时主卡（视觉重心），右=任务/统计/记录
+        var body = new Grid { ColumnSpacing = Fluent.SpaceM };
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
+        var leftCol = new StackPanel { Spacing = Fluent.SpaceM };
+        var rightCol = new StackPanel { Spacing = Fluent.SpaceM };
+        Grid.SetColumn(leftCol, 0);
+        Grid.SetColumn(rightCol, 1);
+        body.Children.Add(leftCol);
+        body.Children.Add(rightCol);
 
         // 计时卡
         _ovPhase = Fluent.Text(_phase == Phase.Focus ? "专注" : "休息", theme, "bodyLarge", Fluent.TextSecondary(theme));
         _ovPhase.HorizontalAlignment = HorizontalAlignment.Center;
-        _ovTime = new TextBlock
-        {
-            Text = Format(_remaining),
-            FontSize = 68,
-            LineHeight = 76,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = Fluent.TextPrimary(theme),
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
+        _ovTime = Fluent.Text(Format(_remaining), theme, "numberHero");
+        _ovTime.HorizontalAlignment = HorizontalAlignment.Center;
 
-        _ovStartPause = new Button { Content = _running ? "暂停" : "开始", MinWidth = 120, Padding = new Thickness(16, 6, 16, 8) };
-        if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style accent)
-            _ovStartPause.Style = accent;
-        _ovStartPause.Click += (_, _) => ToggleStartPause();
+        _ovStartPause = Fluent.Cta(_running ? "暂停" : "开始", ToggleStartPause, accent: true);
         _ovStartPause.IsEnabled = !(_running && !AllowPauseCfg);
 
-        var skipBtn = new Button { Content = "跳过", MinWidth = 96, Padding = new Thickness(16, 6, 16, 8) };
-        skipBtn.Click += (_, _) => Skip();
-        var resetBtn = new Button { Content = "重置", MinWidth = 96, Padding = new Thickness(16, 6, 16, 8) };
-        resetBtn.Click += (_, _) => ResetTimer();
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center };
+        var skipBtn = Fluent.Cta("跳过", Skip, accent: false);
+        var resetBtn = Fluent.Cta("重置", ResetTimer, accent: false);
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS, HorizontalAlignment = HorizontalAlignment.Center };
         controls.Children.Add(_ovStartPause);
         controls.Children.Add(skipBtn);
         controls.Children.Add(resetBtn);
 
-        var timerBody = new StackPanel { Spacing = 12 };
+        var timerBody = new StackPanel { Spacing = Fluent.SpaceM, VerticalAlignment = VerticalAlignment.Center };
         timerBody.Children.Add(_ovPhase);
         timerBody.Children.Add(_ovTime);
         _ovProgress = new ProgressBar
@@ -513,19 +490,26 @@ public sealed class PomodoroWidget : UserControl
         };
         timerBody.Children.Add(_ovProgress);
         timerBody.Children.Add(controls);
-        var timerCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        var timerCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL));
         timerCard.Child = timerBody;
-        body.Children.Add(timerCard);
+        leftCol.Children.Add(timerCard);
 
         // 任务卡
-        var taskBox = new TextBox { Header = "当前专注任务", PlaceholderText = "在做什么…", Text = Task, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var taskBox = new TextBox
+        {
+            Header = "当前专注任务",
+            PlaceholderText = "在做什么…",
+            Text = Task,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = Fluent.TouchTarget
+        };
         taskBox.LostFocus += (_, _) => { _host.SetConfig(nameof(PomodoroPlugin), "task", taskBox.Text.Trim()); UpdateViews(); };
-        var taskCard = Fluent.Card(theme, new Thickness(16, 12, 16, 14));
+        var taskCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         taskCard.Child = taskBox;
-        body.Children.Add(taskCard);
+        rightCol.Children.Add(taskCard);
 
         // 统计卡
-        var statsBody = new StackPanel { Spacing = 10 };
+        var statsBody = new StackPanel { Spacing = Fluent.SpaceS };
         var last7 = PomodoroPlugin.Last7(_host);
         var todayCount = last7.Count > 0 ? last7[^1].count : 0;
         statsBody.Children.Add(Fluent.Text($"今日完成 {todayCount} 个 · 近 7 天", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
@@ -539,16 +523,16 @@ public sealed class PomodoroWidget : UserControl
             var barList = Enumerable.Range(0, 24).Select(h => ($"{h:D2}", hourlyMins[h])).ToList();
             statsBody.Children.Add(MiniChart.Bars(barList, Fluent.Success(theme), Fluent.TextSecondary(theme), 80));
         }
-        var statsCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        var statsCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL));
         statsCard.Child = statsBody;
-        body.Children.Add(statsCard);
+        rightCol.Children.Add(statsCard);
 
         // 最近记录卡
         var sessions = PomodoroPlugin.GetSessions(_host);
         var recent = sessions.OrderByDescending(s => s.Timestamp).Take(10).ToList();
         if (recent.Count > 0)
         {
-            var recentBody = new StackPanel { Spacing = 6 };
+            var recentBody = new StackPanel { Spacing = Fluent.SpaceS };
             recentBody.Children.Add(Fluent.Text("最近专注记录", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
             foreach (var s in recent)
             {
@@ -571,14 +555,14 @@ public sealed class PomodoroWidget : UserControl
                 row.Children.Add(t3);
                 recentBody.Children.Add(row);
             }
-            var recentCard = Fluent.Card(theme, new Thickness(16, 14, 16, 14));
+            var recentCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
             recentCard.Child = recentBody;
-            body.Children.Add(recentCard);
+            rightCol.Children.Add(recentCard);
         }
 
         _overlay.Show(this, "番茄钟", body, _host.Log);
         UpdateViews();
     }
 
-    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _tile.ApplyTheme(((FrameworkElement)this).ActualTheme, brush);
 }

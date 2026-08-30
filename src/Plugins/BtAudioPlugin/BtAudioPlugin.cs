@@ -200,7 +200,7 @@ public class BtAudioPlugin : IPlugin, IPluginSettings, IAgentCapability
         public BtAudioWidgetInfo(BtAudioWidget control) { _control = control; }
         public string Id => "btaudio.main";
         public int Columns => 2;
-        public int Rows => 2;
+        public int Rows => 1;
         public WidgetBackdrop Backdrop => WidgetBackdrop.Acrylic;
         public object CreateControl() => _control;
     }

@@ -21,8 +21,7 @@ public sealed class WeatherWidget : UserControl
     readonly DispatcherQueueTimer _timer;
     readonly BasePluginOverlay _overlay = new();
 
-    Border _root = null!;
-    Border _hoverLayer = null!;
+    WidgetTile _tile = null!;
     Panel _iconHost = null!;
     TextBlock _temp = null!;
     TextBlock _condition = null!;
@@ -82,7 +81,7 @@ public sealed class WeatherWidget : UserControl
         });
         _temp = Fluent.Text("--", ((FrameworkElement)this).ActualTheme, "title");
 
-        var left = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var left = new StackPanel { Spacing = Fluent.SpaceXS, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         left.Children.Add(_iconHost);
         left.Children.Add(_temp);
         Grid.SetColumn(left, 0);
@@ -98,7 +97,7 @@ public sealed class WeatherWidget : UserControl
         _alertRow = new Grid
         {
             Visibility = Visibility.Collapsed,
-            ColumnSpacing = 6,
+            ColumnSpacing = Fluent.SpaceXS,
             ColumnDefinitions =
             {
                 new ColumnDefinition { Width = GridLength.Auto },
@@ -111,52 +110,30 @@ public sealed class WeatherWidget : UserControl
         _alertRow.Children.Add(_alertBadge);
         _alertRow.Children.Add(alertText);
 
-        var right = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var right = new StackPanel { Spacing = Fluent.SpaceXS, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Fluent.SpaceS, 0, 0, 0) };
         right.Children.Add(_city);
         right.Children.Add(_condition);
         right.Children.Add(_details);
         right.Children.Add(_alertRow);
         Grid.SetColumn(right, 1);
 
-        var layout = new Grid { Margin = new Thickness(4) };
+        var layout = new Grid { Margin = new Thickness(Fluent.SpaceXS) };
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
         layout.Children.Add(left);
         layout.Children.Add(right);
 
-        _hoverLayer = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Background = Fluent.SubtleHover(ElementTheme.Default),
-            Opacity = 0,
-            IsHitTestVisible = false
-        };
+        var content = new Grid { Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM) };
+        content.Children.Add(layout);
 
-        _root = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(16, 12, 16, 12),
-            Child = layout
-        };
-
-        var grid = new Grid();
-        grid.Children.Add(_root);
-        grid.Children.Add(_hoverLayer);
-
-        _root.Tapped += (_, _) => OpenOverlay();
-        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
-        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
-
-        Content = grid;
+        _tile = WidgetTile.Create(content, "天气").Tap(OpenOverlay);
+        Content = _tile;
     }
 
     void ApplyTheme()
     {
         var theme = ((FrameworkElement)this).ActualTheme;
-        _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _root.BorderBrush = Fluent.CardStroke(theme);
-        _root.BorderThickness = new Thickness(1);
-        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _tile.ApplyTheme(theme, (Brush)_host.GetWidgetBackgroundBrush());
         _temp.Foreground = Fluent.TextPrimary(theme);
         _condition.Foreground = Fluent.TextPrimary(theme);
         _city.Foreground = Fluent.TextTertiary(theme);
@@ -287,7 +264,7 @@ public sealed class WeatherWidget : UserControl
         OpenOverlay();
     }
 
-    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _tile.ApplyTheme(((FrameworkElement)this).ActualTheme, brush);
 
     public void Stop() => _timer?.Stop();
 }

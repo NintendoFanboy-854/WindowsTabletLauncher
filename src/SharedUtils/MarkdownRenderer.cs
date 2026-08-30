@@ -2,17 +2,19 @@ using Markdig;
 using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
-using Microsoft.UI;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
-using Windows.UI;
 using Windows.UI.Text;
 
 namespace SharedUtils;
 
+/// <summary>
+/// Markdown 渲染（Fluent 2）：颜色全部走主题令牌（随亮/暗主题切换），
+/// 强调用 SemiBold，代码块 4px 圆角，正文 14px Body 起。
+/// </summary>
 public static class MarkdownRenderer
 {
     static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
@@ -20,12 +22,6 @@ public static class MarkdownRenderer
         .DisableHtml()
         .Build();
 
-    static readonly SolidColorBrush CodeBlockBackgroundBrush = new(Color.FromArgb(0x30, 0, 0, 0));
-    static readonly SolidColorBrush SemiTransparentBorderBrush = new(Color.FromArgb(0x30, 0x88, 0x88, 0x88));
-    static readonly SolidColorBrush QuoteBorderBrush = new(Color.FromArgb(0x60, 0x88, 0x88, 0x88));
-    static readonly SolidColorBrush TableHeaderBrush = new(Color.FromArgb(0x18, 0x88, 0x88, 0x88));
-    static readonly SolidColorBrush InlineCodeBrush = new(Color.FromArgb(0xFF, 0xE0, 0x6C, 0x75));
-    static readonly SolidColorBrush LinkBrush = new(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0));
     static readonly FontFamily CodeFontFamily = new("Consolas");
 
     static readonly Dictionary<string, MarkdownDocument> ParseCache = new();
@@ -34,14 +30,21 @@ public static class MarkdownRenderer
     const int ParseCacheCapacity = 50;
     const int ParseCacheMaxKeyLength = 8192;
 
-    public static Panel Render(string markdown, Brush primary, Brush secondary, double fontSize = 13, bool useCache = true)
+
+    static Brush TokenBrush(string key, Brush fallback) => Fluent.Brush(key) ?? fallback;
+
+    public static Panel Render(string markdown, Brush primary, Brush secondary, double fontSize = 14, bool useCache = true, ElementTheme theme = ElementTheme.Dark)
     {
-        var panel = new StackPanel { Spacing = 4 };
+        var panel = new StackPanel { Spacing = Fluent.SpaceXS };
         if (string.IsNullOrWhiteSpace(markdown))
         {
             panel.Children.Add(new TextBlock { Text = markdown, FontSize = fontSize, Foreground = primary, TextWrapping = TextWrapping.Wrap });
             return panel;
         }
+
+        // 规范化：LLM 常把表格紧贴在段落后面输出（缺空行），Markdig 无法把表格从段落里切出来；
+        // 在以 | 开头的行之前若上一行是非表格文本，则补一个空行
+        markdown = NormalizeTableBreaks(markdown);
 
         try
         {
@@ -49,13 +52,35 @@ public static class MarkdownRenderer
                 ? GetCachedDocument(markdown)
                 : Markdown.Parse(markdown, Pipeline);
             foreach (var block in doc)
-                RenderBlock(block, panel, primary, secondary, fontSize);
+                RenderBlock(block, panel, primary, secondary, fontSize, theme);
         }
         catch
         {
             panel.Children.Add(new TextBlock { Text = markdown, FontSize = fontSize, Foreground = primary, TextWrapping = TextWrapping.Wrap });
         }
         return panel;
+    }
+
+    static string NormalizeTableBreaks(string md)
+    {
+        if (!md.Contains('|')) return md;
+        var lines = md.Replace("\r\n", "\n").Split('\n');
+        var sb = new System.Text.StringBuilder(md.Length + 16);
+        bool prevEmpty = true;
+        bool prevRow = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var t = line.TrimStart();
+            var isRow = t.StartsWith("|") || (t.EndsWith("|") && t.Contains('|') && !t.StartsWith("```"));
+            if (isRow && !prevEmpty && !prevRow)
+                sb.Append('\n');
+            sb.Append(line);
+            if (i < lines.Length - 1) sb.Append('\n');
+            prevEmpty = t.Length == 0;
+            prevRow = isRow;
+        }
+        return sb.ToString();
     }
 
     static MarkdownDocument GetCachedDocument(string markdown)
@@ -78,23 +103,24 @@ public static class MarkdownRenderer
         }
     }
 
-    static void RenderBlock(Markdig.Syntax.Block block, StackPanel panel, Brush primary, Brush secondary, double fontSize)
+    static void RenderBlock(Markdig.Syntax.Block block, StackPanel panel, Brush primary, Brush secondary, double fontSize, ElementTheme theme)
     {
         var f = fontSize;
+        var borderBrush = TokenBrush("CardStrokeColorDefaultBrush", Fluent.CardStroke(theme));
         switch (block)
         {
             case HeadingBlock h:
             {
-                double hf = h.Level switch { 1 => f + 5, 2 => f + 2, _ => f };
-                var tb = new TextBlock { FontSize = hf, Foreground = primary, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-                RenderInlines(h.Inline, tb.Inlines, primary, secondary, f);
+                double hf = h.Level switch { 1 => f + 6, 2 => f + 4, _ => f };
+                var tb = new TextBlock { FontSize = hf, LineHeight = hf * 1.35, Foreground = primary, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+                RenderInlines(h.Inline, tb.Inlines, primary, secondary, f, theme);
                 panel.Children.Add(tb);
                 break;
             }
             case ParagraphBlock p:
             {
-                var tb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-                RenderInlines(p.Inline, tb.Inlines, primary, secondary, f);
+                var tb = new TextBlock { FontSize = f, LineHeight = f * 1.45, Foreground = primary, TextWrapping = TextWrapping.Wrap };
+                RenderInlines(p.Inline, tb.Inlines, primary, secondary, f, theme);
                 panel.Children.Add(tb);
                 break;
             }
@@ -103,14 +129,14 @@ public static class MarkdownRenderer
                 var text = code.Lines.ToString();
                 var border = new Border
                 {
-                    Background = CodeBlockBackgroundBrush,
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(10, 8, 10, 8)
+                    Background = TokenBrush("CardBackgroundFillColorDefaultBrush", Fluent.CardBg(theme)),
+                    CornerRadius = new CornerRadius(Fluent.RadiusControl),
+                    Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS)
                 };
                 border.Child = new TextBlock
                 {
                     Text = text,
-                    FontSize = f - 1,
+                    FontSize = Math.Max(Fluent.FontCaption, f - 2),
                     FontFamily = CodeFontFamily,
                     Foreground = secondary,
                     TextWrapping = TextWrapping.Wrap
@@ -133,13 +159,13 @@ public static class MarkdownRenderer
                             FontSize = f,
                             Foreground = secondary,
                             Width = 24,
-                            Margin = new Thickness(0, 0, 8, 0),
+                            Margin = new Thickness(0, 0, Fluent.SpaceS, 0),
                             HorizontalTextAlignment = TextAlignment.Right
                         });
 
                         var content = new StackPanel();
                         foreach (var sub in li)
-                            RenderBlock(sub, content, primary, secondary, f);
+                            RenderBlock(sub, content, primary, secondary, f, theme);
                         row.Children.Add(content);
 
                         panel.Children.Add(row);
@@ -151,22 +177,22 @@ public static class MarkdownRenderer
                 panel.Children.Add(new Border
                 {
                     Height = 1,
-                    Background = SemiTransparentBorderBrush,
-                    Margin = new Thickness(0, 4, 0, 4)
+                    Background = TokenBrush("DividerStrokeColorDefaultBrush", Fluent.Divider(theme)),
+                    Margin = new Thickness(0, Fluent.SpaceXS, 0, Fluent.SpaceXS)
                 });
                 break;
             case QuoteBlock quote:
             {
                 var border = new Border
                 {
-                    BorderBrush = QuoteBorderBrush,
+                    BorderBrush = borderBrush,
                     BorderThickness = new Thickness(3, 0, 0, 0),
-                    Padding = new Thickness(8, 2, 0, 2),
+                    Padding = new Thickness(Fluent.SpaceS, 2, 0, 2),
                     Margin = new Thickness(0, 2, 0, 2)
                 };
                 var inner = new StackPanel();
                 foreach (var b in quote)
-                    RenderBlock(b, inner, secondary, secondary, f);
+                    RenderBlock(b, inner, secondary, secondary, f, theme);
                 border.Child = inner;
                 panel.Children.Add(border);
                 break;
@@ -195,13 +221,13 @@ public static class MarkdownRenderer
 
                         var cellBorder = new Border
                         {
-                            BorderBrush = SemiTransparentBorderBrush,
+                            BorderBrush = borderBrush,
                             BorderThickness = new Thickness(1),
-                            Padding = new Thickness(6, 3, 6, 3),
+                            Padding = new Thickness(Fluent.SpaceS, 4, Fluent.SpaceS, 4),
                             Child = cellTb
                         };
                         if (rowIdx == 0)
-                            cellBorder.Background = TableHeaderBrush;
+                            cellBorder.Background = TokenBrush("CardBackgroundFillColorSecondaryBrush", Fluent.CardBgSecondary(theme));
                         Grid.SetRow(cellBorder, rowIdx);
                         Grid.SetColumn(cellBorder, colIdx);
                         grid.Children.Add(cellBorder);
@@ -216,7 +242,7 @@ public static class MarkdownRenderer
                 if (block is LeafBlock leaf && leaf.Inline != null)
                 {
                 var tb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-                RenderInlines(leaf.Inline, tb.Inlines, primary, secondary, f);
+                RenderInlines(leaf.Inline, tb.Inlines, primary, secondary, f, theme);
                 panel.Children.Add(tb);
                 }
                 break;
@@ -243,7 +269,7 @@ public static class MarkdownRenderer
                 AppendInlineText(child, sb);
     }
 
-    static void RenderInlines(ContainerInline? container, InlineCollection target, Brush primary, Brush secondary, double f)
+    static void RenderInlines(ContainerInline? container, InlineCollection target, Brush primary, Brush secondary, double f, ElementTheme theme)
     {
         if (container == null) return;
         foreach (var inline in container)
@@ -253,14 +279,20 @@ public static class MarkdownRenderer
                 case LiteralInline lit:
                     target.Add(new Run { Text = lit.Content.ToString() ?? "" });
                     break;
+                case LineBreakInline:
+                    // 换行不能丢：软/硬换行（Markdig 统一为 LineBreakInline）丢弃后
+                    // "段落\n表格"会黏成一行，破坏表格与排版
+                    target.Add(new LineBreak());
+                    break;
                 case EmphasisInline em:
                 {
+                    // Fluent 排版：不使用 Bold/Italic，强调用 SemiBold，次级强调用次级文字色
                     var span = new Span();
-                    if (em.DelimiterChar == '*' && em.DelimiterCount == 2)
-                        span.FontWeight = FontWeights.Bold;
+                    if (em.DelimiterCount >= 2)
+                        span.FontWeight = FontWeights.SemiBold;
                     else
-                        span.FontStyle = FontStyle.Italic;
-                    RenderInlines(em, span.Inlines, primary, secondary, f);
+                        span.Foreground = secondary;
+                    RenderInlines(em, span.Inlines, primary, secondary, f, theme);
                     target.Add(span);
                     break;
                 }
@@ -270,8 +302,8 @@ public static class MarkdownRenderer
                     {
                         Text = ci.Content,
                         FontFamily = CodeFontFamily,
-                        FontSize = Math.Max(10, f - 1),
-                        Foreground = InlineCodeBrush
+                        FontSize = Math.Max(Fluent.FontCaption, f - 2),
+                        Foreground = Fluent.Critical(theme)
                     };
                     target.Add(run);
                     break;
@@ -279,14 +311,14 @@ public static class MarkdownRenderer
                 case LinkInline link:
                 {
                     var span = new Span();
-                    span.Foreground = LinkBrush;
-                    RenderInlines(link, span.Inlines, primary, secondary, f);
+                    span.Foreground = Fluent.Accent();
+                    RenderInlines(link, span.Inlines, primary, secondary, f, theme);
                     target.Add(span);
                     break;
                 }
                 default:
                     if (inline is ContainerInline ci2)
-                        RenderInlines(ci2, target, primary, secondary, f);
+                        RenderInlines(ci2, target, primary, secondary, f, theme);
                     break;
             }
         }

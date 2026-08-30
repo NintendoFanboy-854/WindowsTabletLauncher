@@ -48,7 +48,10 @@ public sealed class WeatherOverlayBuilder
 
         foreach (var name in new[] { "总览", "预报", "环境", "天文·历史" })
             _selector.Items.Add(new SelectorBarItem { Text = name });
-        _selector.SelectionChanged += (_, _) => ShowPage(CurrentPageKey());
+        // Wayfinding：明确指示"我在哪"——默认选中第一项，选中项用强调色，未选中用次级文字色
+        _selector.SelectedItem = _selector.Items[0];
+        UpdateSelectorColors();
+        _selector.SelectionChanged += (_, _) => { UpdateSelectorColors(); ShowPage(CurrentPageKey()); };
         root.Children.Add(_selector);
 
         for (int i = 0; i < 4; i++)
@@ -73,6 +76,15 @@ public sealed class WeatherOverlayBuilder
         {
             foreach (var key in cardKeys)
                 SetCardError(key, ex);
+        }
+    }
+
+    void UpdateSelectorColors()
+    {
+        foreach (var it in _selector.Items.OfType<SelectorBarItem>())
+        {
+            var selected = ReferenceEquals(it, _selector.SelectedItem);
+            it.Foreground = selected ? Fluent.Accent() : Fluent.TextSecondary(_theme);
         }
     }
 
@@ -139,16 +151,17 @@ public sealed class WeatherOverlayBuilder
         var favs = _service.GetFavorites();
         if (favs.Count == 0) return null;
 
-        var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         var cur = _widget.CurrentLocation?.Id;
         foreach (var (id, name) in favs)
         {
             var locId = id;
             var chip = new ToggleButton
             {
-                Content = Fluent.Text(name, _theme, "caption", Fluent.TextPrimary(_theme)),
-                Padding = new Thickness(12, 4, 12, 6),
-                IsChecked = locId == cur
+                Content = Fluent.Text(name, _theme, "body", Fluent.TextPrimary(_theme)),
+                Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceS, Fluent.SpaceL, Fluent.SpaceS),
+                MinHeight = Fluent.TouchTarget,
+                CornerRadius = new CornerRadius(22)
             };
             chip.Click += async (_, _) =>
             {
@@ -182,15 +195,15 @@ public sealed class WeatherOverlayBuilder
         var content = new Grid { MinHeight = 32 };
         content.Children.Add(LoadingPlaceholder());
 
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        header.Children.Add(Fluent.Text(title, _theme, "bodyLargeStrong", Fluent.TextPrimary(_theme)));
+        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
+        header.Children.Add(Fluent.SectionTitle(title, _theme));
         if (headerExtra != null) header.Children.Add(headerExtra);
 
-        var body = new StackPanel { Spacing = 10 };
+        var body = new StackPanel { Spacing = Fluent.SpaceS };
         body.Children.Add(header);
         body.Children.Add(content);
 
-        var card = Fluent.Card(_theme, new Thickness(16, 14, 16, 16));
+        var card = Fluent.Card(_theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL));
         card.Child = body;
 
         PageIdx(pageKey);
@@ -236,14 +249,7 @@ public sealed class WeatherOverlayBuilder
         var msg = ex is QWeatherApiException q
             ? $"{q.Title}{(string.IsNullOrEmpty(q.Detail) ? "" : "：" + q.Detail)}"
             : ex.Message;
-        SetCard(key, new TextBlock
-        {
-            Text = $"获取失败：{msg}",
-            FontSize = 13,
-            LineHeight = 18,
-            Foreground = Fluent.Critical(_theme),
-            TextWrapping = TextWrapping.Wrap
-        });
+        SetCard(key, Fluent.Text($"获取失败：{msg}", _theme, "body", Fluent.Critical(_theme), TextWrapping.Wrap));
     }
 
     async void Load(string key, Func<Task<FrameworkElement>> build)
@@ -362,20 +368,16 @@ public sealed class WeatherOverlayBuilder
 
     FrameworkElement BuildCurrent(QCurrentWeather c)
     {
-        var body = new StackPanel { Spacing = 16 };
+        var body = new StackPanel { Spacing = Fluent.SpaceL };
 
-        var hero = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+        // hero 水平居中：图标 + 温度 + 现象
+        var hero = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceL, HorizontalAlignment = HorizontalAlignment.Center };
         hero.Children.Add(WeatherIcons.CreateIcon(c.Condition?.Code, 64, _theme));
 
         var heroText = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
-        heroText.Children.Add(new TextBlock
-        {
-            Text = c.Temperature?.Value is double t ? $"{t:0.#}°" : "--",
-            FontSize = 44,
-            LineHeight = 52,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = Fluent.TextPrimary(_theme)
-        });
+        heroText.Children.Add(Fluent.Text(
+            c.Temperature?.Value is double t ? $"{t:0.#}°" : "--",
+            _theme, "numberTile", Fluent.TextPrimary(_theme)));
         heroText.Children.Add(Fluent.Text(c.Condition?.Text ?? "--", _theme, "bodyLarge", Fluent.TextSecondary(_theme)));
         hero.Children.Add(heroText);
         body.Children.Add(hero);
@@ -399,7 +401,7 @@ public sealed class WeatherOverlayBuilder
     FrameworkElement BuildStatChips((string label, string value)[] items)
     {
         const int cols = 5;
-        var grid = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        var grid = new Grid { ColumnSpacing = Fluent.SpaceS, RowSpacing = Fluent.SpaceS };
         for (int i = 0; i < cols; i++)
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var rows = (int)Math.Ceiling(items.Length / (double)cols);
@@ -408,16 +410,8 @@ public sealed class WeatherOverlayBuilder
 
         for (int i = 0; i < items.Length; i++)
         {
-            var cell = new StackPanel { Spacing = 1 };
-            cell.Children.Add(Fluent.Text(items[i].label, _theme, "caption", Fluent.TextTertiary(_theme)));
-            cell.Children.Add(Fluent.Text(
-                string.IsNullOrEmpty(items[i].value) ? "—" : items[i].value,
-                _theme, "bodyStrong", Fluent.TextPrimary(_theme)));
-
-            var chip = Fluent.Card(_theme, new Thickness(10, 6, 10, 8), 4);
-            chip.Background = Fluent.CardBgSecondary(_theme);
-            chip.Child = cell;
-
+            var chip = Fluent.StatTile(items[i].label,
+                string.IsNullOrEmpty(items[i].value) ? "—" : items[i].value, _theme);
             Grid.SetColumn(chip, i % cols);
             Grid.SetRow(chip, i / cols);
             grid.Children.Add(chip);
@@ -427,14 +421,15 @@ public sealed class WeatherOverlayBuilder
 
     FrameworkElement BuildMinutely(QV7MinutelyResponse r)
     {
-        var body = new StackPanel { Spacing = 10 };
+        var body = new StackPanel { Spacing = Fluent.SpaceS };
         body.Children.Add(Fluent.Text(r.Summary ?? "--", _theme, "bodyLarge", Fluent.TextPrimary(_theme), TextWrapping.Wrap));
 
         var items = (r.Minutely ?? new()).Take(24).ToList();
         if (items.Count > 0)
         {
-            // 24 根柱在 780px 下每列 ~30px，"HH:mm" 放不下 → 每 4 根显示一个标签
-            var data = items.Select((m, i) => (i % 4 == 0 ? Label(m.FxTime, "HH:mm") : "", ParseD(m.Precip))).ToList();
+            // 24 根柱在 780px 下每列 ~30px，纯小时数字必然放得下 → 每 4 根显示一个
+            // 注意 "HH" 是合法的 DateTime 格式符（"H" 不是，ToString("H") 会抛 FormatException）
+            var data = items.Select((m, i) => (i % 4 == 0 ? Label(m.FxTime, "HH") : "", ParseD(m.Precip))).ToList();
             body.Children.Add(MiniChart.Bars(data, Fluent.Accent(), Fluent.TextSecondary(_theme), 110));
         }
         return body;
@@ -444,13 +439,15 @@ public sealed class WeatherOverlayBuilder
 
     void BuildForecastPage()
     {
-        var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         foreach (var (label, days) in new[] { ("7 天", 7), ("15 天", 15), ("30 天", 30) })
         {
             var chip = new ToggleButton
             {
-                Content = Fluent.Text(label, _theme, "caption", Fluent.TextPrimary(_theme)),
-                Padding = new Thickness(10, 2, 10, 4),
+                Content = Fluent.Text(label, _theme, "body", Fluent.TextPrimary(_theme)),
+                Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceS, Fluent.SpaceL, Fluent.SpaceS),
+                MinHeight = Fluent.TouchTarget,
+                CornerRadius = new CornerRadius(22),
                 IsChecked = days == 7
             };
             var dayCount = days;
@@ -484,14 +481,12 @@ public sealed class WeatherOverlayBuilder
 
     FrameworkElement BuildHourly(QHourlyWeather h)
     {
-        var body = new StackPanel { Spacing = 12 };
+        // 逐小时信息由下方卡片行承载（图标+温度+降水概率），不再重复绘制温度折线
+        var body = new StackPanel { Spacing = Fluent.SpaceM };
         var hours = h.Hours ?? new List<QHourlyHour>();
         if (hours.Count == 0) return InfoNote("暂无数据");
 
-        var temps = hours.Select(x => (Label(x.ForecastTime, "HH"), x.Temperature?.Value ?? 0)).ToList();
-        body.Children.Add(MiniChart.Line(temps, Fluent.Accent(), Fluent.TextSecondary(_theme), 110, 46));
-
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         foreach (var x in hours)
         {
             var col = new StackPanel { Spacing = 2, MinWidth = 64 };
@@ -507,10 +502,10 @@ public sealed class WeatherOverlayBuilder
                 HorizontalAlignment = HorizontalAlignment.Center
             });
             col.Children.Add(x.Precipitation?.Probability is double p && p > 0
-                ? Fluent.Text($"{Math.Round(p * 100)}%", _theme, "caption", Fluent.Accent())
+                ? Fluent.Text($"{Math.Round(p * 100)}%", _theme, "caption", Fluent.TextSecondary(_theme))
                 : Fluent.Text("", _theme, "caption"));
 
-            var chip = Fluent.Card(_theme, new Thickness(6, 6, 6, 8), 4);
+            var chip = Fluent.Card(_theme, new Thickness(Fluent.SpaceS, Fluent.SpaceS, Fluent.SpaceS, Fluent.SpaceM), Fluent.RadiusControl);
             chip.Child = col;
             row.Children.Add(chip);
         }
@@ -584,14 +579,14 @@ public sealed class WeatherOverlayBuilder
     {
         var grid = new Grid
         {
-            ColumnSpacing = 10,
+            ColumnSpacing = Fluent.SpaceM,
             ColumnDefinitions =
             {
                 new ColumnDefinition { Width = new GridLength(56) },
                 new ColumnDefinition { Width = new GridLength(32) },
-                new ColumnDefinition { Width = new GridLength(1.1, GridUnitType.Star) },
+                new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) },
                 new ColumnDefinition { Width = new GridLength(44) },
-                new ColumnDefinition { Width = new GridLength(120) },
+                new ColumnDefinition { Width = new GridLength(160) },
                 new ColumnDefinition { Width = new GridLength(44) }
             }
         };
@@ -605,8 +600,10 @@ public sealed class WeatherOverlayBuilder
         Grid.SetColumn(icon, 1);
         grid.Children.Add(icon);
 
-        var cond = Fluent.Text(condition, _theme, "caption", Fluent.TextSecondary(_theme), TextWrapping.Wrap);
+        var cond = Fluent.Text(condition, _theme, "caption", Fluent.TextSecondary(_theme));
         cond.VerticalAlignment = VerticalAlignment.Center;
+        cond.TextTrimming = TextTrimming.CharacterEllipsis;
+        cond.MaxLines = 1;
         Grid.SetColumn(cond, 2);
         grid.Children.Add(cond);
 
@@ -626,8 +623,8 @@ public sealed class WeatherOverlayBuilder
         {
             CornerRadius = new CornerRadius(2),
             HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(left * 120, 0, 0, 0),
-            Width = Math.Max(4, width * 120),
+            Margin = new Thickness(left * 160, 0, 0, 0),
+            Width = Math.Max(4, width * 160),
             Background = Fluent.Accent()
         });
         Grid.SetColumn(track, 4);
@@ -640,8 +637,9 @@ public sealed class WeatherOverlayBuilder
 
         return new Border
         {
-            Padding = new Thickness(8, 4, 8, 4),
-            CornerRadius = new CornerRadius(4),
+            MinHeight = Fluent.TouchTarget,
+            Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
+            CornerRadius = new CornerRadius(Fluent.RadiusControl),
             Background = Fluent.CardBgSecondary(_theme),
             Child = grid
         };
@@ -666,7 +664,7 @@ public sealed class WeatherOverlayBuilder
 
     FrameworkElement BuildAir(QAirResponse air)
     {
-        var body = new StackPanel { Spacing = 12 };
+        var body = new StackPanel { Spacing = Fluent.SpaceM };
         var index = PickAirIndex(air);
         if (index == null) return InfoNote("该地区暂无空气质量数据");
 
@@ -674,16 +672,10 @@ public sealed class WeatherOverlayBuilder
             ? Color.FromArgb(0xFF, (byte)Math.Clamp(col.Red!.Value, 0, 255), (byte)Math.Clamp(col.Green ?? 0, 0, 255), (byte)Math.Clamp(col.Blue ?? 0, 0, 255))
             : Colors.Gray;
 
-        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
-        head.Children.Add(new TextBlock
-        {
-            Text = index.AqiDisplay ?? index.Aqi?.ToString("0.#") ?? "--",
-            FontSize = 44,
-            LineHeight = 52,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(aqiColor),
-            VerticalAlignment = VerticalAlignment.Center
-        });
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceL };
+        head.Children.Add(Fluent.Text(
+            index.AqiDisplay ?? index.Aqi?.ToString("0.#") ?? "--",
+            _theme, "numberTile", new SolidColorBrush(aqiColor)));
         var info = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
         info.Children.Add(Fluent.Text($"{index.Name}: {index.Category ?? "--"}", _theme, "bodyLargeStrong", Fluent.TextPrimary(_theme)));
         if (index.PrimaryPollutant != null)
@@ -701,7 +693,7 @@ public sealed class WeatherOverlayBuilder
                 IsClosable = false
             });
 
-        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         foreach (var p in air.Pollutants ?? new List<QPollutant>())
         {
             var chip = new StackPanel { Spacing = 0 };
@@ -710,7 +702,7 @@ public sealed class WeatherOverlayBuilder
                 p.Concentration?.Value is double v ? $"{v:0.#} {p.Concentration?.Unit}" : "--",
                 _theme, "bodyStrong", Fluent.TextPrimary(_theme)));
 
-            var box = Fluent.Card(_theme, new Thickness(10, 4, 10, 6), 4);
+            var box = Fluent.Card(_theme, new Thickness(Fluent.SpaceM, Fluent.SpaceXS, Fluent.SpaceM, Fluent.SpaceXS), Fluent.RadiusControl);
             box.Background = Fluent.CardBgSecondary(_theme);
             box.Child = chip;
             chips.Children.Add(box);
@@ -736,14 +728,14 @@ public sealed class WeatherOverlayBuilder
 
     FrameworkElement BuildIndices(List<QIndicesItem> items)
     {
-        var body = new StackPanel { Spacing = 8 };
+        var body = new StackPanel { Spacing = Fluent.SpaceS };
         if (items.Count == 0) return InfoNote("暂无指数数据");
 
         foreach (var it in items)
         {
             var grid = new Grid
             {
-                ColumnSpacing = 10,
+                ColumnSpacing = Fluent.SpaceS,
                 ColumnDefinitions =
                 {
                     new ColumnDefinition { Width = new GridLength(96) },
@@ -757,7 +749,7 @@ public sealed class WeatherOverlayBuilder
             Grid.SetColumn(name, 0);
             grid.Children.Add(name);
 
-            var catChip = Fluent.Card(_theme, new Thickness(8, 2, 8, 3), 4);
+            var catChip = Fluent.Card(_theme, new Thickness(Fluent.SpaceM, Fluent.SpaceXS, Fluent.SpaceM, Fluent.SpaceXS), Fluent.RadiusControl);
             catChip.Background = Fluent.CardBgSecondary(_theme);
             catChip.Child = Fluent.Text($"{it.Category}（{it.Level}级）", _theme, "caption", Fluent.TextPrimary(_theme));
             catChip.VerticalAlignment = VerticalAlignment.Center;
@@ -771,8 +763,8 @@ public sealed class WeatherOverlayBuilder
 
             body.Children.Add(new Border
             {
-                Padding = new Thickness(10, 6, 10, 8),
-                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
                 Background = Fluent.CardBgSecondary(_theme),
                 Child = grid
             });
@@ -794,21 +786,15 @@ public sealed class WeatherOverlayBuilder
         Load("astro", () => BuildAstro(loc));
 
         var results = new Grid();
-        results.Children.Add(InfoNote("选择日期后点击查询"));
 
-        var combo = new ComboBox { Width = 140 };
+        // 选择即查：去掉"选日期→再点查询"的两步流程与帮助文案
+        var combo = new ComboBox { Width = 140, MinHeight = Fluent.TouchTarget };
         for (int i = 1; i <= 9; i++) combo.Items.Add(i == 1 ? "昨天" : $"{i} 天前");
         combo.SelectedIndex = 0;
 
-        var btn = new Button
+        async void QueryAsync(int idx)
         {
-            Content = Fluent.Text("查询", _theme, "body"),
-            Padding = new Thickness(16, 4, 16, 6)
-        };
-        btn.Click += async (_, _) =>
-        {
-            var idx = combo.SelectedIndex < 0 ? 1 : combo.SelectedIndex + 1;
-            btn.IsEnabled = false;
+            combo.IsEnabled = false;
             results.Children.Clear();
             results.Children.Add(LoadingPlaceholder());
             try
@@ -828,33 +814,35 @@ public sealed class WeatherOverlayBuilder
                 _widget.RunOnUi(() =>
                 {
                     results.Children.Clear();
-                    results.Children.Add(new TextBlock
-                    {
-                        Text = $"获取失败：{msg}",
-                        FontSize = 13,
-                        Foreground = Fluent.Critical(_theme),
-                        TextWrapping = TextWrapping.Wrap
-                    });
+                    results.Children.Add(Fluent.Text($"获取失败：{msg}", _theme, "body", Fluent.Critical(_theme), TextWrapping.Wrap));
                 });
             }
             finally
             {
-                _widget.RunOnUi(() => btn.IsEnabled = true);
+                _widget.RunOnUi(() => combo.IsEnabled = true);
             }
+        }
+
+        combo.SelectionChanged += (_, _) =>
+        {
+            var idx = combo.SelectedIndex < 0 ? 1 : combo.SelectedIndex + 1;
+            QueryAsync(idx);
         };
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         row.Children.Add(combo);
-        row.Children.Add(btn);
 
         if (_cards.TryGetValue("history", out var entry))
         {
             entry.Content.Children.Clear();
-            var wrap = new StackPanel { Spacing = 10 };
+            var wrap = new StackPanel { Spacing = Fluent.SpaceS };
             wrap.Children.Add(row);
             wrap.Children.Add(results);
             entry.Content.Children.Add(wrap);
         }
+
+        // 初始即查一次"昨天"，避免打开页签后是空白提示
+        QueryAsync(1);
     }
 
     async Task<FrameworkElement> BuildAstro(QLocation loc)
@@ -863,31 +851,31 @@ public sealed class WeatherOverlayBuilder
         var sun = await _service.GetSunAsync(loc, today);
         var moon = await _service.GetMoonAsync(loc, today);
 
-        var body = new StackPanel { Spacing = 10 };
+        var body = new StackPanel { Spacing = Fluent.SpaceS };
 
         var grid = new Grid
         {
-            ColumnSpacing = 12,
+            ColumnSpacing = Fluent.SpaceM,
             ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition() }
         };
 
-        var sunBody = new StackPanel { Spacing = 6 };
+        var sunBody = new StackPanel { Spacing = Fluent.SpaceS };
         sunBody.Children.Add(Fluent.Text("太阳", _theme, "bodyStrong", Fluent.TextPrimary(_theme)));
         sunBody.Children.Add(BuildAstroRow("\uE706", "日出", FmtTimeShort(sun?.Sunrise)));
         sunBody.Children.Add(BuildAstroRow("\uE708", "日落", FmtTimeShort(sun?.Sunset)));
 
-        var sunCard = Fluent.Card(_theme, new Thickness(14), 4);
+        var sunCard = Fluent.Card(_theme, new Thickness(Fluent.SpaceL), Fluent.RadiusControl);
         sunCard.Background = Fluent.CardBgSecondary(_theme);
         sunCard.Child = sunBody;
         Grid.SetColumn(sunCard, 0);
         grid.Children.Add(sunCard);
 
-        var moonBody = new StackPanel { Spacing = 6 };
+        var moonBody = new StackPanel { Spacing = Fluent.SpaceS };
         moonBody.Children.Add(Fluent.Text("月亮", _theme, "bodyStrong", Fluent.TextPrimary(_theme)));
         var phase = moon?.MoonPhase is { Count: > 0 } ph ? ph[0] : null;
         if (phase != null)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
             row.Children.Add(WeatherIcons.CreateIcon(phase.Icon, 24, _theme));
             var t = Fluent.Text($"{phase.Name} · 照亮率 {phase.Illumination ?? "--"}%", _theme, "body", Fluent.TextSecondary(_theme));
             t.VerticalAlignment = VerticalAlignment.Center;
@@ -897,7 +885,7 @@ public sealed class WeatherOverlayBuilder
         moonBody.Children.Add(BuildAstroRow("\uE9B4", "月升", FmtTimeShort(moon?.Moonrise)));
         moonBody.Children.Add(BuildAstroRow("\uE9B5", "月落", FmtTimeShort(moon?.Moonset)));
 
-        var moonCard = Fluent.Card(_theme, new Thickness(14), 4);
+        var moonCard = Fluent.Card(_theme, new Thickness(Fluent.SpaceL), Fluent.RadiusControl);
         moonCard.Background = Fluent.CardBgSecondary(_theme);
         moonCard.Child = moonBody;
         Grid.SetColumn(moonCard, 1);
@@ -930,7 +918,7 @@ public sealed class WeatherOverlayBuilder
         var h = await _service.GetHistoricalAsync(loc, date.ToString("yyyyMMdd", CultureInfo.InvariantCulture))
                 ?? throw new QWeatherApiException(400, "无数据", null!);
 
-        var body = new StackPanel { Spacing = 10 };
+        var body = new StackPanel { Spacing = Fluent.SpaceS };
         var d = h.WeatherDaily;
         body.Children.Add(BuildStatChips(new (string, string)[]
         {
@@ -946,7 +934,7 @@ public sealed class WeatherOverlayBuilder
 
         var hourly = (h.WeatherHourly ?? new List<QHistoricalHour>())
             .Where(x => !string.IsNullOrEmpty(x.Time))
-            .Select(x => (x.Time!.Length >= 16 ? x.Time[11..16] : x.Time!, ParseD(x.Temp)))
+            .Select(x => (HourLabel(x.Time!), ParseD(x.Temp)))
             .ToList();
         if (hourly.Count > 0)
             body.Children.Add(MiniChart.Line(hourly, Fluent.Accent(), Fluent.TextSecondary(_theme), 110, 46));
@@ -969,6 +957,14 @@ public sealed class WeatherOverlayBuilder
     }
 
     static string FmtTime(string? iso) => iso == null ? "--" : Label(iso, "MM-dd HH:mm");
+
+    /// <summary>历史逐小时时间标签：API 可能给 "2026-08-29T13:00+08:00" 也可能只给 "13"；统一为 "HH:00"。</summary>
+    static string HourLabel(string t)
+    {
+        if (t.Length >= 16 && t[13] == ':') return t[11..16];
+        if (int.TryParse(t, out var hr)) return $"{hr:00}:00";
+        return t;
+    }
 
     static string FmtTimeShort(string? iso) => iso == null ? "--" : Label(iso, "HH:mm");
 
@@ -1013,8 +1009,15 @@ public sealed class WeatherOverlayBuilder
 
     static string PrecipText(QCurrentWeather c) =>
         c.Precipitation?.Amount?.Value is double a
-            ? $"{a:0.#}mm ({c.Precipitation?.Type ?? "-"})"
+            ? $"{a:0.#}mm（{PrecipTypeZh(c.Precipitation?.Type)}）"
             : "无";
+
+    static string PrecipTypeZh(string? type) => type?.ToLowerInvariant() switch
+    {
+        "rain" => "雨",
+        "snow" => "雪",
+        _ => type ?? "-"
+    };
 
     static string VisibilityText(QCurrentWeather c)
     {

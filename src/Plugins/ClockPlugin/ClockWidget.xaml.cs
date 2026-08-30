@@ -22,16 +22,15 @@ public sealed class ClockWidget : UserControl
     readonly DispatcherQueueTimer _timer;
     readonly ClockOverlay _overlay = new();
 
-    Border _root = null!;
-    Border _hoverLayer = null!;
+    WidgetTile _tile = null!;
     TextBlock _timeText = null!;
     TextBlock _dateText = null!;
     TextBlock _lunarText = null!;
 
     // overlay live refs
     readonly List<(TextBlock Time, TimeZoneInfo? Zone)> _ovClocks = new();
-    TextBlock? _ovDateText;
     TextBlock? _ovLunarText;
+    TextBlock? _ovWeekText;
     TextBlock? _ovHeroTime;
     TextBlock? _ovHeroDate;
     DispatcherQueueTimer? _ovTimer;
@@ -102,9 +101,7 @@ public sealed class ClockWidget : UserControl
     void BuildUi()
     {
         var theme = ((FrameworkElement)this).ActualTheme;
-        _timeText = Fluent.Text("", theme, "title");
-        _timeText.FontSize = 48;
-        _timeText.LineHeight = 56;
+        _timeText = Fluent.Text("", theme, "numberTile");
         _timeText.HorizontalAlignment = HorizontalAlignment.Center;
         _dateText = Fluent.Text("", theme, "bodyLarge", Fluent.TextSecondary(theme));
         _dateText.HorizontalAlignment = HorizontalAlignment.Center;
@@ -112,41 +109,21 @@ public sealed class ClockWidget : UserControl
         _lunarText.HorizontalAlignment = HorizontalAlignment.Center;
         _lunarText.Visibility = Visibility.Collapsed;
 
-        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 4 };
+        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = Fluent.SpaceXS };
         stack.Children.Add(_timeText);
         stack.Children.Add(_dateText);
         stack.Children.Add(_lunarText);
 
-        _root = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(16, 12, 16, 12),
-            Child = stack
-        };
-        _hoverLayer = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Background = Fluent.SubtleHover(theme),
-            Opacity = 0,
-            IsHitTestVisible = false
-        };
+        var content = new Grid { Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM) };
+        content.Children.Add(stack);
 
-        var grid = new Grid();
-        grid.Children.Add(_root);
-        grid.Children.Add(_hoverLayer);
-
-        _root.Tapped += (_, _) => OpenOverlay();
-        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
-        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
-        Content = grid;
+        _tile = WidgetTile.Create(content, "时钟").Tap(OpenOverlay);
+        Content = _tile;
     }
 
     void ApplyTheme(ElementTheme theme)
     {
-        _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _root.BorderBrush = Fluent.CardStroke(theme);
-        _root.BorderThickness = new Thickness(1);
-        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _tile.ApplyTheme(theme, (Brush)_host.GetWidgetBackgroundBrush());
         _timeText.Foreground = Fluent.TextPrimary(theme);
         _dateText.Foreground = Fluent.TextSecondary(theme);
         _lunarText.Foreground = Fluent.TextTertiary(theme);
@@ -243,44 +220,54 @@ public sealed class ClockWidget : UserControl
         var now = DateTime.Now;
 
         _ovClocks.Clear();
-        var body = new StackPanel { Spacing = 12 };
+        var body = new StackPanel { Spacing = Fluent.SpaceM };
 
-        // hero：当前时间卡
-        var heroTime = Fluent.Text("", theme, "title");
-        heroTime.FontSize = 52;
-        heroTime.LineHeight = 60;
+        // hero：时间 + 日期（日期只在这里出现一次）
+        var heroTime = Fluent.Text("", theme, "numberHero");
         heroTime.HorizontalAlignment = HorizontalAlignment.Center;
         var heroDate = Fluent.Text("", theme, "bodyLarge", Fluent.TextSecondary(theme));
         heroDate.HorizontalAlignment = HorizontalAlignment.Center;
-        var heroCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
-        heroCard.Child = new StackPanel { Spacing = 4, Children = { heroTime, heroDate } };
+        var heroCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL));
+        heroCard.Child = new StackPanel { Spacing = Fluent.SpaceXS, Children = { heroTime, heroDate } };
         body.Children.Add(heroCard);
         _ovHeroTime = heroTime;
         _ovHeroDate = heroDate;
 
-        // 日期卡
-        _ovLunarText = Fluent.Text(LunarString(now), theme, "bodyLarge", Fluent.TextSecondary(theme));
-        _ovDateText = Fluent.Text("", theme, "bodyLarge", Fluent.TextSecondary(theme));
-        var dateCard = Fluent.Card(theme, new Thickness(16, 12, 16, 14));
-        dateCard.Child = new StackPanel { Spacing = 4, Children = { _ovDateText, _ovLunarText } };
+        // 农历 + 周进度卡（农历只在这里出现一次；文字居中，与 hero 视觉重心一致）
+        _ovLunarText = Fluent.Text(LunarString(now), theme, "bodyLarge", Fluent.TextPrimary(theme));
+        _ovLunarText.HorizontalAlignment = HorizontalAlignment.Center;
+        _ovWeekText = Fluent.Text("", theme, "caption", Fluent.TextTertiary(theme));
+        _ovWeekText.HorizontalAlignment = HorizontalAlignment.Center;
+        var dateCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
+        dateCard.Child = new StackPanel { Spacing = Fluent.SpaceXS, Children = { _ovLunarText, _ovWeekText } };
         body.Children.Add(dateCard);
 
-        // 世界时钟卡
-        var worldBody = new StackPanel { Spacing = 6 };
-        worldBody.Children.Add(Fluent.Text("世界时钟", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
-        worldBody.Children.Add(AddWorldRow(theme, "本地", null));
+        // 世界时钟卡：仅在配置了额外时区时显示，避免只有"本地"一行的冗余
+        var zones = new List<TimeZoneInfo>();
         foreach (var id in ClockPlugin.GetZones(_host))
         {
-            try
-            {
-                var tz = TimeZoneInfo.FindSystemTimeZoneById(id);
-                worldBody.Children.Add(AddWorldRow(theme, tz.DisplayName, tz));
-            }
+            try { zones.Add(TimeZoneInfo.FindSystemTimeZoneById(id)); }
             catch { }
         }
-        var worldCard = Fluent.Card(theme, new Thickness(16, 12, 16, 14));
-        worldCard.Child = worldBody;
-        body.Children.Add(worldCard);
+        if (zones.Count > 0)
+        {
+            var worldBody = new StackPanel { Spacing = Fluent.SpaceS };
+            worldBody.Children.Add(Fluent.SectionTitle("世界时钟", theme));
+            worldBody.Children.Add(AddWorldRow(theme, "本地", null));
+            foreach (var tz in zones)
+                worldBody.Children.Add(AddWorldRow(theme, tz.DisplayName, tz));
+            var worldCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
+            worldCard.Child = worldBody;
+            body.Children.Add(worldCard);
+        }
+        else
+        {
+            // 轻提示：世界时钟卡未配置时不留空，引导去设置添加
+            var hint = Fluent.Text("在设置中添加世界时钟城市，即可在这里查看多地时间。", theme, "caption", Fluent.TextTertiary(theme));
+            hint.TextWrapping = TextWrapping.Wrap;
+            hint.HorizontalAlignment = HorizontalAlignment.Center;
+            body.Children.Add(hint);
+        }
 
         _overlay.Show(this, "时钟", body, _host.Log);
 
@@ -321,8 +308,8 @@ public sealed class ClockWidget : UserControl
         _ovClocks.Add((t, zone));
         return new Border
         {
-            Padding = new Thickness(8, 4, 8, 6),
-            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
+            CornerRadius = new CornerRadius(Fluent.RadiusControl),
             Background = Fluent.CardBgSecondary(theme),
             Child = grid
         };
@@ -335,16 +322,16 @@ public sealed class ClockWidget : UserControl
         if (_ovHeroTime != null)
             _ovHeroTime.Text = local.ToString(TimeFormat());
         if (_ovHeroDate != null)
-            _ovHeroDate.Text = LunarString(local);
-        if (_ovDateText != null)
+            _ovHeroDate.Text = $"{local:yyyy-MM-dd} {WeekNames[(int)local.DayOfWeek]}";
+        if (_ovLunarText != null)
+            _ovLunarText.Text = LunarString(local);
+        if (_ovWeekText != null)
         {
             var week = ISOWeek.GetWeekOfYear(local);
             var dayOfYear = local.DayOfYear;
             var yearProgress = Math.Round(dayOfYear / (DateTime.IsLeapYear(local.Year) ? 366.0 : 365.0) * 100);
-            _ovDateText.Text = $"{local:yyyy-MM-dd} {WeekNames[(int)local.DayOfWeek]} · 第 {week} 周 · 年进度 {yearProgress}%";
+            _ovWeekText.Text = $"第 {week} 周 · 年进度 {yearProgress}%";
         }
-        if (_ovLunarText != null)
-            _ovLunarText.Text = LunarString(local);
         foreach (var (tb, zone) in _ovClocks)
         {
             var t = zone == null ? local : TimeZoneInfo.ConvertTime(now, zone).DateTime;
@@ -358,5 +345,5 @@ public sealed class ClockWidget : UserControl
         _ovTimer?.Stop();
     }
 
-    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _tile.ApplyTheme(((FrameworkElement)this).ActualTheme, brush);
 }

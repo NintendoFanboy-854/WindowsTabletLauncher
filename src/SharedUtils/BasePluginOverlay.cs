@@ -1,38 +1,35 @@
-using Microsoft.UI.Composition;
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Windows.UI;
 
 namespace SharedUtils;
 
+/// <summary>
+/// Fluent 2 弹层骨架：
+/// - Smoke 遮罩 + 8px 圆角实面卡片（材质规则：瞬态弹层用实面+描边，不用 Acrylic 大面积铺）
+/// - 头部：44×44 返回钮 + Subtitle(20) 左对齐标题
+/// - 进场 fade 180ms + scale 0.94→1 (220ms)；退场 fade/scale 150ms；尊重系统"减少动画"
+/// - Esc 关闭、关闭后焦点归还发起者
+/// </summary>
 public class BasePluginOverlay
 {
     Popup? _popup;
+    FrameworkElement? _source;
+    bool _closing;
     protected FrameworkElement? Card { get; private set; }
     protected Grid? Scrim { get; private set; }
 
-    static readonly AcrylicBrush LightCardBrush = new()
-    {
-        TintColor = Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3),
-        TintOpacity = 0.85,
-        FallbackColor = Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
-    };
-    static readonly AcrylicBrush DarkCardBrush = new()
-    {
-        TintColor = Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B),
-        TintOpacity = 0.85,
-        FallbackColor = Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B)
-    };
-
     public bool IsOpen => _popup?.IsOpen == true;
 
-    public void Show(FrameworkElement source, string title, FrameworkElement body, Action<string>? log = null)
+    /// <summary>
+    /// width：内容目标宽度（卡片整体不超过 w-80）。两列布局的复杂弹层可传更大值（如 1100）。
+    /// </summary>
+    public void Show(FrameworkElement source, string title, FrameworkElement body, Action<string>? log = null, double width = 780)
     {
-        if (source.XamlRoot == null || IsOpen) return;
+        if (source.XamlRoot == null || IsOpen || _closing) return;
 
         var theme = source.ActualTheme;
         var root = source.XamlRoot.Content as FrameworkElement;
@@ -42,48 +39,54 @@ public class BasePluginOverlay
         var raw = source.XamlRoot.Size;
         log?.Invoke($"Overlay open '{title}': content={w:F0}x{h:F0}epx xamlRootSize={raw.Width:F0}x{raw.Height:F0} scale={source.XamlRoot.RasterizationScale:F2}");
 
-        // Fluent 2：卡片需要稳定的布局宽度。无固定宽度的内容统一锚定到目标宽度，
-        // 避免含 * 列的 Grid 在无约束测量下塌缩（卡片缩成 468px 导致内容挤压重叠）。
-        if (double.IsNaN(body.Width))
-            body.Width = Math.Min(w - 120, 780);
-
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var tint = theme == ElementTheme.Light
-            ? Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
-            : Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B);
+        // Fluent 2：横向滚动一律禁用（内容不应左右滚）。HSB=Disabled 使 ScrollViewer
+        // 以有限宽度测量子内容，含 * 列的 Grid 也能正常撑满，无需再锚定固定宽度。
+        _source = source;
+        _closing = false;
 
         var scrim = new Grid
         {
             Width = w,
             Height = h,
-            Background = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0x99, 0, 0, 0))
         };
         scrim.Tapped += (_, _) => Close();
         Scrim = scrim;
 
-        var header = BuildHeader(title, primary);
+        var header = BuildHeader(title, theme == ElementTheme.Light
+            ? new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
+            : new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)));
 
-        var outer = new StackPanel { Spacing = 16 };
+        // 头部固定 + 内容区自适应滚动：Grid 两行（Auto/*），长内容只滚动 body，头部始终可见
+        var outer = new Grid { RowSpacing = Fluent.SpaceL };
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        Grid.SetRow(header, 0);
         outer.Children.Add(header);
-        outer.Children.Add(new ScrollViewer
+        var scroll = new ScrollViewer
         {
             Content = body,
-            MaxHeight = Math.Max(200, h - 160),
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
-        });
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        Grid.SetRow(scroll, 1);
+        outer.Children.Add(scroll);
 
         var card = new Border
         {
-            MaxWidth = w - 80,
+            // 固定宽度：星号列 Grid 的期望宽度会收缩到内容大小，必须钉死卡片宽度，
+            // 内容区（含纵向滚动条）在此宽度内自适应，不再横向溢出
+            Width = Math.Min(w - 80, width + Fluent.SpaceXL * 2),
             MaxHeight = h - 80,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(24),
-            Background = theme == ElementTheme.Light ? LightCardBrush : DarkCardBrush,
+            CornerRadius = new CornerRadius(Fluent.RadiusOverlay),
+            Padding = new Thickness(Fluent.SpaceXL),
+            Background = Fluent.OverlaySurface(theme),
+            BorderThickness = new Thickness(1),
+            BorderBrush = Fluent.CardStroke(theme),
             Child = outer
         };
         card.Tapped += (_, e) => e.Handled = true;
@@ -93,13 +96,7 @@ public class BasePluginOverlay
         _popup = new Popup { XamlRoot = source.XamlRoot, IsLightDismissEnabled = false, Child = scrim };
         _popup.IsOpen = true;
 
-        var sv = ElementCompositionPreview.GetElementVisual(scrim);
-        var comp = sv.Compositor;
-        var fade = comp.CreateScalarKeyFrameAnimation();
-        fade.InsertKeyFrame(0f, 0f);
-        fade.InsertKeyFrame(1f, 1f);
-        fade.Duration = TimeSpan.FromMilliseconds(180);
-        sv.StartAnimation("Opacity", fade);
+        Comp.Fade(scrim, 1, 180);
 
         card.Loaded += (_, _) =>
         {
@@ -108,13 +105,14 @@ public class BasePluginOverlay
             var overflow = cw > w + 0.5 || ch > h + 0.5;
             log?.Invoke($"Overlay laid out '{title}': card={cw:F0}x{ch:F0} window={w:F0}x{h:F0} overflow={overflow}");
 
-            var cv = ElementCompositionPreview.GetElementVisual(card);
-            cv.CenterPoint = new System.Numerics.Vector3(card.ActualSize.X / 2f, card.ActualSize.Y / 2f, 0f);
-            cv.Scale = new System.Numerics.Vector3(0.94f, 0.94f, 1f);
-            var s = comp.CreateVector3KeyFrameAnimation();
-            s.InsertKeyFrame(1f, new System.Numerics.Vector3(1f, 1f, 1f));
-            s.Duration = TimeSpan.FromMilliseconds(220);
-            cv.StartAnimation("Scale", s);
+            if (Fluent.AnimationsEnabled)
+            {
+                var v = ElementCompositionPreview.GetElementVisual(card);
+                var size = v.Size;
+                v.CenterPoint = new System.Numerics.Vector3(size.X / 2f, size.Y / 2f, 0f);
+                v.Scale = new System.Numerics.Vector3(0.94f, 0.94f, 1f);
+                Comp.Scale(card, 1f, 220);
+            }
         };
 
         OnOpened();
@@ -122,28 +120,23 @@ public class BasePluginOverlay
 
     protected virtual FrameworkElement BuildHeader(string title, SolidColorBrush primary)
     {
-        var back = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE72B", FontSize = 16 },
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
-            Width = 40,
-            Height = 40,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        back.Click += (_, _) => Close();
+        var back = Fluent.IconButton("\uE72B", "返回", Close, "返回");
+        back.VerticalAlignment = VerticalAlignment.Center;
 
-        var header = new StackPanel { Orientation = Orientation.Horizontal };
-        header.Children.Add(back);
-        header.Children.Add(new TextBlock
+        var accel = new KeyboardAccelerator { Key = Windows.System.VirtualKey.Escape };
+        accel.Invoked += (_, _) => Close();
+        back.KeyboardAccelerators.Add(accel);
+
+        var label = Fluent.Text(title, ElementTheme.Dark, "subtitle", primary);
+        label.VerticalAlignment = VerticalAlignment.Center;
+
+        var header = new StackPanel
         {
-            Text = title,
-            FontSize = 24,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = primary,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0)
-        });
+            Orientation = Orientation.Horizontal,
+            Spacing = Fluent.SpaceM
+        };
+        header.Children.Add(back);
+        header.Children.Add(label);
         return header;
     }
 
@@ -151,14 +144,37 @@ public class BasePluginOverlay
 
     public virtual void Close()
     {
+        if (_popup == null || _closing) return;
+        _closing = true;
         OnClosing();
-        if (_popup != null)
-        {
-            _popup.IsOpen = false;
-            _popup = null;
-        }
+
+        var popup = _popup;
+        var scrim = Scrim;
+        var card = Card;
+        _popup = null;
         Scrim = null;
         Card = null;
+
+        if (Fluent.AnimationsEnabled && scrim != null && card != null)
+        {
+            Comp.Fade(scrim, 0, 150);
+            Comp.Scale(card, 0.96f, 150);
+            _ = CloseDelayedAsync(popup);
+        }
+        else
+        {
+            popup.IsOpen = false;
+        }
+
+        _source?.Focus(FocusState.Programmatic);
+        _source = null;
+        _closing = false;
+    }
+
+    static async System.Threading.Tasks.Task CloseDelayedAsync(Popup popup)
+    {
+        await System.Threading.Tasks.Task.Delay(150);
+        popup.IsOpen = false;
     }
 
     protected virtual void OnClosing() { }

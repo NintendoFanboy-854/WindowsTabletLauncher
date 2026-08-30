@@ -9,10 +9,11 @@
     mc:Ignorable="d">
 
     <ContentDialog.Resources>
-        <x:Double x:Key="ContentDialogMaxWidth">760</x:Double>
+        <!-- 默认 760 装不下 720 宽内容 + 对话框内边距，导致右侧按钮被裁切 -->
+        <x:Double x:Key="ContentDialogMaxWidth">860</x:Double>
     </ContentDialog.Resources>
 
-    <Grid Width="720" Height="460" RowSpacing="16">
+    <Grid Width="780" Height="560" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -35,7 +36,7 @@
                 <ContentControl
                     x:Name="DetailHost"
                     HorizontalContentAlignment="Stretch"
-                    Padding="4,0,4,0">
+                    Padding="8,0,8,0">
                     <StackPanel x:Name="GlobalPanel" Spacing="12">
                         <ComboBox x:Name="LanguageCombo" Header="语言" HorizontalAlignment="Stretch">
                             <ComboBoxItem Tag="zh-cn">中文</ComboBoxItem>
@@ -70,19 +71,19 @@
                             <ToggleSwitch x:Name="VoiceAutoToggle" Header="语音自动聆听" Visibility="Collapsed" />
                             <NumberBox x:Name="SilenceFramesBox" Header="无人脸停止聆听(帧)" Minimum="5" Maximum="120" SpinButtonPlacementMode="Inline" Visibility="Collapsed" />
                             <NumberBox x:Name="CaptureIntervalBox" Header="人脸检测间隔(秒)" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" Visibility="Collapsed" />
-                            <StackPanel x:Name="FaceSection" Spacing="6" Visibility="Collapsed">
+                            <StackPanel x:Name="FaceSection" Spacing="8" Visibility="Collapsed">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <TextBlock x:Name="FaceStatusLabel" Text="人脸: 未注册" FontSize="12" VerticalAlignment="Center" Opacity="0.7" />
-                                    <Button x:Name="RegisterFaceBtn" Content="注册人脸" FontSize="11" Height="28" Padding="8,0" />
+                                    <TextBlock x:Name="FaceStatusLabel" Text="人脸: 未注册" FontSize="12" LineHeight="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                    <Button x:Name="RegisterFaceBtn" Content="注册人脸" MinHeight="44" Padding="16,8,16,8" />
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="12">
-                                <TextBlock x:Name="MemoryLabel" Text="AI 记忆: 0 条" FontSize="12" VerticalAlignment="Center" Opacity="0.7" />
-                                <Button x:Name="ViewMemoryBtn" Content="查看" FontSize="11" Width="48" Height="28" Padding="0" />
-                                <Button x:Name="ClearMemoryBtn" Content="清除" FontSize="11" Width="48" Height="28" Padding="0" />
+                                <TextBlock x:Name="MemoryLabel" Text="AI 记忆: 0 条" FontSize="12" LineHeight="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                <Button x:Name="ViewMemoryBtn" Content="查看" MinHeight="44" MinWidth="64" Padding="16,8,16,8" />
+                                <Button x:Name="ClearMemoryBtn" Content="清除" MinHeight="44" MinWidth="64" Padding="16,8,16,8" />
                             </StackPanel>
                             <ScrollViewer x:Name="MemoryScroll" MaxHeight="120" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                                <TextBlock x:Name="MemoryContent" TextWrapping="Wrap" FontSize="12" Opacity="0.8" />
+                                <TextBlock x:Name="MemoryContent" TextWrapping="Wrap" FontSize="12" LineHeight="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </ScrollViewer>
                         </StackPanel>
                     </Expander>
@@ -91,11 +92,13 @@
                         x:Name="ResetButton"
                         Content="重置所有设置与布局"
                         Margin="0,12,0,0"
+                        MinHeight="44"
                         HorizontalAlignment="Stretch">
+                        <!-- 语义色 Critical（与 Fluent.SystemFillColorCritical 一致），禁用硬编码纯红 -->
                         <Button.Resources>
-                            <SolidColorBrush x:Key="ButtonBackground" Color="#CC0000" />
-                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#B00000" />
-                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#990000" />
+                            <SolidColorBrush x:Key="ButtonBackground" Color="#C42B1C" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#A92013" />
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#8F1A0E" />
                             <SolidColorBrush x:Key="ButtonForeground" Color="White" />
                             <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
                             <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
@@ -109,10 +112,10 @@
         <StackPanel
             Grid.Row="1"
             Orientation="Horizontal"
-            HorizontalAlignment="Center"
-            Spacing="48">
-            <Button x:Name="CloseButton" Content="关闭" MinWidth="120" />
-            <Button x:Name="ExitButton" Content="退出启动器" MinWidth="120"
+            HorizontalAlignment="Right"
+            Spacing="12">
+            <Button x:Name="CloseButton" Content="关闭" MinWidth="120" MinHeight="44" />
+            <Button x:Name="ExitButton" Content="退出启动器" MinWidth="120" MinHeight="44"
                     Style="{StaticResource AccentButtonStyle}" />
         </StackPanel>
     </Grid>

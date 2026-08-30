@@ -19,7 +19,8 @@ sealed class BlockInfo
     public BlockType Type;
     public UIElement Container = null!;       // ScrollViewer(think) / TextBlock(tool) / ScrollViewer(output)
     public StackPanel? StreamPanel;           // markdown streaming target (think/output)
-    public TextBlock? CollapsedPh;
+    public Button? CollapsedPh;               // 单行可点击折叠条（▸ 已深度思考 / 已调用工具）
+    public bool ExpandedOverride;             // 用户对单块的手动展开状态（叠加在全局开关之上）
     public StringBuilder Text = new();
     public Brush PrimaryBrush = null!;
     public Brush SecondaryBrush = null!;
@@ -42,37 +43,27 @@ public sealed class AgentSession
     readonly List<BlockInfo> _curBlocks = new();
     readonly List<List<BlockInfo>> _allSubTurnBlocks = new();
 
-    TextBlock? _curThinkingPh;
-    TextBlock? _curToolPh;
+    Button? _curThinkingPh;
+    Button? _curToolPh;
     TextBlock? _waitingStatusTb;
     bool _thinkingActive;
     bool _toolActive;
-    static readonly SolidColorBrush RetryTint = new(Color.FromArgb(0x12, 0x40, 0x90, 0xFF));
-    static readonly SolidColorBrush UserBubbleBrush = new(Color.FromArgb(0xFF, 0x1A, 0x66, 0xCC));
-    static readonly SolidColorBrush UserBubbleTextBrush = new(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-    static readonly SolidColorBrush ErrorBgBrush = new(Color.FromArgb(0x1A, 0xE0, 0x3A, 0x3A));
-    static readonly SolidColorBrush ErrorTextBrush = new(Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A));
-    static readonly SolidColorBrush ToolForegroundBrush = new(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0));
-    static readonly SolidColorBrush ToolPhBrush = new(Color.FromArgb(0x60, 0x62, 0xA0, 0xE0));
 
-    Brush? _primaryLight;
-    Brush? _primaryDark;
-    Brush? _secondaryLight;
-    Brush? _secondaryDark;
+    // ---- Fluent 令牌画刷（随主题解析）----
 
-    Brush GetPrimaryBrush(ElementTheme theme)
-    {
-        if (theme == ElementTheme.Light)
-            return _primaryLight ??= new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A));
-        return _primaryDark ??= new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-    }
+    static Brush WithAlpha(Brush b, byte a) =>
+        b is SolidColorBrush sc ? new SolidColorBrush(Windows.UI.Color.FromArgb(a, sc.Color.R, sc.Color.G, sc.Color.B)) : b;
 
-    Brush GetSecondaryBrush(ElementTheme theme)
-    {
-        if (theme == ElementTheme.Light)
-            return _secondaryLight ??= new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0));
-        return _secondaryDark ??= new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
-    }
+    Brush UserBubble(ElementTheme t) => Fluent.Accent();
+    Brush UserBubbleText(ElementTheme t) => Fluent.OnAccent(t);
+    Brush ErrorBg(ElementTheme t) => WithAlpha(Fluent.Critical(t), 0x1A);
+    Brush ErrorText(ElementTheme t) => Fluent.Critical(t);
+    Brush ToolForeground(ElementTheme t) => Fluent.Accent();
+    Brush ToolPlaceholder(ElementTheme t) => WithAlpha(Fluent.Accent(), 0x60);
+    Brush RetryHighlight(ElementTheme t) => Fluent.SubtleHover(t);
+
+    Brush GetPrimaryBrush(ElementTheme theme) => Fluent.TextPrimary(theme);
+    Brush GetSecondaryBrush(ElementTheme theme) => Fluent.TextSecondary(theme);
 
     DispatcherQueueTimer? _spinnerTimer;
     int _spinnerIdx;
@@ -120,9 +111,9 @@ public sealed class AgentSession
             var frame = SpinnerFrames[_spinnerIdx++ % SpinnerFrames.Length];
             _tickCount++;
             if (_thinkingActive && _curThinkingPh != null && _curThinkingPh.Visibility == Visibility.Visible)
-                _curThinkingPh.Text = frame + " 思考中...";
+                _curThinkingPh.Content = frame + " 深度思考中…";
             if (_toolActive && _curToolPh != null && _curToolPh.Visibility == Visibility.Visible)
-                _curToolPh.Text = frame + " 调用工具...";
+                _curToolPh.Content = frame + " 调用工具…";
             if (_waitingStatusTb != null)
                 _waitingStatusTb.Text = frame + " 等待回应中…";
         };
@@ -139,7 +130,7 @@ public sealed class AgentSession
             RenderBlock(bi);
         };
         _service.ExpandCotChanged += ApplyExpandMode;
-        _service.OnAgentRetry += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = RetryTint; });
+        _service.OnAgentRetry += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = RetryHighlight(_parentGrid.ActualTheme); });
         _service.OnAgentRetryExhausted += () => _dispatcher.TryEnqueue(() => { if (_curBlock != null) _curBlock.Background = null; });
     }
 
@@ -173,45 +164,47 @@ public sealed class AgentSession
 
             EnsureBubble(_parentGrid,
                 theme == ElementTheme.Light
-                    ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-                    : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)),
+                    ? Fluent.TextPrimary(theme)
+                    : Fluent.TextPrimary(theme),
                 secondary);
 
             var playBtn = new Button
             {
-                Width = 32, Height = 32, Padding = new Thickness(0),
-                Content = new FontIcon { Glyph = "\uE1D6", FontSize = 14 },
+                Width = 44, Height = 44, Padding = new Thickness(Fluent.SpaceXS),
+                Content = new FontIcon { Glyph = "\uE1D6", FontSize = 14, Foreground = UserBubbleText(theme) },
+                CornerRadius = new CornerRadius(22),
                 VerticalAlignment = VerticalAlignment.Center,
                 IsEnabled = false,
                 IsTabStop = false
             };
             var durText = new TextBlock
             {
-                Text = "0:00", FontSize = 11, Foreground = secondary, Opacity = 0.7,
+                Text = "0:00", FontSize = 12, LineHeight = 16,
+                Foreground = UserBubbleText(theme),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
             var player = CreateTrackedPlayer();
 
-            var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
             audioRow.Children.Add(playBtn);
             audioRow.Children.Add(durText);
 
-            var bubbleStack = new StackPanel { Spacing = 4 };
+            var bubbleStack = new StackPanel { Spacing = Fluent.SpaceXS };
             bubbleStack.Children.Add(audioRow);
 
             var transTb = new TextBlock
             {
-                Text = "...", FontSize = 11, Opacity = 0.7,
-                Foreground = secondary, TextWrapping = TextWrapping.Wrap
+                Text = "...", FontSize = 12, LineHeight = 16,
+                Foreground = UserBubbleText(theme), TextWrapping = TextWrapping.Wrap
             };
             bubbleStack.Children.Add(transTb);
 
             var bubble = new Border
             {
-                CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 6, 8, 6),
+                CornerRadius = new CornerRadius(Fluent.RadiusCard), Padding = new Thickness(Fluent.SpaceS, Fluent.SpaceS, Fluent.SpaceS, Fluent.SpaceS),
                 Margin = new Thickness(48, 4, 0, 4), HorizontalAlignment = HorizontalAlignment.Right,
-                Background = UserBubbleBrush, Child = bubbleStack, MaxWidth = 360
+                Background = UserBubble(theme), Child = bubbleStack, MaxWidth = 360
             };
             _msgStack!.Children.Add(bubble);
             LogService.Info($"[AgentSession] recording bubble added, msgStackChildren={_msgStack.Children.Count}");
@@ -308,15 +301,17 @@ public sealed class AgentSession
         // audio player
         var playBtn = new Button
         {
-            Width = 32, Height = 32, Padding = new Thickness(0),
-            Content = new FontIcon { Glyph = "\uE102", FontSize = 12 },
+            Width = 44, Height = 44, Padding = new Thickness(Fluent.SpaceXS),
+            Content = new FontIcon { Glyph = "\uE102", FontSize = 12, Foreground = UserBubbleText(theme) },
+            CornerRadius = new CornerRadius(22),
             VerticalAlignment = VerticalAlignment.Center,
             IsTabStop = false
         };
         var durText = new TextBlock
         {
             Text = $"{(int)duration.TotalMinutes}:{duration.Seconds:D2}",
-            FontSize = 11, Foreground = secondary, Opacity = 0.7,
+            FontSize = 12, LineHeight = 16,
+            Foreground = UserBubbleText(theme),
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 0)
         };
 
@@ -363,28 +358,29 @@ public sealed class AgentSession
             });
         };
 
-        var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var audioRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
         audioRow.Children.Add(playBtn);
         audioRow.Children.Add(durText);
 
-        var bubbleStack = new StackPanel { Spacing = 4 };
+        var bubbleStack = new StackPanel { Spacing = Fluent.SpaceXS };
         bubbleStack.Children.Add(audioRow);
 
         var transcriptionTb = new TextBlock
         {
             Text = initialTranscription ?? "转录中…",
-            FontSize = 11, Opacity = 0.7, Foreground = secondary,
+            FontSize = 12, LineHeight = 16,
+            Foreground = UserBubbleText(theme),
             TextWrapping = TextWrapping.Wrap
         };
         bubbleStack.Children.Add(transcriptionTb);
 
         var bubble = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(8, 6, 8, 6),
+            CornerRadius = new CornerRadius(Fluent.RadiusCard),
+            Padding = new Thickness(Fluent.SpaceS),
             Margin = new Thickness(48, 4, 0, 4),
             HorizontalAlignment = HorizontalAlignment.Right,
-            Background = UserBubbleBrush,
+            Background = UserBubble(theme),
             Child = bubbleStack,
             MaxWidth = 360
         };
@@ -460,7 +456,7 @@ public sealed class AgentSession
 
         var secondary = GetSecondaryBrush(theme);
 
-        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 10, Foreground = secondary, Opacity = 0.4, Margin = new Thickness(0, 2, 0, 0) };
+        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 12, LineHeight = 16, Foreground = secondary, Margin = new Thickness(0, 2, 0, 0) };
         _msgStack!.Children.Add(_waitingStatusTb);
         AutoScroll();
 
@@ -501,15 +497,15 @@ public sealed class AgentSession
 
         var userBubble = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10, 6, 10, 6),
+            CornerRadius = new CornerRadius(Fluent.RadiusCard),
+            Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
             Margin = new Thickness(48, 4, 0, 4),
             HorizontalAlignment = HorizontalAlignment.Right,
-            Background = UserBubbleBrush,
-            Child = new TextBlock { Text = input, FontSize = 13, Foreground = UserBubbleTextBrush, TextWrapping = TextWrapping.Wrap }
+            Background = UserBubble(theme),
+            Child = new TextBlock { Text = input, FontSize = 14, LineHeight = 20, Foreground = UserBubbleText(theme), TextWrapping = TextWrapping.Wrap }
         };
         _msgStack!.Children.Add(userBubble);
-        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 11, Foreground = secondary, Opacity = 0.5, Margin = new Thickness(0, 2, 0, 0) };
+        _waitingStatusTb = new TextBlock { Text = "⠋ 等待回应中…", FontSize = 12, LineHeight = 16, Foreground = secondary, Margin = new Thickness(0, 2, 0, 0) };
         _msgStack.Children.Add(_waitingStatusTb);
         AutoScroll();
 
@@ -548,12 +544,13 @@ public sealed class AgentSession
     void AddErrorBlock(string err)
     {
         if (_msgStack == null) return;
+        var theme = _parentGrid.ActualTheme;
         var errBlock = new Border
         {
-            CornerRadius = new CornerRadius(8), Padding = new Thickness(10, 6, 10, 6),
+            CornerRadius = new CornerRadius(Fluent.RadiusCard), Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
             Margin = new Thickness(0, 4, 48, 4), HorizontalAlignment = HorizontalAlignment.Left,
-            Background = ErrorBgBrush,
-            Child = new TextBlock { Text = err, FontSize = 13, Foreground = ErrorTextBrush, TextWrapping = TextWrapping.Wrap }
+            Background = ErrorBg(theme),
+            Child = new TextBlock { Text = err, FontSize = 14, LineHeight = 20, Foreground = ErrorText(theme), TextWrapping = TextWrapping.Wrap }
         };
         _msgStack.Children.Add(errBlock);
         AutoScroll();
@@ -607,10 +604,10 @@ public sealed class AgentSession
         _curToolPh = null;
         TryStopSpinner();
 
-        if (bi.Type == BlockType.Thinking && bi.Text.Length > 0 && bi.CollapsedPh != null)
-            bi.CollapsedPh.Text = "思考完毕";
-        else if (bi.Type == BlockType.Tool && bi.CollapsedPh != null)
-            bi.CollapsedPh.Text = "已调用工具";
+        if (bi.Type == BlockType.Thinking && bi.Text.Length > 0)
+            UpdateToggleChevron(bi);
+        else if (bi.Type == BlockType.Tool)
+            UpdateToggleChevron(bi);
 
         LogService.Info($"[AgentSession] CloseLastBlock type={bi.Type} textLen={bi.Text.Length}");
     }
@@ -628,7 +625,7 @@ public sealed class AgentSession
     {
         EnsureCurBlock(primary, secondary);
 
-        var sp = new StackPanel { Spacing = 4 };
+        var sp = new StackPanel { Spacing = Fluent.SpaceXS };
         var sv = new ScrollViewer
         {
             Content = sp,
@@ -640,12 +637,14 @@ public sealed class AgentSession
             Opacity = 0.6
         };
         var blk = _curBlock!;
+
+        // 折叠条放在内容之前：展开时内容向下生长（符合直觉）
+        var ph = MakeToggleChip("深度思考中…", secondary);
+        blk.Children.Add(ph);
         blk.Children.Add(sv);
 
-        var ph = new TextBlock { Text = "思考中...", FontSize = 10, Opacity = 0.4, Foreground = secondary, Visibility = Expand ? Visibility.Collapsed : Visibility.Visible };
-        blk.Children.Add(ph);
-
         var bi = new BlockInfo { Type = BlockType.Thinking, Container = sv, StreamPanel = sp, CollapsedPh = ph, PrimaryBrush = primary, SecondaryBrush = secondary };
+        ph.Click += (_, _) => ToggleBlockExpanded(bi);
         _curBlocks.Add(bi);
         _curThinkingPh = ph;
         return bi;
@@ -655,17 +654,58 @@ public sealed class AgentSession
     {
         EnsureCurBlock(primary, secondary);
 
-        var toolTb = new TextBlock { FontSize = 11, Foreground = ToolForegroundBrush, Opacity = 0.6, Visibility = Expand ? Visibility.Visible : Visibility.Collapsed };
+        var theme = _parentGrid.ActualTheme;
+        var toolTb = new TextBlock { FontSize = 12, LineHeight = 16, Foreground = ToolForeground(theme), Visibility = Expand ? Visibility.Visible : Visibility.Collapsed };
         var blk = _curBlock!;
+
+        var ph = MakeToggleChip("调用工具…", secondary);
+        blk.Children.Add(ph);
         blk.Children.Add(toolTb);
 
-        var ph = new TextBlock { Text = "调用工具...", FontSize = 10, Opacity = 0.4, Foreground = ToolPhBrush, Visibility = Expand ? Visibility.Collapsed : Visibility.Visible };
-        blk.Children.Add(ph);
-
-        var bi = new BlockInfo { Type = BlockType.Tool, Container = toolTb, CollapsedPh = ph, PrimaryBrush = ToolForegroundBrush, SecondaryBrush = ToolForegroundBrush };
+        var bi = new BlockInfo { Type = BlockType.Tool, Container = toolTb, CollapsedPh = ph, PrimaryBrush = ToolForeground(theme), SecondaryBrush = ToolForeground(theme) };
+        ph.Click += (_, _) => ToggleBlockExpanded(bi);
         _curBlocks.Add(bi);
         _curToolPh = ph;
         return bi;
+    }
+
+    /// <summary>单行折叠条：小号透明按钮，点击展开/收起该块。用普通字符 ▸/▾（Button 默认字体无 Fluent 图标字形）。</summary>
+    Button MakeToggleChip(string text, Brush foreground)
+    {
+        return new Button
+        {
+            Content = "▸ " + text,
+            FontSize = 12,
+            Foreground = foreground,
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(Fluent.SpaceS, Fluent.SpaceXS, Fluent.SpaceS, Fluent.SpaceXS),
+            MinHeight = 40,
+            MinWidth = 0,
+            CornerRadius = new CornerRadius(Fluent.RadiusControl),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            UseSystemFocusVisuals = true
+        };
+    }
+
+    void ToggleBlockExpanded(BlockInfo b)
+    {
+        b.ExpandedOverride = !b.ExpandedOverride;
+        ApplyOne(b, Expand);
+    }
+
+    static string FormatChars(int n) => n < 1000 ? $"{n} 字" : $"{n / 1000.0:0.#}k 字";
+
+    void UpdateToggleChevron(BlockInfo b)
+    {
+        if (b.CollapsedPh == null) return;
+        var open = Expand || b.ExpandedOverride;
+        var arrow = open ? "▾ " : "▸ ";
+        if (b.Type == BlockType.Thinking)
+            b.CollapsedPh.Content = arrow + $"已深度思考 ({FormatChars(b.Text.Length)})";
+        else if (b.Type == BlockType.Tool)
+            b.CollapsedPh.Content = arrow + "已调用工具";
     }
 
     BlockInfo CreateOutputBlock(Brush primary, Brush secondary)
@@ -745,18 +785,18 @@ public sealed class AgentSession
         if (bi.Type == BlockType.Thinking)
         {
             var sv = (ScrollViewer)bi.Container;
-            try { if (bi.StreamPanel != null) RenderStreaming(bi, bi.StreamPanel, bi.SecondaryBrush, bi.SecondaryBrush, 11); }
+            try { if (bi.StreamPanel != null) RenderStreaming(bi, bi.StreamPanel, bi.SecondaryBrush, bi.SecondaryBrush, 12); }
             catch { }
             sv.ChangeView(null, double.MaxValue, null, true);
-            AutoScroll(false);
+            FollowScroll();
         }
         else if (bi.Type == BlockType.Output)
         {
             var sv = (ScrollViewer)bi.Container;
-            try { if (bi.StreamPanel != null) RenderStreaming(bi, bi.StreamPanel, bi.PrimaryBrush, bi.SecondaryBrush, 13); }
+            try { if (bi.StreamPanel != null) RenderStreaming(bi, bi.StreamPanel, bi.PrimaryBrush, bi.SecondaryBrush, 14); }
             catch { }
             sv.ChangeView(null, double.MaxValue, null, true);
-            AutoScroll(false);
+            FollowScroll();
         }
     }
 
@@ -930,8 +970,7 @@ public sealed class AgentSession
         if (bi.Type != BlockType.Tool) return;
         bi.Text.Clear();
         bi.Text.Append(name);
-        if (!Expand && bi.CollapsedPh != null)
-            bi.CollapsedPh.Text = "已调用工具";
+        UpdateToggleChevron(bi);
     }
 
     // ── Expand / collapse ─────────────────────────────────────────
@@ -956,17 +995,22 @@ public sealed class AgentSession
     void ApplyOne(BlockInfo b, bool expand)
     {
         if (b.Type == BlockType.Output) return;
+        var open = expand || b.ExpandedOverride;
         if (b.Container is ScrollViewer sv)
         {
-            sv.MaxHeight = expand ? double.PositiveInfinity : (b.Type == BlockType.Thinking ? 72 : 36);
-            if (expand && b.Type == BlockType.Thinking && b.StreamPanel is { } sp && !b.HasStreamed && b.Text.Length > 0)
+            sv.MaxHeight = open ? double.PositiveInfinity : (b.Type == BlockType.Thinking ? 72 : 36);
+            if (open && b.Type == BlockType.Thinking && b.StreamPanel is { } sp && !b.HasStreamed && b.Text.Length > 0)
             {
-                RenderStreaming(b, sp, b.SecondaryBrush, b.SecondaryBrush, 11);
+                RenderStreaming(b, sp, b.SecondaryBrush, b.SecondaryBrush, 12);
             }
         }
-        b.Container.Visibility = expand ? Visibility.Visible : Visibility.Collapsed;
+        b.Container.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
         if (b.CollapsedPh != null)
-            b.CollapsedPh.Visibility = expand ? Visibility.Collapsed : Visibility.Visible;
+        {
+            // 折叠条始终可见：▸ 收起态 / ▾ 展开态，点击切换
+            b.CollapsedPh.Visibility = Visibility.Visible;
+            UpdateToggleChevron(b);
+        }
     }
 
     // ── Bubble ────────────────────────────────────────────────────
@@ -975,9 +1019,9 @@ public sealed class AgentSession
     {
         if (_bubble != null) return;
 
-        var tint = source.ActualTheme == ElementTheme.Light
-            ? Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
-            : Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B);
+        var theme = source.ActualTheme;
+        var tintBrush = Fluent.OverlaySurface(theme);
+        var tint = tintBrush is SolidColorBrush sc ? sc.Color : Windows.UI.Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B);
 
         _msgStack = new StackPanel { Spacing = 2 };
 
@@ -986,20 +1030,14 @@ public sealed class AgentSession
             Content = _msgStack,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            MaxHeight = 360
+            // 长回复可见区域：窗口高度的 55%（320~640 之间），配合智能滚动减少"信息被卷走"感
+            MaxHeight = Math.Clamp(_parentGrid.ActualHeight * 0.55, 320, 640)
         };
         Grid.SetRow(_scrollViewer, 1);
 
-        var closeBtn = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE711", FontSize = 10 },
-            Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
-            Width = 24, Height = 24, Padding = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-        closeBtn.Click += (_, _) => CloseBubble();
+        var closeBtn = Fluent.IconButton("\uE711", "关闭对话", CloseBubble, "关闭", 12);
         Grid.SetRow(closeBtn, 0);
+        closeBtn.HorizontalAlignment = HorizontalAlignment.Right;
 
         var bubbleContent = new Grid();
         bubbleContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -1010,9 +1048,11 @@ public sealed class AgentSession
         _bubble = new Border
         {
             Background = new AcrylicBrush { TintColor = tint, TintOpacity = 0.9, FallbackColor = tint },
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(14, 10, 14, 14),
-            MaxWidth = 480,
+            BorderBrush = Fluent.CardStroke(theme),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(Fluent.RadiusCard),
+            Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL),
+            MaxWidth = 560,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom,
             Margin = new Thickness(0, 0, 16, 56),
@@ -1022,11 +1062,19 @@ public sealed class AgentSession
         _parentGrid.Children.Add(_bubble);
     }
 
-    void AutoScroll(bool animated = true)
+    void AutoScroll(bool force = true)
     {
         if (_scrollViewer == null) return;
-        _scrollViewer.ChangeView(null, double.MaxValue, null, !animated);
+        if (!force)
+        {
+            // 智能跟随：仅当用户本来就在底部附近才滚动，避免打断向上翻阅
+            var distance = _scrollViewer.ScrollableHeight - _scrollViewer.VerticalOffset;
+            if (distance > 40) return;
+        }
+        _scrollViewer.ChangeView(null, double.MaxValue, null, true);
     }
+
+    void FollowScroll() => AutoScroll(force: false);
 
     public void CloseBubble()
     {

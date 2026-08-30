@@ -120,6 +120,13 @@ public sealed class AgentLoop
                 {
                     _retryAttempt = 0;
                     _history.AddAssistantMessage(finalText, response.ThinkingContent?.Trim(), null);
+
+                    // 截断显性化：流中断/达到长度上限时明确告知，不再静默吞掉
+                    if (response.StreamError)
+                        OnError?.Invoke("连接中断，回复可能不完整。");
+                    else if (response.FinishReason == "length")
+                        OnError?.Invoke("已达长度上限，回复被截断。");
+
                     await MaybeCompressAsync(token);
                     return finalText;
                 }

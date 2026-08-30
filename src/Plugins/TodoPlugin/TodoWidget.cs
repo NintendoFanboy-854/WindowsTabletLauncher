@@ -17,8 +17,7 @@ public sealed class TodoWidget : UserControl, IDisposable
     readonly Action<TodoItem> _onToggle;
     readonly TodoOverlay _overlay = new();
 
-    Border _root = null!;
-    Border _hoverLayer = null!;
+    WidgetTile _tile = null!;
     StackPanel _preview = null!;
     ListView? _taskList;
     ContentControl? _detailHost;
@@ -30,6 +29,7 @@ public sealed class TodoWidget : UserControl, IDisposable
     string _lastSavedSelectedId = "";
     ProgressBar? _subProgress;
     TextBlock? _subProgressText;
+    double _detailMinHeight = 320;
     readonly DispatcherQueueTimer _searchDebounce;
 
     public TodoWidget(IHostHandle host, TodoStore store, Action<TodoItem> onToggle)
@@ -68,32 +68,21 @@ public sealed class TodoWidget : UserControl, IDisposable
 
     void BuildUi()
     {
-        _preview = new StackPanel { Spacing = 6 };
-        _root = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12), Child = _preview };
-        _hoverLayer = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Background = Fluent.SubtleHover(((FrameworkElement)this).ActualTheme),
-            Opacity = 0,
-            IsHitTestVisible = false
-        };
-        var grid = new Grid();
-        grid.Children.Add(_root);
-        grid.Children.Add(_hoverLayer);
-        _root.Tapped += (_, _) => OpenDetail();
-        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
-        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
-        Content = grid;
+        _preview = new StackPanel { Spacing = Fluent.SpaceS };
+        var content = new Grid { Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM) };
+        content.Children.Add(_preview);
+        _tile = WidgetTile.Create(content, "待办事项").Tap(OpenDetail);
+        Content = _tile;
     }
 
-    static Brush Res(string key) => (Brush)Application.Current.Resources[key];
+    static Brush Res(string key) =>
+        Application.Current.Resources.TryGetValue(key, out var v) && v is Brush b
+            ? b
+            : Fluent.TextPrimary(ElementTheme.Dark);
 
     void ApplyTheme(ElementTheme theme)
     {
-        _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _root.BorderBrush = Fluent.CardStroke(theme);
-        _root.BorderThickness = new Thickness(1);
-        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _tile.ApplyTheme(theme, (Brush)_host.GetWidgetBackgroundBrush());
         RefreshTile();
     }
 
@@ -113,7 +102,7 @@ public sealed class TodoWidget : UserControl, IDisposable
     {
         var items = _store.ItemsInList(_currentList).AsEnumerable();
         if (HideDone) items = items.Where(i => !i.Done);
-        var list = items.Take(7).ToList();
+        var list = items.Take(5).ToList();
         var pending = items.Count(i => !i.Done);
 
         var snapshot = string.Join(",", list.Select(i => $"{i.Id}:{i.Done}:{(int)i.Priority}:{i.Deadline?.Ticks}:{i.Repeat}:{i.Text}:{i.Tags}:{i.Subtasks.Count(s => s.Done)}/{i.Subtasks.Count}"))
@@ -129,17 +118,19 @@ public sealed class TodoWidget : UserControl, IDisposable
         _preview.Children.Clear();
 
         var count = _store.ListNames.Length;
-        _preview.Children.Add(new TextBlock
+        var head = new TextBlock
         {
             Text = count > 1 ? $"待办 · {_currentList} · {pending}" : $"待办 · {pending}",
-            FontSize = 15,
+            FontSize = 14,
+            LineHeight = 20,
             FontWeight = FontWeights.SemiBold,
             Foreground = secondary
-        });
+        };
+        _preview.Children.Add(head);
 
         if (list.Count == 0)
         {
-            _preview.Children.Add(new TextBlock { Text = "暂无待办", FontSize = 14, Foreground = tertiary });
+            _preview.Children.Add(Fluent.EmptyState("暂无待办，点击添加", ElementTheme.Dark));
             return;
         }
 
@@ -250,47 +241,41 @@ public sealed class TodoWidget : UserControl, IDisposable
     void OpenDetail()
     {
         var root = XamlRoot?.Content as FrameworkElement;
-        var winW = root?.ActualWidth > 0 ? root.ActualWidth : 1440;
         var winH = root?.ActualHeight > 0 ? root.ActualHeight : 960;
-
-        var cardW = Math.Min(winW * 0.65, winW - 80);
-        var cardH = Math.Min(winH * 0.62, winH - 120);
-        var leftW = cardW * 0.35;
 
         var primary = Res("TextFillColorPrimaryBrush");
         var secondary = Res("TextFillColorSecondaryBrush");
-        var cardBg = Res("CardBackgroundFillColorDefaultBrush");
-        var subtleBg = Res("SubtleFillColorSecondaryBrush");
 
-        var cols = new Grid { Width = cardW, Height = cardH, ColumnSpacing = 24, RowSpacing = 16 };
-        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(leftW) });
-        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        // 宽度交给 BasePluginOverlay 统一锚定（min(w-120, 780)），高度按窗口比例
+        var cols = new Grid
+        {
+            Height = Math.Min(winH * 0.62, winH - 200),
+            ColumnSpacing = Fluent.SpaceXL,
+            RowSpacing = Fluent.SpaceL
+        };
+        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(35, GridUnitType.Star) });
+        cols.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(65, GridUnitType.Star) });
         cols.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         cols.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         cols.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        // 空态卡需要撑满右列（减去顶行与底行）
+        _detailMinHeight = Math.Max(320, cols.Height - 150);
 
-        // -- top row: list name + buttons spanning both columns --
-        var topRow = new Grid { ColumnSpacing = 8 };
+        // -- top row: 列表选择（固定宽度）+ 列表管理按钮 --
+        var topRow = new Grid { ColumnSpacing = Fluent.SpaceS };
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        topRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var listCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        var listCombo = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, MinHeight = Fluent.TouchTarget };
         _listCombo = listCombo;
         void PopLists() { listCombo.Items.Clear(); foreach (var n in _store.ListNames) listCombo.Items.Add(n); listCombo.SelectedItem = _currentList; }
         PopLists();
         listCombo.SelectionChanged += (_, _) => { if (listCombo.SelectedItem is string s && s != _currentList) { _currentList = s; _host.SetConfig(nameof(TodoPlugin), "current_list", s); RebuildTaskList(); } };
         Grid.SetColumn(listCombo, 0);
 
-        var renameBtn = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE70F", FontSize = 12 },
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        ToolTipService.SetToolTip(renameBtn, "重命名列表");
+        var renameBtn = Fluent.IconButton("\uE70F", "重命名列表", null, "重命名列表");
         renameBtn.Click += (_, _) =>
         {
             if (_currentList == TodoStore.DefaultList || _currentList == TodoStore.InboxList) return;
@@ -299,13 +284,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         };
         Grid.SetColumn(renameBtn, 1);
 
-        var newBtn = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE710", FontSize = 12 },
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        ToolTipService.SetToolTip(newBtn, "新建列表");
+        var newBtn = Fluent.IconButton("\uE710", "新建列表", null, "新建列表");
         newBtn.Click += async (_, _) =>
         {
             var input = new TextBox { PlaceholderText = "列表名称…", Width = 200 };
@@ -332,13 +311,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         };
         Grid.SetColumn(newBtn, 2);
 
-        var delBtn = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE74D", FontSize = 12 },
-            Width = 36, Height = 36, Padding = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        ToolTipService.SetToolTip(delBtn, "删除列表");
+        var delBtn = Fluent.IconButton("\uE74D", "删除列表", null, "删除列表");
         delBtn.Click += async (_, _) =>
         {
             if (_currentList == TodoStore.DefaultList || _currentList == TodoStore.InboxList) return;
@@ -372,12 +345,12 @@ public sealed class TodoWidget : UserControl, IDisposable
         cols.Children.Add(topRow);
 
         // -- left column --
-        var leftCol = new Grid { RowSpacing = 12 };
+        var leftCol = new Grid { RowSpacing = Fluent.SpaceM };
         leftCol.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         leftCol.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         leftCol.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var sb = new TextBox { PlaceholderText = "搜索…" };
+        var sb = new TextBox { PlaceholderText = "搜索…", MinHeight = Fluent.TouchTarget };
         _searchBox = sb;
         sb.TextChanged += (_, _) =>
         {
@@ -388,22 +361,15 @@ public sealed class TodoWidget : UserControl, IDisposable
         leftCol.Children.Add(sb);
 
         _taskList = new ListView { SelectionMode = ListViewSelectionMode.Single };
-        var leftCard = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1),
-            BorderBrush = Res("CardStrokeColorDefaultBrush"),
-            Background = Res("CardBackgroundFillColorDefaultBrush"),
-            Padding = new Thickness(4),
-            Child = _taskList
-        };
+        var leftCard = Fluent.Card(ElementTheme.Dark, new Thickness(Fluent.SpaceS));
+        leftCard.Child = _taskList;
         Grid.SetRow(leftCard, 1);
         leftCol.Children.Add(leftCard);
 
-        var addRow = new Grid { ColumnSpacing = 8 };
+        var addRow = new Grid { ColumnSpacing = Fluent.SpaceS };
         addRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         addRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var inp = new TextBox { PlaceholderText = "添加任务…", VerticalAlignment = VerticalAlignment.Center };
+        var inp = new TextBox { PlaceholderText = "添加任务…", MinHeight = Fluent.TouchTarget, VerticalAlignment = VerticalAlignment.Center };
         void DoAdd()
         {
             if (string.IsNullOrWhiteSpace(inp.Text)) return;
@@ -413,8 +379,7 @@ public sealed class TodoWidget : UserControl, IDisposable
             RebuildTaskList();
         }
         inp.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) DoAdd(); };
-        var addBtn = new Button { Content = "添加" };
-        addBtn.Click += (_, _) => DoAdd();
+        var addBtn = Fluent.Cta("添加", DoAdd, accent: true);
         Grid.SetColumn(inp, 0); Grid.SetColumn(addBtn, 1);
         addRow.Children.Add(inp); addRow.Children.Add(addBtn);
         Grid.SetRow(addRow, 2);
@@ -432,25 +397,22 @@ public sealed class TodoWidget : UserControl, IDisposable
         cols.Children.Add(rightPanel);
 
         // bottom toolbar
-        var bottomRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center };
+        var bottomRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceM, VerticalAlignment = VerticalAlignment.Center };
 
-        var clearBtn = new Button { Content = "清除已完成", FontSize = 13 };
-        clearBtn.Click += (_, _) => { _store.ClearCompleted(_currentList); RebuildTaskList(); };
+        var clearBtn = Fluent.Cta("清除已完成", () => { _store.ClearCompleted(_currentList); RebuildTaskList(); }, accent: false);
         bottomRow.Children.Add(clearBtn);
 
-        var statsBtn = new Button { Content = "统计", FontSize = 13 };
-        statsBtn.Click += (_, _) => OpenStats();
+        var statsBtn = Fluent.Cta("统计", OpenStats, accent: false);
         bottomRow.Children.Add(statsBtn);
 
-        var shareBtn = new Button { Content = "分享", FontSize = 13 };
-        shareBtn.Click += (_, _) => ShareList();
+        var shareBtn = Fluent.Cta("分享", ShareList, accent: false);
         bottomRow.Children.Add(shareBtn);
 
         Grid.SetRow(bottomRow, 2);
         Grid.SetColumnSpan(bottomRow, 2);
         cols.Children.Add(bottomRow);
 
-        _overlay.Show(this, "待办事项", cols, _host.Log);
+        _overlay.Show(this, "待办事项", cols, _host.Log, width: 1100);
         RebuildTaskList();
     }
 
@@ -491,15 +453,16 @@ public sealed class TodoWidget : UserControl, IDisposable
             {
                 var gh = new Border
                 {
-                    Margin = new Thickness(0, 8, 0, 4),
-                    Padding = new Thickness(8, 6, 8, 6),
-                    CornerRadius = new CornerRadius(6),
+                    Margin = new Thickness(0, Fluent.SpaceS, 0, Fluent.SpaceXS),
+                    Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
+                    CornerRadius = new CornerRadius(Fluent.RadiusControl),
                     Background = groupBg,
                     Child = new TextBlock
                     {
                         Text = GroupTitle(g) + $" · {groupCounts.GetValueOrDefault(g)} 项",
                         FontSize = 12,
-                        FontWeight = FontWeights.Medium,
+                        LineHeight = 16,
+                        FontWeight = FontWeights.SemiBold,
                         Foreground = secondary
                     }
                 };
@@ -526,7 +489,7 @@ public sealed class TodoWidget : UserControl, IDisposable
             if (item.Repeat != RepeatKind.None) meta += (meta.Length > 0 ? "  " : "") + "\u21BB";
             if (item.Subtasks.Count > 0) meta += (meta.Length > 0 ? "  " : "") + $"{item.Subtasks.Count(s => s.Done)}/{item.Subtasks.Count}";
 
-            var ext = new TextBlock { Text = meta, FontSize = 11, Foreground = secondary, Opacity = 0.75, Margin = new Thickness(0, 2, 0, 0) };
+            var ext = new TextBlock { Text = meta, FontSize = 12, LineHeight = 16, Foreground = secondary, Opacity = 0.75, Margin = new Thickness(0, 2, 0, 0) };
             Grid.SetColumn(ext, 1);
             Grid.SetRow(ext, 1);
 
@@ -549,14 +512,14 @@ public sealed class TodoWidget : UserControl, IDisposable
                 if (dlv != null)
                 {
                     var overdue = !item.Done && item.Deadline is { } d && d < DateTime.Now;
-                    subItems.Children.Add(new TextBlock { Text = dlv, FontSize = 11, Foreground = overdue ? critical : secondary });
+                    subItems.Children.Add(new TextBlock { Text = dlv, FontSize = 12, LineHeight = 16, Foreground = overdue ? critical : secondary });
                 }
                 if (meta.Length > 0) subItems.Children.Add(ext);
                 Grid.SetColumn(subItems, 1); Grid.SetRow(subItems, 1);
                 row.Children.Add(subItems);
             }
 
-            var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6) };
+            var lvi = new ListViewItem { Content = row, Tag = item, HorizontalContentAlignment = HorizontalAlignment.Stretch, MinHeight = Fluent.TouchTarget, Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS) };
             _taskList.Items.Add(lvi);
             if (ReferenceEquals(item, _selected)) toSelect = lvi;
         }
@@ -611,44 +574,38 @@ public sealed class TodoWidget : UserControl, IDisposable
         {
             _detailHost.Content = new Border
             {
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = new CornerRadius(Fluent.RadiusCard),
                 Padding = new Thickness(32),
+                MinHeight = _detailMinHeight,
                 Background = Res("CardBackgroundFillColorDefaultBrush"),
                 BorderThickness = new Thickness(1),
                 BorderBrush = Res("CardStrokeColorDefaultBrush"),
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Child = new TextBlock
-                {
-                    Text = "选择左侧任务以编辑",
-                    FontSize = 14,
-                    Foreground = secondary,
-                    TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                }
+                Child = Fluent.EmptyState("选择左侧任务以编辑", ElementTheme.Dark, "\uE70F")
             };
             return;
         }
 
         var card = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(24),
+            CornerRadius = new CornerRadius(Fluent.RadiusCard),
+            Padding = new Thickness(Fluent.SpaceXL),
             Background = Res("CardBackgroundFillColorDefaultBrush"),
             BorderThickness = new Thickness(1),
             BorderBrush = Res("CardStrokeColorDefaultBrush")
         };
 
-        var stack = new StackPanel { Spacing = 20 };
+        var stack = new StackPanel { Spacing = Fluent.SpaceXL };
 
         // title row
-        var titleRow = new Grid { ColumnSpacing = 12 };
+        var titleRow = new Grid { ColumnSpacing = Fluent.SpaceM };
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var ttl = new TextBlock { Text = item.Text, FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = primary, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var ttl = new TextBlock { Text = item.Text, FontSize = 20, LineHeight = 28, FontWeight = FontWeights.SemiBold, Foreground = primary, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(ttl, 0);
 
         // priority picker
-        var pcb = new ComboBox { Width = 80 };
+        var pcb = new ComboBox { Width = 80, MinHeight = Fluent.TouchTarget };
         pcb.Items.Add(new ComboBoxItem { Content = "无", Tag = Priority.None });
         pcb.Items.Add(new ComboBoxItem { Content = "低", Tag = Priority.Low });
         pcb.Items.Add(new ComboBoxItem { Content = "中", Tag = Priority.Medium });
@@ -660,7 +617,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         stack.Children.Add(titleRow);
 
         // tags
-        var tbx = new TextBox { PlaceholderText = "标签（逗号分隔）", Text = item.Tags ?? "", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var tbx = new TextBox { PlaceholderText = "标签（逗号分隔）", Text = item.Tags ?? "", HorizontalAlignment = HorizontalAlignment.Stretch, MinHeight = Fluent.TouchTarget };
         tbx.LostFocus += (_, _) => { item.Tags = tbx.Text; SaveDetailEdit(); };
         stack.Children.Add(tbx);
 
@@ -679,9 +636,9 @@ public sealed class TodoWidget : UserControl, IDisposable
         }
         dp.DateChanged += (_, _) => UpdDdl();
         tp.TimeChanged += (_, _) => UpdDdl();
-        var cdl = new Button { Content = "清除截止", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left };
-        cdl.Click += (_, _) => { dp.Date = null; item.Deadline = null; item.Reminded = false; SaveDetailEdit(); RebuildDetail(); };
-        var ds = new StackPanel { Spacing = 8 };
+        var cdl = Fluent.Cta("清除截止", () => { dp.Date = null; item.Deadline = null; item.Reminded = false; SaveDetailEdit(); RebuildDetail(); }, accent: false);
+        cdl.HorizontalAlignment = HorizontalAlignment.Left;
+        var ds = new StackPanel { Spacing = Fluent.SpaceS };
         ds.Children.Add(dp); ds.Children.Add(tp); ds.Children.Add(cdl);
         stack.Children.Add(ds);
 
@@ -694,34 +651,34 @@ public sealed class TodoWidget : UserControl, IDisposable
         rcb.SelectionChanged += (_, _) => { if (rcb.SelectedItem is ComboBoxItem ci && ci.Tag is RepeatKind rk) { item.Repeat = rk; SaveDetailEdit(); } };
         var ldb = new NumberBox { Minimum = 0, Maximum = 1440, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, Value = item.LeadMinutes, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "提前（分钟）" };
         ldb.ValueChanged += (_, _) => { if (!double.IsNaN(ldb.Value)) { item.LeadMinutes = (int)ldb.Value; SaveDetailEdit(); } };
-        var rs2 = new StackPanel { Spacing = 8 };
+        var rs2 = new StackPanel { Spacing = Fluent.SpaceS };
         rs2.Children.Add(rcb); rs2.Children.Add(ldb);
         stack.Children.Add(rs2);
 
         stack.Children.Add(Sep());
 
         // note
-        var nb = new TextBox { PlaceholderText = "备注…", Text = item.Note ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 64, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "备注" };
+        var nb = new TextBox { PlaceholderText = "备注…", Text = item.Note ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 64, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "备注" };
         nb.LostFocus += (_, _) => { item.Note = nb.Text; SaveDetailEdit(); };
         stack.Children.Add(nb);
 
         // subtasks
         stack.Children.Add(Sep());
-        var ss = new StackPanel { Spacing = 8 };
+        var ss = new StackPanel { Spacing = Fluent.SpaceS };
         ss.Children.Add(SectHead("子任务", secondary));
 
         if (item.Subtasks.Count > 0)
         {
             var doneCount = item.Subtasks.Count(s => s.Done);
             var totalCount = item.Subtasks.Count;
-            var progRow = new Grid { ColumnSpacing = 8 };
+            var progRow = new Grid { ColumnSpacing = Fluent.SpaceS };
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var pb = new ProgressBar { Value = (double)doneCount / totalCount * 100, Minimum = 0, Maximum = 100, Height = 6, Foreground = doneCount == totalCount ? success : accent };
             _subProgress = pb;
             Grid.SetColumn(pb, 0);
             progRow.Children.Add(pb);
-            var progressText = new TextBlock { Text = $"{doneCount}/{totalCount}", FontSize = 12, Foreground = secondary, VerticalAlignment = VerticalAlignment.Center };
+            var progressText = new TextBlock { Text = $"{doneCount}/{totalCount}", FontSize = 12, LineHeight = 16, Foreground = secondary, VerticalAlignment = VerticalAlignment.Center };
             _subProgressText = progressText;
             Grid.SetColumn(progressText, 1);
             progRow.Children.Add(progressText);
@@ -729,10 +686,10 @@ public sealed class TodoWidget : UserControl, IDisposable
         }
         foreach (var st in item.Subtasks.ToList())
         {
-            var sr = new Grid { ColumnSpacing = 4 };
+            var sr = new Grid { ColumnSpacing = Fluent.SpaceXS };
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var ch = new CheckBox { IsChecked = st.Done, Content = st.Text, FontSize = 13 };
+            var ch = new CheckBox { IsChecked = st.Done, Content = st.Text, MinHeight = Fluent.TouchTarget, VerticalContentAlignment = VerticalAlignment.Center };
             ch.Click += (_, _) =>
             {
                 st.Done = ch.IsChecked == true;
@@ -743,17 +700,16 @@ public sealed class TodoWidget : UserControl, IDisposable
                 RefreshTile();
             };
             Grid.SetColumn(ch, 0);
-            var sd = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 10 }, Width = 28, Height = 28, Padding = new Thickness(0) };
-            sd.Click += (_, _) => { item.Subtasks.Remove(st); SaveDetailEdit(); RebuildDetail(); };
+            var sd = Fluent.IconButton("\uE711", $"删除子任务 {st.Text}", () => { item.Subtasks.Remove(st); SaveDetailEdit(); RebuildDetail(); }, "删除", 12);
             Grid.SetColumn(sd, 1);
             sr.Children.Add(ch); sr.Children.Add(sd);
             ss.Children.Add(sr);
         }
-        var sa = new Grid { ColumnSpacing = 8 };
+        var sa = new Grid { ColumnSpacing = Fluent.SpaceS };
         sa.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         sa.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var si = new TextBox { PlaceholderText = "新增子任务…", FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
-        var sbtn = new Button { Content = "+", Width = 32, Height = 32, FontSize = 14, Padding = new Thickness(0) };
+        var si = new TextBox { PlaceholderText = "新增子任务…", MinHeight = Fluent.TouchTarget, VerticalAlignment = VerticalAlignment.Center };
+        var sbtn = Fluent.IconButton("\uE710", "新增子任务", null, "新增");
         void SDo() { if (string.IsNullOrWhiteSpace(si.Text)) return; item.Subtasks.Add(new Subtask { Text = si.Text.Trim() }); SaveDetailEdit(); RebuildDetail(); }
         sbtn.Click += (_, _) => SDo();
         si.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) SDo(); };
@@ -763,15 +719,10 @@ public sealed class TodoWidget : UserControl, IDisposable
         stack.Children.Add(ss);
 
         // delete
-        var delBtn = new Button
-        {
-            Content = "删除任务",
-            Foreground = critical,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            FontSize = 13,
-            Margin = new Thickness(0, 8, 0, 0)
-        };
-        delBtn.Click += (_, _) => { _store.Delete(item); _selected = null; SaveSelection(""); RebuildTaskList(); };
+        var delBtn = Fluent.Cta("删除任务", () => { _store.Delete(item); _selected = null; SaveSelection(""); RebuildTaskList(); }, accent: false);
+        delBtn.Foreground = critical;
+        delBtn.HorizontalAlignment = HorizontalAlignment.Left;
+        delBtn.Margin = new Thickness(0, Fluent.SpaceS, 0, 0);
         stack.Children.Add(delBtn);
 
         card.Child = stack;
@@ -798,7 +749,7 @@ public sealed class TodoWidget : UserControl, IDisposable
 
     static Border Sep() => new() { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") };
 
-    static TextBlock SectHead(string text, Brush color) => new() { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = color, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 4) };
+    static TextBlock SectHead(string text, Brush color) => new() { Text = text, FontSize = 12, LineHeight = 16, FontWeight = FontWeights.SemiBold, Foreground = color, Opacity = 0.7, Margin = new Thickness(0, 0, 0, Fluent.SpaceXS) };
 
     static string RepeatName(RepeatKind k) => k switch
     {
@@ -814,7 +765,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         _store.Changed -= OnStoreChanged;
     }
 
-    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _tile.ApplyTheme(((FrameworkElement)this).ActualTheme, brush);
 
     void OpenStats()
     {
@@ -848,10 +799,10 @@ public sealed class TodoWidget : UserControl, IDisposable
         var secondary = Res("TextFillColorSecondaryBrush");
         var accent = Res("AccentFillColorDefaultBrush");
 
-        var body = new StackPanel { Spacing = 12, MinWidth = 320 };
-        body.Children.Add(new TextBlock { Text = "待办统计", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = primary });
+        // 标题由弹层头部统一展示，正文不再重复
+        var body = new StackPanel { Spacing = Fluent.SpaceM, MinWidth = 320 };
 
-        var grid = new Grid { ColumnSpacing = 24 };
+        var grid = new Grid { ColumnSpacing = Fluent.SpaceXL };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -859,13 +810,13 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         void AddStat(int col, string label, string value)
         {
-            var s = new StackPanel { Spacing = 1 };
-            s.Children.Add(new TextBlock { Text = value, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = primary });
-            s.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary });
+            var s = new StackPanel { Spacing = Fluent.SpaceXS };
+            s.Children.Add(new TextBlock { Text = value, FontSize = 28, LineHeight = 36, FontWeight = FontWeights.SemiBold, Foreground = primary });
+            s.Children.Add(new TextBlock { Text = label, FontSize = 12, LineHeight = 16, Foreground = secondary });
             var chip = new Border
             {
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(14, 8, 14, 10),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
+                Padding = new Thickness(Fluent.SpaceM, Fluent.SpaceS, Fluent.SpaceM, Fluent.SpaceS),
                 Background = Res("CardBackgroundFillColorSecondaryBrush"),
                 BorderThickness = new Thickness(1),
                 BorderBrush = Res("CardStrokeColorDefaultBrush"),
@@ -882,7 +833,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         body.Children.Add(grid);
 
         body.Children.Add(new Border { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") });
-        body.Children.Add(new TextBlock { Text = "近 7 天完成趋势", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary });
+        body.Children.Add(new TextBlock { Text = "近 7 天完成趋势", FontSize = 14, LineHeight = 20, FontWeight = FontWeights.SemiBold, Foreground = primary });
         body.Children.Add(MiniChart.Line(weeklySeries, accent, secondary));
 
         // 不关闭主界面：统计 overlay 关闭后回到待办主视图

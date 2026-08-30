@@ -468,7 +468,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         readonly IHostHandle _host; readonly TodoWidget _control;
         public TodoWidgetInfo(IHostHandle host, TodoWidget control) { _host = host; _control = control; }
         public string Id => "todo.main";
-        public int Columns => 2; public int Rows => 3;
+        public int Columns => 2; public int Rows => 2;
         public WidgetBackdrop Backdrop => WidgetBackdrop.Acrylic;
         public object CreateControl() { _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush()); return _control; }
     }

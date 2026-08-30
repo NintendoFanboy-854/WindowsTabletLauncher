@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
@@ -27,8 +28,7 @@ public sealed class BtAudioWidget : UserControl
     readonly List<BtDevice> _devices = new();
     readonly Dictionary<string, DateTime> _lastConnected = new();
 
-    Border _root = null!;
-    Border _hoverLayer = null!;
+    WidgetTile _tile = null!;
     Ellipse _dot = null!;
     TextBlock _devText = null!;
     TextBlock _statusText = null!;
@@ -785,7 +785,7 @@ public sealed class BtAudioWidget : UserControl
 
         var stack = new StackPanel
         {
-            Spacing = 4,
+            Spacing = Fluent.SpaceXS,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -794,35 +794,16 @@ public sealed class BtAudioWidget : UserControl
         stack.Children.Add(_statusText);
         stack.Children.Add(_trackText);
 
-        _root = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12),
-            Child = stack
-        };
-        _hoverLayer = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Opacity = 0,
-            IsHitTestVisible = false
-        };
+        var content = new Grid { Padding = new Thickness(Fluent.SpaceM) };
+        content.Children.Add(stack);
 
-        var grid = new Grid();
-        grid.Children.Add(_root);
-        grid.Children.Add(_hoverLayer);
-
-        _root.Tapped += (_, _) => OpenOverlay();
-        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
-        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
-        Content = grid;
+        _tile = WidgetTile.Create(content, "蓝牙音频").Tap(OpenOverlay);
+        Content = _tile;
     }
 
     void ApplyTheme(ElementTheme theme)
     {
-        _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _root.BorderBrush = Fluent.CardStroke(theme);
-        _root.BorderThickness = new Thickness(1);
-        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _tile.ApplyTheme(theme, (Brush)_host.GetWidgetBackgroundBrush());
         _devText.Foreground = Fluent.TextPrimary(theme);
         UpdateViews();
     }
@@ -880,38 +861,41 @@ public sealed class BtAudioWidget : UserControl
         var theme = ((FrameworkElement)this).ActualTheme;
         _rebuilding = true;
 
-        var body = new StackPanel { Spacing = 12 };
+        // 两列自适应布局（横向屏幕）：左列=状态/播放/蓝牙/设置；右列=发现/设备/帮助
+        var body = new Grid { ColumnSpacing = Fluent.SpaceM };
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
+        var leftCol = new StackPanel { Spacing = Fluent.SpaceM };
+        var rightCol = new StackPanel { Spacing = Fluent.SpaceM };
+        Grid.SetColumn(leftCol, 0);
+        Grid.SetColumn(rightCol, 1);
+        body.Children.Add(leftCol);
+        body.Children.Add(rightCol);
 
         // 状态卡
         _ovStatus = Fluent.Text(StatusLabel(), theme, "subtitle");
-        _ovStatus.HorizontalAlignment = HorizontalAlignment.Center;
         _ovDetail = Fluent.Text(DetailLabel(), theme, "caption", Fluent.TextTertiary(theme));
-        _ovDetail.HorizontalAlignment = HorizontalAlignment.Center;
+        _ovDetail.TextWrapping = TextWrapping.Wrap;
 
-        _ovConnect = new Button { Content = "连接", MinWidth = 120, Padding = new Thickness(16, 6, 16, 8) };
-        if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style accent)
-            _ovConnect.Style = accent;
-        _ovConnect.Click += (_, _) => { var d = ActiveDevice; if (d != null) ConnectTo(d); };
-
-        _ovDisconnect = new Button { Content = "断开", MinWidth = 96, Padding = new Thickness(16, 6, 16, 8) };
-        _ovDisconnect.Click += (_, _) => Disconnect();
+        _ovConnect = Fluent.Cta("连接", () => { var d = ActiveDevice; if (d != null) ConnectTo(d); }, accent: true);
+        _ovDisconnect = Fluent.Cta("断开", Disconnect, accent: false);
 
         var statusButtons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = HorizontalAlignment.Center
+            Spacing = Fluent.SpaceS,
+            HorizontalAlignment = HorizontalAlignment.Left
         };
         statusButtons.Children.Add(_ovConnect);
         statusButtons.Children.Add(_ovDisconnect);
 
-        var statusBody = new StackPanel { Spacing = 8 };
+        var statusBody = new StackPanel { Spacing = Fluent.SpaceS };
         statusBody.Children.Add(_ovStatus);
         statusBody.Children.Add(_ovDetail);
         statusBody.Children.Add(statusButtons);
-        var statusCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        var statusCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceL));
         statusCard.Child = statusBody;
-        body.Children.Add(statusCard);
+        leftCol.Children.Add(statusCard);
 
         // 蓝牙卡
         _ovRadio = new ToggleSwitch
@@ -930,90 +914,82 @@ public sealed class BtAudioWidget : UserControl
         };
         _ovRadioState = Fluent.Text(RadioStateText(), theme, "caption", Fluent.TextTertiary(theme));
         _ovRadioState.TextWrapping = TextWrapping.Wrap;
-        _ovRadioSettings = new Button
-        {
-            Content = "打开系统蓝牙设置",
-            Padding = new Thickness(12, 4, 12, 6),
-            Visibility = (!_radioAvailable || _radioSetFailed) ? Visibility.Visible : Visibility.Collapsed,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
+        _ovRadioSettings = Fluent.Cta("打开系统蓝牙设置", null, accent: false);
         _ovRadioSettings.Click += async (_, _) =>
         {
             try { _ = await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:bluetooth")); }
             catch { }
         };
-        var radioBody = new StackPanel { Spacing = 4 };
+        _ovRadioSettings.Visibility = (!_radioAvailable || _radioSetFailed) ? Visibility.Visible : Visibility.Collapsed;
+        _ovRadioSettings.HorizontalAlignment = HorizontalAlignment.Left;
+        var radioBody = new StackPanel { Spacing = Fluent.SpaceS };
         radioBody.Children.Add(_ovRadio);
         radioBody.Children.Add(_ovRadioState);
         radioBody.Children.Add(_ovRadioSettings);
-        var radioCard = Fluent.Card(theme, new Thickness(16, 12, 16, 12));
+        var radioCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         radioCard.Child = radioBody;
-        body.Children.Add(radioCard);
+        leftCol.Children.Add(radioCard);
 
         // 发现设备卡
-        _ovDiscover = new Button
-        {
-            Content = "搜索附近设备",
-            Padding = new Thickness(12, 4, 12, 6),
-            IsEnabled = !_discovering
-        };
+        _ovDiscover = Fluent.Cta("搜索附近设备", null, accent: false);
         _ovDiscover.Click += (_, _) => StartDiscovery();
+        _ovDiscover.IsEnabled = !_discovering;
         _ovScanRing = new ProgressRing { Width = 16, Height = 16, IsActive = _discovering };
-        _ovScanText = Fluent.Text(_discovering ? "正在扫描附近设备…" : "点击「搜索附近设备」开始扫描", theme, "caption", Fluent.TextTertiary(theme));
+        // 扫描状态 + 配对提示合并为一条说明，独占一行避免与标题/按钮挤压换行
+        _ovScanText = Fluent.Text(_discovering ? "正在扫描附近设备…" : "点击「搜索附近设备」开始扫描；配对时留意系统弹出的确认窗口", theme, "caption", Fluent.TextTertiary(theme));
         _ovScanText.TextWrapping = TextWrapping.Wrap;
         _ovScanText.VerticalAlignment = VerticalAlignment.Center;
 
-        var discoveryHeader = new Grid { ColumnSpacing = 8 };
-        discoveryHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        discoveryHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        discoveryHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var discoveryTitle = Fluent.Text("发现新设备", theme, "bodyLargeStrong", Fluent.TextPrimary(theme));
+        // 头部两行：第一行=标题+按钮（两端对齐），第二行=扫描说明
+        var discoveryHeader = new Grid { RowSpacing = Fluent.SpaceXS };
+        discoveryHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        discoveryHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var titleRow = new Grid { ColumnSpacing = Fluent.SpaceS };
+        titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var discoveryTitle = Fluent.SectionTitle("发现新设备", theme);
+        discoveryTitle.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(discoveryTitle, 0);
-        discoveryHeader.Children.Add(discoveryTitle);
-        Grid.SetColumn(_ovScanText, 1);
-        discoveryHeader.Children.Add(_ovScanText);
+        titleRow.Children.Add(discoveryTitle);
         var discoveryRight = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 8,
+            Spacing = Fluent.SpaceS,
             VerticalAlignment = VerticalAlignment.Center
         };
         _ovScanRing.VerticalAlignment = VerticalAlignment.Center;
         discoveryRight.Children.Add(_ovScanRing);
         discoveryRight.Children.Add(_ovDiscover);
-        Grid.SetColumn(discoveryRight, 2);
-        discoveryHeader.Children.Add(discoveryRight);
+        Grid.SetColumn(discoveryRight, 1);
+        titleRow.Children.Add(discoveryRight);
+        Grid.SetRow(titleRow, 0);
+        discoveryHeader.Children.Add(titleRow);
+        Grid.SetRow(_ovScanText, 1);
+        discoveryHeader.Children.Add(_ovScanText);
 
-        _ovDiscoveryList = new StackPanel { Spacing = 4 };
+        _ovDiscoveryList = new StackPanel { Spacing = Fluent.SpaceS };
         _ovDiscoveryEmpty = Fluent.Text("未发现设备，请确认设备已进入配对模式", theme, "caption", Fluent.TextTertiary(theme));
         _ovDiscoveryEmpty.HorizontalAlignment = HorizontalAlignment.Center;
-        _ovDiscoveryEmpty.Margin = new Thickness(0, 4, 0, 0);
+        _ovDiscoveryEmpty.Margin = new Thickness(0, Fluent.SpaceXS, 0, 0);
 
-        var discoveryHint = Fluent.Text("配对时请留意系统弹出的确认窗口；设备需处于配对模式才会被扫描到", theme, "caption", Fluent.TextTertiary(theme));
-        discoveryHint.TextWrapping = TextWrapping.Wrap;
-        discoveryHint.Opacity = 0.7;
-
-        var discoveryBody = new StackPanel { Spacing = 8 };
+        var discoveryBody = new StackPanel { Spacing = Fluent.SpaceS };
         discoveryBody.Children.Add(discoveryHeader);
         discoveryBody.Children.Add(_ovDiscoveryList);
         discoveryBody.Children.Add(_ovDiscoveryEmpty);
-        discoveryBody.Children.Add(discoveryHint);
-        var discoveryCard = Fluent.Card(theme, new Thickness(16, 14, 16, 12));
+        var discoveryCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         discoveryCard.Child = discoveryBody;
-        body.Children.Add(discoveryCard);
+        rightCol.Children.Add(discoveryCard);
 
-        // 播放卡
-        _ovTitle = Fluent.Text("", theme, "bodyLargeStrong");
-        _ovTitle.HorizontalAlignment = HorizontalAlignment.Center;
+        // 播放卡（横排）：左侧曲目信息，右侧播放控制，进度条全宽置底
+        _ovTitle = Fluent.Text("", theme, "bodyStrong");
         _ovTitle.TextTrimming = TextTrimming.CharacterEllipsis;
-        _ovArtist = Fluent.Text("", theme, "body", Fluent.TextSecondary(theme));
-        _ovArtist.HorizontalAlignment = HorizontalAlignment.Center;
+        _ovArtist = Fluent.Text("", theme, "caption", Fluent.TextSecondary(theme));
         _ovArtist.TextTrimming = TextTrimming.CharacterEllipsis;
         _ovPos = Fluent.Text("0:00", theme, "caption", Fluent.TextTertiary(theme));
         _ovDur = Fluent.Text("--:--", theme, "caption", Fluent.TextTertiary(theme));
         _ovProgress = new ProgressBar { Minimum = 0, Maximum = 100, Value = 0, Height = 4, CornerRadius = new CornerRadius(2) };
 
-        var progressRow = new Grid { ColumnSpacing = 8 };
+        var progressRow = new Grid { ColumnSpacing = Fluent.SpaceS };
         progressRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         progressRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         progressRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1025,32 +1001,52 @@ public sealed class BtAudioWidget : UserControl
         Grid.SetColumn(_ovDur, 2);
         progressRow.Children.Add(_ovDur);
 
-        var prevBtn = IconBtn("\uE892", () => _media.SendCommand("previous"));
-        _ovPlayPause = IconBtn("\uE768", () => _media.SendCommand("play_pause"));
-        var nextBtn = IconBtn("\uE893", () => _media.SendCommand("next"));
+        var prevBtn = Fluent.IconButton("\uE892", "上一首", () => _media.SendCommand("previous"));
+        _ovPlayPause = Fluent.IconButton("\uE768", "播放/暂停", () => _media.SendCommand("play_pause"));
+        var nextBtn = Fluent.IconButton("\uE893", "下一首", () => _media.SendCommand("next"));
         var mediaButtons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            HorizontalAlignment = HorizontalAlignment.Center
+            Spacing = Fluent.SpaceXS,
+            VerticalAlignment = VerticalAlignment.Center
         };
         mediaButtons.Children.Add(prevBtn);
         mediaButtons.Children.Add(_ovPlayPause);
         mediaButtons.Children.Add(nextBtn);
 
-        var mediaBody = new StackPanel { Spacing = 10 };
-        mediaBody.Children.Add(_ovTitle);
-        mediaBody.Children.Add(_ovArtist);
+        var mediaInfo = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        mediaInfo.Children.Add(_ovTitle);
+        mediaInfo.Children.Add(_ovArtist);
+
+        var mediaTop = new Grid { ColumnSpacing = Fluent.SpaceM };
+        mediaTop.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        mediaTop.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        mediaTop.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var musicIcon = new FontIcon
+        {
+            Glyph = "\uE8D6",
+            FontSize = 24,
+            Foreground = Fluent.Accent(),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(musicIcon, 0);
+        mediaTop.Children.Add(musicIcon);
+        Grid.SetColumn(mediaInfo, 1);
+        mediaTop.Children.Add(mediaInfo);
+        Grid.SetColumn(mediaButtons, 2);
+        mediaTop.Children.Add(mediaButtons);
+
+        var mediaBody = new StackPanel { Spacing = Fluent.SpaceS };
+        mediaBody.Children.Add(mediaTop);
         mediaBody.Children.Add(progressRow);
-        mediaBody.Children.Add(mediaButtons);
-        _ovMediaCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        _ovMediaCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         _ovMediaCard.Child = mediaBody;
         _ovMediaCard.Visibility = Visibility.Collapsed;
-        body.Children.Add(_ovMediaCard);
+        leftCol.Children.Add(_ovMediaCard);
 
         // 设备列表卡
-        _ovCount = Fluent.Text("设备", theme, "bodyLargeStrong", Fluent.TextPrimary(theme));
-        var refreshBtn = IconBtn("\uE72C", RefreshDevices);
+        _ovCount = Fluent.SectionTitle("设备", theme);
+        var refreshBtn = Fluent.IconButton("\uE72C", "刷新设备列表", RefreshDevices, "刷新");
         var listHeader = new Grid();
         listHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         listHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1060,18 +1056,18 @@ public sealed class BtAudioWidget : UserControl
         Grid.SetColumn(refreshBtn, 1);
         listHeader.Children.Add(refreshBtn);
 
-        _ovDeviceList = new StackPanel { Spacing = 4 };
+        _ovDeviceList = new StackPanel { Spacing = Fluent.SpaceS };
         _ovEmpty = Fluent.Text("未找到设备，请在 Windows 蓝牙设置中配对手机。", theme, "caption", Fluent.TextTertiary(theme));
         _ovEmpty.HorizontalAlignment = HorizontalAlignment.Center;
-        _ovEmpty.Margin = new Thickness(0, 8, 0, 4);
+        _ovEmpty.Margin = new Thickness(0, Fluent.SpaceS, 0, Fluent.SpaceXS);
 
-        var listBody = new StackPanel { Spacing = 8 };
+        var listBody = new StackPanel { Spacing = Fluent.SpaceS };
         listBody.Children.Add(listHeader);
         listBody.Children.Add(_ovDeviceList);
         listBody.Children.Add(_ovEmpty);
-        var listCard = Fluent.Card(theme, new Thickness(16, 14, 16, 14));
+        var listCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         listCard.Child = listBody;
-        body.Children.Add(listCard);
+        rightCol.Children.Add(listCard);
 
         // 设置卡
         _ovAutoConnect = new ToggleSwitch
@@ -1098,12 +1094,12 @@ public sealed class BtAudioWidget : UserControl
             if (_rebuilding) return;
             _host.SetConfig(nameof(BtAudioPlugin), "notify", _ovNotify.IsOn ? "true" : "false");
         };
-        var settingsBody = new StackPanel { Spacing = 4 };
+        var settingsBody = new StackPanel { Spacing = Fluent.SpaceXS };
         settingsBody.Children.Add(_ovAutoConnect);
         settingsBody.Children.Add(_ovNotify);
-        var settingsCard = Fluent.Card(theme, new Thickness(16, 12, 16, 8));
+        var settingsCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         settingsCard.Child = settingsBody;
-        body.Children.Add(settingsCard);
+        leftCol.Children.Add(settingsCard);
 
         // 错误行 + 帮助卡
         _ovError = Fluent.Text("", theme, "caption", Fluent.Critical(theme));
@@ -1114,10 +1110,10 @@ public sealed class BtAudioWidget : UserControl
             "将手机与本机配对后，在上方列表选择设备并点击「连接」，然后在手机的蓝牙设置中把「媒体音频」输出切换到本机，手机播放的音频即通过本机扬声器播放。星标可设为默认设备，开启自动连接后将自动回连。若听不到声音，请检查系统音量与输出设备。",
             theme, "caption", Fluent.TextTertiary(theme));
         help.TextWrapping = TextWrapping.Wrap;
-        var helpCard = Fluent.Card(theme, new Thickness(16, 12, 16, 12));
+        var helpCard = Fluent.Card(theme, new Thickness(Fluent.SpaceL, Fluent.SpaceM, Fluent.SpaceL, Fluent.SpaceM));
         helpCard.Child = help;
-        body.Children.Add(_ovError);
-        body.Children.Add(helpCard);
+        rightCol.Children.Add(_ovError);
+        rightCol.Children.Add(helpCard);
 
         _rebuilding = false;
 
@@ -1130,22 +1126,9 @@ public sealed class BtAudioWidget : UserControl
             _bt.StopDiscovery();
             _discovering = false;
         };
-        _overlay.Show(this, "蓝牙音频", body, _host.Log);
+        _overlay.Show(this, "蓝牙音频", body, _host.Log, width: 1100);
         _progressTimer.Start();
         ScanQuietly();
-    }
-
-    Button IconBtn(string glyph, Action action)
-    {
-        var btn = new Button
-        {
-            Content = new FontIcon { Glyph = glyph, FontSize = 16 },
-            Padding = new Thickness(10, 4, 10, 4),
-            MinWidth = 0,
-            MinHeight = 0
-        };
-        btn.Click += (_, _) => action();
-        return btn;
     }
 
     void RebuildDeviceList()
@@ -1177,7 +1160,7 @@ public sealed class BtAudioWidget : UserControl
             {
                 Width = 32,
                 Height = 32,
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
                 Background = Fluent.CardBgSecondary(theme),
                 Child = new FontIcon { Glyph = "\uE702", FontSize = 14 }
             };
@@ -1196,7 +1179,7 @@ public sealed class BtAudioWidget : UserControl
                     : $"上次连接 {device.LastConnectedTime:yyyy/M/d HH:mm}",
                 theme, "caption", Fluent.TextTertiary(theme));
             lastText.Opacity = 0.7;
-            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Fluent.SpaceM, 0, 0, 0) };
             texts.Children.Add(nameText);
             texts.Children.Add(statusText);
             if (device.LastConnectedTime != default) texts.Children.Add(lastText);
@@ -1214,10 +1197,13 @@ public sealed class BtAudioWidget : UserControl
                 Content = star,
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 BorderThickness = new Thickness(0),
-                Padding = new Thickness(6, 2, 6, 2),
-                MinWidth = 0,
-                MinHeight = 0
+                Padding = new Thickness(Fluent.SpaceXS),
+                MinWidth = Fluent.TouchTarget,
+                MinHeight = Fluent.TouchTarget,
+                CornerRadius = new CornerRadius(Fluent.RadiusControl)
             };
+            ToolTipService.SetToolTip(starBtn, isDefault ? "取消默认设备" : "设为默认设备");
+            AutomationProperties.SetName(starBtn, isDefault ? $"取消默认设备 {device.Name}" : $"设为默认设备 {device.Name}");
             starBtn.Click += (_, _) =>
             {
                 var target = FindLocal(device.Id);
@@ -1243,11 +1229,14 @@ public sealed class BtAudioWidget : UserControl
                 Content = new FontIcon { Glyph = "\uE712", FontSize = 14 },
                 Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 BorderThickness = new Thickness(0),
-                Padding = new Thickness(6, 2, 6, 2),
-                MinWidth = 0,
-                MinHeight = 0,
+                Padding = new Thickness(Fluent.SpaceXS),
+                MinWidth = Fluent.TouchTarget,
+                MinHeight = Fluent.TouchTarget,
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
                 VerticalAlignment = VerticalAlignment.Center
             };
+            ToolTipService.SetToolTip(moreBtn, "更多操作");
+            AutomationProperties.SetName(moreBtn, $"更多操作 {device.Name}");
             var moreFlyout = new MenuFlyout();
             var unpairItem = new MenuFlyoutItem { Text = "取消配对" };
             unpairItem.Click += (_, _) => UnpairDevice(device);
@@ -1255,7 +1244,7 @@ public sealed class BtAudioWidget : UserControl
             moreBtn.Flyout = moreFlyout;
             Grid.SetColumn(moreBtn, 3);
 
-            var rowGrid = new Grid { ColumnSpacing = 8 };
+            var rowGrid = new Grid { ColumnSpacing = Fluent.SpaceS };
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1267,13 +1256,14 @@ public sealed class BtAudioWidget : UserControl
 
             var row = new Border
             {
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(10, 8, 8, 8),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
+                Padding = new Thickness(Fluent.SpaceM),
                 Background = isSelected ? Fluent.SubtleHover(theme) : Fluent.CardBgSecondary(theme),
                 BorderThickness = new Thickness(1),
                 BorderBrush = isSelected ? Fluent.Accent() : Fluent.CardStroke(theme),
                 Child = rowGrid
             };
+            AutomationProperties.SetName(row, $"设备 {device.Name}");
             row.Tapped += (_, _) =>
             {
                 _selectedId = device.Id;
@@ -1306,7 +1296,7 @@ public sealed class BtAudioWidget : UserControl
             {
                 Width = 32,
                 Height = 32,
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
                 Background = Fluent.CardBgSecondary(theme),
                 Child = new FontIcon { Glyph = "\uE702", FontSize = 14 }
             };
@@ -1314,7 +1304,7 @@ public sealed class BtAudioWidget : UserControl
 
             var nameText = Fluent.Text(item.Name, theme, "body", Fluent.TextPrimary(theme));
             var statusText = Fluent.Text(item.Pairing ? "正在配对…" : "未配对", theme, "caption", Fluent.TextSecondary(theme));
-            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Fluent.SpaceM, 0, 0, 0) };
             texts.Children.Add(nameText);
             texts.Children.Add(statusText);
             Grid.SetColumn(texts, 1);
@@ -1322,14 +1312,15 @@ public sealed class BtAudioWidget : UserControl
             var pairBtn = new Button
             {
                 Content = item.Pairing ? "配对中…" : "配对",
-                Padding = new Thickness(12, 4, 12, 6),
+                Padding = new Thickness(Fluent.SpaceL, Fluent.SpaceS, Fluent.SpaceL, Fluent.SpaceS),
+                MinHeight = Fluent.TouchTarget,
                 IsEnabled = !item.Pairing,
                 VerticalAlignment = VerticalAlignment.Center
             };
             pairBtn.Click += (_, _) => PairDiscovered(item);
             Grid.SetColumn(pairBtn, 2);
 
-            var rowGrid = new Grid { ColumnSpacing = 8 };
+            var rowGrid = new Grid { ColumnSpacing = Fluent.SpaceS };
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1339,8 +1330,8 @@ public sealed class BtAudioWidget : UserControl
 
             var row = new Border
             {
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(10, 8, 8, 8),
+                CornerRadius = new CornerRadius(Fluent.RadiusControl),
+                Padding = new Thickness(Fluent.SpaceM),
                 Background = Fluent.CardBgSecondary(theme),
                 BorderThickness = new Thickness(1),
                 BorderBrush = Fluent.CardStroke(theme),
@@ -1419,7 +1410,9 @@ public sealed class BtAudioWidget : UserControl
         if (_ovScanRing != null) _ovScanRing.IsActive = _discovering;
         if (_ovScanRing != null) _ovScanRing.Visibility = _discovering ? Visibility.Visible : Visibility.Collapsed;
         if (_ovScanText != null)
-            _ovScanText.Text = _discovering ? "正在扫描附近设备…" : "点击「搜索附近设备」开始扫描";
+            _ovScanText.Text = _discovering
+                ? "正在扫描附近设备…"
+                : "点击「搜索附近设备」开始扫描；配对时留意系统弹出的确认窗口";
         if (_ovDiscover != null) _ovDiscover.IsEnabled = !_discovering;
         if (_ovDiscoveryEmpty != null)
             _ovDiscoveryEmpty.Visibility = !_discovering && GetDiscoveredCount() == 0
@@ -1457,7 +1450,7 @@ public sealed class BtAudioWidget : UserControl
         _ovProgress.Foreground = playing ? Fluent.Success(((FrameworkElement)this).ActualTheme) : Fluent.TextTertiary(((FrameworkElement)this).ActualTheme);
     }
 
-    internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+    internal void SetWidgetBackground(Brush brush) => _tile.ApplyTheme(((FrameworkElement)this).ActualTheme, brush);
 
     internal void Stop() => _progressTimer.Stop();
 

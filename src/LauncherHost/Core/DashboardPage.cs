@@ -1,11 +1,9 @@
 using System.Text.Json;
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
 using SharedUtils;
-using Windows.UI;
 
 namespace LauncherHost.Core;
 
@@ -13,11 +11,6 @@ public sealed class DashboardPage
 {
     readonly IHostHandle _host;
     BasePluginOverlay? _overlay;
-
-    static readonly SolidColorBrush _lightPrimary = new(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A));
-    static readonly SolidColorBrush _lightSecondary = new(Color.FromArgb(0x99, 0, 0, 0));
-    static readonly SolidColorBrush _darkPrimary = new(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-    static readonly SolidColorBrush _darkSecondary = new(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
 
     public DashboardPage(IHostHandle host)
     {
@@ -29,13 +22,13 @@ public sealed class DashboardPage
         if (source.XamlRoot == null || _overlay?.IsOpen == true) return;
 
         var theme = source.ActualTheme;
-        var (primary, secondary) = theme == ElementTheme.Light
-            ? (_lightPrimary, _lightSecondary)
-            : (_darkPrimary, _darkSecondary);
+        var primary = Fluent.TextPrimary(theme);
+        var secondary = Fluent.TextSecondary(theme);
 
-        var body = new StackPanel { Spacing = 24, MinWidth = 480 };
+        var body = new StackPanel { Spacing = Fluent.SpaceXL, MinWidth = 480 };
 
-        var title = new TextBlock { Text = "数据复盘", FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 0, 0, 8) };
+        var title = Fluent.Text("数据复盘", theme, "title", primary);
+        title.Margin = new Thickness(0, 0, 0, Fluent.SpaceS);
         body.Children.Add(title);
 
         try
@@ -47,7 +40,7 @@ public sealed class DashboardPage
         }
         catch (Exception ex)
         {
-            body.Children.Add(new TextBlock { Text = $"数据加载失败: {ex.Message}", FontSize = 14, Foreground = secondary });
+            body.Children.Add(Fluent.Text($"数据加载失败: {ex.Message}", theme, "body", secondary));
         }
 
         _overlay = new BasePluginOverlay();
@@ -56,10 +49,11 @@ public sealed class DashboardPage
 
     void AddPomodoroSection(StackPanel body, IReadOnlyList<(string pluginId, string key, string value)> configs, Brush primary, Brush secondary)
     {
+        var theme = (App.MainWindow?.Content as FrameworkElement)?.ActualTheme ?? ElementTheme.Default;
         var statsRaw = configs.FirstOrDefault(c => c.pluginId == "PomodoroPlugin" && c.key == "stats").value;
         if (string.IsNullOrWhiteSpace(statsRaw)) return;
 
-        body.Children.Add(new TextBlock { Text = "番茄专注", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+        body.Children.Add(Fluent.SectionTitle("番茄专注", theme, primary));
 
         try
         {
@@ -78,7 +72,7 @@ public sealed class DashboardPage
                 var d = DateTime.Today.AddDays(-i).ToString("yyyy-MM-dd");
                 last7.Add((d[5..], stats.TryGetValue(d, out var v) ? v : 0));
             }
-            body.Children.Add(MiniChart.Bars(last7.Select(t => (t.Item1, t.Item2)).ToList(), new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
+            body.Children.Add(MiniChart.Bars(last7.Select(t => (t.Item1, t.Item2)).ToList(), Fluent.Accent(), secondary));
         }
         catch { }
     }
@@ -88,13 +82,13 @@ public sealed class DashboardPage
         var itemsRaw = configs.FirstOrDefault(c => c.pluginId == "TodoPlugin" && c.key == "items").value;
         if (string.IsNullOrWhiteSpace(itemsRaw)) return;
 
-        body.Children.Add(new TextBlock { Text = "待办事项", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+        var theme = (App.MainWindow?.Content as FrameworkElement)?.ActualTheme ?? ElementTheme.Default;
+        body.Children.Add(Fluent.SectionTitle("待办事项", theme, primary));
 
         try
         {
             var items = JsonSerializer.Deserialize<List<JsonElement>>(itemsRaw);
             if (items == null) return;
-            var today = DateTime.Today;
             var doneCount = items.Count(i => i.TryGetProperty("Done", out var d) && d.GetBoolean());
             var overdueCount = 0;
             foreach (var i in items)
@@ -117,7 +111,8 @@ public sealed class DashboardPage
         var historyRaw = configs.FirstOrDefault(c => c.pluginId == "SedentaryPlugin" && c.key == "history").value;
         if (string.IsNullOrWhiteSpace(historyRaw)) return;
 
-        body.Children.Add(new TextBlock { Text = "久坐统计", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+        var theme = (App.MainWindow?.Content as FrameworkElement)?.ActualTheme ?? ElementTheme.Default;
+        body.Children.Add(Fluent.SectionTitle("久坐统计", theme, primary));
 
         try
         {
@@ -138,16 +133,18 @@ public sealed class DashboardPage
             StatCard(bodyRow, "周平均", $"{weekAvg:F0} 分钟", primary, secondary);
             body.Children.Add(bodyRow);
 
-            body.Children.Add(MiniChart.Line(last7, new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
+            body.Children.Add(MiniChart.Line(last7, Fluent.Accent(), secondary));
         }
         catch { }
     }
 
     static void StatCard(Panel parent, string label, string value, Brush primary, Brush secondary)
     {
-        var stack = new StackPanel { Spacing = 4, MinWidth = 80 };
-        stack.Children.Add(new TextBlock { Text = value, FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = primary });
-        stack.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary, Opacity = 0.7 });
+        var stack = new StackPanel { Spacing = Fluent.SpaceXS, MinWidth = 80 };
+        var valueText = Fluent.Text(value, ElementTheme.Dark, "subtitle", primary);
+        var labelText = Fluent.Text(label, ElementTheme.Dark, "caption", secondary);
+        stack.Children.Add(valueText);
+        stack.Children.Add(labelText);
         parent.Children.Add(stack);
     }
 }

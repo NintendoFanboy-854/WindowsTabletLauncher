@@ -4,6 +4,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
@@ -18,6 +19,7 @@ using LauncherHost.Controls;
 using LauncherHost.Core;
 using LauncherHost.Core.Agent;
 using LauncherHost.Services;
+using SharedUtils;
 
 namespace LauncherHost;
 
@@ -45,7 +47,7 @@ public sealed partial class MainWindow : Window
     const double PagerReserve = 56;
     const string LayoutStore = "layout";
     const string SettingsWidgetId = "host.settings";
-    const string LayoutSchema = "3";
+    const string LayoutSchema = "4";
     bool _restorePositions;
     FrameworkElement? _dragTarget;
     int _dragOrigCol, _dragOrigRow, _dragOrigColSpan, _dragOrigRowSpan;
@@ -132,7 +134,9 @@ public sealed partial class MainWindow : Window
                     if (state == VoiceState.Recording)
                     {
                         MicBtn.Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
-                        MicBtn.Foreground = new SolidColorBrush(Microsoft.UI.Colors.Black);
+                        MicBtn.Foreground = Application.Current.Resources.TryGetValue("AccentTextFillColorPrimaryBrush", out var af) && af is Brush ab
+                            ? ab
+                            : new SolidColorBrush(Microsoft.UI.Colors.Black);
                     }
                     else if (state == VoiceState.Idle)
                     {
@@ -304,6 +308,7 @@ public sealed partial class MainWindow : Window
         _pages.Add(page);
         Pager.Items.Add(page.Root);
         Pips.NumberOfPages = _pages.Count;
+        Pips.Visibility = _pages.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         ApplyGeometry(page);
         return page;
     }
@@ -635,19 +640,24 @@ public sealed partial class MainWindow : Window
         _hostHandle.RegisterAgentCapability(hostCapability);
     }
 
-    async Task ExitLauncherAsync()
+    async Task<bool> ConfirmAsync(string title, string content, string primaryText)
     {
         var confirm = new ContentDialog
         {
-            Title = "确认退出",
-            Content = "确定要退出启动器吗？",
-            PrimaryButtonText = "退出",
+            Title = title,
+            Content = content,
+            PrimaryButtonText = primaryText,
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot
         };
         var result = await confirm.ShowAsync();
-        if (result == ContentDialogResult.Primary)
+        return result == ContentDialogResult.Primary;
+    }
+
+    async Task ExitLauncherAsync()
+    {
+        if (await ConfirmAsync("确认退出", "确定要退出启动器吗？", "退出"))
             Application.Current.Exit();
     }
 
@@ -1033,17 +1043,7 @@ public sealed partial class MainWindow : Window
             },
             async () =>
             {
-                var confirm = new ContentDialog
-                {
-                    Title = "确认重置",
-                    Content = "将清空全部设置、布局与插件数据（待办、位置、页面等），并关闭启动器。此操作不可撤销，确定继续吗？",
-                    PrimaryButtonText = "重置并退出",
-                    CloseButtonText = "取消",
-                    DefaultButton = ContentDialogButton.Close,
-                    XamlRoot = Content.XamlRoot
-                };
-                var result = await confirm.ShowAsync();
-                if (result == ContentDialogResult.Primary)
+                if (await ConfirmAsync("确认重置", "将清空全部设置、布局与插件数据（待办、位置、页面等），并关闭启动器。此操作不可撤销，确定继续吗？", "重置并退出"))
                 {
                     LogService.Info("User requested full reset");
                     _suppressConfigPersist = true;
@@ -1144,6 +1144,7 @@ public sealed partial class MainWindow : Window
         }
         if (_pages.Count == 0) AddPage();
         Pips.NumberOfPages = _pages.Count;
+        Pips.Visibility = _pages.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         if (Pager.SelectedIndex >= _pages.Count)
             Pager.SelectedIndex = _pages.Count - 1;
     }
@@ -1287,6 +1288,7 @@ public sealed partial class MainWindow : Window
         var contentFe = (FrameworkElement)Content;
         var theme = contentFe.ActualTheme;
         var banner = BuildBanner(title, message, isFullScreen: false, theme);
+        AttachShadow(banner, contentFe);
 
         double w = contentFe.ActualWidth, h = contentFe.ActualHeight;
         var raw = Content.XamlRoot.Size;
@@ -1319,6 +1321,7 @@ public sealed partial class MainWindow : Window
         host.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xB0, 0x00, 0x00, 0x00));
 
         var card = BuildBanner(title, message, isFullScreen: true, theme);
+        AttachShadow(card, (FrameworkElement)Content);
         card.HorizontalAlignment = HorizontalAlignment.Center;
         card.VerticalAlignment = VerticalAlignment.Center;
         host.Children.Add(card);
@@ -1349,50 +1352,56 @@ public sealed partial class MainWindow : Window
         _notifTimer = null;
         if (_notifPopup != null)
         {
-            _notifPopup.IsOpen = false;
+            var popup = _notifPopup;
             _notifPopup = null;
+            if (Fluent.AnimationsEnabled && popup.Child is UIElement child)
+            {
+                Comp.Fade(child, 0, 150);
+                _ = ClosePopupDelayedAsync(popup);
+            }
+            else
+            {
+                popup.IsOpen = false;
+            }
         }
         ShowNextNotification();
     }
 
+    static async Task ClosePopupDelayedAsync(Popup popup)
+    {
+        await Task.Delay(150);
+        popup.IsOpen = false;
+    }
+
+    /// <summary>给浮层元素加 Fluent ThemeShadow（投影到主内容层），失败不影响功能。</summary>
+    static void AttachShadow(FrameworkElement fe, FrameworkElement receiver)
+    {
+        try
+        {
+            var shadow = new ThemeShadow();
+            shadow.Receivers.Add(receiver);
+            fe.Shadow = shadow;
+            fe.Translation = new System.Numerics.Vector3(0, 0, 32);
+        }
+        catch (Exception ex)
+        {
+            LogService.Warn($"AttachShadow failed: {ex.Message}");
+        }
+    }
+
     FrameworkElement BuildBanner(string title, string message, bool isFullScreen, ElementTheme theme)
     {
-        var tint = theme == ElementTheme.Light
-            ? Windows.UI.Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
-            : Windows.UI.Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B);
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Windows.UI.Color.FromArgb(0x99, 0x00, 0x00, 0x00))
-            : new SolidColorBrush(Windows.UI.Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        var primary = Fluent.TextPrimary(theme);
+        var secondary = Fluent.TextSecondary(theme);
 
-        var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = isFullScreen ? 28 : 16,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = primary
-        });
-        text.Children.Add(new TextBlock
-        {
-            Text = message,
-            FontSize = isFullScreen ? 18 : 13,
-            Foreground = secondary,
-            TextWrapping = TextWrapping.Wrap
-        });
+        var text = new StackPanel { Spacing = Fluent.SpaceXS, VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(Fluent.Text(title, theme, isFullScreen ? "title" : "bodyStrong", primary, TextWrapping.Wrap));
+        text.Children.Add(Fluent.Text(message, theme, isFullScreen ? "bodyLarge" : "body", secondary, TextWrapping.Wrap));
 
-        var dismiss = new Button
-        {
-            Content = new FontIcon { Glyph = "\uE711", FontSize = 14 },
-            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
-            BorderThickness = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Top
-        };
-        dismiss.Click += (_, _) => DismissNotification();
+        var dismiss = Fluent.IconButton("\uE711", "关闭通知", DismissNotification, "关闭");
+        dismiss.VerticalAlignment = VerticalAlignment.Top;
 
-        var layout = new Grid { ColumnSpacing = 12 };
+        var layout = new Grid { ColumnSpacing = Fluent.SpaceM };
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(text, 0);
@@ -1400,18 +1409,23 @@ public sealed partial class MainWindow : Window
         layout.Children.Add(text);
         layout.Children.Add(dismiss);
 
-        return new Border
+        // 瞬态浮层材质：Acrylic + 1px 描边 + ThemeShadow，与底下磁贴分层
+        var banner = new Border
         {
-            Background = new SolidColorBrush(tint),
-            CornerRadius = new CornerRadius(isFullScreen ? 16 : 10),
-            Padding = new Thickness(isFullScreen ? 40 : 20, isFullScreen ? 32 : 14, isFullScreen ? 24 : 14, isFullScreen ? 32 : 14),
-            Margin = isFullScreen ? new Thickness(0) : new Thickness(0, 24, 0, 0),
+            Background = Fluent.Brush("AcrylicBackgroundFillColorDefaultBrush") ?? Fluent.OverlaySurface(theme),
+            BorderBrush = Fluent.CardStroke(theme),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(Fluent.RadiusOverlay),
+            Padding = isFullScreen ? new Thickness(40, 32, 24, 32) : new Thickness(20, 12, 12, 12),
+            Margin = isFullScreen ? new Thickness(0) : new Thickness(0, 0, 0, 76),
             MinWidth = isFullScreen ? 360 : 320,
             MaxWidth = isFullScreen ? 560 : 460,
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = isFullScreen ? VerticalAlignment.Center : VerticalAlignment.Top,
+            VerticalAlignment = isFullScreen ? VerticalAlignment.Center : VerticalAlignment.Bottom,
             Child = layout
         };
+        AutomationProperties.SetName(banner, title);
+        return banner;
     }
 
     static void FadeInElement(UIElement element)
