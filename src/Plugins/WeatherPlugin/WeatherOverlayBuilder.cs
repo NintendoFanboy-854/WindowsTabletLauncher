@@ -316,10 +316,19 @@ public sealed class WeatherOverlayBuilder
                 "moderate" => InfoBarSeverity.Warning,
                 _ => InfoBarSeverity.Informational
             };
+            var headline = a.Headline;
+            var message = string.IsNullOrEmpty(a.Description) ? a.Criteria : a.Description;
+            // 澳门等地 CAP 预警的 headline 与 description 文本相同，去重只显示一次
+            if (!string.IsNullOrEmpty(headline) && !string.IsNullOrEmpty(message) &&
+                (headline == message || message.Contains(headline)))
+            {
+                message = headline;
+                headline = $"{a.EventType?.Name ?? "天气"}预警";
+            }
             var bar = new InfoBar
             {
-                Title = a.Headline ?? $"{a.EventType?.Name}预警",
-                Message = string.IsNullOrEmpty(a.Description) ? a.Criteria : a.Description,
+                Title = headline ?? $"{a.EventType?.Name}预警",
+                Message = message,
                 Severity = severity,
                 IsOpen = true,
                 IsClosable = false

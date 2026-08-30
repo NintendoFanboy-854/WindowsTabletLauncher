@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Assets/">
+    <Project Path="Assets/BluetoothAudioReceiver/BluetoothAudioReceiver.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/LauncherHost/LauncherHost.csproj" />
     <Project Path="src/PluginContract/PluginContract.csproj" />

@@ -38,7 +38,8 @@ if (-not (Test-Path $weatherDll)) {
 $morePlugins = @(
     @{ Name = "PomodoroPlugin" },
     @{ Name = "SedentaryPlugin" },
-    @{ Name = "TodoPlugin" }
+    @{ Name = "TodoPlugin" },
+    @{ Name = "BtAudioPlugin" }
 )
 $moreDlls = @()
 foreach ($p in $morePlugins) {

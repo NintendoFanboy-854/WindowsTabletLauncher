@@ -24,6 +24,7 @@
 - 语音识别（MiMo-V2.5-ASR）：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/Speech-Recognition
 
 ## 和风天气
+
 - GeoAPI：https://dev.qweather.com/docs/api/geoapi/
 - 天气预报：https://dev.qweather.com/docs/api/weather/
 - 分钟预报：https://dev.qweather.com/docs/api/minutely/
@@ -34,3 +35,36 @@
 - 天文：https://dev.qweather.com/docs/api/astronomy/
 - 控制台API：https://dev.qweather.com/docs/api/console/
 - 按量计费定价：https://dev.qweather.com/docs/finance/pricing/
+
+## Fluent 2 System
+
+- Home: https://fluent2.microsoft.design/
+- Design Language
+  - Design principles: https://fluent2.microsoft.design/design-principles
+  - Color: https://fluent2.microsoft.design/color
+  - Elevation: https://fluent2.microsoft.design/elevation
+  - Iconography: https://fluent2.microsoft.design/iconography
+  - Layout: https://fluent2.microsoft.design/layout
+  - Material: https://fluent2.microsoft.design/material
+  - Motion: https://fluent2.microsoft.design/motion
+  - Shapes: https://fluent2.microsoft.design/shapes
+  - Typography: https://fluent2.microsoft.design/typography
+- UX frameworks and guidelines
+  - Accessibility: https://fluent2.microsoft.design/accessibility
+  - Content design: https://fluent2.microsoft.design/content-design
+  - Design tokens: https://fluent2.microsoft.design/design-tokens
+  - Handoffs: https://fluent2.microsoft.design/handoffs
+  - Onboarding: https://fluent2.microsoft.design/onboarding
+  - Wait UX: https://fluent2.microsoft.design/wait-ux
+
+## Windows Development Documentation 
+
+> 全部都在本地。这不是一个在线文档，而是一个本地文档，所有的内容都在本地，离线也可以使用。
+- Application developers: Assets\windows-dev-docs\hub\apps\index.yml
+- Developer tools: Assets\windows-dev-docs\hub\dev-environment\index.md
+- Hardware developers: Assets\windows-dev-docs\hub\windows-hardware\drivers\
+- Windows client for IT pros: Assets\windows-dev-docs\hub\windows\resources\
+- Windows Server for IT pros: Assets\windows-dev-docs\hub\windows-server\
+- Windows for IoT: Assets\windows-dev-docs\hub\windows\iot\
+- Windows Insider Program: Assets\windows-dev-docs\hub\windows-insider\
+- Windows 365: Assets\windows-dev-docs\hub\windows-365\
