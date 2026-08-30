@@ -37,24 +37,28 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
 
     Task<string> OnUi(Func<string> action)
     {
-        var tcs = new TaskCompletionSource<string>();
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (_dispatcher.HasThreadAccess)
         {
             try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
         }
+        else if (_dispatcher.TryEnqueue(() =>
+        {
+            try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
+        }))
+        {
+            // enqueued
+        }
         else
         {
-            _dispatcher.TryEnqueue(() =>
-            {
-                try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
-            });
+            tcs.TrySetResult(AgentJson.Error("dispatcher_unavailable"));
         }
         return tcs.Task;
     }
 
     public IReadOnlyList<IWidget> GetWidgets()
     {
-        _widget = new ClockWidget(_host);
+        _widget ??= new ClockWidget(_host);
         _widget.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
 
         return new[]
@@ -162,8 +166,7 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
         {
             Name = "query_time",
             Description = "获取当前时间、日期与星期。",
-        },
-        new AgentTool
+        },        new AgentTool
         {
             Name = "set_time_format",
             Description = "设置时钟的显示格式为 12 小时制或 24 小时制。",
@@ -238,6 +241,20 @@ public class ClockPlugin : IPlugin, IAgentCapability, IPluginSettings
             default:
                 return Task.FromResult(AgentJson.Error("unknown_tool"));
         }
+    }
+
+    /// <summary>AI 状态快照 hook。</summary>
+    string? IAgentCapability.GetContextSnapshot()
+    {
+        try
+        {
+            var now = DateTime.Now;
+            var fmt = _host.GetConfig(PluginId, "time_format") ?? "HH:mm:ss";
+            var zones = GetZones(_host);
+            return $"时钟: 当前 {now:yyyy-MM-dd HH:mm:ss}（{(fmt.StartsWith("HH") ? "24" : "12")}小时制）农历 {ClockWidget.LunarString(now)}"
+                + (zones.Count > 0 ? $"；世界时钟: {string.Join("、", zones)}" : "");
+        }
+        catch { return null; }
     }
 
     class ClockWidgetInfo : IWidget

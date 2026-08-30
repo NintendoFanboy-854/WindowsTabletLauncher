@@ -19,4 +19,10 @@ public interface IAgentCapability
     // Returns a JSON string with the structured result/data — the Agent/LLM
     // is responsible for turning it into a natural-language answer.
     Task<string> InvokeAsync(string tool, string argumentsJson);
+
+    /// <summary>
+    /// 每轮对话开始时注入给 LLM 的插件状态快照（可选 hook）。
+    /// 实现要求：同步返回、不发网络请求、内容一两行以内；返回 null 表示无上下文。
+    /// </summary>
+    string? GetContextSnapshot() => null;
 }

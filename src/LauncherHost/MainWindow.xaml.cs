@@ -35,11 +35,12 @@ public sealed partial class MainWindow : Window
     VoiceSession? _voiceSession;
     /* FaceAuthService? _faceAuthService; */
     /* ContinuousFaceMonitor? _faceMonitor; */
-    MemoryStore? _agentMemory;
     List<IPlugin> _plugins = new();
     List<PluginContract.IPluginSettings> _pluginSettings = new();
     bool _editMode;
     bool _spaceHeld;
+    bool _mainLoaded;
+    bool _suppressConfigPersist;
     const double Pad = 32;
     const double PagerReserve = 56;
     const string LayoutStore = "layout";
@@ -114,6 +115,9 @@ public sealed partial class MainWindow : Window
 
             ((FrameworkElement)Content).Loaded += (_, _) =>
             {
+                if (_mainLoaded) return;
+                _mainLoaded = true;
+
                 ApplyStoredTheme();
                 LogService.Info("Loading plugins");
                 LoadPlugins();
@@ -163,24 +167,31 @@ public sealed partial class MainWindow : Window
                 AgentInput.PlaceholderText = _hostHandle.Translate("agent.placeholder");
                 AgentSendBtn.Content = _hostHandle.Translate("agent.send");
 
+                _loc.CultureChanged += () => DispatcherQueue.TryEnqueue(() =>
+                {
+                    AgentInput.PlaceholderText = _hostHandle.Translate("agent.placeholder");
+                    AgentSendBtn.Content = _hostHandle.Translate("agent.send");
+                });
+
                 AgentSendBtn.Click += (_, _) =>
                 {
                     if (_agentService != null && _agentService.IsBusy) return;
                     var text = AgentInput.Text.Trim();
                     if (string.IsNullOrEmpty(text)) return;
                     AgentInput.Text = "";
-                    _agentSession!.Send(text, (FrameworkElement)Content);
+                    _ = _agentSession!.Send(text, (FrameworkElement)Content);
                 };
 
                 AgentInput.KeyDown += (_, e) =>
                 {
                     if (e.Key == Windows.System.VirtualKey.Enter)
                     {
+                        if (e.KeyStatus.WasKeyDown) return;
                         if (_agentService != null && _agentService.IsBusy) return;
                         var text = AgentInput.Text.Trim();
                         if (string.IsNullOrEmpty(text)) return;
                         AgentInput.Text = "";
-                        _agentSession!.Send(text, (FrameworkElement)Content);
+                        _ = _agentSession!.Send(text, (FrameworkElement)Content);
                     }
                 };
 
@@ -546,6 +557,9 @@ public sealed partial class MainWindow : Window
                 var lang = HostJson.Str(args, "language") ?? "zh-cn";
                 _config.Set("host", "language", lang);
                 _loc.SetCulture(lang);
+                _hostHandle.ShowNotification(
+                    _hostHandle.Translate("host.lang_changed_title"),
+                    _hostHandle.Translate("host.lang_changed_msg"));
                 return JsonSerializer.Serialize(new { ok = true, language = lang });
             },
             ["set_edit_mode"] = args =>
@@ -571,19 +585,16 @@ public sealed partial class MainWindow : Window
                 var value = HostJson.Str(args, "value");
                 if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
                     return "{\"ok\":false,\"error\":\"key_value_required\"}";
-                _agentMemory ??= new MemoryStore();
-                _agentMemory.SetFact(key, value);
+                _agentService!.Memory.SetFact(key, value);
                 return JsonSerializer.Serialize(new { ok = true });
             },
             ["get_memory"] = args =>
             {
-                _agentMemory ??= new MemoryStore();
-                return JsonSerializer.Serialize(new { ok = true, memories = _agentMemory.Facts.Select(f => new { key = f.Key, value = f.Value }) });
+                return JsonSerializer.Serialize(new { ok = true, memories = _agentService!.Memory.Facts.Select(f => new { key = f.Key, value = f.Value }) });
             },
             ["clear_memory"] = args =>
             {
-                _agentMemory ??= new MemoryStore();
-                _agentMemory.Clear();
+                _agentService!.Memory.Clear();
                 return JsonSerializer.Serialize(new { ok = true });
             },
             ["set_expand_cot"] = args =>
@@ -610,7 +621,18 @@ public sealed partial class MainWindow : Window
             /* }, */
         };
 
-        _hostHandle.RegisterAgentCapability(new HostAgentCapability(DispatcherQueue, tools, handlers));
+        var hostCapability = new HostAgentCapability(DispatcherQueue, tools, handlers)
+        {
+            ContextProvider = () =>
+            {
+                var theme = _config.Get("host", "theme") ?? "Default";
+                var lang = _config.Get("host", "language") ?? "zh-cn";
+                var editMode = _editMode ? "开启" : "关闭";
+                var pages = _pages.Count;
+                return $"宿主: 主题={theme} 语言={lang} 编辑模式={editMode} 页数={pages}";
+            }
+        };
+        _hostHandle.RegisterAgentCapability(hostCapability);
     }
 
     async Task ExitLauncherAsync()
@@ -1024,13 +1046,15 @@ public sealed partial class MainWindow : Window
                 if (result == ContentDialogResult.Primary)
                 {
                     LogService.Info("User requested full reset");
+                    _suppressConfigPersist = true;
                     foreach (var p in _pluginSettings)
                         p.ResetConfig(_hostHandle);
                     _config.ResetAll();
                     Application.Current.Exit();
                 }
             },
-            () => _agentService!.NotifyExpandCotChanged());
+            () => _agentService!.NotifyExpandCotChanged(),
+            _agentService!.Memory);
             /* , async () => await RegisterFaceAsync() */
             /* , async (name) => await ReinforceFaceAsync(name) */
             /* , enabled => { if (enabled) StartFaceMonitor(); else StopFaceMonitor(); } */
@@ -1236,6 +1260,11 @@ public sealed partial class MainWindow : Window
 
     void OnNotificationRequested(string title, string message, bool escalate)
     {
+        if (!DispatcherQueue.HasThreadAccess)
+        {
+            DispatcherQueue.TryEnqueue(() => OnNotificationRequested(title, message, escalate));
+            return;
+        }
         _notifQueue.Enqueue((title, message, escalate));
         if (!_notifActive)
             ShowNextNotification();
@@ -1406,8 +1435,16 @@ public sealed partial class MainWindow : Window
     void OnClosed(object sender, WindowEventArgs args)
     {
         LogService.Info("Window closing");
-        foreach (var plugin in _plugins)
-            plugin.Shutdown();
+        if (!_suppressConfigPersist)
+        {
+            foreach (var plugin in _plugins)
+            {
+                try { plugin.Shutdown(); }
+                catch (Exception ex) { LogService.Error(ex, $"Plugin shutdown failed: {plugin.GetType().Name}"); }
+            }
+            _config.FlushNow();
+        }
+        LogService.FlushNow();
 
         _backdropController?.Dispose();
         _backdropController = null;

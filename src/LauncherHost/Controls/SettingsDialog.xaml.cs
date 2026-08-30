@@ -24,11 +24,11 @@ public sealed partial class SettingsDialog : ContentDialog
     readonly Func<Task> _onExit;
     readonly Func<Task> _onReset;
     readonly Action? _onExpandCotChanged;
+    readonly MemoryStore? _sharedMemory;
     /* readonly Func<Task<bool>>? _onRegisterFace; */
     /* readonly Func<string, Task<bool>>? _onReinforceFace; */
     /* readonly Action<bool>? _onVoiceAutoChanged; */
     /* readonly Action<string>? _onDeleteFace; */
-    readonly DispatcherQueue _dispatcher;
     readonly List<ComboBox> _pageCombos = new();
     bool _rebuildingAi;
 
@@ -44,7 +44,8 @@ public sealed partial class SettingsDialog : ContentDialog
         Action<string, int> onPageChange,
         Func<Task> onExit,
         Func<Task> onReset,
-        Action? onExpandCotChanged = null
+        Action? onExpandCotChanged = null,
+        MemoryStore? sharedMemory = null
         /*, Func<Task<bool>>? onRegisterFace = null */
         /*, Func<string, Task<bool>>? onReinforceFace = null */
         /*, Action<bool>? onVoiceAutoChanged = null */
@@ -61,13 +62,10 @@ public sealed partial class SettingsDialog : ContentDialog
         _onExit = onExit;
         _onReset = onReset;
         _onExpandCotChanged = onExpandCotChanged;
-        /* _onRegisterFace = onRegisterFace; */
-        /* _onReinforceFace = onReinforceFace; */
-        /* _onVoiceAutoChanged = onVoiceAutoChanged; */
-        /* _onDeleteFace = onDeleteFace; */
-        _dispatcher = DispatcherQueue.GetForCurrentThread();
+        _sharedMemory = sharedMemory;
 
         XamlRoot = App.MainWindow!.Content.XamlRoot;
+        ApplyLocalizedTexts();
 
         SetupLanguage();
         SetupTheme();
@@ -90,30 +88,70 @@ public sealed partial class SettingsDialog : ContentDialog
         ExitButton.Click += async (_, _) =>
         {
             Hide();
+            await Task.Delay(150);
             await _onExit();
         };
 
         ResetButton.Click += async (_, _) =>
         {
             Hide();
+            await Task.Delay(150);
             await _onReset();
         };
+    }
+
+    string T(string key) => _loc.Translate(key);
+
+    string PageLabel(int i) => string.Format(T("settings.page_label"), i + 1);
+
+    void ApplyLocalizedTexts()
+    {
+        Title = T("settings.title");
+        LanguageCombo.Header = T("settings.language");
+        ThemeCombo.Header = T("settings.theme");
+        EditModeToggle.Header = T("settings.edit_mode");
+        NotifySecondsBox.Header = T("settings.notify_seconds");
+        SettingsPageCombo.Header = T("settings.settings_tile_page");
+        AiExpander.Header = T("settings.ai");
+        ProviderCombo.Header = T("settings.provider");
+        ModelCombo.Header = T("settings.model");
+        ThinkingCombo.Header = T("settings.thinking");
+        ExpandCotToggle.Header = T("settings.expand_cot");
+        VoiceAutoToggle.Header = T("settings.voice_auto");
+        CloseButton.Content = T("settings.close");
+        ExitButton.Content = T("settings.exit");
+        ResetButton.Content = T("settings.reset");
+        ViewMemoryBtn.Content = T("settings.memory_view");
+        ClearMemoryBtn.Content = T("settings.memory_clear");
+        if (ThemeCombo.Items.Count == 3)
+        {
+            ((ComboBoxItem)ThemeCombo.Items[0]).Content = T("settings.theme.system");
+            ((ComboBoxItem)ThemeCombo.Items[1]).Content = T("settings.theme.light");
+            ((ComboBoxItem)ThemeCombo.Items[2]).Content = T("settings.theme.dark");
+        }
     }
 
     public void RefreshPageCombos(int pageCount, bool editMode)
     {
         _rebuilding = true;
-        _pageCount = pageCount;
-        foreach (var combo in _pageCombos)
+        try
         {
-            var savedIdx = combo.SelectedIndex;
-            combo.Items.Clear();
-            for (int i = 0; i < _pageCount; i++)
-                combo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
-            combo.IsEnabled = editMode;
-            combo.SelectedIndex = Math.Clamp(savedIdx, 0, _pageCount - 1);
+            _pageCount = pageCount;
+            var max = Math.Max(0, _pageCount - 1);
+            foreach (var combo in _pageCombos)
+            {
+                var savedIdx = combo.SelectedIndex;
+                combo.Items.Clear();
+                for (int i = 0; i < _pageCount; i++)
+                    combo.Items.Add(new ComboBoxItem { Content = PageLabel(i), Tag = i });
+                combo.IsEnabled = editMode;
+                combo.SelectedIndex = Math.Clamp(savedIdx, 0, max);
+            }
         }
-        _rebuilding = false;
+        finally
+        {
+            _rebuilding = false;
+        }
     }
 
     string GetCurrentProvider() => ProviderCombo.SelectedItem is ComboBoxItem ci ? (string)ci.Tag : "deepseek";
@@ -191,9 +229,10 @@ public sealed partial class SettingsDialog : ContentDialog
     {
         SettingsPageCombo.IsEnabled = _editMode;
         var currentPage = int.TryParse(_config.Get(LayoutStore, "page.host.settings"), out var cp) ? cp : 0;
+        var max = Math.Max(0, _pageCount - 1);
         for (int i = 0; i < _pageCount; i++)
-            SettingsPageCombo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
-        SettingsPageCombo.SelectedIndex = Math.Clamp(currentPage, 0, _pageCount - 1);
+            SettingsPageCombo.Items.Add(new ComboBoxItem { Content = PageLabel(i), Tag = i });
+        SettingsPageCombo.SelectedIndex = Math.Clamp(currentPage, 0, max);
 
         SettingsPageCombo.SelectionChanged += (_, _) =>
         {
@@ -210,15 +249,18 @@ public sealed partial class SettingsDialog : ContentDialog
     {
         var current = _config.Get("host", "agent_provider") ?? "deepseek";
         _rebuildingAi = true;
-        foreach (ComboBoxItem item in ProviderCombo.Items)
+        try
         {
-            if ((string)item.Tag == current)
+            foreach (ComboBoxItem item in ProviderCombo.Items)
             {
-                ProviderCombo.SelectedItem = item;
-                break;
+                if ((string)item.Tag == current)
+                {
+                    ProviderCombo.SelectedItem = item;
+                    break;
+                }
             }
         }
-        _rebuildingAi = false;
+        finally { _rebuildingAi = false; }
 
         ProviderCombo.SelectionChanged += (_, _) =>
         {
@@ -245,8 +287,9 @@ public sealed partial class SettingsDialog : ContentDialog
             _config.Set("host", $"agent_api_key.{p}", ApiKeyBox.Text.Trim());
         };
 
-        var memory = new MemoryStore();
-        MemoryLabel.Text = $"AI 记忆: {memory.Facts.Count} 条";
+        var memory = _sharedMemory ?? new MemoryStore();
+        memory.ReloadFromDisk();
+        MemoryLabel.Text = string.Format(T("settings.memory_label"), memory.Facts.Count);
 
         ViewMemoryBtn.Click += (_, _) =>
         {
@@ -255,16 +298,16 @@ public sealed partial class SettingsDialog : ContentDialog
                 MemoryScroll.Visibility = Visibility.Collapsed;
                 return;
             }
-            var mem = new MemoryStore();
-            var facts = mem.Facts;
-            MemoryContent.Text = facts.Count == 0 ? "无记忆" : string.Join("\n", facts.Select(f => f.Key + ": " + f.Value));
+            memory.ReloadFromDisk();
+            var facts = memory.Facts;
+            MemoryContent.Text = facts.Count == 0 ? T("settings.memory_empty") : string.Join("\n", facts.Select(f => f.Key + ": " + f.Value));
             MemoryScroll.Visibility = Visibility.Visible;
         };
 
         ClearMemoryBtn.Click += (_, _) =>
         {
-            new MemoryStore().Clear();
-            MemoryLabel.Text = "AI 记忆: 0 条";
+            memory.Clear();
+            MemoryLabel.Text = string.Format(T("settings.memory_label"), 0);
             MemoryScroll.Visibility = Visibility.Collapsed;
         };
     }
@@ -272,78 +315,82 @@ public sealed partial class SettingsDialog : ContentDialog
     void RefreshModelCombo(string provider)
     {
         _rebuildingAi = true;
-        var savedTag = _config.Get("host", $"agent_model.{provider}")
-            ?? _config.Get("host", "agent_model")
-            ?? "";
-        ModelCombo.Items.Clear();
+        try
+        {
+            var savedTag = _config.Get("host", $"agent_model.{provider}")
+                ?? _config.Get("host", "agent_model")
+                ?? "";
+            ModelCombo.Items.Clear();
 
-        if (provider == "mimo")
-        {
-            ModelCombo.Items.Add(new ComboBoxItem { Tag = "mimo-v2.5", Content = "MiMo V2.5" });
-            ModelCombo.Items.Add(new ComboBoxItem { Tag = "mimo-v2.5-pro", Content = "MiMo V2.5 Pro" });
-        }
-        else
-        {
-            ModelCombo.Items.Add(new ComboBoxItem { Tag = "deepseek-v4-pro", Content = "DeepSeek V4 Pro" });
-            ModelCombo.Items.Add(new ComboBoxItem { Tag = "deepseek-v4-flash", Content = "DeepSeek V4 Flash" });
-        }
-
-        var matched = false;
-        foreach (ComboBoxItem item in ModelCombo.Items)
-        {
-            if ((string)item.Tag == savedTag)
+            if (provider == "mimo")
             {
-                ModelCombo.SelectedItem = item;
-                matched = true;
-                break;
+                ModelCombo.Items.Add(new ComboBoxItem { Tag = "mimo-v2.5", Content = "MiMo V2.5" });
+                ModelCombo.Items.Add(new ComboBoxItem { Tag = "mimo-v2.5-pro", Content = "MiMo V2.5 Pro" });
+            }
+            else
+            {
+                ModelCombo.Items.Add(new ComboBoxItem { Tag = "deepseek-v4-pro", Content = "DeepSeek V4 Pro" });
+                ModelCombo.Items.Add(new ComboBoxItem { Tag = "deepseek-v4-flash", Content = "DeepSeek V4 Flash" });
+            }
+
+            var matched = false;
+            foreach (ComboBoxItem item in ModelCombo.Items)
+            {
+                if ((string)item.Tag == savedTag)
+                {
+                    ModelCombo.SelectedItem = item;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched && ModelCombo.Items.Count > 0)
+            {
+                // 仅选中第一项用于展示；不覆盖用户保存的配置
+                ModelCombo.SelectedIndex = 0;
             }
         }
-        if (!matched && ModelCombo.Items.Count > 0)
-        {
-            ModelCombo.SelectedIndex = 0;
-            _config.Set("host", $"agent_model.{provider}", (string)((ComboBoxItem)ModelCombo.Items[0]).Tag);
-        }
-
-        _rebuildingAi = false;
+        finally { _rebuildingAi = false; }
     }
 
     void RefreshThinkingCombo(string provider)
     {
         _rebuildingAi = true;
-        var savedTag = _config.Get("host", $"agent_thinking.{provider}")
-            ?? _config.Get("host", "agent_thinking")
-            ?? "";
-        ThinkingCombo.Items.Clear();
+        try
+        {
+            var savedTag = _config.Get("host", $"agent_thinking.{provider}")
+                ?? _config.Get("host", "agent_thinking")
+                ?? "";
+            ThinkingCombo.Items.Clear();
 
-        if (provider == "mimo")
-        {
-            ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "none", Content = "无" });
-            ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "enabled", Content = "启用" });
-        }
-        else
-        {
-            ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "none", Content = "无" });
-            ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "high", Content = "High" });
-            ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "max", Content = "Max" });
-        }
-
-        var matched = false;
-        foreach (ComboBoxItem item in ThinkingCombo.Items)
-        {
-            if ((string)item.Tag == savedTag)
+            if (provider == "mimo")
             {
-                ThinkingCombo.SelectedItem = item;
-                matched = true;
-                break;
+                ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "none", Content = T("settings.thinking_none") });
+                ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "enabled", Content = T("settings.thinking_enabled") });
+            }
+            else
+            {
+                ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "none", Content = T("settings.thinking_none") });
+                ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "high", Content = "High" });
+                ThinkingCombo.Items.Add(new ComboBoxItem { Tag = "max", Content = "Max" });
+            }
+
+            var matched = false;
+            foreach (ComboBoxItem item in ThinkingCombo.Items)
+            {
+                if ((string)item.Tag == savedTag)
+                {
+                    ThinkingCombo.SelectedItem = item;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched && ThinkingCombo.Items.Count > 0)
+            {
+                // 仅选中第一项用于展示；不覆盖用户保存的配置
+                ThinkingCombo.SelectedIndex = 0;
             }
         }
-        if (!matched && ThinkingCombo.Items.Count > 0)
-        {
-            ThinkingCombo.SelectedIndex = 0;
-            _config.Set("host", $"agent_thinking.{provider}", (string)((ComboBoxItem)ThinkingCombo.Items[0]).Tag);
-        }
-
-        _rebuildingAi = false;
+        finally { _rebuildingAi = false; }
     }
 
     void SetupModelCombo()
@@ -481,7 +528,7 @@ public sealed partial class SettingsDialog : ContentDialog
         IReadOnlyList<IPlugin> plugins,
         IReadOnlyList<IPluginSettings> pluginSettings)
     {
-        var globalItem = new ListViewItem { Content = "全局", Tag = GlobalPanel };
+        var globalItem = new ListViewItem { Content = T("settings.global"), Tag = GlobalPanel };
         NavList.Items.Add(globalItem);
 
         foreach (var plugin in plugins)
@@ -520,26 +567,30 @@ public sealed partial class SettingsDialog : ContentDialog
 
             var pageCombo = new ComboBox
             {
-                Header = "所在页面",
+                Header = T("settings.location_page"),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 MinWidth = 120,
                 IsEnabled = _editMode
             };
+            var max = Math.Max(0, _pageCount - 1);
             for (int i = 0; i < _pageCount; i++)
-                pageCombo.Items.Add(new ComboBoxItem { Content = $"第 {i + 1} 页", Tag = i });
-            pageCombo.SelectedIndex = Math.Clamp(currentPage, 0, _pageCount - 1);
+                pageCombo.Items.Add(new ComboBoxItem { Content = PageLabel(i), Tag = i });
+            pageCombo.SelectedIndex = Math.Clamp(currentPage, 0, max);
 
             pageCombo.SelectionChanged += (_, _) =>
             {
                 if (_rebuilding) return;
                 if (pageCombo.SelectedItem is not ComboBoxItem ci || ci.Tag is not int p) return;
                 _config.Set(LayoutStore, $"page.{typeName}", p.ToString());
-                if (enabled) _onPageChange(typeName, p);
+                // 实时读取启用状态，避免闭包捕获过期值
+                var enabledNow = (_config.Get(LayoutStore, $"enabled.{typeName}") ?? "true") == "true";
+                if (enabledNow) _onPageChange(typeName, p);
             };
             detailStack.Children.Add(pageCombo);
             _pageCombos.Add(pageCombo);
 
-            var settings = pluginSettings.FirstOrDefault(s => s.PluginId == typeName);
+            var settings = pluginSettings.FirstOrDefault(s => s.PluginId == typeName)
+                ?? pluginSettings.FirstOrDefault(s => s.PluginId == plugin.DisplayName);
             if (settings != null)
             {
                 detailStack.Children.Add((FrameworkElement)settings.CreateSettingsControl());
@@ -548,7 +599,7 @@ public sealed partial class SettingsDialog : ContentDialog
             {
                 detailStack.Children.Add(new TextBlock
                 {
-                    Text = "此插件无设置项",
+                    Text = T("settings.no_settings"),
                     Opacity = 0.5
                 });
             }

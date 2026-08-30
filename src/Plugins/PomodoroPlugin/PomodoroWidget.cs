@@ -1,9 +1,7 @@
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using PluginContract;
 using SharedUtils;
@@ -12,6 +10,10 @@ using Windows.UI;
 
 namespace PomodoroPlugin;
 
+/// <summary>
+/// 番茄钟 tile（Fluent 2）：主题资源画刷 + 字阶 + 卡片描边 + hover + 阶段色（专注=Accent，休息=Success）；
+/// overlay：计时卡（display 大数字 + accent 主按钮）/ 任务卡 / 统计卡 / 记录卡。
+/// </summary>
 public sealed class PomodoroWidget : UserControl
 {
     enum Phase { Focus, Break }
@@ -23,6 +25,7 @@ public sealed class PomodoroWidget : UserControl
     readonly BasePluginOverlay _overlay = new();
 
     Border _root = null!;
+    Border _hoverLayer = null!;
     TextBlock _phaseText = null!;
     TextBlock _timeText = null!;
     TextBlock _hintText = null!;
@@ -31,7 +34,7 @@ public sealed class PomodoroWidget : UserControl
     TextBlock? _ovTime;
     TextBlock? _ovPhase;
     Button? _ovStartPause;
-    Button? _ovSkip;
+    ProgressBar? _ovProgress;
     readonly int[] _hourlySeconds = new int[24];
 
     Phase _phase = Phase.Focus;
@@ -40,6 +43,8 @@ public sealed class PomodoroWidget : UserControl
     int _remaining;
     int _focusCount;
     int _tickCounter;
+    DateTime _hourlyDate = DateTime.Today;
+    int? _tempFocusSeconds;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     static extern bool MessageBeep(uint uType);
@@ -66,7 +71,13 @@ public sealed class PomodoroWidget : UserControl
         _timer.Interval = TimeSpan.FromSeconds(1);
         _timer.IsRepeating = true;
         _timer.Tick += OnTick;
-        _timer.Start();
+        UpdateTimer();
+    }
+
+    void UpdateTimer()
+    {
+        if (_running) _timer.Start();
+        else _timer.Stop();
     }
 
     int FocusMin => GetInt("focus_min", 25);
@@ -82,16 +93,26 @@ public sealed class PomodoroWidget : UserControl
     int GetInt(string key, int def)
         => int.TryParse(_host.GetConfig(nameof(PomodoroPlugin), key), out var v) && v > 0 ? v : def;
 
-    int CurrentPhaseSeconds => (_phase == Phase.Focus ? FocusMin : (_isLongBreak ? LongBreakMin : BreakMin)) * 60;
+    int CurrentPhaseSeconds
+        => _phase == Phase.Focus ? (_tempFocusSeconds ?? FocusMin * 60) : (_isLongBreak ? LongBreakMin : BreakMin) * 60;
 
     void PlayChime() { if (!SoundOn) return; try { MessageBeep(0x00000040); } catch { } }
 
     void BuildUi()
     {
-        _phaseText = new TextBlock { FontSize = 16, HorizontalAlignment = HorizontalAlignment.Center, Text = "专注" };
-        _timeText = new TextBlock { FontSize = 48, FontWeight = FontWeights.SemiLight, HorizontalAlignment = HorizontalAlignment.Center, Text = "25:00" };
-        _hintText = new TextBlock { FontSize = 13, Opacity = 0.7, HorizontalAlignment = HorizontalAlignment.Center, Text = "已暂停" };
-        _taskText = new TextBlock { FontSize = 12, Opacity = 0.7, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Visibility = Visibility.Collapsed };
+        var theme = ((FrameworkElement)this).ActualTheme;
+        _phaseText = Fluent.Text("专注", theme, "bodyStrong", Fluent.TextSecondary(theme));
+        _phaseText.HorizontalAlignment = HorizontalAlignment.Center;
+        _timeText = Fluent.Text("25:00", theme, "title");
+        _timeText.FontSize = 44;
+        _timeText.LineHeight = 52;
+        _timeText.HorizontalAlignment = HorizontalAlignment.Center;
+        _hintText = Fluent.Text("已暂停", theme, "caption", Fluent.TextTertiary(theme));
+        _hintText.HorizontalAlignment = HorizontalAlignment.Center;
+        _taskText = Fluent.Text("", theme, "caption", Fluent.TextTertiary(theme));
+        _taskText.TextTrimming = TextTrimming.CharacterEllipsis;
+        _taskText.HorizontalAlignment = HorizontalAlignment.Center;
+        _taskText.Visibility = Visibility.Collapsed;
 
         var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         stack.Children.Add(_phaseText);
@@ -99,32 +120,61 @@ public sealed class PomodoroWidget : UserControl
         stack.Children.Add(_hintText);
         stack.Children.Add(_taskText);
 
-        _root = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Child = stack };
+        _root = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12),
+            Child = stack
+        };
+        _hoverLayer = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = Fluent.SubtleHover(theme),
+            Opacity = 0,
+            IsHitTestVisible = false
+        };
+
+        var grid = new Grid();
+        grid.Children.Add(_root);
+        grid.Children.Add(_hoverLayer);
+
         _root.Tapped += (_, _) => OpenDetail();
-        Content = _root;
+        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
+        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
+        Content = grid;
     }
 
     void ApplyTheme(ElementTheme theme)
     {
         _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        var (primary, secondary) = Brushes(theme);
-        _phaseText.Foreground = secondary;
-        _timeText.Foreground = primary;
-        _hintText.Foreground = secondary;
-        _taskText.Foreground = secondary;
+        _root.BorderBrush = Fluent.CardStroke(theme);
+        _root.BorderThickness = new Thickness(1);
+        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _timeText.Foreground = Fluent.TextPrimary(theme);
+        _hintText.Foreground = Fluent.TextTertiary(theme);
+        _taskText.Foreground = Fluent.TextSecondary(theme);
+        UpdatePhaseColor(theme);
     }
 
-    static (Brush primary, Brush secondary) Brushes(ElementTheme theme) =>
-        theme == ElementTheme.Light
-            ? (new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A)), new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0)))
-            : (new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF)));
+    void UpdatePhaseColor(ElementTheme theme)
+    {
+        _phaseText.Foreground = _phase == Phase.Focus ? Fluent.Accent() : Fluent.Success(theme);
+    }
 
     void OnTick(DispatcherQueueTimer sender, object args)
     {
         if (!_running) return;
         _remaining--;
         var now = DateTime.Now;
-        _hourlySeconds[now.Hour] += 1;
+        // 跨午夜：清零分时分布，避免昨日数据被改签到今天
+        if (now.Date != _hourlyDate)
+        {
+            _hourlyDate = now.Date;
+            Array.Clear(_hourlySeconds, 0, 24);
+        }
+        // 只有专注阶段计入专注分布
+        if (_phase == Phase.Focus)
+            _hourlySeconds[now.Hour] += 1;
         _tickCounter++;
         if (_tickCounter >= 30)
         {
@@ -141,8 +191,10 @@ public sealed class PomodoroWidget : UserControl
         PlayChime();
         if (_phase == Phase.Focus)
         {
+            var focusMin = _tempFocusSeconds.HasValue ? Math.Max(1, _tempFocusSeconds.Value / 60) : FocusMin;
+            _tempFocusSeconds = null;
             _focusCount++;
-            PomodoroPlugin.AddCompletion(_host, Task, FocusMin);
+            PomodoroPlugin.AddCompletion(_host, Task, focusMin);
             _isLongBreak = LongBreakEvery > 0 && _focusCount % LongBreakEvery == 0;
             _phase = Phase.Break;
             _remaining = (_isLongBreak ? LongBreakMin : BreakMin) * 60;
@@ -158,12 +210,13 @@ public sealed class PomodoroWidget : UserControl
             _running = AutoStart;
         }
 
-        if (!_running)
-            SetScreen(false);
-
+        // 屏幕常亮只在专注运行阶段保持
         if (_running && _phase == Phase.Focus)
             SetScreen(true);
+        else
+            SetScreen(false);
 
+        UpdateTimer();
         PersistState();
     }
 
@@ -178,9 +231,8 @@ public sealed class PomodoroWidget : UserControl
         _host.SetConfig(nameof(PomodoroPlugin), "remaining_seconds", _remaining.ToString());
         _host.SetConfig(nameof(PomodoroPlugin), "focus_count", _focusCount.ToString());
         _host.SetConfig(nameof(PomodoroPlugin), "is_long_break", _isLongBreak ? "true" : "false");
-        var today = DateTime.Today.ToString("yyyyMMdd");
         _host.SetConfig(nameof(PomodoroPlugin), "hourly_today", JsonSerializer.Serialize(_hourlySeconds));
-        _host.SetConfig(nameof(PomodoroPlugin), "hourly_date", today);
+        _host.SetConfig(nameof(PomodoroPlugin), "hourly_date", _hourlyDate.ToString("yyyyMMdd"));
     }
 
     void RestoreState()
@@ -206,6 +258,7 @@ public sealed class PomodoroWidget : UserControl
         var hourlyDate = _host.GetConfig(nameof(PomodoroPlugin), "hourly_date");
         if (hourlyDate == DateTime.Today.ToString("yyyyMMdd"))
         {
+            _hourlyDate = DateTime.Today;
             var hourlyJson = _host.GetConfig(nameof(PomodoroPlugin), "hourly_today");
             if (!string.IsNullOrEmpty(hourlyJson))
             {
@@ -224,9 +277,22 @@ public sealed class PomodoroWidget : UserControl
 
     void ToggleStartPause()
     {
-        if (!_running && !AllowPauseCfg) return;
-        _running = !_running;
-        SetScreen(_running && _phase == Phase.Focus);
+        if (!_running)
+        {
+            // 开始始终允许
+            _running = true;
+            if (_phase == Phase.Focus) SetScreen(true);
+        }
+        else if (AllowPauseCfg)
+        {
+            _running = false;
+            SetScreen(false);
+        }
+        else
+        {
+            return;
+        }
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
@@ -236,14 +302,17 @@ public sealed class PomodoroWidget : UserControl
         if (!AllowPauseCfg) return;
         _running = false;
         SetScreen(false);
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
 
     internal void Resume()
     {
+        if (!AllowPauseCfg) return;
         _running = true;
         if (_phase == Phase.Focus) SetScreen(true);
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
@@ -252,7 +321,10 @@ public sealed class PomodoroWidget : UserControl
     {
         if (_phase == Phase.Focus)
         {
-            _isLongBreak = LongBreakEvery > 0 && (_focusCount + 1) % LongBreakEvery == 0;
+            // 跳过的专注同样推进长休节奏（与自然完成口径一致），但不记录完成次数
+            _focusCount++;
+            _isLongBreak = LongBreakEvery > 0 && _focusCount % LongBreakEvery == 0;
+            _tempFocusSeconds = null;
             _phase = Phase.Break;
         }
         else
@@ -263,6 +335,7 @@ public sealed class PomodoroWidget : UserControl
         _remaining = CurrentPhaseSeconds;
         _running = false;
         SetScreen(false);
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
@@ -272,26 +345,32 @@ public sealed class PomodoroWidget : UserControl
         _running = false;
         _remaining = CurrentPhaseSeconds;
         SetScreen(false);
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
 
     public void StartFocus(int minutes)
     {
-        _host.SetConfig(nameof(PomodoroPlugin), "focus_min", minutes.ToString());
+        // 临时时长：不永久改写 focus_min 配置；限制 1-180 分钟防止溢出
+        var m = Math.Clamp(minutes, 1, 180);
+        _tempFocusSeconds = m * 60;
         _phase = Phase.Focus;
         _isLongBreak = false;
-        _remaining = Math.Max(1, minutes) * 60;
+        _remaining = m * 60;
         _running = true;
         SetScreen(true);
-        _host.Log($"Pomodoro: start focus {minutes}min");
+        _host.Log($"Pomodoro: start focus {m}min (temporary)");
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
 
     public void ApplyDurations()
     {
-        _remaining = CurrentPhaseSeconds;
+        // 计时进行中不打断当前倒计时，仅未运行时应用新时长
+        if (!_running)
+            _remaining = CurrentPhaseSeconds;
         _host.Log($"Pomodoro: apply durations focus={FocusMin} break={BreakMin} running={_running}");
         UpdateViews();
     }
@@ -301,10 +380,13 @@ public sealed class PomodoroWidget : UserControl
         _phase = Phase.Focus;
         _isLongBreak = false;
         _focusCount = 0;
+        _tempFocusSeconds = null;
+        _hourlyDate = DateTime.Today;
         Array.Clear(_hourlySeconds, 0, 24);
         _remaining = FocusMin * 60;
         _running = false;
         SetScreen(false);
+        UpdateTimer();
         PersistState();
         UpdateViews();
     }
@@ -330,6 +412,15 @@ public sealed class PomodoroWidget : UserControl
         });
     }
 
+    /// <summary>AI 状态快照（一行摘要，供 GetContextSnapshot hook）。</summary>
+    public string Snapshot()
+    {
+        var phase = _phase == Phase.Focus ? "专注" : (_isLongBreak ? "长休息" : "休息");
+        var last7 = PomodoroPlugin.Last7(_host);
+        var today = last7.Count > 0 ? last7[^1].count : 0;
+        return $"番茄钟: {phase} 剩余 {Format(_remaining)} {(_running ? "运行中" : "已暂停")}；任务「{Task}」；今日完成 {today} 个；设置 专注{FocusMin}min/休息{BreakMin}min/长休{LongBreakMin}min/每{LongBreakEvery}轮";
+    }
+
     static string Format(int seconds)
     {
         if (seconds < 0) seconds = 0;
@@ -338,8 +429,10 @@ public sealed class PomodoroWidget : UserControl
 
     void UpdateViews()
     {
+        var theme = ((FrameworkElement)this).ActualTheme;
         var phase = _phase == Phase.Focus ? "专注" : (_isLongBreak ? "长休息" : "休息");
         _phaseText.Text = phase;
+        UpdatePhaseColor(theme);
         _timeText.Text = Format(_remaining);
         _hintText.Text = _running ? "进行中" : "已暂停";
 
@@ -351,75 +444,136 @@ public sealed class PomodoroWidget : UserControl
         {
             if (_ovPhase != null) _ovPhase.Text = phase;
             if (_ovTime != null) _ovTime.Text = Format(_remaining);
-            if (_ovStartPause != null) _ovStartPause.Content = _running ? "暂停" : "开始";
+            if (_ovStartPause != null)
+            {
+                _ovStartPause.Content = _running ? "暂停" : "开始";
+                // 不允许暂停时，仅禁用"暂停"方向；开始方向始终可用
+                _ovStartPause.IsEnabled = !(_running && !AllowPauseCfg);
+            }
+            if (_ovProgress != null)
+            {
+                _ovProgress.Value = ProgressPercent();
+                var t = ((FrameworkElement)this).ActualTheme;
+                _ovProgress.Foreground = _phase == Phase.Focus ? Fluent.Accent() : Fluent.Success(t);
+            }
         }
+    }
 
+    double ProgressPercent()
+    {
+        var total = CurrentPhaseSeconds;
+        return total <= 0 ? 0 : Math.Clamp((total - _remaining) * 100.0 / total, 0, 100);
     }
 
     void OpenDetail()
     {
         if (_overlay.IsOpen) return;
         var theme = ((FrameworkElement)this).ActualTheme;
-        var (primary, secondary) = Brushes(theme);
 
-        var body = new StackPanel { Spacing = 20, MinWidth = 340, HorizontalAlignment = HorizontalAlignment.Center };
+        var body = new StackPanel { Spacing = 12, HorizontalAlignment = HorizontalAlignment.Center };
 
-        _ovPhase = new TextBlock { Text = _phase == Phase.Focus ? "专注" : "休息", FontSize = 20, Foreground = secondary, HorizontalAlignment = HorizontalAlignment.Center };
-        _ovTime = new TextBlock { Text = Format(_remaining), FontSize = 72, FontWeight = FontWeights.SemiLight, Foreground = primary, HorizontalAlignment = HorizontalAlignment.Center };
-        body.Children.Add(_ovPhase);
-        body.Children.Add(_ovTime);
+        // 计时卡
+        _ovPhase = Fluent.Text(_phase == Phase.Focus ? "专注" : "休息", theme, "bodyLarge", Fluent.TextSecondary(theme));
+        _ovPhase.HorizontalAlignment = HorizontalAlignment.Center;
+        _ovTime = new TextBlock
+        {
+            Text = Format(_remaining),
+            FontSize = 68,
+            LineHeight = 76,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Fluent.TextPrimary(theme),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
 
-        _ovStartPause = new Button { Content = _running ? "暂停" : "开始", MinWidth = 100 };
+        _ovStartPause = new Button { Content = _running ? "暂停" : "开始", MinWidth = 120, Padding = new Thickness(16, 6, 16, 8) };
+        if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style accent)
+            _ovStartPause.Style = accent;
         _ovStartPause.Click += (_, _) => ToggleStartPause();
-        if (!AllowPauseCfg && !_running) _ovStartPause.IsEnabled = false;
+        _ovStartPause.IsEnabled = !(_running && !AllowPauseCfg);
 
-        _ovSkip = new Button { Content = "跳过", MinWidth = 100 };
-        _ovSkip.Click += (_, _) => Skip();
-        var reset = new Button { Content = "重置", MinWidth = 100 };
-        reset.Click += (_, _) => ResetTimer();
-        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, HorizontalAlignment = HorizontalAlignment.Center };
+        var skipBtn = new Button { Content = "跳过", MinWidth = 96, Padding = new Thickness(16, 6, 16, 8) };
+        skipBtn.Click += (_, _) => Skip();
+        var resetBtn = new Button { Content = "重置", MinWidth = 96, Padding = new Thickness(16, 6, 16, 8) };
+        resetBtn.Click += (_, _) => ResetTimer();
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center };
         controls.Children.Add(_ovStartPause);
-        controls.Children.Add(_ovSkip);
-        controls.Children.Add(reset);
-        body.Children.Add(controls);
+        controls.Children.Add(skipBtn);
+        controls.Children.Add(resetBtn);
 
+        var timerBody = new StackPanel { Spacing = 12 };
+        timerBody.Children.Add(_ovPhase);
+        timerBody.Children.Add(_ovTime);
+        _ovProgress = new ProgressBar
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = ProgressPercent(),
+            Height = 4,
+            CornerRadius = new CornerRadius(2)
+        };
+        timerBody.Children.Add(_ovProgress);
+        timerBody.Children.Add(controls);
+        var timerCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        timerCard.Child = timerBody;
+        body.Children.Add(timerCard);
+
+        // 任务卡
         var taskBox = new TextBox { Header = "当前专注任务", PlaceholderText = "在做什么…", Text = Task, HorizontalAlignment = HorizontalAlignment.Stretch };
         taskBox.LostFocus += (_, _) => { _host.SetConfig(nameof(PomodoroPlugin), "task", taskBox.Text.Trim()); UpdateViews(); };
-        body.Children.Add(taskBox);
+        var taskCard = Fluent.Card(theme, new Thickness(16, 12, 16, 14));
+        taskCard.Child = taskBox;
+        body.Children.Add(taskCard);
 
-        // stats
-        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
+        // 统计卡
+        var statsBody = new StackPanel { Spacing = 10 };
         var last7 = PomodoroPlugin.Last7(_host);
         var todayCount = last7.Count > 0 ? last7[^1].count : 0;
-        body.Children.Add(new TextBlock { Text = $"今日完成 {todayCount} 个 · 近 7 天", FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = primary });
+        statsBody.Children.Add(Fluent.Text($"今日完成 {todayCount} 个 · 近 7 天", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
         var chartData = last7.Select(d => (d.date.ToString("MM-dd"), (double)d.count)).ToList();
-        body.Children.Add(MiniChart.Bars(chartData, new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
+        statsBody.Children.Add(MiniChart.Bars(chartData, Fluent.Accent(), Fluent.TextSecondary(theme)));
 
-        // hourly distribution
         var hourlyMins = _hourlySeconds.Select(v => v / 60.0).ToArray();
-        var hourLabels = Enumerable.Range(0, 24).Select(h => $"{h:D2}").ToList();
-        var hasData = hourlyMins.Any(v => v > 0);
-        if (hasData)
+        if (hourlyMins.Any(v => v > 0))
         {
-            body.Children.Add(new TextBlock { Text = "今日专注分布", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
-            var barList = hourLabels.Select((l, i) => (l, hourlyMins[i])).ToList();
-            body.Children.Add(MiniChart.Bars(barList, new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)), secondary, 80));
+            statsBody.Children.Add(Fluent.Text("今日专注分布", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
+            var barList = Enumerable.Range(0, 24).Select(h => ($"{h:D2}", hourlyMins[h])).ToList();
+            statsBody.Children.Add(MiniChart.Bars(barList, Fluent.Success(theme), Fluent.TextSecondary(theme), 80));
         }
+        var statsCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        statsCard.Child = statsBody;
+        body.Children.Add(statsCard);
 
-        // recent sessions
+        // 最近记录卡
         var sessions = PomodoroPlugin.GetSessions(_host);
         var recent = sessions.OrderByDescending(s => s.Timestamp).Take(10).ToList();
         if (recent.Count > 0)
         {
-            body.Children.Add(new TextBlock { Text = "最近专注记录", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
+            var recentBody = new StackPanel { Spacing = 6 };
+            recentBody.Children.Add(Fluent.Text("最近专注记录", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
             foreach (var s in recent)
             {
-                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-                row.Children.Add(new TextBlock { Text = s.Timestamp.ToString("HH:mm"), FontSize = 12, Foreground = secondary, Width = 48 });
-                row.Children.Add(new TextBlock { Text = s.Task.Length > 20 ? s.Task[..20] + "…" : s.Task, FontSize = 12, Foreground = primary });
-                row.Children.Add(new TextBlock { Text = $"{s.FocusMin}min", FontSize = 12, Foreground = secondary });
-                body.Children.Add(row);
+                var row = new Grid { ColumnSpacing = 8 };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var t1 = Fluent.Text(s.Timestamp.ToString("HH:mm"), theme, "caption", Fluent.TextTertiary(theme));
+                t1.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(t1, 0);
+                row.Children.Add(t1);
+                var t2 = Fluent.Text(s.Task.Length > 24 ? s.Task[..24] + "…" : s.Task, theme, "body", Fluent.TextPrimary(theme));
+                t2.TextTrimming = TextTrimming.CharacterEllipsis;
+                t2.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(t2, 1);
+                row.Children.Add(t2);
+                var t3 = Fluent.Text($"{s.FocusMin}min", theme, "caption", Fluent.TextSecondary(theme));
+                t3.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(t3, 2);
+                row.Children.Add(t3);
+                recentBody.Children.Add(row);
             }
+            var recentCard = Fluent.Card(theme, new Thickness(16, 14, 16, 14));
+            recentCard.Child = recentBody;
+            body.Children.Add(recentCard);
         }
 
         _overlay.Show(this, "番茄钟", body, _host.Log);

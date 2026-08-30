@@ -13,7 +13,7 @@ public sealed class AgentLoop
     int _maxTurns = 10;
     int _retryAttempt;
     const int MaxRetry = 3;
-    const int CompressThreshold = 800_000;
+    const int CompressThreshold = 48_000;
     CancellationTokenSource? _cts;
 
     public event Action<string>? OnThinking;
@@ -39,9 +39,14 @@ public sealed class AgentLoop
 
     string BuildSystemPrompt(string basePrompt)
     {
+        var sb = new System.Text.StringBuilder(basePrompt);
+        var context = _toolRegistry.BuildContextPrompt();
+        if (!string.IsNullOrEmpty(context))
+            sb.Append("\n\n[当前设备状态快照（由各插件实时提供，可直接引用；如需详情仍可调用查询工具）]\n")
+              .Append(context);
         var memory = _memory.ToPromptSection();
-        if (string.IsNullOrEmpty(memory)) return basePrompt;
-        return basePrompt + "\n" + memory;
+        if (!string.IsNullOrEmpty(memory)) sb.Append('\n').Append(memory);
+        return sb.ToString();
     }
 
     public async Task<string> RunAsync(string userInput, CancellationToken ct)
@@ -81,6 +86,7 @@ public sealed class AgentLoop
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
+                LogService.Error($"[AgentLoop] request failed: {ex.GetType().Name}: {ex.Message}");
                 OnError?.Invoke(ex.Message);
                 return "错误: " + ex.Message;
             }
@@ -97,6 +103,7 @@ public sealed class AgentLoop
 
                 foreach (var tc in response.ToolCalls)
                 {
+                    token.ThrowIfCancellationRequested();
                     OnToolStart?.Invoke(tc.Name, tc.Arguments);
                     var result = await _toolRegistry.InvokeAsync(tc.Name, tc.Arguments);
                     OnToolResult?.Invoke(tc.Name, result);
@@ -105,6 +112,9 @@ public sealed class AgentLoop
             }
             else
             {
+                if (response.Cancelled)
+                    throw new OperationCanceledException(token);
+
                 var finalText = (response.Content ?? "").Trim();
                 if (!string.IsNullOrWhiteSpace(finalText))
                 {
@@ -113,21 +123,30 @@ public sealed class AgentLoop
                     await MaybeCompressAsync(token);
                     return finalText;
                 }
-                if (!string.IsNullOrEmpty(response.ThinkingContent) && ++_retryAttempt < MaxRetry)
+
+                if (response.StreamError)
                 {
-                    LogService.Info($"[AgentLoop] empty content with thinking, retry {_retryAttempt}/{MaxRetry}");
+                    OnError?.Invoke("连接中断，本次回复不完整，请重试。");
+                    return "错误: 连接中断，回复不完整。";
+                }
+
+                _retryAttempt++;
+                if (_retryAttempt <= MaxRetry)
+                {
+                    LogService.Info($"[AgentLoop] empty content (thinking={response.ThinkingContent?.Length ?? 0} chars), retry {_retryAttempt}/{MaxRetry}");
                     OnRetry?.Invoke();
                     turn--;
                     continue;
                 }
-                if (_retryAttempt >= MaxRetry)
-                {
-                    LogService.Info("[AgentLoop] max retries reached");
-                    OnRetryExhausted?.Invoke();
-                }
+
+                LogService.Info("[AgentLoop] max retries reached");
+                OnRetryExhausted?.Invoke();
                 return "";
             }
         }
+
+        if (token.IsCancellationRequested)
+            throw new OperationCanceledException(token);
 
         var error = "达到最大工具调用次数，已中止。";
         OnError?.Invoke(error);
@@ -142,9 +161,11 @@ public sealed class AgentLoop
 
     async Task MaybeCompressAsync(CancellationToken ct)
     {
+        if (ct.IsCancellationRequested) return;
         if (_history.EstimateTokenCount() > CompressThreshold)
         {
-            try { await _history.CompressAsync(_client, _memory.ToPromptSection(), ct); }
+            try { await _history.CompressAsync(_client, ct); }
+            catch (OperationCanceledException) { }
             catch (Exception ex) { OnError?.Invoke("压缩失败: " + ex.Message); }
         }
     }

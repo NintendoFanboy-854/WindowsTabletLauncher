@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading;
+using LauncherHost.Services;
 
 namespace LauncherHost.Core.Agent;
 
@@ -33,6 +34,9 @@ public class ConversationHistory
     public IReadOnlyList<ChatMessage> Messages => _messages;
     public string SystemPrompt { get => _systemPrompt; set => _systemPrompt = value; }
 
+    /// <summary>压缩历史时生成的对话摘要；独立保存，避免被 SystemPrompt 重建覆盖。</summary>
+    public string? Summary { get; private set; }
+
     public void AddUserMessage(string text)
         => _messages.Add(new ChatMessage("user", Content: text));
 
@@ -57,7 +61,7 @@ public class ConversationHistory
         }
     }
 
-    public void Clear() { _messages.Clear(); _systemPrompt = ""; }
+    public void Clear() { _messages.Clear(); _systemPrompt = ""; Summary = null; }
 
     static string ContentPartToPlaceholder(ContentPart part) => part.Type switch
     {
@@ -95,8 +99,11 @@ public class ConversationHistory
     public List<object> ToApiMessages(string model = "deepseek-v4-pro")
     {
         var list = new List<object>(_messages.Count + 1);
-        if (!string.IsNullOrWhiteSpace(_systemPrompt))
-            list.Add(new { role = "system", content = _systemPrompt });
+        var sys = _systemPrompt;
+        if (!string.IsNullOrWhiteSpace(Summary))
+            sys = string.IsNullOrWhiteSpace(sys) ? "[对话摘要]\n" + Summary : sys + "\n\n[对话摘要]\n" + Summary;
+        if (!string.IsNullOrWhiteSpace(sys))
+            list.Add(new { role = "system", content = sys });
 
         foreach (var m in _messages)
         {
@@ -119,13 +126,11 @@ public class ConversationHistory
                     ["content"] = m.Content,
                     ["tool_calls"] = tcs
                 };
-                if (!string.IsNullOrEmpty(m.ReasoningContent))
-                    msg["reasoning_content"] = m.ReasoningContent;
                 list.Add(msg);
             }
-            else if (m.Role == "assistant" && !string.IsNullOrEmpty(m.ReasoningContent))
+            else if (m.Role == "assistant")
             {
-                list.Add(new { role = "assistant", content = m.Content, reasoning_content = m.ReasoningContent });
+                list.Add(new { role = "assistant", content = m.Content });
             }
             else if (m.Role == "user" && m.ContentParts is { Count: > 0 } && AllPartsSupported(m.ContentParts, model))
             {
@@ -154,20 +159,31 @@ public class ConversationHistory
 
     public int EstimateTokenCount()
     {
-        var totalChars = 0;
+        var totalChars = _systemPrompt.Length + (Summary?.Length ?? 0);
         foreach (var m in _messages)
         {
             totalChars += m.Role.Length + 2;
             if (m.ContentParts is { Count: > 0 })
+            {
                 totalChars += ContentPartsToFallbackText(m.ContentParts, "text").Length;
+                foreach (var p in m.ContentParts)
+                {
+                    if (p.Data.TryGetValue("data", out var d))
+                        totalChars += (d?.ToString()?.Length ?? 0) / 4;
+                }
+            }
             else
+            {
                 totalChars += m.Content?.Length ?? 0;
+            }
             totalChars += (m.ReasoningContent?.Length ?? 0) + 1;
+            if (m.ToolCalls is { Count: > 0 })
+                totalChars += m.ToolCalls.Sum(tc => tc.Function.Name.Length + (tc.Function.Arguments?.Length ?? 0));
         }
         return (int)(totalChars * 0.65);
     }
 
-    public async Task CompressAsync(ChatClient flash, string memoryPrompt, CancellationToken ct)
+    public async Task CompressAsync(ChatClient flash, CancellationToken ct)
     {
         var text = string.Join("\n", _messages.TakeLast(30).Select(m =>
         {
@@ -177,17 +193,26 @@ public class ConversationHistory
         }));
 
         var summary = await CompressOneShotAsync(flash, text, ct);
-        var last3 = _messages.TakeLast(6).ToList();
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            LogService.Info("[ConversationHistory] compression skipped (summary unavailable)");
+            return;
+        }
+
+        var kept = _messages.TakeLast(6).ToList();
+        while (kept.Count > 0 && kept[0].Role == "tool")
+            kept.RemoveAt(0);
+        if (kept.Count > 0 && kept[0].Role == "assistant" && kept[0].ToolCalls is { Count: > 0 }
+            && (kept.Count < 2 || kept[1].Role != "tool"))
+        {
+            kept.RemoveAt(0);
+        }
+
         _messages.Clear();
-
-        var compressedPrompt = _systemPrompt;
-        if (!string.IsNullOrEmpty(memoryPrompt)) compressedPrompt += "\n" + memoryPrompt;
-        compressedPrompt += "\n[对话摘要]\n" + (summary ?? "(无)") + "\n";
-
-        foreach (var m in last3)
+        foreach (var m in kept)
             _messages.Add(m);
-
-        _systemPrompt = compressedPrompt;
+        Summary = summary;
+        LogService.Info($"[ConversationHistory] compressed: kept={kept.Count}, summary={summary.Length} chars");
     }
 
     async Task<string?> CompressOneShotAsync(ChatClient flash, string text, CancellationToken ct)

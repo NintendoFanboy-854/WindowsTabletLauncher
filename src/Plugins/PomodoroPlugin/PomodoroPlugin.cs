@@ -35,17 +35,21 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
 
     Task<string> OnUi(Func<string> action)
     {
-        var tcs = new TaskCompletionSource<string>();
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (_dispatcher.HasThreadAccess)
         {
             try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
         }
+        else if (_dispatcher.TryEnqueue(() =>
+        {
+            try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
+        }))
+        {
+            // enqueued
+        }
         else
         {
-            _dispatcher.TryEnqueue(() =>
-            {
-                try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
-            });
+            tcs.TrySetResult(AgentJson.Error("dispatcher_unavailable"));
         }
         return tcs.Task;
     }
@@ -204,14 +208,14 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
     IReadOnlyList<AgentTool> IAgentCapability.GetTools() => new[]
     {
         new AgentTool { Name = "query_pomodoro", Description = "获取番茄钟当前状态及全部设置。返回 phase, remainingSeconds, running, task, focusCount, focusMin, breakMin, longBreakMin, longBreakEvery, autoStart, sound, allowPause, keepScreenOn。" },
-        new AgentTool { Name = "start_pomodoro", Description = "开始一个专注计时，可指定分钟数。", ParametersJsonSchema = """{"type":"object","properties":{"minutes":{"type":"integer","minimum":1}}}""" },
+        new AgentTool { Name = "start_pomodoro", Description = "开始一个专注计时，可指定分钟数（仅本次生效，不修改默认设置）。", ParametersJsonSchema = """{"type":"object","properties":{"minutes":{"type":"integer","minimum":1,"maximum":180}}}""" },
         new AgentTool { Name = "pause_pomodoro", Description = "暂停当前番茄钟计时（需要允许暂停设置开启）。" },
         new AgentTool { Name = "resume_pomodoro", Description = "继续当前番茄钟计时。" },
         new AgentTool { Name = "skip_pomodoro", Description = "跳过当前阶段（专注/休息）。" },
         new AgentTool { Name = "reset_pomodoro", Description = "重置当前阶段计时。" },
         new AgentTool { Name = "query_pomodoro_stats", Description = "获取番茄钟统计：今日完成数、近7天每日完成数、累计总数、累计分钟。" },
         new AgentTool { Name = "query_pomodoro_sessions", Description = "获取最近N条番茄专注记录（任务、时长、时间）。", ParametersJsonSchema = """{"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":100}}}""" },
-        new AgentTool { Name = "query_pomodoro_distribution", Description = "获取近30天专注时间分时分布（24小时各小时分钟数）。" },
+        new AgentTool { Name = "query_pomodoro_distribution", Description = "获取今日专注时间分时分布（24小时各小时的专注分钟数）。" },
         new AgentTool { Name = "set_pomodoro_settings", Description = "修改番茄钟设置（专注时长、休息时长、是否自动开始等）。", ParametersJsonSchema = """{"type":"object","properties":{"focusMin":{"type":"integer","minimum":1,"maximum":180},"breakMin":{"type":"integer","minimum":1,"maximum":60},"longBreakMin":{"type":"integer","minimum":1,"maximum":60},"longBreakEvery":{"type":"integer","minimum":1,"maximum":20},"autoStart":{"type":"boolean"},"sound":{"type":"boolean"},"allowPause":{"type":"boolean"},"keepScreenOn":{"type":"boolean"}}}""" },
         new AgentTool { Name = "set_white_noise", Description = "白噪音功能暂不可用。" },
         new AgentTool { Name = "query_white_noise", Description = "查询白噪音状态（暂不可用）。" },
@@ -281,7 +285,7 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
             {
                 var hourly = HourlyDistribution(_host);
                 var labels = Enumerable.Range(0, 24).Select(h => $"{h:D2}").ToArray();
-                return Task.FromResult(AgentJson.Serialize(new { ok = true, hourly = labels.Zip(hourly.Select(v => v / 60), (l, m) => new { hour = l, minutes = m }) }));
+                return Task.FromResult(AgentJson.Serialize(new { ok = true, hourly = labels.Zip(hourly.Select(v => (int)Math.Round(v / 60.0)), (l, m) => new { hour = l, minutes = m }) }));
             }
 
             case "set_pomodoro_settings":
@@ -309,6 +313,9 @@ public class PomodoroPlugin : IPlugin, IPluginSettings, IAgentCapability
                 return Task.FromResult(AgentJson.Error("unknown_tool"));
         }
     }
+
+    /// <summary>AI 状态快照 hook。</summary>
+    string? IAgentCapability.GetContextSnapshot() => _widget?.Snapshot();
 
     void ApplySetting(string argsJson, string jsonKey, string configKey)
     {

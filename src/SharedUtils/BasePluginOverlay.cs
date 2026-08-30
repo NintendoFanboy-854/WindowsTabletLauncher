@@ -15,6 +15,19 @@ public class BasePluginOverlay
     protected FrameworkElement? Card { get; private set; }
     protected Grid? Scrim { get; private set; }
 
+    static readonly AcrylicBrush LightCardBrush = new()
+    {
+        TintColor = Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3),
+        TintOpacity = 0.85,
+        FallbackColor = Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3)
+    };
+    static readonly AcrylicBrush DarkCardBrush = new()
+    {
+        TintColor = Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B),
+        TintOpacity = 0.85,
+        FallbackColor = Color.FromArgb(0xFF, 0x2B, 0x2B, 0x2B)
+    };
+
     public bool IsOpen => _popup?.IsOpen == true;
 
     public void Show(FrameworkElement source, string title, FrameworkElement body, Action<string>? log = null)
@@ -28,6 +41,11 @@ public class BasePluginOverlay
 
         var raw = source.XamlRoot.Size;
         log?.Invoke($"Overlay open '{title}': content={w:F0}x{h:F0}epx xamlRootSize={raw.Width:F0}x{raw.Height:F0} scale={source.XamlRoot.RasterizationScale:F2}");
+
+        // Fluent 2：卡片需要稳定的布局宽度。无固定宽度的内容统一锚定到目标宽度，
+        // 避免含 * 列的 Grid 在无约束测量下塌缩（卡片缩成 468px 导致内容挤压重叠）。
+        if (double.IsNaN(body.Width))
+            body.Width = Math.Min(w - 120, 780);
 
         var primary = theme == ElementTheme.Light
             ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
@@ -65,7 +83,7 @@ public class BasePluginOverlay
             VerticalAlignment = VerticalAlignment.Center,
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(24),
-            Background = new AcrylicBrush { TintColor = tint, TintOpacity = 0.85, FallbackColor = tint },
+            Background = theme == ElementTheme.Light ? LightCardBrush : DarkCardBrush,
             Child = outer
         };
         card.Tapped += (_, e) => e.Handled = true;

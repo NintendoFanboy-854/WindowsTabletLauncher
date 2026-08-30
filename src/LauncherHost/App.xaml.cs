@@ -10,9 +10,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using LauncherHost.Services;
 
 namespace LauncherHost;
 
@@ -22,15 +20,68 @@ namespace LauncherHost;
 public partial class App : Application
 {
     public static Window? MainWindow { get; private set; }
+    private static Mutex? _singleInstanceMutex;
+    private const string SingleInstanceMutexName = "WindowsTabletLauncher_SingleInstance_Mutex";
 
     public App()
     {
+        if (!AcquireSingleInstance())
+        {
+            Environment.Exit(0);
+            return;
+        }
+
         InitializeComponent();
+        UnhandledException += OnUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex)
+                LogService.Error(ex, "AppDomain.UnhandledException (terminating=" + e.IsTerminating + ")");
+            else
+                LogService.Error("AppDomain.UnhandledException (terminating=" + e.IsTerminating + "): " + e.ExceptionObject);
+            LogService.FlushNow();
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            LogService.Error(e.Exception, "TaskScheduler.UnobservedTaskException");
+            e.SetObserved();
+        };
+    }
+
+    void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        LogService.Error(e.Exception, $"App.UnhandledException: {e.Message}");
+        LogService.FlushNow();
+    }
+
+    private static bool AcquireSingleInstance()
+    {
+        try
+        {
+            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out var createdNew);
+            if (createdNew) return true;
+            LogService.Error("Another launcher instance is already running; exiting.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "Single-instance mutex acquisition failed");
+            return true;
+        }
     }
 
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
-        MainWindow = new MainWindow();
-        MainWindow.Activate();
+        try
+        {
+            MainWindow = new MainWindow();
+            MainWindow.Activate();
+        }
+        catch (Exception ex)
+        {
+            LogService.Error(ex, "OnLaunched failed");
+            LogService.FlushNow();
+            throw;
+        }
     }
 }

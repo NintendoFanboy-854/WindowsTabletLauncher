@@ -1,36 +1,42 @@
 using Microsoft.UI.Dispatching;
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using PluginContract;
 using SharedUtils;
 using Windows.UI;
 
 namespace WeatherPlugin;
 
+/// <summary>
+/// 天气 tile（Fluent 2）：主题资源画刷 + 字阶（Title 28 温度 / BodyStrong 现象 / Caption 辅助）+
+/// 卡片 8px 圆角 + 1px 卡片描边 + Subtle hover 反馈 + InfoBadge 预警计数。
+/// </summary>
 public sealed class WeatherWidget : UserControl
 {
     readonly IHostHandle _host;
-    readonly AmapWeatherService _service;
+    readonly QWeatherService _service;
     readonly DispatcherQueue _dispatcher;
     readonly DispatcherQueueTimer _timer;
     readonly BasePluginOverlay _overlay = new();
 
     Border _root = null!;
-    FontIcon _icon = null!;
+    Border _hoverLayer = null!;
+    Panel _iconHost = null!;
     TextBlock _temp = null!;
     TextBlock _condition = null!;
     TextBlock _city = null!;
     TextBlock _details = null!;
+    Grid _alertRow = null!;
+    InfoBadge _alertBadge = null!;
 
+    QLocation? _loc;
+    QCurrentWeather? _lastCurrent;
+    List<QAlert> _alerts = new();
     bool _isRefreshing;
-    string? _adcode;
-    Live? _lastLive;
-    Forecast? _lastForecast;
 
-    public WeatherWidget(IHostHandle host, AmapWeatherService service)
+    public WeatherWidget(IHostHandle host, QWeatherService service)
     {
         _host = host;
         _service = service;
@@ -38,309 +44,250 @@ public sealed class WeatherWidget : UserControl
 
         BuildUi();
 
-        Loaded += (_, _) =>
-        {
-            ApplyTheme(((FrameworkElement)this).ActualTheme);
-            _ = RefreshAsync();
-        };
-        ActualThemeChanged += (_, _) => ApplyTheme(((FrameworkElement)this).ActualTheme);
+        Loaded += (_, _) => { ApplyTheme(); _ = RefreshAsync(); };
+        ActualThemeChanged += (_, _) => ApplyTheme();
 
         _timer = _dispatcher.CreateTimer();
-        _timer.Interval = TimeSpan.FromMinutes(RefreshMinutes);
+        _timer.Interval = TimeSpan.FromMinutes(_service.RefreshMinutes);
         _timer.IsRepeating = true;
         _timer.Tick += (_, _) => _ = RefreshAsync();
         _timer.Start();
     }
 
-    int RefreshMinutes
-        => int.TryParse(_host.GetConfig(nameof(WeatherPlugin), "refresh_min"), out var v) && v > 0 ? v : 30;
+    public IHostHandle Host => _host;
+    public QWeatherService Service => _service;
+    public QLocation? CurrentLocation => _loc;
+    public QCurrentWeather? CurrentWeather => _lastCurrent;
+    public List<QAlert> CurrentAlerts => _alerts;
+    public DispatcherQueue Ui => _dispatcher;
 
-    public void ApplyRefreshInterval() => _timer.Interval = TimeSpan.FromMinutes(RefreshMinutes);
+    public void RunOnUi(Action action)
+    {
+        if (_dispatcher.HasThreadAccess) action();
+        else _dispatcher.TryEnqueue(() => action());
+    }
+
+    public void ApplyRefreshInterval() => _timer.Interval = TimeSpan.FromMinutes(_service.RefreshMinutes);
 
     // ---- tile ----
 
     void BuildUi()
     {
-        _icon = new FontIcon { FontSize = 40, Glyph = "\uE753", HorizontalAlignment = HorizontalAlignment.Center };
-        _temp = new TextBlock { FontSize = 32, FontWeight = FontWeights.SemiLight, HorizontalAlignment = HorizontalAlignment.Center, Text = "--" };
+        _iconHost = new Grid { Width = 48, Height = 48 };
+        _iconHost.Children.Add(new TextBlock
+        {
+            Text = "--",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        _temp = Fluent.Text("--", ((FrameworkElement)this).ActualTheme, "title");
 
-        var left = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        left.Children.Add(_icon);
+        var left = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        left.Children.Add(_iconHost);
         left.Children.Add(_temp);
         Grid.SetColumn(left, 0);
 
-        _city = new TextBlock { FontSize = 13, Opacity = 0.75, Text = "" };
-        _condition = new TextBlock { FontSize = 17, FontWeight = FontWeights.SemiBold, Text = "加载中…" };
-        _details = new TextBlock { FontSize = 12, Opacity = 0.75, Text = "", TextWrapping = TextWrapping.Wrap };
+        _city = Fluent.Text("", ElementTheme.Default, "caption", Fluent.TextTertiary(ElementTheme.Default));
+        _condition = Fluent.Text("加载中…", ElementTheme.Default, "bodyStrong");
+        _details = Fluent.Text("", ElementTheme.Default, "caption", Fluent.TextSecondary(ElementTheme.Default), TextWrapping.Wrap);
 
-        var right = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        _alertBadge = new InfoBadge { Value = 1, Visibility = Visibility.Collapsed };
+        var alertStyle = Application.Current.Resources.TryGetValue("AttentionValueInfoBadgeStyle", out var s) && s is Style st ? st : null;
+        if (alertStyle != null) _alertBadge.Style = alertStyle;
+        var alertText = Fluent.Text("天气预警", ElementTheme.Default, "caption", Fluent.Critical(ElementTheme.Default));
+        _alertRow = new Grid
+        {
+            Visibility = Visibility.Collapsed,
+            ColumnSpacing = 6,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = GridLength.Auto },
+                new ColumnDefinition { Width = GridLength.Auto }
+            }
+        };
+        _alertBadge.SetValue(Grid.ColumnProperty, 0);
+        alertText.SetValue(Grid.ColumnProperty, 1);
+        alertText.VerticalAlignment = VerticalAlignment.Center;
+        _alertRow.Children.Add(_alertBadge);
+        _alertRow.Children.Add(alertText);
+
+        var right = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         right.Children.Add(_city);
         right.Children.Add(_condition);
         right.Children.Add(_details);
+        right.Children.Add(_alertRow);
         Grid.SetColumn(right, 1);
 
-        var layout = new Grid();
+        var layout = new Grid { Margin = new Thickness(4) };
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
         layout.Children.Add(left);
         layout.Children.Add(right);
 
-        _root = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12), Child = layout };
+        _hoverLayer = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = Fluent.SubtleHover(ElementTheme.Default),
+            Opacity = 0,
+            IsHitTestVisible = false
+        };
+
+        _root = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16, 12, 16, 12),
+            Child = layout
+        };
+
+        var grid = new Grid();
+        grid.Children.Add(_root);
+        grid.Children.Add(_hoverLayer);
+
         _root.Tapped += (_, _) => OpenOverlay();
+        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
+        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
 
-        Content = _root;
+        Content = grid;
     }
 
-    void ApplyTheme(ElementTheme theme)
+    void ApplyTheme()
     {
+        var theme = ((FrameworkElement)this).ActualTheme;
         _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        var (primary, secondary) = ThemeBrushes(theme);
-        _icon.Foreground = primary;
-        _temp.Foreground = primary;
-        _condition.Foreground = primary;
-        _city.Foreground = secondary;
-        _details.Foreground = secondary;
+        _root.BorderBrush = Fluent.CardStroke(theme);
+        _root.BorderThickness = new Thickness(1);
+        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _temp.Foreground = Fluent.TextPrimary(theme);
+        _condition.Foreground = Fluent.TextPrimary(theme);
+        _city.Foreground = Fluent.TextTertiary(theme);
+        _details.Foreground = Fluent.TextSecondary(theme);
     }
-
-    static (Brush primary, Brush secondary) ThemeBrushes(ElementTheme theme) =>
-        theme == ElementTheme.Light
-            ? (new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A)), new SolidColorBrush(Color.FromArgb(0x99, 0x00, 0x00, 0x00)))
-            : (new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)), new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF)));
 
     public void Refresh() => _ = RefreshAsync();
 
-    async Task RefreshAsync()
+    public async Task RefreshAsync()
     {
         if (_isRefreshing) return;
         _isRefreshing = true;
         try
         {
-        var mode = _host.GetConfig(nameof(WeatherPlugin), "location_mode") ?? "auto";
-        string? adcode;
+            var loc = await _service.ResolveCurrentAsync();
+            _loc = loc;
+            if (loc == null)
+            {
+                RunOnUi(() =>
+                {
+                    _temp.Text = "--";
+                    _condition.Text = "未定位";
+                    _city.Text = "";
+                    _details.Text = "请检查网络或在设置中手动选择城市";
+                    _alertRow.Visibility = Visibility.Collapsed;
+                });
+                return;
+            }
 
-        if (mode == "manual")
-        {
-            adcode = _host.GetConfig(nameof(WeatherPlugin), "adcode");
+            QCurrentWeather? current = null;
+            List<QAlert> alerts = new();
+            try { current = await _service.GetCurrentAsync(loc); }
+            catch (QWeatherApiException ex)
+            {
+                _host.LogError($"Weather: current failed {ex.Message}");
+                RunOnUi(() => { _condition.Text = ex.Title ?? "获取失败"; _details.Text = ex.Detail ?? ""; });
+            }
+            try { alerts = await _service.GetAlertsAsync(loc); }
+            catch (QWeatherApiException ex) { _host.LogError($"Weather: alerts failed {ex.Message}"); }
+
+            _lastCurrent = current;
+            _alerts = alerts;
+            RunOnUi(() => ApplyData(loc, current, alerts));
         }
-        else
+        catch (Exception ex)
         {
-            var ipResult = await _service.GetIpLocationAsync();
-            adcode = ipResult?.Adcode;
-        }
-
-        if (string.IsNullOrWhiteSpace(adcode))
-        {
-            _adcode = null;
-            _lastLive = null;
-            _lastForecast = null;
-            _temp.Text = "--";
-            _condition.Text = mode == "manual" ? "未选择城市" : "定位失败";
-            _city.Text = "";
-            _details.Text = "";
-            return;
-        }
-
-        var live = await _service.GetLiveAsync(adcode);
-        _adcode = adcode;
-
-        if (live == null)
-        {
-            _condition.Text = "天气获取失败";
-            return;
-        }
-
-        _lastLive = live;
-        _icon.Glyph = WeatherIcons.GetGlyph(live.Weather);
-        _temp.Text = $"{live.Temperature}°";
-        _condition.Text = live.Weather;
-        _city.Text = live.City;
-        _details.Text = $"湿度 {live.Humidity}% · {live.Winddirection}风 {live.Windpower}级";
-
-        _lastForecast = await _service.GetForecastAsync(adcode);
+            _host.LogError($"Weather: refresh failed {ex.Message}");
+            RunOnUi(() => { if (_lastCurrent == null) _condition.Text = "获取失败"; });
         }
         finally { _isRefreshing = false; }
     }
 
-    async void SwitchCity(string adcode, string name)
+    void ApplyData(QLocation loc, QCurrentWeather? current, List<QAlert> alerts)
     {
-        _host.SetConfig(nameof(WeatherPlugin), "location_mode", "manual");
-        _host.SetConfig(nameof(WeatherPlugin), "adcode", adcode);
-        _host.SetConfig(nameof(WeatherPlugin), "location_name", name);
-        _host.Log($"Weather: switch city {name} ({adcode})");
-        await RefreshAsync();
-        _overlay.Close();
-        OpenOverlay();
-    }
-
-    // ---- overlay (lightweight scale/fade via shared BasePluginOverlay) ----
-
-    void OpenOverlay()
-    {
-        if (_lastLive == null) return;
         var theme = ((FrameworkElement)this).ActualTheme;
-        var body = BuildOverlayBody(theme);
-        _overlay.Show(this, _lastLive.City, body, _host.Log);
-    }
-
-    FrameworkElement BuildOverlayBody(ElementTheme theme)
-    {
-        var (primary, secondary) = ThemeBrushes(theme);
-        var live = _lastLive!;
-
-        var body = new StackPanel { Spacing = 16, MinWidth = 360 };
-
-        // favorites quick-switch bar
-        var favs = WeatherPlugin.GetFavorites(_host);
-        if (favs.Count > 0)
+        _city.Text = loc.DisplayName;
+        if (current?.Condition == null)
         {
-            var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-            foreach (var f in favs)
-            {
-                var b = new Button { Content = f.Name };
-                if (f.Adcode == _adcode) b.IsEnabled = false;
-                b.Click += (_, _) => SwitchCity(f.Adcode, f.Name);
-                bar.Children.Add(b);
-            }
-            body.Children.Add(bar);
+            if (_lastCurrent == null) _condition.Text = "天气获取失败";
+            return;
         }
 
-        // current summary
-        var summary = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
-        summary.Children.Add(new FontIcon { Glyph = WeatherIcons.GetGlyph(live.Weather), FontSize = 72, Foreground = primary, VerticalAlignment = VerticalAlignment.Center });
-        var summaryText = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        summaryText.Children.Add(new TextBlock { Text = $"{live.Temperature}°C", FontSize = 48, FontWeight = FontWeights.SemiLight, Foreground = primary });
-        summaryText.Children.Add(new TextBlock { Text = live.Weather, FontSize = 18, Foreground = secondary });
-        summary.Children.Add(summaryText);
-        body.Children.Add(summary);
+        _iconHost.Children.Clear();
+        _iconHost.Children.Add(WeatherIcons.CreateIcon(current.Condition.Code, 48, theme));
+        _temp.Text = FmtTemp(current.Temperature);
+        _condition.Text = current.Condition.Text ?? "--";
+        _details.Text = BuildDetailLine(current);
 
-        var stats = new (string label, string value)[]
+        if (alerts.Count > 0)
         {
-            ("温度", $"{live.Temperature} ℃"),
-            ("湿度", $"{live.Humidity} %"),
-            ("风向", live.Winddirection),
-            ("风力", $"{live.Windpower} 级"),
-            ("天气", live.Weather),
-            ("省份", live.Province),
-            ("城市", live.City),
-            ("区域编码", live.Adcode),
-            ("发布时间", live.Reporttime),
-        };
-        body.Children.Add(BuildStatsGrid(stats, 3, primary, secondary));
-
-        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
-        body.Children.Add(new TextBlock { Text = "未来预报", FontSize = 18, FontWeight = FontWeights.SemiBold, Foreground = primary });
-
-        var casts = _lastForecast?.Casts;
-        if (casts is { Count: > 0 })
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            for (int i = 0; i < casts.Count; i++)
-                row.Children.Add(BuildDayColumn(casts[i], i, primary, secondary));
-            body.Children.Add(row);
+            _alertBadge.Value = alerts.Count;
+            _alertBadge.Visibility = Visibility.Visible;
+            _alertRow.Visibility = Visibility.Visible;
         }
         else
         {
-            body.Children.Add(new TextBlock { Text = "预报获取失败", FontSize = 14, Foreground = secondary });
+            _alertRow.Visibility = Visibility.Collapsed;
         }
-
-        return body;
     }
 
-    static Grid BuildStatsGrid((string label, string value)[] items, int columns, Brush primary, Brush secondary)
+    internal static string FmtTemp(QValueUnit? v) =>
+        v?.Value is double d ? $"{Math.Round(d)}°" : "--";
+
+    internal static string BuildDetailLine(QCurrentWeather c)
     {
-        var grid = new Grid { ColumnSpacing = 24, RowSpacing = 10 };
-        for (int c = 0; c < columns; c++)
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var rows = (int)Math.Ceiling(items.Length / (double)columns);
-        for (int r = 0; r < rows; r++)
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        for (int i = 0; i < items.Length; i++)
-        {
-            var cell = new StackPanel { Spacing = 2 };
-            cell.Children.Add(new TextBlock { Text = items[i].label, FontSize = 12, Foreground = secondary });
-            cell.Children.Add(new TextBlock
-            {
-                Text = string.IsNullOrEmpty(items[i].value) ? "—" : items[i].value,
-                FontSize = 16,
-                Foreground = primary,
-                TextWrapping = TextWrapping.Wrap
-            });
-            Grid.SetColumn(cell, i % columns);
-            Grid.SetRow(cell, i / columns);
-            grid.Children.Add(cell);
-        }
-        return grid;
+        var parts = new List<string>();
+        if (c.FeelsLike?.Value is double f) parts.Add($"体感 {Math.Round(f)}°");
+        if (c.Humidity is double h) parts.Add($"湿度 {Math.Round(h * 100)}%");
+        if (c.Wind?.Scale is double s && s > 0)
+            parts.Add($"风{(c.Wind?.Direction?.Compass is { Length: > 0 } dir ? CompassZh(dir) + " " : "")}{Math.Round(s)}级");
+        if (c.Precipitation?.Amount?.Value is double p && p > 0) parts.Add($"降水 {p:0.#}mm");
+        return string.Join(" · ", parts);
     }
 
-    static Border BuildDayColumn(Cast cast, int index, Brush primary, Brush secondary)
+    static readonly string[] Compass16 =
     {
-        var panel = new StackPanel { Spacing = 6, MinWidth = 150 };
-
-        panel.Children.Add(new TextBlock { Text = DayLabel(cast.Date, index), FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = primary, HorizontalAlignment = HorizontalAlignment.Center });
-        panel.Children.Add(new TextBlock { Text = FormatDate(cast.Date), FontSize = 11, Foreground = secondary, HorizontalAlignment = HorizontalAlignment.Center });
-        panel.Children.Add(new FontIcon { Glyph = WeatherIcons.GetGlyph(cast.Dayweather), FontSize = 32, Foreground = primary, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 6) });
-        panel.Children.Add(new TextBlock { Text = $"{cast.Nighttemp}° ~ {cast.Daytemp}°", FontSize = 15, Foreground = primary, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 6) });
-
-        var rows = new StackPanel { Spacing = 4 };
-        AddRow(rows, "白天", cast.Dayweather, primary, secondary);
-        AddRow(rows, "夜间", cast.Nightweather, primary, secondary);
-        AddRow(rows, "白天风", $"{cast.Daywind} {cast.Daypower}级", primary, secondary);
-        AddRow(rows, "夜间风", $"{cast.Nightwind} {cast.Nightpower}级", primary, secondary);
-        panel.Children.Add(rows);
-
-        return new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(14),
-            Background = new SolidColorBrush(Color.FromArgb(0x14, 0x88, 0x88, 0x88)),
-            Child = panel
-        };
-    }
-
-    static void AddRow(Panel container, string label, string value, Brush primary, Brush secondary)
-    {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var l = new TextBlock { Text = label, FontSize = 12, Foreground = secondary };
-        Grid.SetColumn(l, 0);
-        var v = new TextBlock { Text = string.IsNullOrEmpty(value) ? "—" : value, FontSize = 12, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-        Grid.SetColumn(v, 1);
-
-        row.Children.Add(l);
-        row.Children.Add(v);
-        container.Children.Add(row);
-    }
-
-    static string DayLabel(string date, int index) => index switch
-    {
-        0 => "今天",
-        1 => "明天",
-        2 => "后天",
-        _ => WeekName(date)
+        "北", "东北偏北", "东北", "东北偏东", "东", "东南偏东", "东南", "东南偏南",
+        "南", "西南偏南", "西南", "西南偏西", "西", "西北偏西", "西北", "西北偏北"
     };
 
-    static string WeekName(string date)
+    public static string CompassZh(string compass) => compass?.ToLowerInvariant() switch
     {
-        if (!DateTime.TryParse(date, out var d)) return "";
-        return d.DayOfWeek switch
-        {
-            DayOfWeek.Monday => "星期一",
-            DayOfWeek.Tuesday => "星期二",
-            DayOfWeek.Wednesday => "星期三",
-            DayOfWeek.Thursday => "星期四",
-            DayOfWeek.Friday => "星期五",
-            DayOfWeek.Saturday => "星期六",
-            _ => "星期日"
-        };
+        "n" => "北", "nne" => "东北偏北", "ne" => "东北", "ene" => "东北偏东",
+        "e" => "东", "ese" => "东南偏东", "se" => "东南", "sse" => "东南偏南",
+        "s" => "南", "ssw" => "西南偏南", "sw" => "西南", "wsw" => "西南偏西",
+        "w" => "西", "wnw" => "西北偏西", "nw" => "西北", "nnw" => "西北偏北",
+        "vrb" => "风向不定", _ => ""
+    };
+
+    // ---- overlay ----
+
+    void OpenOverlay()
+    {
+        if (((FrameworkElement)this).XamlRoot == null) return;
+        var builder = new WeatherOverlayBuilder(this);
+        var body = builder.Build();
+        var title = _loc?.Name is { Length: > 0 } n ? n : "天气";
+        _overlay.Show(this, title, body, _host.Log);
     }
 
-    static string FormatDate(string date) => DateTime.TryParse(date, out var d) ? d.ToString("MM-dd") : date;
-
-    public void Stop() => _timer?.Stop();
+    /// <summary>切换城市后：刷新并重开 overlay。</summary>
+    public async Task SwitchAndReopenAsync(QLocation loc)
+    {
+        _service.SetManualLocation(loc);
+        _host.Log($"Weather: switch city {loc.DisplayName} ({loc.Id})");
+        _overlay.Close();
+        await RefreshAsync();
+        OpenOverlay();
+    }
 
     internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
+
+    public void Stop() => _timer?.Stop();
 }

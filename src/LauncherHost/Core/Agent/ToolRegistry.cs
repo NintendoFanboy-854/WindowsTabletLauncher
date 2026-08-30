@@ -8,9 +8,6 @@ public sealed class ToolRegistry
     readonly List<(string PluginId, IAgentCapability Capability)> _caps = new();
     readonly List<ToolDef> _hostTools = new();
     List<ToolDef>? _cachedToolDefs;
-    int _pageCount;
-
-    public int PageCount => _pageCount;
 
     public ToolRegistry(IHostHandle host)
     {
@@ -42,8 +39,6 @@ public sealed class ToolRegistry
     {
         return _host;
     }
-
-    public void IncreasePageCount(int count) => _pageCount = Math.Max(_pageCount, count);
 
     public List<ToolDef> GetToolDefs()
     {
@@ -95,12 +90,71 @@ public sealed class ToolRegistry
         return $"{{\"ok\":false,\"error\":\"tool_not_found: {Escape(toolName)}\"}}";
     }
 
-    static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    static string Escape(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var sb = new System.Text.StringBuilder(s.Length + 8);
+        foreach (var ch in s)
+        {
+            switch (ch)
+            {
+                case '\\': sb.Append("\\\\"); break;
+                case '"': sb.Append("\\\""); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    if (char.IsControl(ch)) sb.Append(' ');
+                    else sb.Append(ch);
+                    break;
+            }
+        }
+        return sb.ToString();
+    }
 
     public int GetActiveToolCount()
     {
         int count = _hostTools.Count;
         foreach (var (_, cap) in _caps) count += cap.GetTools().Count;
         return count;
+    }
+
+    /// <summary>
+    /// 收集所有插件的状态快照（IAgentCapability.GetContextSnapshot hook），
+    /// 用于每轮对话注入 system prompt，让 LLM 无需调用查询工具即可感知当前状态。
+    /// </summary>
+    public string BuildContextPrompt()
+    {
+        var sections = new List<string>();
+        try
+        {
+            var host = GetHostImpl();
+            if (host is HostHandle hh)
+            {
+                foreach (var cap in hh.GetCapabilities())
+                {
+                    if (cap is HostAgentCapability hc)
+                    {
+                        var s = SafeSnapshot(hc);
+                        if (s != null) sections.Add(s);
+                        break;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        foreach (var (pluginId, cap) in _caps)
+        {
+            var s = SafeSnapshot(cap);
+            if (s != null) sections.Add(s);
+        }
+        return string.Join("\n", sections);
+    }
+
+    static string? SafeSnapshot(IAgentCapability cap)
+    {
+        try { return cap.GetContextSnapshot(); }
+        catch { return null; }
     }
 }

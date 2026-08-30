@@ -79,6 +79,14 @@ Copy-Item $pluginDll $pluginsDir -Force
 Copy-Item $weatherDll $pluginsDir -Force
 foreach ($dll in $moreDlls) { Copy-Item $dll $pluginsDir -Force }
 
+Write-Host "=== Copy weather icons ===" -ForegroundColor Cyan
+$weatherIconsSrc = "$Root\assets\weather-icons"
+if (Test-Path $weatherIconsSrc) {
+    Copy-Item $weatherIconsSrc "$pluginsDir\WeatherIcons" -Recurse -Force
+} else {
+    Write-Warning "assets\weather-icons not found, weather plugin will fall back to emoji icons"
+}
+
 Write-Host "=== Trim locale folders ===" -ForegroundColor Cyan
 Get-ChildItem $output -Directory | Where-Object {
     $_.Name -match '^[a-z]{2,3}(-[A-Za-z0-9]+){1,2}$' -and $_.Name -notlike 'zh-CN' -and $_.Name -notlike 'en-US' -and $_.Name -notlike 'en-us'

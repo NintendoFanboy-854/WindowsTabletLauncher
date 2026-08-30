@@ -98,7 +98,10 @@ public sealed class TodoStore
             }
             catch (Exception ex)
             {
+                // 损坏数据备份到独立配置键，避免空列表覆写导致永久丢失
                 _host.LogError($"Todo: failed to load items: {ex.Message}");
+                try { _host.SetConfig(PluginId, "items_corrupt_backup", raw.Length > 512 * 1024 ? raw[..(512 * 1024)] : raw); } catch { }
+                _host.ShowNotification("待办", "待办数据解析失败，原数据已备份（items_corrupt_backup）。", false);
                 Items = new();
             }
         }
@@ -123,6 +126,20 @@ public sealed class TodoStore
     public void Save()
     {
         if (!_dirty) return;
+        Persist();
+        Changed?.Invoke();
+    }
+
+    // Persists without broadcasting Changed; used by in-place detail edits so
+    // the open editor is not rebuilt (which would destroy focus/scroll state).
+    public void SaveQuiet()
+    {
+        _dirty = true;
+        Persist();
+    }
+
+    void Persist()
+    {
         try
         {
             _host.SetConfig(PluginId, "items", JsonSerializer.Serialize(Items));
@@ -130,7 +147,6 @@ public sealed class TodoStore
         }
         catch (Exception ex) { _host.LogError($"Todo: failed to save items: {ex.Message}"); }
         _dirty = false;
-        Changed?.Invoke();
     }
 
     public TodoItem Add(string text, string? list = null)
@@ -174,6 +190,17 @@ public sealed class TodoStore
         _dirty = true; InvalidateListNamesCache();
         _host.Log($"Todo: cleared {n} completed");
         Save();
+    }
+
+    /// <summary>清空全部内存态并落盘（供 ResetConfig 使用）。</summary>
+    public void ResetAll()
+    {
+        Items = new();
+        _lists.Clear();
+        InvalidateListNamesCache();
+        _dirty = true;
+        Persist();
+        Changed?.Invoke();
     }
 
     public TodoItem? FindById(string id)

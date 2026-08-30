@@ -21,7 +21,7 @@ public abstract class AgentCapabilityBase : IAgentCapability
 
     public Task<string> InvokeAsync(string tool, string argumentsJson)
     {
-        var tcs = new TaskCompletionSource<string>();
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         void Run()
         {
             try { tcs.SetResult(HandleTool(tool, argumentsJson ?? "{}")); }
@@ -29,7 +29,8 @@ public abstract class AgentCapabilityBase : IAgentCapability
         }
 
         if (_dispatcher.HasThreadAccess) Run();
-        else _dispatcher.TryEnqueue(Run);
+        else if (!_dispatcher.TryEnqueue(Run))
+            tcs.TrySetResult("{\"ok\":false,\"error\":\"dispatcher_unavailable\"}");
         return tcs.Task;
     }
 }

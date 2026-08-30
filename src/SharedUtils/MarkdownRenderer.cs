@@ -29,9 +29,12 @@ public static class MarkdownRenderer
     static readonly FontFamily CodeFontFamily = new("Consolas");
 
     static readonly Dictionary<string, MarkdownDocument> ParseCache = new();
+    static readonly Queue<string> ParseCacheOrder = new();
     static readonly object ParseCacheLock = new();
+    const int ParseCacheCapacity = 50;
+    const int ParseCacheMaxKeyLength = 8192;
 
-    public static Panel Render(string markdown, Brush primary, Brush secondary, double fontSize = 13)
+    public static Panel Render(string markdown, Brush primary, Brush secondary, double fontSize = 13, bool useCache = true)
     {
         var panel = new StackPanel { Spacing = 4 };
         if (string.IsNullOrWhiteSpace(markdown))
@@ -42,17 +45,9 @@ public static class MarkdownRenderer
 
         try
         {
-            MarkdownDocument doc;
-            lock (ParseCacheLock)
-            {
-                if (!ParseCache.TryGetValue(markdown, out doc!))
-                {
-                    doc = Markdown.Parse(markdown, Pipeline);
-                    if (ParseCache.Count >= 50)
-                        ParseCache.Clear();
-                    ParseCache[markdown] = doc;
-                }
-            }
+            var doc = useCache && markdown.Length <= ParseCacheMaxKeyLength
+                ? GetCachedDocument(markdown)
+                : Markdown.Parse(markdown, Pipeline);
             foreach (var block in doc)
                 RenderBlock(block, panel, primary, secondary, fontSize);
         }
@@ -61,6 +56,26 @@ public static class MarkdownRenderer
             panel.Children.Add(new TextBlock { Text = markdown, FontSize = fontSize, Foreground = primary, TextWrapping = TextWrapping.Wrap });
         }
         return panel;
+    }
+
+    static MarkdownDocument GetCachedDocument(string markdown)
+    {
+        lock (ParseCacheLock)
+        {
+            if (ParseCache.TryGetValue(markdown, out var doc))
+                return doc!;
+        }
+        var parsed = Markdown.Parse(markdown, Pipeline);
+        lock (ParseCacheLock)
+        {
+            if (ParseCache.TryGetValue(markdown, out var existing))
+                return existing!;
+            ParseCache[markdown] = parsed;
+            ParseCacheOrder.Enqueue(markdown);
+            while (ParseCacheOrder.Count > ParseCacheCapacity)
+                ParseCache.Remove(ParseCacheOrder.Dequeue());
+            return parsed;
+        }
     }
 
     static void RenderBlock(Markdig.Syntax.Block block, StackPanel panel, Brush primary, Brush secondary, double fontSize)
@@ -72,14 +87,14 @@ public static class MarkdownRenderer
             {
                 double hf = h.Level switch { 1 => f + 5, 2 => f + 2, _ => f };
                 var tb = new TextBlock { FontSize = hf, Foreground = primary, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-                RenderInlines(h.Inline, tb.Inlines, primary, secondary);
+                RenderInlines(h.Inline, tb.Inlines, primary, secondary, f);
                 panel.Children.Add(tb);
                 break;
             }
             case ParagraphBlock p:
             {
                 var tb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-                RenderInlines(p.Inline, tb.Inlines, primary, secondary);
+                RenderInlines(p.Inline, tb.Inlines, primary, secondary, f);
                 panel.Children.Add(tb);
                 break;
             }
@@ -174,7 +189,7 @@ public static class MarkdownRenderer
                     {
                         if (tCell is not TableCell cell || colIdx >= colCount) continue;
                         var cellTb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-                        cellTb.Inlines.Add(new Run { Text = ExtractText(cell), Foreground = primary });
+                        cellTb.Inlines.Add(new Run { Text = ExtractText(cell) });
                         Grid.SetRow(cellTb, rowIdx);
                         Grid.SetColumn(cellTb, colIdx);
 
@@ -200,9 +215,9 @@ public static class MarkdownRenderer
             default:
                 if (block is LeafBlock leaf && leaf.Inline != null)
                 {
-                    var tb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
-                    RenderInlines(leaf.Inline, tb.Inlines, primary, secondary);
-                    panel.Children.Add(tb);
+                var tb = new TextBlock { FontSize = f, Foreground = primary, TextWrapping = TextWrapping.Wrap };
+                RenderInlines(leaf.Inline, tb.Inlines, primary, secondary, f);
+                panel.Children.Add(tb);
                 }
                 break;
         }
@@ -228,7 +243,7 @@ public static class MarkdownRenderer
                 AppendInlineText(child, sb);
     }
 
-    static void RenderInlines(ContainerInline? container, InlineCollection target, Brush primary, Brush secondary)
+    static void RenderInlines(ContainerInline? container, InlineCollection target, Brush primary, Brush secondary, double f)
     {
         if (container == null) return;
         foreach (var inline in container)
@@ -236,7 +251,7 @@ public static class MarkdownRenderer
             switch (inline)
             {
                 case LiteralInline lit:
-                    target.Add(new Run { Text = lit.Content.ToString() ?? "", Foreground = primary });
+                    target.Add(new Run { Text = lit.Content.ToString() ?? "" });
                     break;
                 case EmphasisInline em:
                 {
@@ -245,7 +260,7 @@ public static class MarkdownRenderer
                         span.FontWeight = FontWeights.Bold;
                     else
                         span.FontStyle = FontStyle.Italic;
-                    RenderInlines(em, span.Inlines, primary, secondary);
+                    RenderInlines(em, span.Inlines, primary, secondary, f);
                     target.Add(span);
                     break;
                 }
@@ -255,7 +270,7 @@ public static class MarkdownRenderer
                     {
                         Text = ci.Content,
                         FontFamily = CodeFontFamily,
-                        FontSize = 12,
+                        FontSize = Math.Max(10, f - 1),
                         Foreground = InlineCodeBrush
                     };
                     target.Add(run);
@@ -265,13 +280,13 @@ public static class MarkdownRenderer
                 {
                     var span = new Span();
                     span.Foreground = LinkBrush;
-                    RenderInlines(link, span.Inlines, primary, secondary);
+                    RenderInlines(link, span.Inlines, primary, secondary, f);
                     target.Add(span);
                     break;
                 }
                 default:
                     if (inline is ContainerInline ci2)
-                        RenderInlines(ci2, target, primary, secondary);
+                        RenderInlines(ci2, target, primary, secondary, f);
                     break;
             }
         }

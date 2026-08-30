@@ -45,15 +45,23 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         _monitor.Interval = TimeSpan.FromSeconds(PollSeconds);
         _monitor.IsRepeating = true;
         _monitor.Tick += (_, _) => Poll();
-        _monitor.Start();
 
         RestoreState();
+        SetMonitor(Enabled);
+    }
 
-        var firstRun = (_host.GetConfig(PluginId, "first_run") ?? "true") == "true";
-        if (firstRun)
-        {
-            _host.SetConfig(PluginId, "first_run", "false");
-        }
+    void SetMonitor(bool on)
+    {
+        if (_monitor == null) return;
+        if (on) { if (!_monitor.IsRunning) _monitor.Start(); }
+        else _monitor.Stop();
+    }
+
+    void RefreshWidgetOnUi()
+    {
+        if (_widget == null) return;
+        if (_dispatcher.HasThreadAccess) _widget.Refresh();
+        else _dispatcher.TryEnqueue(() => _widget?.Refresh());
     }
 
     public IReadOnlyList<IWidget> GetWidgets()
@@ -250,7 +258,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         var panel = new StackPanel { Spacing = 12, Margin = new Thickness(0, 8, 0, 4) };
 
         var enable = new ToggleSwitch { Header = "启用久坐监控", IsOn = Enabled };
-        enable.Toggled += (_, _) => _host.SetConfig(PluginId, "enabled", enable.IsOn ? "true" : "false");
+        enable.Toggled += (_, _) => { _host.SetConfig(PluginId, "enabled", enable.IsOn ? "true" : "false"); SetMonitor(Enabled); };
         panel.Children.Add(enable);
 
         panel.Children.Add(MakeNumber("久坐阈值（分钟）", "threshold_min", 60, 240));
@@ -283,6 +291,17 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         host.SetConfig(PluginId, "hourly_today", "");
         host.SetConfig(PluginId, "hourly_date", "");
         host.SetConfig(PluginId, "last_reminder_ticks", "");
+        host.SetConfig(PluginId, "today_seconds", "");
+        // 彻底重置：清内存态并恢复监控运行，防止统计数据被写回"复活"
+        _activeSeconds = 0;
+        _todaySeconds = 0;
+        _breaksToday = 0;
+        Array.Clear(_hourly);
+        _today = DateTime.Today;
+        _lastReminderTime = DateTime.MinValue;
+        _persistCounter = 0;
+        SetMonitor(Enabled);
+        _widget?.HideInfoBar();
         _widget?.Refresh();
     }
 
@@ -328,7 +347,9 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
             {
                 var on = AgentJson.GetBool(argumentsJson, "enabled") ?? true;
                 _host.SetConfig(PluginId, "enabled", on ? "true" : "false");
-                _widget?.Refresh();
+                if (_dispatcher.HasThreadAccess) SetMonitor(Enabled);
+                else _dispatcher.TryEnqueue(() => SetMonitor(Enabled));
+                RefreshWidgetOnUi();
                 return Task.FromResult(AgentJson.Serialize(new { ok = true, enabled = on }));
             }
 
@@ -337,7 +358,7 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
                 var mins = AgentJson.GetInt(argumentsJson, "minutes");
                 if (mins is not > 0) return Task.FromResult(AgentJson.Error("invalid_minutes"));
                 _host.SetConfig(PluginId, "threshold_min", mins.Value.ToString());
-                _widget?.Refresh();
+                RefreshWidgetOnUi();
                 return Task.FromResult(AgentJson.Serialize(new { ok = true, thresholdMinutes = mins.Value }));
             }
 
@@ -361,6 +382,16 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         }
     }
 
+    /// <summary>AI 状态快照 hook。</summary>
+    string? IAgentCapability.GetContextSnapshot()
+    {
+        try
+        {
+            return $"久坐: 连续 {_activeSeconds / 60} 分钟（阈值 {ThresholdMin} 分钟），今日 {_todaySeconds / 60} 分钟，起身 {_breaksToday} 次，{(Enabled ? "监控中" : "已关闭")}";
+        }
+        catch { return null; }
+    }
+
     class SedentaryWidgetInfo : IWidget
     {
         readonly IHostHandle _host;
@@ -380,7 +411,11 @@ public class SedentaryPlugin : IPlugin, IPluginSettings, IAgentCapability
         public object CreateControl()
         {
             _control.SetWidgetBackground((Brush)_host.GetWidgetBackgroundBrush());
-            if (_firstRun) _control.ShowTeachingTipIfNeeded();
+            if (_firstRun)
+            {
+                _control.ShowTeachingTipIfNeeded(() =>
+                    _host.SetConfig(nameof(SedentaryPlugin), "first_run", "false"));
+            }
             return _control;
         }
     }

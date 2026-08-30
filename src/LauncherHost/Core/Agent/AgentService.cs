@@ -28,6 +28,7 @@ public sealed class AgentService
     public string Thinking => _thinking;
     public string Provider => _provider;
     public ConversationHistory History => _history;
+    public MemoryStore Memory => _memory;
 
     public AgentService(IHostHandle host)
     {
@@ -134,7 +135,11 @@ public sealed class AgentService
         Action<string, string>? onToolResult,
         Action<string>? onError)
     {
-        if (IsBusy) return;
+        if (IsBusy)
+        {
+            onError?.Invoke("busy");
+            return;
+        }
 
         ReloadConfig();
         EnsureClient();
@@ -145,20 +150,22 @@ public sealed class AgentService
             return;
         }
 
-        _cts = new CancellationTokenSource();
-        _currentLoop = new AgentLoop(_client, _toolRegistry, _memory, _history);
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        var loop = new AgentLoop(_client, _toolRegistry, _memory, _history);
+        _currentLoop = loop;
 
-        _currentLoop.OnThinking += d => { onThinking?.Invoke(d); OnThinking?.Invoke(d); };
-        _currentLoop.OnContent += d => { onContent?.Invoke(d); OnContent?.Invoke(d); };
-        _currentLoop.OnToolStart += (n, a) => { onToolStart?.Invoke(n, a); OnToolStart?.Invoke(n, a); };
-        _currentLoop.OnToolResult += (n, r) => { onToolResult?.Invoke(n, r); OnToolResult?.Invoke(n, r); };
-        _currentLoop.OnError += e => { onError?.Invoke(e); OnError?.Invoke(e); };
-        _currentLoop.OnRetry += () =>
+        loop.OnThinking += d => { onThinking?.Invoke(d); OnThinking?.Invoke(d); };
+        loop.OnContent += d => { onContent?.Invoke(d); OnContent?.Invoke(d); };
+        loop.OnToolStart += (n, a) => { onToolStart?.Invoke(n, a); OnToolStart?.Invoke(n, a); };
+        loop.OnToolResult += (n, r) => { onToolResult?.Invoke(n, r); OnToolResult?.Invoke(n, r); };
+        loop.OnError += e => { onError?.Invoke(e); OnError?.Invoke(e); };
+        loop.OnRetry += () =>
         {
             OnAgentRetry?.Invoke();
             _host.ShowNotification("自动重试", "模型未返回最终回答，正在重试…", false);
         };
-        _currentLoop.OnRetryExhausted += () =>
+        loop.OnRetryExhausted += () =>
         {
             OnAgentRetryExhausted?.Invoke();
             _host.ShowNotification("重试失败", "已达最大重试次数，可展开查看思考内容", false);
@@ -168,7 +175,7 @@ public sealed class AgentService
 
         try
         {
-            var result = await run(_currentLoop, _cts.Token);
+            var result = await run(loop, cts.Token);
             _host.Log($"Agent: completed, length={result.Length}");
         }
         catch (OperationCanceledException) { }
@@ -181,9 +188,13 @@ public sealed class AgentService
         }
         finally
         {
-            _currentLoop = null;
-            _cts?.Dispose();
-            _cts = null;
+            if (ReferenceEquals(_currentLoop, loop))
+                _currentLoop = null;
+            if (ReferenceEquals(_cts, cts))
+            {
+                _cts.Dispose();
+                _cts = null;
+            }
             NotifyBusy();
         }
     }
@@ -201,8 +212,8 @@ public sealed class AgentService
 
     public void Abort()
     {
-        _cts?.Cancel();
-        _currentLoop = null;
+        try { _cts?.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 
     public void ClearHistory()

@@ -1,4 +1,3 @@
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -10,6 +9,10 @@ using Windows.UI;
 
 namespace SedentaryPlugin;
 
+/// <summary>
+/// 久坐提醒 tile（Fluent 2）：状态点（Success/Caution/Critical 语义色）+ 字阶 + 卡片描边 + hover；
+/// overlay：统计 chips 卡 + 分时/近7天图表卡 + accent 主按钮。
+/// </summary>
 public sealed class SedentaryWidget : UserControl
 {
     readonly IHostHandle _host;
@@ -19,6 +22,7 @@ public sealed class SedentaryWidget : UserControl
     InfoBar? _infoBar;
 
     Border _root = null!;
+    Border _hoverLayer = null!;
     Ellipse _dot = null!;
     TextBlock _mins = null!;
 
@@ -38,27 +42,49 @@ public sealed class SedentaryWidget : UserControl
 
     void BuildUi()
     {
+        var theme = ((FrameworkElement)this).ActualTheme;
         _dot = new Ellipse { Width = 22, Height = 22, HorizontalAlignment = HorizontalAlignment.Center };
-        _mins = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Text = "0m" };
+        _mins = Fluent.Text("0m", theme, "caption", Fluent.TextSecondary(theme));
+        _mins.HorizontalAlignment = HorizontalAlignment.Center;
 
-        var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var stack = new StackPanel { Spacing = 6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         stack.Children.Add(_dot);
         stack.Children.Add(_mins);
 
-        _root = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(8), Child = stack };
+        _root = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8),
+            Child = stack
+        };
+        _hoverLayer = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = Fluent.SubtleHover(theme),
+            Opacity = 0,
+            IsHitTestVisible = false
+        };
+
+        var grid = new Grid();
+        grid.Children.Add(_root);
+        grid.Children.Add(_hoverLayer);
+
         _root.Tapped += (_, _) => OpenDetail();
-        Content = _root;
+        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
+        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
+        Content = grid;
     }
 
     void ApplyTheme(ElementTheme theme)
     {
         _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
-        _mins.Foreground = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
+        _root.BorderBrush = Fluent.CardStroke(theme);
+        _root.BorderThickness = new Thickness(1);
+        _hoverLayer.Background = Fluent.SubtleHover(theme);
+        _mins.Foreground = Fluent.TextSecondary(theme);
     }
 
-    static Color StatusColor(int active, int threshold)
+    Color StatusColor(int active, int threshold)
     {
         var ratio = threshold > 0 ? (double)active / threshold : 0;
         if (ratio >= 1.0) return Color.FromArgb(0xFF, 0xE0, 0x3A, 0x3A);
@@ -82,52 +108,75 @@ public sealed class SedentaryWidget : UserControl
     void OpenDetail()
     {
         var theme = ((FrameworkElement)this).ActualTheme;
-        var primary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1A, 0x1A))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        var secondary = theme == ElementTheme.Light
-            ? new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF));
-
         var s = _state();
-        var body = new StackPanel { Spacing = 12, MinWidth = 340 };
 
-        Row(body, "连续久坐", $"{s.ActiveSeconds / 60} 分钟", primary, secondary);
-        Row(body, "今日累计", $"{s.TodaySeconds / 60} 分钟", primary, secondary);
-        Row(body, "提醒阈值", $"{s.ThresholdSeconds / 60} 分钟", primary, secondary);
-        Row(body, "起身次数", s.Breaks.ToString(), primary, secondary);
+        var body = new StackPanel { Spacing = 12 };
 
-        var reset = new Button { Content = "我起来了", MinWidth = 120, HorizontalAlignment = HorizontalAlignment.Left };
+        // 统计 chips + 阈值进度条
+        var stats = new (string, string)[]
+        {
+            ("连续久坐", $"{s.ActiveSeconds / 60} 分钟"),
+            ("今日累计", $"{s.TodaySeconds / 60} 分钟"),
+            ("提醒阈值", $"{s.ThresholdSeconds / 60} 分钟"),
+            ("起身次数", s.Breaks.ToString()),
+        };
+        var chipGrid = new Grid { ColumnSpacing = 8 };
+        foreach (var _ in stats) chipGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (int i = 0; i < stats.Length; i++)
+        {
+            var cell = new StackPanel { Spacing = 1 };
+            cell.Children.Add(Fluent.Text(stats[i].Item1, theme, "caption", Fluent.TextTertiary(theme)));
+            cell.Children.Add(Fluent.Text(stats[i].Item2, theme, "bodyStrong", Fluent.TextPrimary(theme)));
+            var chip = Fluent.Card(theme, new Thickness(10, 6, 10, 8), 4);
+            chip.Background = Fluent.CardBgSecondary(theme);
+            chip.Child = cell;
+            Grid.SetColumn(chip, i);
+            chipGrid.Children.Add(chip);
+        }
+        var statsCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        var statsWrap = new StackPanel { Spacing = 10 };
+        statsWrap.Children.Add(chipGrid);
+
+        var ratio = s.ThresholdSeconds > 0 ? (double)s.ActiveSeconds / s.ThresholdSeconds : 0;
+        var pb = new ProgressBar
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = Math.Clamp(ratio * 100, 0, 100),
+            Height = 4,
+            CornerRadius = new CornerRadius(2)
+        };
+        pb.Foreground = ratio >= 1.0 ? Fluent.Critical(theme) : ratio >= 0.6 ? Fluent.Caution(theme) : Fluent.Success(theme);
+        statsWrap.Children.Add(pb);
+        statsWrap.Children.Add(Fluent.Text(
+            ratio >= 1.0 ? "已达到提醒阈值，快起身活动！"
+            : ratio >= 0.6 ? "接近提醒阈值，稍后休息一下"
+            : "状态良好，继续保持",
+            theme, "caption", Fluent.TextSecondary(theme)));
+        statsCard.Child = statsWrap;
+        body.Children.Add(statsCard);
+
+        // 图表卡
+        var chartBody = new StackPanel { Spacing = 10 };
+        chartBody.Children.Add(Fluent.Text("今日分时久坐", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
+        var barData = s.Hourly.Select((v, i) => ($"{i:D2}", (double)v / 60d)).ToList();
+        chartBody.Children.Add(MiniChart.Bars(barData, Fluent.Accent(), Fluent.TextSecondary(theme), 80));
+
+        chartBody.Children.Add(Fluent.Text("近 7 天久坐总量", theme, "bodyLargeStrong", Fluent.TextPrimary(theme)));
+        var lineData = s.Last7.Select(d => (d.date.ToString("MM-dd"), (double)d.minutes)).ToList();
+        chartBody.Children.Add(MiniChart.Line(lineData, Fluent.Caution(theme), Fluent.TextSecondary(theme)));
+        var chartCard = Fluent.Card(theme, new Thickness(16, 14, 16, 16));
+        chartCard.Child = chartBody;
+        body.Children.Add(chartCard);
+
+        // 操作
+        var reset = new Button { Content = "我起来了", MinWidth = 128, Padding = new Thickness(16, 6, 16, 8), HorizontalAlignment = HorizontalAlignment.Left };
+        if (Application.Current.Resources.TryGetValue("AccentButtonStyle", out var accentStyle) && accentStyle is Style accent)
+            reset.Style = accent;
         reset.Click += (_, _) => { _onReset(); Refresh(); };
         body.Children.Add(reset);
 
-        body.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x30, 0x88, 0x88, 0x88)) });
-
-        // hourly bar chart
-        body.Children.Add(new TextBlock { Text = "今日分时久坐", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary });
-        var barData = s.Hourly.Select((v, i) => ($"{i:D2}", (double)v / 60d)).ToList();
-        body.Children.Add(MiniChart.Bars(barData, new SolidColorBrush(Color.FromArgb(0xFF, 0x62, 0xA0, 0xE0)), secondary, 80));
-
-        // 7-day line chart
-        body.Children.Add(new TextBlock { Text = "近 7 天久坐总量", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary, Margin = new Thickness(0, 8, 0, 0) });
-        var lineData = s.Last7.Select(d => (d.date.ToString("MM-dd"), (double)d.minutes)).ToList();
-        body.Children.Add(MiniChart.Line(lineData, new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
-
         _overlay.Show(this, "久坐提醒", body, _host.Log);
-    }
-
-    static void Row(Panel container, string label, string value, Brush primary, Brush secondary)
-    {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var l = new TextBlock { Text = label, FontSize = 14, Foreground = secondary };
-        Grid.SetColumn(l, 0);
-        var v = new TextBlock { Text = value, FontSize = 16, Foreground = primary };
-        Grid.SetColumn(v, 1);
-        grid.Children.Add(l);
-        grid.Children.Add(v);
-        container.Children.Add(grid);
     }
 
     internal void SetWidgetBackground(Brush brush) => _root.Background = brush;
@@ -135,6 +184,8 @@ public sealed class SedentaryWidget : UserControl
     public void ShowInfoBar(int minutes)
     {
         if (_infoBar != null) return;
+        var parent = _root.Parent as Panel;
+        if (parent == null) return;
         _infoBar = new InfoBar
         {
             Message = $"你已经连续坐了 {minutes} 分钟，起来活动一下吧！",
@@ -144,9 +195,7 @@ public sealed class SedentaryWidget : UserControl
         };
         ((Button)_infoBar.ActionButton).Click += (_, _) => { _onReset(); HideInfoBar(); };
         _infoBar.CloseButtonClick += (_, _) => HideInfoBar();
-
-        var parent = _root.Parent as Panel;
-        parent?.Children.Add(_infoBar);
+        parent.Children.Add(_infoBar);
     }
 
     public void HideInfoBar()
@@ -158,32 +207,44 @@ public sealed class SedentaryWidget : UserControl
         _infoBar = null;
     }
 
-    public void ShowTeachingTipIfNeeded()
+    /// <summary>
+    /// 首次使用引导。控件可能尚未进入可视树，因此统一等 Loaded 后再弹出；
+    /// 提示关闭（含 light dismiss）后回调 onShown，由插件标记 first_run=false。
+    /// </summary>
+    public void ShowTeachingTipIfNeeded(Action? onShown = null)
     {
-        if (_root.XamlRoot == null) return;
-        var tip = new TeachingTip
-        {
-            Target = _root,
-            Title = "久坐提醒",
-            Subtitle = "当你连续久坐超过阈值时，这里会提醒你起身活动。点击圆点可查看详细数据。",
-            IsLightDismissEnabled = true,
-            PreferredPlacement = TeachingTipPlacementMode.Bottom
-        };
+        if (_tipShown) return;
+        _tipShown = true;
 
-        if (_root.IsLoaded)
+        void ShowTip()
         {
+            var tip = new TeachingTip
+            {
+                Target = _root,
+                Title = "久坐提醒",
+                Subtitle = "当你连续久坐超过阈值时，这里会提醒你起身活动。点击圆点可查看详细数据。",
+                IsLightDismissEnabled = true,
+                PreferredPlacement = TeachingTipPlacementMode.Bottom
+            };
+            tip.Closed += (_, _) => onShown?.Invoke();
             tip.IsOpen = true;
-            return;
         }
 
-        RoutedEventHandler onLoaded = null!;
-        onLoaded = (_, _) =>
+        if (this.XamlRoot != null && this.IsLoaded)
         {
-            _root.Loaded -= onLoaded;
-            tip.IsOpen = true;
-        };
-        _root.Loaded += onLoaded;
-
-        tip.Closed += (_, _) => _root.Loaded -= onLoaded;
+            ShowTip();
+        }
+        else
+        {
+            RoutedEventHandler onLoaded = null!;
+            onLoaded = (_, _) =>
+            {
+                Loaded -= onLoaded;
+                ShowTip();
+            };
+            Loaded += onLoaded;
+        }
     }
+
+    bool _tipShown;
 }

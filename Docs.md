@@ -22,3 +22,15 @@
 - 联网搜索：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/text-generation/tool-calling/web-search
   > 警告：这个`联网搜索`的文档有问题，我们并不需要联网搜索，就算真的需要联网搜索，也应该是用我们自己本地实现的插件来实现，而不是直接使用小米的联网搜索功能。具体还是要看`Chat Completions API 兼容`里面的`tools`字段的内容，里面有提到相关的。`联网搜索`的文档仅仅作为参考。
 - 语音识别（MiMo-V2.5-ASR）：https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/Speech-Recognition
+
+## 和风天气
+- GeoAPI：https://dev.qweather.com/docs/api/geoapi/
+- 天气预报：https://dev.qweather.com/docs/api/weather/
+- 分钟预报：https://dev.qweather.com/docs/api/minutely/
+- 预警：https://dev.qweather.com/docs/api/warning/
+- 天气指数：https://dev.qweather.com/docs/api/indices/
+- 空气质量：https://dev.qweather.com/docs/api/air-quality/
+- 时光机：https://dev.qweather.com/docs/api/time-machine/
+- 天文：https://dev.qweather.com/docs/api/astronomy/
+- 控制台API：https://dev.qweather.com/docs/api/console/
+- 按量计费定价：https://dev.qweather.com/docs/finance/pricing/

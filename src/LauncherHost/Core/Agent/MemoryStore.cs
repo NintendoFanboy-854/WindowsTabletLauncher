@@ -6,6 +6,7 @@ public sealed class MemoryStore
 {
     readonly string _path;
     readonly List<(string Key, string Value)> _facts = new();
+    readonly object _gate = new();
     const int MaxFacts = 100;
 
     public MemoryStore()
@@ -16,32 +17,45 @@ public sealed class MemoryStore
         Load();
     }
 
-    public IReadOnlyList<(string Key, string Value)> Facts => _facts;
+    public IReadOnlyList<(string Key, string Value)> Facts
+    {
+        get { lock (_gate) return _facts.ToList(); }
+    }
 
     public void SetFact(string key, string value)
     {
-        SetFactInternal(key, value);
-        Save();
+        lock (_gate)
+        {
+            SetFactInternal(key, value);
+            Save();
+        }
     }
 
-    public void ApplyFromJson(string jsonResult)
+    public void Clear()
     {
-        try
+        lock (_gate)
         {
-            var doc = JsonDocument.Parse(jsonResult);
-            if (doc.RootElement.TryGetProperty("facts", out var arr))
-            {
-                foreach (var f in arr.EnumerateArray())
-                {
-                    var key = f.GetProperty("key").GetString();
-                    var value = f.GetProperty("value").GetString();
-                    if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
-                        SetFactInternal(key, value);
-                }
-                Save();
-            }
+            _facts.Clear();
+            Save();
         }
-        catch { }
+    }
+
+    public void ReloadFromDisk()
+    {
+        lock (_gate)
+        {
+            _facts.Clear();
+            Load();
+        }
+    }
+
+    public string ToPromptSection()
+    {
+        lock (_gate)
+        {
+            if (_facts.Count == 0) return "";
+            return "用户信息:\n" + string.Join("\n", _facts.Select(f => "- " + f.Key + ": " + f.Value)) + "\n";
+        }
     }
 
     void SetFactInternal(string key, string value)
@@ -52,18 +66,6 @@ public sealed class MemoryStore
 
         while (_facts.Count > MaxFacts)
             _facts.RemoveAt(0);
-    }
-
-    public string ToPromptSection()
-    {
-        if (_facts.Count == 0) return "";
-        return "用户信息:\n" + string.Join("\n", _facts.Select(f => "- " + f.Key + ": " + f.Value)) + "\n";
-    }
-
-    public void Clear()
-    {
-        _facts.Clear();
-        Save();
     }
 
     void Load()
@@ -77,7 +79,11 @@ public sealed class MemoryStore
                 foreach (var pair in list)
                     if (pair.Count >= 2) _facts.Add((pair[0], pair[1]));
         }
-        catch { _facts.Clear(); }
+        catch (Exception ex)
+        {
+            Log($"memory.json parse failed: {ex.Message}");
+            _facts.Clear();
+        }
     }
 
     void Save()
@@ -86,8 +92,15 @@ public sealed class MemoryStore
         {
             var list = _facts.Select(f => new List<string> { f.Key, f.Value }).ToList();
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            File.WriteAllText(_path, JsonSerializer.Serialize(list));
+            var tmp = _path + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(list));
+            File.Move(tmp, _path, true);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"memory.json save failed: {ex.Message}");
+        }
     }
+
+    static void Log(string message) => Services.LogService.Warn($"MemoryStore: {message}");
 }

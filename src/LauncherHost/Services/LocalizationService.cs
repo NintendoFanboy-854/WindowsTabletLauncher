@@ -6,7 +6,9 @@ namespace LauncherHost.Services;
 public class LocalizationService
 {
     private readonly string _stringsDir;
-    private Dictionary<string, JsonObject> _cache = new();
+    private readonly Dictionary<string, Dictionary<string, string>> _cache = new();
+    private readonly HashSet<string> _warnedKeys = new();
+    private readonly object _gate = new();
     private string _culture;
 
     public event Action? CultureChanged;
@@ -20,44 +22,62 @@ public class LocalizationService
         EnsureFallback("en-us");
     }
 
-    public string Culture => _culture;
+    public string Culture { get { lock (_gate) return _culture; } }
 
     public void SetCulture(string culture)
     {
-        if (string.Equals(_culture, culture, StringComparison.OrdinalIgnoreCase))
-            return;
-        LoadCulture(culture);
-        _culture = culture;
-        EnsureFallback(culture);
+        lock (_gate)
+        {
+            if (string.Equals(_culture, culture, StringComparison.OrdinalIgnoreCase))
+                return;
+            LoadCulture(culture);
+            _culture = culture;
+            EnsureFallback(culture);
+        }
         CultureChanged?.Invoke();
     }
 
     public string Translate(string key)
     {
-        if (TryGet(_culture, key, out var value))
+        string culture;
+        lock (_gate) culture = _culture;
+
+        if (TryGet(culture, key, out var value))
             return value;
 
-        if (!string.Equals(_culture, "zh-cn", StringComparison.OrdinalIgnoreCase) &&
+        if (!string.Equals(culture, "zh-cn", StringComparison.OrdinalIgnoreCase) &&
             TryGet("zh-cn", key, out value))
             return value;
 
-        if (!string.Equals(_culture, "en-us", StringComparison.OrdinalIgnoreCase) &&
+        if (!string.Equals(culture, "en-us", StringComparison.OrdinalIgnoreCase) &&
             TryGet("en-us", key, out value))
             return value;
 
-        LogService.Warn($"Missing key '{key}' for culture '{_culture}'");
+        WarnMissingKeyOnce(key);
         return key;
+    }
+
+    private void WarnMissingKeyOnce(string key)
+    {
+        lock (_warnedKeys)
+        {
+            if (!_warnedKeys.Add(key)) return;
+        }
+        LogService.Warn($"Missing key '{key}' for culture '{_culture}'");
     }
 
     private bool TryGet(string culture, string key, out string value)
     {
         value = "";
-        if (_cache.TryGetValue(culture, out var json) &&
-            json.TryGetPropertyValue(key, out var node) &&
-            node is not null)
+        lock (_gate)
         {
-            value = node.GetValue<string>();
-            return true;
+            if (_cache.TryGetValue(culture, out var map) &&
+                map.TryGetValue(key, out var v) &&
+                !string.IsNullOrEmpty(v))
+            {
+                value = v;
+                return true;
+            }
         }
         return false;
     }
@@ -81,7 +101,15 @@ public class LocalizationService
         {
             var json = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
             if (json is not null)
-                _cache[culture] = json;
+            {
+                var map = new Dictionary<string, string>(json.Count, StringComparer.Ordinal);
+                foreach (var (key, node) in json)
+                {
+                    if (node is JsonValue v && v.TryGetValue<string>(out var s))
+                        map[key] = s;
+                }
+                _cache[culture] = map;
+            }
         }
         catch (Exception ex)
         {

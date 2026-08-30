@@ -125,18 +125,20 @@ public sealed class DashboardPage
             var todayKey = StatsHelper.TodayKey();
             var today = history.TryGetValue(todayKey, out var tm) ? tm : 0;
 
-            var bodyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 32 };
-            StatCard(bodyRow, "今日久坐", $"{today} 分钟", primary, secondary);
-            StatCard(bodyRow, "周平均", $"{(history.Values.DefaultIfEmpty(0).TakeLast(7).DefaultIfEmpty(0).Average()):F0} 分钟", primary, secondary);
-            body.Children.Add(bodyRow);
-
             var last7 = new List<(string, double)>();
             for (int i = 6; i >= 0; i--)
             {
                 var d = DateTime.Today.AddDays(-i).ToString("yyyy-MM-dd");
                 last7.Add((d[5..], history.TryGetValue(d, out var v) ? v : 0));
             }
-            body.Children.Add(MiniChart.Line(last7.Select(t => (t.Item1, t.Item2)).ToList(), new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
+            var weekAvg = last7.Average(t => t.Item2);
+
+            var bodyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 32 };
+            StatCard(bodyRow, "今日久坐", $"{today} 分钟", primary, secondary);
+            StatCard(bodyRow, "周平均", $"{weekAvg:F0} 分钟", primary, secondary);
+            body.Children.Add(bodyRow);
+
+            body.Children.Add(MiniChart.Line(last7, new SolidColorBrush(Color.FromArgb(0xFF, 0xE0, 0x62, 0x40)), secondary));
         }
         catch { }
     }

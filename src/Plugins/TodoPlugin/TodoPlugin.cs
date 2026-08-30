@@ -54,34 +54,45 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
 
     Task<string> OnUi(Func<string> action)
     {
-        var tcs = new TaskCompletionSource<string>();
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (_dispatcher.HasThreadAccess)
         {
             try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
         }
+        else if (_dispatcher.TryEnqueue(() =>
+        {
+            try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
+        }))
+        {
+            // enqueued
+        }
         else
         {
-            _dispatcher.TryEnqueue(() =>
-            {
-                try { tcs.SetResult(action()); } catch (Exception ex) { tcs.SetException(ex); }
-            });
+            tcs.TrySetResult(AgentJson.Error("dispatcher_unavailable"));
         }
         return tcs.Task;
     }
 
     async void ToggleItem(TodoItem item)
     {
-        if (!item.Done && item.Repeat != RepeatKind.None && item.Deadline is { } dl)
+        try
         {
-            item.Deadline = await NextOccurrenceAsync(dl, item.Repeat);
-            item.Reminded = false;
-            item.Done = false;
-            _host.Log($"Todo: recurring '{item.Text}' rolled to {item.Deadline:yyyy-MM-dd HH:mm}");
-            _store.MarkDirty(); _store.Save();
+            if (!item.Done && item.Repeat != RepeatKind.None && item.Deadline is { } dl)
+            {
+                item.Deadline = await NextOccurrenceAsync(dl, item.Repeat);
+                item.Reminded = false;
+                item.Done = false;
+                _host.Log($"Todo: recurring '{item.Text}' rolled to {item.Deadline:yyyy-MM-dd HH:mm}");
+                _store.MarkDirty(); _store.Save();
+            }
+            else
+            {
+                _store.Toggle(item);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _store.Toggle(item);
+            _host.LogError($"Todo: toggle failed: {ex.Message}");
         }
     }
 
@@ -92,7 +103,9 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         try
         {
             var now = DateTime.Now;
-            foreach (var item in _store.Items)
+            var changed = false;
+            // 快照遍历：await 期间 UI 线程可能增删 Items，避免集合被修改异常
+            foreach (var item in _store.Items.ToList())
             {
                 if (item.Done || item.Reminded || item.Deadline is not { } dl) continue;
                 var remindAt = dl.AddMinutes(-item.LeadMinutes);
@@ -110,21 +123,44 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 {
                     item.Reminded = true;
                 }
-                _store.MarkDirty(); _store.Save();
+                changed = true;
+            }
+            if (changed)
+            {
+                _store.MarkDirty();
+                _store.Save();
             }
         }
         catch (Exception ex) { _host.LogError($"Todo: reminder check failed: {ex.Message}"); }
         finally { _checking = false; }
     }
 
-    async Task<DateTime> NextOccurrenceAsync(DateTime from, RepeatKind repeat) => repeat switch
+    async Task<DateTime> NextOccurrenceAsync(DateTime from, RepeatKind repeat)
     {
-        RepeatKind.Daily => from.AddDays(1),
-        RepeatKind.Weekly => from.AddDays(7),
-        RepeatKind.Monthly => from.AddMonths(1),
-        RepeatKind.Workday => (await _holiday.NextWorkdayAsync(from)).Date + from.TimeOfDay,
-        _ => from
-    };
+        var next = repeat switch
+        {
+            RepeatKind.Daily => from.AddDays(1),
+            RepeatKind.Weekly => from.AddDays(7),
+            RepeatKind.Monthly => from.AddMonths(1),
+            RepeatKind.Workday => (await _holiday.NextWorkdayAsync(from)).Date + from.TimeOfDay,
+            _ => from
+        };
+        // 追赶到未来：设备关机数天后重开时，避免连环补发过期提醒
+        var guard = 0;
+        while (next <= DateTime.Now && guard++ < 400)
+        {
+            next = repeat switch
+            {
+                RepeatKind.Daily => next.AddDays(1),
+                RepeatKind.Weekly => next.AddDays(7),
+                RepeatKind.Monthly => next.AddMonths(1),
+                RepeatKind.Workday => (await _holiday.NextWorkdayAsync(DateTime.Now)).Date + from.TimeOfDay,
+                _ => next
+            };
+            if (repeat == RepeatKind.Workday) break; // Workday 一次跳跃已基于当前时间
+        }
+        return next;
+    }
 
     object IPluginSettings.CreateSettingsControl()
     {
@@ -148,11 +184,15 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
     void IPluginSettings.ResetConfig(IHostHandle host)
     {
         host.SetConfig(PluginId, "items", "[]");
+        host.SetConfig(PluginId, "items_corrupt_backup", "");
+        host.SetConfig(PluginId, "lists", "[]");
+        host.SetConfig(PluginId, "holiday_cache", "");
         host.SetConfig(PluginId, "auto_complete_on_subtasks", "true");
         host.SetConfig(PluginId, "hide_done", "false");
         host.SetConfig(PluginId, "default_view", "list");
         host.SetConfig(PluginId, "current_list", "");
         host.SetConfig(PluginId, "selected_item_id", "");
+        _store.ResetAll();
         _widget?.OnStoreChanged();
     }
 
@@ -195,7 +235,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                     var dateStr = AgentJson.GetString(argumentsJson, "date");
                     if (!string.IsNullOrWhiteSpace(dateStr) && DateTime.TryParse(dateStr, out var dt))
                     {
-                        var filtered = _store.Items.Where(i => i.Deadline?.Date == dt.Date || (!i.Done && i.Deadline?.Date == dt.Date)).ToList();
+                        var filtered = _store.Items.Where(i => i.Deadline?.Date == dt.Date).ToList();
                         return AgentJson.Serialize(new { ok = true, items = filtered, date = dateStr });
                     }
                     return ListJson();
@@ -243,7 +283,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
 
             case "set_todo_note": return OnUi(() => WithItemById(argumentsJson, item => { item.Note = AgentJson.GetString(argumentsJson, "note"); _store.MarkDirty(); _store.Save(); }));
             case "set_todo_repeat": return OnUi(() => WithItemById(argumentsJson, item => { item.Repeat = ParseRepeat(AgentJson.GetString(argumentsJson, "repeat")); _store.MarkDirty(); _store.Save(); }));
-            case "set_todo_priority": return OnUi(() => WithItemById(argumentsJson, item => { item.Priority = (Priority?)Enum.Parse(typeof(Priority), AgentJson.GetString(argumentsJson, "priority") ?? "None", true) ?? Priority.None; _store.MarkDirty(); _store.Save(); }));
+            case "set_todo_priority": return OnUi(() => WithItemById(argumentsJson, item => { item.Priority = ParsePriority(AgentJson.GetString(argumentsJson, "priority")); _store.MarkDirty(); _store.Save(); }));
             case "set_todo_tags": return OnUi(() => WithItemById(argumentsJson, item => { item.Tags = AgentJson.GetString(argumentsJson, "tags") ?? ""; _store.MarkDirty(); _store.Save(); }));
 
             case "add_subtask":
@@ -274,7 +314,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 });
 
             case "list_lists":
-                return Task.FromResult(AgentJson.Serialize(new { ok = true, lists = _store.ListNames }));
+                return OnUi(() => AgentJson.Serialize(new { ok = true, lists = _store.ListNames }));
 
             case "create_list":
                 return OnUi(() =>
@@ -306,29 +346,29 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                 });
 
             case "query_todo_stats":
-            {
-                var items = _store.Items;
-                var today = DateTime.Today;
-                var todayItems = items.Where(i => i.Deadline?.Date == today || (i.CompletedDate?.Date == today));
-                var todayCompleted = items.Count(i => i.Done && i.CompletedDate?.Date == today);
-                var todayTotal = items.Count(i => i.Deadline?.Date == today || i.List == TodoStore.InboxList || (i.CompletedDate?.Date == today));
-                var overdue = items.Count(i => !i.Done && i.Deadline is { } dl && dl < DateTime.Now);
-                var totalDone = items.Count(i => i.Done);
-                var weekly = Enumerable.Range(0, 7).Select(offset =>
+                return OnUi(() =>
                 {
-                    var d = today.AddDays(-offset);
-                    return new { date = d.ToString("MM-dd"), count = items.Count(i => i.Done && i.CompletedDate?.Date == d) };
-                }).Reverse().ToList();
-                return Task.FromResult(AgentJson.Serialize(new
-                {
-                    ok = true,
-                    todayCompleted,
-                    todayTotal,
-                    overdueCount = overdue,
-                    historyTotal = totalDone,
-                    weeklyTrend = weekly
-                }));
-            }
+                    var items = _store.Items;
+                    var today = DateTime.Today;
+                    var todayCompleted = items.Count(i => i.Done && i.CompletedDate?.Date == today);
+                    var todayTotal = items.Count(i => i.Deadline?.Date == today || i.List == TodoStore.InboxList || (i.CompletedDate?.Date == today));
+                    var overdue = items.Count(i => !i.Done && i.Deadline is { } dl && dl < DateTime.Now);
+                    var totalDone = items.Count(i => i.Done);
+                    var weekly = Enumerable.Range(0, 7).Select(offset =>
+                    {
+                        var d = today.AddDays(-offset);
+                        return new { date = d.ToString("MM-dd"), count = items.Count(i => i.Done && i.CompletedDate?.Date == d) };
+                    }).Reverse().ToList();
+                    return AgentJson.Serialize(new
+                    {
+                        ok = true,
+                        todayCompleted,
+                        todayTotal,
+                        overdueCount = overdue,
+                        historyTotal = totalDone,
+                        weeklyTrend = weekly
+                    });
+                });
 
             case "move_to_list":
                 return OnUi(() =>
@@ -338,29 +378,52 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
                     if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(listName)) return AgentJson.Error("id_required");
                     var item = _store.FindById(id);
                     if (item == null) return AgentJson.Error("not_found");
-                    item.List = listName;
-                    _store.MarkDirty(); _store.Save();
+                    _store.MoveToExistingList(item, listName);
                     return ListJson();
                 });
 
             case "share_todo_list":
-            {
-                var listName = AgentJson.GetString(argumentsJson, "listName");
-                var items = listName != null ? _store.Items.Where(i => i.List == listName) : _store.Items;
-                var sb = new System.Text.StringBuilder();
-                foreach (var i in items.Where(i => !i.Done))
+                return OnUi(() =>
                 {
-                    var tag = i.Priority switch { Priority.High => "!!", Priority.Medium => "!", Priority.Low => "·", _ => "" };
-                    var dl = i.Deadline is { } d ? $" — 截止 {d:MM-dd HH:mm}" : "";
-                    sb.AppendLine($"[{(i.List == TodoStore.InboxList ? "待办箱" : i.List)}] {tag} {i.Text}{dl}");
-                }
-                var result = sb.ToString();
-                try { Windows.ApplicationModel.DataTransfer.DataPackage dp = new(); dp.SetText(result); Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp); } catch { }
-                return Task.FromResult(AgentJson.Serialize(new { ok = true, text = result, copied = true }));
-            }
+                    var listName = AgentJson.GetString(argumentsJson, "listName");
+                    var items = listName != null ? _store.Items.Where(i => i.List == listName) : _store.Items;
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var i in items.Where(i => !i.Done))
+                    {
+                        var tag = i.Priority switch { Priority.High => "!!", Priority.Medium => "!", Priority.Low => "·", _ => "" };
+                        var dl = i.Deadline is { } d ? $" — 截止 {d:MM-dd HH:mm}" : "";
+                        sb.AppendLine($"[{(i.List == TodoStore.InboxList ? "待办箱" : i.List)}] {tag} {i.Text}{dl}");
+                    }
+                    var result = sb.ToString();
+                    bool copied = false;
+                    try
+                    {
+                        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                        dp.SetText(result);
+                        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+                        copied = true;
+                    }
+                    catch (Exception ex) { _host.LogError($"Todo: clipboard failed: {ex.Message}"); }
+                    return AgentJson.Serialize(new { ok = true, text = result, copied });
+                });
 
             default: return Task.FromResult(AgentJson.Error("unknown_tool"));
         }
+    }
+
+    /// <summary>AI 状态快照 hook。</summary>
+    string? IAgentCapability.GetContextSnapshot()
+    {
+        try
+        {
+            var items = _store.Items;
+            var pending = items.Count(i => !i.Done);
+            var overdue = items.Count(i => !i.Done && i.Deadline is { } d && d < DateTime.Now);
+            var lists = string.Join("、", _store.ListNames);
+            var current = _host.GetConfig(PluginId, "current_list");
+            return $"待办: 共 {items.Count} 项（未完成 {pending}，逾期 {overdue}）；列表 [{lists}]，当前 {(string.IsNullOrWhiteSpace(current) ? TodoStore.DefaultList : current)}";
+        }
+        catch { return null; }
     }
 
     string WithItemById(string argsJson, Action<TodoItem> op)
@@ -386,7 +449,7 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
         var note = AgentJson.GetString(argsJson, "note");
         if (!string.IsNullOrWhiteSpace(note)) item.Note = note;
         item.Repeat = ParseRepeat(AgentJson.GetString(argsJson, "repeat"));
-        item.Priority = (Priority?)Enum.Parse(typeof(Priority), AgentJson.GetString(argsJson, "priority") ?? "None", true) ?? Priority.None;
+        item.Priority = ParsePriority(AgentJson.GetString(argsJson, "priority"));
         var tags = AgentJson.GetString(argsJson, "tags");
         if (tags != null) item.Tags = tags;
         return null;
@@ -396,6 +459,9 @@ public class TodoPlugin : IPlugin, IPluginSettings, IAgentCapability
     {
         "daily" => RepeatKind.Daily, "weekly" => RepeatKind.Weekly, "monthly" => RepeatKind.Monthly, "workday" => RepeatKind.Workday, _ => RepeatKind.None
     };
+
+    static Priority ParsePriority(string? s)
+        => Enum.TryParse<Priority>(s, true, out var p) ? p : Priority.None;
 
     class TodoWidgetInfo : IWidget
     {

@@ -1,3 +1,4 @@
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,6 +18,7 @@ public sealed class TodoWidget : UserControl, IDisposable
     readonly TodoOverlay _overlay = new();
 
     Border _root = null!;
+    Border _hoverLayer = null!;
     StackPanel _preview = null!;
     ListView? _taskList;
     ContentControl? _detailHost;
@@ -25,6 +27,10 @@ public sealed class TodoWidget : UserControl, IDisposable
     TodoItem? _selected;
     string _currentList = TodoStore.DefaultList;
     string _lastTileSnapshot = "";
+    string _lastSavedSelectedId = "";
+    ProgressBar? _subProgress;
+    TextBlock? _subProgressText;
+    readonly DispatcherQueueTimer _searchDebounce;
 
     public TodoWidget(IHostHandle host, TodoStore store, Action<TodoItem> onToggle)
     {
@@ -34,9 +40,22 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         _currentList = _host.GetConfig(nameof(TodoPlugin), "current_list") ?? TodoStore.DefaultList;
 
-        var savedId = _host.GetConfig(nameof(TodoPlugin), "selected_item_id");
+        var savedId = _host.GetConfig(nameof(TodoPlugin), "selected_item_id") ?? "";
+        _lastSavedSelectedId = savedId;
         if (!string.IsNullOrEmpty(savedId))
             _selected = _store.Items.FirstOrDefault(i => i.Id == savedId);
+
+        _searchDebounce = DispatcherQueue.CreateTimer();
+        _searchDebounce.Interval = TimeSpan.FromMilliseconds(250);
+        _searchDebounce.IsRepeating = false;
+        _searchDebounce.Tick += (_, _) => RebuildTaskList();
+
+        // 磁贴"今天/逾期"标签随时间变化，每分钟轻量刷新（快照比对无变化则无开销）
+        var tileTimer = DispatcherQueue.CreateTimer();
+        tileTimer.Interval = TimeSpan.FromSeconds(30);
+        tileTimer.IsRepeating = true;
+        tileTimer.Tick += (_, _) => RefreshTile();
+        tileTimer.Start();
 
         BuildUi();
         _store.Changed += OnStoreChanged;
@@ -51,8 +70,20 @@ public sealed class TodoWidget : UserControl, IDisposable
     {
         _preview = new StackPanel { Spacing = 6 };
         _root = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12), Child = _preview };
+        _hoverLayer = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = Fluent.SubtleHover(((FrameworkElement)this).ActualTheme),
+            Opacity = 0,
+            IsHitTestVisible = false
+        };
+        var grid = new Grid();
+        grid.Children.Add(_root);
+        grid.Children.Add(_hoverLayer);
         _root.Tapped += (_, _) => OpenDetail();
-        Content = _root;
+        PointerEntered += (_, _) => _hoverLayer.Opacity = 1;
+        PointerExited += (_, _) => _hoverLayer.Opacity = 0;
+        Content = grid;
     }
 
     static Brush Res(string key) => (Brush)Application.Current.Resources[key];
@@ -60,6 +91,9 @@ public sealed class TodoWidget : UserControl, IDisposable
     void ApplyTheme(ElementTheme theme)
     {
         _root.Background = (Brush)_host.GetWidgetBackgroundBrush();
+        _root.BorderBrush = Fluent.CardStroke(theme);
+        _root.BorderThickness = new Thickness(1);
+        _hoverLayer.Background = Fluent.SubtleHover(theme);
         RefreshTile();
     }
 
@@ -82,8 +116,9 @@ public sealed class TodoWidget : UserControl, IDisposable
         var list = items.Take(7).ToList();
         var pending = items.Count(i => !i.Done);
 
-        var snapshot = string.Join(",", list.Select(i => $"{i.Id}:{i.Done}:{(int)i.Priority}:{i.Deadline?.Ticks}:{i.Repeat}"))
-            + $"|{pending}|{_store.ListNames.Length}|{_currentList}";
+        var snapshot = string.Join(",", list.Select(i => $"{i.Id}:{i.Done}:{(int)i.Priority}:{i.Deadline?.Ticks}:{i.Repeat}:{i.Text}:{i.Tags}:{i.Subtasks.Count(s => s.Done)}/{i.Subtasks.Count}"))
+            + $"|{pending}|{_store.ListNames.Length}|{_currentList}"
+            + $"|{DateTime.Now.Ticks / TimeSpan.TicksPerMinute}";
         if (snapshot == _lastTileSnapshot) return;
         _lastTileSnapshot = snapshot;
 
@@ -344,7 +379,11 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         var sb = new TextBox { PlaceholderText = "搜索…" };
         _searchBox = sb;
-        sb.TextChanged += (_, _) => RebuildTaskList();
+        sb.TextChanged += (_, _) =>
+        {
+            _searchDebounce.Stop();
+            _searchDebounce.Start();
+        };
         Grid.SetRow(sb, 0);
         leftCol.Children.Add(sb);
 
@@ -353,7 +392,9 @@ public sealed class TodoWidget : UserControl, IDisposable
         {
             CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1),
-            BorderBrush = Res("DividerStrokeColorDefaultBrush"),
+            BorderBrush = Res("CardStrokeColorDefaultBrush"),
+            Background = Res("CardBackgroundFillColorDefaultBrush"),
+            Padding = new Thickness(4),
             Child = _taskList
         };
         Grid.SetRow(leftCard, 1);
@@ -368,7 +409,6 @@ public sealed class TodoWidget : UserControl, IDisposable
             if (string.IsNullOrWhiteSpace(inp.Text)) return;
             _selected = _store.Add(inp.Text, _currentList);
             _store.Save();
-            _host.SetConfig(nameof(TodoPlugin), "selected_item_id", _selected.Id);
             inp.Text = "";
             RebuildTaskList();
         }
@@ -414,7 +454,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         RebuildTaskList();
     }
 
-    void RebuildTaskList()
+    void RebuildTaskList(bool rebuildDetail = true)
     {
         if (_taskList == null) return;
         var primary = Res("TextFillColorPrimaryBrush");
@@ -439,6 +479,7 @@ public sealed class TodoWidget : UserControl, IDisposable
             .ThenByDescending(i => (int)i.Priority)
             .ThenBy(i => i.Deadline)
             .ToList();
+        var groupCounts = sorted.GroupBy(i => TodoStore.SortOrder(i, now)).ToDictionary(g => g.Key, g => g.Count());
 
         ListViewItem? toSelect = null;
         int? lastGroup = null;
@@ -456,7 +497,7 @@ public sealed class TodoWidget : UserControl, IDisposable
                     Background = groupBg,
                     Child = new TextBlock
                     {
-                        Text = GroupTitle(g) + $" · {sorted.Count(i => TodoStore.SortOrder(i, now) == g)} 项",
+                        Text = GroupTitle(g) + $" · {groupCounts.GetValueOrDefault(g)} 项",
                         FontSize = 12,
                         FontWeight = FontWeights.Medium,
                         Foreground = secondary
@@ -520,10 +561,30 @@ public sealed class TodoWidget : UserControl, IDisposable
             if (ReferenceEquals(item, _selected)) toSelect = lvi;
         }
 
+        // 先恢复选中再挂事件：程序性赋值不触发 RebuildDetail，
+        // 保证 rebuildDetail:false 时编辑器与焦点不被重建
+        if (toSelect != null)
+        {
+            _taskList.SelectedItem = toSelect;
+        }
+        else if (_selected != null && sorted.Any(i => ReferenceEquals(i, _selected)))
+        {
+            // 选中项仍在列表中但被过滤视图隐藏（如搜索命中其它项）：保留选中与详情
+        }
+        else
+        {
+            _selected = null;
+            SaveSelection("");
+        }
         _taskList.SelectionChanged += OnTaskSelectionChanged;
-        if (toSelect != null) _taskList.SelectedItem = toSelect;
-        else { _selected = null; _host.SetConfig(nameof(TodoPlugin), "selected_item_id", ""); }
-        RebuildDetail();
+        if (rebuildDetail) RebuildDetail();
+    }
+
+    void SaveSelection(string id)
+    {
+        if (_lastSavedSelectedId == id) return;
+        _lastSavedSelectedId = id;
+        _host.SetConfig(nameof(TodoPlugin), "selected_item_id", id);
     }
 
     static string GroupTitle(int g) => g switch { 0 => "逾期", 1 => "今天", 2 => "将来", 3 => "无截止", _ => "已完成" };
@@ -531,16 +592,17 @@ public sealed class TodoWidget : UserControl, IDisposable
     void OnTaskSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selected = (_taskList?.SelectedItem as ListViewItem)?.Tag as TodoItem;
-        _host.SetConfig(nameof(TodoPlugin), "selected_item_id", _selected?.Id ?? "");
+        SaveSelection(_selected?.Id ?? "");
         RebuildDetail();
     }
 
     void RebuildDetail()
     {
         if (_detailHost == null) return;
+        _subProgress = null;
+        _subProgressText = null;
         var primary = Res("TextFillColorPrimaryBrush");
         var secondary = Res("TextFillColorSecondaryBrush");
-        var subtleBg = Res("SubtleFillColorSecondaryBrush");
         var accent = Res("AccentFillColorDefaultBrush");
         var success = Res("SystemFillColorSuccessBrush");
         var critical = Res("SystemFillColorCriticalBrush");
@@ -549,8 +611,11 @@ public sealed class TodoWidget : UserControl, IDisposable
         {
             _detailHost.Content = new Border
             {
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(32),
+                Background = Res("CardBackgroundFillColorDefaultBrush"),
+                BorderThickness = new Thickness(1),
+                BorderBrush = Res("CardStrokeColorDefaultBrush"),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Child = new TextBlock
                 {
@@ -566,9 +631,11 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         var card = new Border
         {
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(8),
             Padding = new Thickness(24),
-            Background = subtleBg
+            Background = Res("CardBackgroundFillColorDefaultBrush"),
+            BorderThickness = new Thickness(1),
+            BorderBrush = Res("CardStrokeColorDefaultBrush")
         };
 
         var stack = new StackPanel { Spacing = 20 };
@@ -587,14 +654,14 @@ public sealed class TodoWidget : UserControl, IDisposable
         pcb.Items.Add(new ComboBoxItem { Content = "中", Tag = Priority.Medium });
         pcb.Items.Add(new ComboBoxItem { Content = "高", Tag = Priority.High });
         pcb.SelectedIndex = (int)item.Priority;
-        pcb.SelectionChanged += (_, _) => { if (pcb.SelectedItem is ComboBoxItem ci && ci.Tag is Priority p) { item.Priority = p; _store.MarkDirty(); _store.Save(); } };
+        pcb.SelectionChanged += (_, _) => { if (pcb.SelectedItem is ComboBoxItem ci && ci.Tag is Priority p) { item.Priority = p; SaveDetailEdit(); } };
         Grid.SetColumn(pcb, 1);
         titleRow.Children.Add(ttl); titleRow.Children.Add(pcb);
         stack.Children.Add(titleRow);
 
         // tags
         var tbx = new TextBox { PlaceholderText = "标签（逗号分隔）", Text = item.Tags ?? "", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch };
-        tbx.LostFocus += (_, _) => { item.Tags = tbx.Text; _store.MarkDirty(); _store.Save(); };
+        tbx.LostFocus += (_, _) => { item.Tags = tbx.Text; SaveDetailEdit(); };
         stack.Children.Add(tbx);
 
         stack.Children.Add(Sep());
@@ -608,12 +675,12 @@ public sealed class TodoWidget : UserControl, IDisposable
         {
             if (dp.Date is { } dd) { item.Deadline = dd.Date + tp.Time; item.Reminded = false; }
             else item.Deadline = null;
-            _store.MarkDirty(); _store.Save();
+            SaveDetailEdit();
         }
         dp.DateChanged += (_, _) => UpdDdl();
         tp.TimeChanged += (_, _) => UpdDdl();
         var cdl = new Button { Content = "清除截止", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Left };
-        cdl.Click += (_, _) => { dp.Date = null; item.Deadline = null; item.Reminded = false; _store.MarkDirty(); _store.Save(); RebuildDetail(); };
+        cdl.Click += (_, _) => { dp.Date = null; item.Deadline = null; item.Reminded = false; SaveDetailEdit(); RebuildDetail(); };
         var ds = new StackPanel { Spacing = 8 };
         ds.Children.Add(dp); ds.Children.Add(tp); ds.Children.Add(cdl);
         stack.Children.Add(ds);
@@ -624,9 +691,9 @@ public sealed class TodoWidget : UserControl, IDisposable
         foreach (var k in new[] { RepeatKind.None, RepeatKind.Daily, RepeatKind.Weekly, RepeatKind.Monthly, RepeatKind.Workday })
             rcb.Items.Add(new ComboBoxItem { Content = RepeatName(k), Tag = k });
         rcb.SelectedIndex = (int)item.Repeat;
-        rcb.SelectionChanged += (_, _) => { if (rcb.SelectedItem is ComboBoxItem ci && ci.Tag is RepeatKind rk) { item.Repeat = rk; _store.MarkDirty(); _store.Save(); } };
+        rcb.SelectionChanged += (_, _) => { if (rcb.SelectedItem is ComboBoxItem ci && ci.Tag is RepeatKind rk) { item.Repeat = rk; SaveDetailEdit(); } };
         var ldb = new NumberBox { Minimum = 0, Maximum = 1440, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline, Value = item.LeadMinutes, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "提前（分钟）" };
-        ldb.ValueChanged += (_, _) => { if (!double.IsNaN(ldb.Value)) { item.LeadMinutes = (int)ldb.Value; _store.MarkDirty(); _store.Save(); } };
+        ldb.ValueChanged += (_, _) => { if (!double.IsNaN(ldb.Value)) { item.LeadMinutes = (int)ldb.Value; SaveDetailEdit(); } };
         var rs2 = new StackPanel { Spacing = 8 };
         rs2.Children.Add(rcb); rs2.Children.Add(ldb);
         stack.Children.Add(rs2);
@@ -635,7 +702,7 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         // note
         var nb = new TextBox { PlaceholderText = "备注…", Text = item.Note ?? "", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 64, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Stretch, Header = "备注" };
-        nb.LostFocus += (_, _) => { item.Note = nb.Text; _store.MarkDirty(); _store.Save(); };
+        nb.LostFocus += (_, _) => { item.Note = nb.Text; SaveDetailEdit(); };
         stack.Children.Add(nb);
 
         // subtasks
@@ -651,9 +718,11 @@ public sealed class TodoWidget : UserControl, IDisposable
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             progRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var pb = new ProgressBar { Value = (double)doneCount / totalCount * 100, Minimum = 0, Maximum = 100, Height = 6, Foreground = doneCount == totalCount ? success : accent };
+            _subProgress = pb;
             Grid.SetColumn(pb, 0);
             progRow.Children.Add(pb);
             var progressText = new TextBlock { Text = $"{doneCount}/{totalCount}", FontSize = 12, Foreground = secondary, VerticalAlignment = VerticalAlignment.Center };
+            _subProgressText = progressText;
             Grid.SetColumn(progressText, 1);
             progRow.Children.Add(progressText);
             ss.Children.Add(progRow);
@@ -664,10 +733,18 @@ public sealed class TodoWidget : UserControl, IDisposable
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             sr.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var ch = new CheckBox { IsChecked = st.Done, Content = st.Text, FontSize = 13 };
-            ch.Click += (_, _) => { st.Done = ch.IsChecked == true; if (AutoCompleteSub && item.Subtasks.All(s => s.Done)) { item.Done = true; item.CompletedDate = DateTime.Today; } _store.MarkDirty(); _store.Save(); RebuildDetail(); };
+            ch.Click += (_, _) =>
+            {
+                st.Done = ch.IsChecked == true;
+                if (AutoCompleteSub && item.Subtasks.All(s => s.Done)) { item.Done = true; item.CompletedDate = DateTime.Today; }
+                _store.SaveQuiet();
+                UpdateSubProgress(item);
+                RebuildTaskList(rebuildDetail: false);
+                RefreshTile();
+            };
             Grid.SetColumn(ch, 0);
             var sd = new Button { Content = new FontIcon { Glyph = "\uE711", FontSize = 10 }, Width = 28, Height = 28, Padding = new Thickness(0) };
-            sd.Click += (_, _) => { item.Subtasks.Remove(st); _store.MarkDirty(); _store.Save(); RebuildDetail(); };
+            sd.Click += (_, _) => { item.Subtasks.Remove(st); SaveDetailEdit(); RebuildDetail(); };
             Grid.SetColumn(sd, 1);
             sr.Children.Add(ch); sr.Children.Add(sd);
             ss.Children.Add(sr);
@@ -677,7 +754,7 @@ public sealed class TodoWidget : UserControl, IDisposable
         sa.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var si = new TextBox { PlaceholderText = "新增子任务…", FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
         var sbtn = new Button { Content = "+", Width = 32, Height = 32, FontSize = 14, Padding = new Thickness(0) };
-        void SDo() { if (string.IsNullOrWhiteSpace(si.Text)) return; item.Subtasks.Add(new Subtask { Text = si.Text.Trim() }); _store.MarkDirty(); _store.Save(); RebuildDetail(); }
+        void SDo() { if (string.IsNullOrWhiteSpace(si.Text)) return; item.Subtasks.Add(new Subtask { Text = si.Text.Trim() }); SaveDetailEdit(); RebuildDetail(); }
         sbtn.Click += (_, _) => SDo();
         si.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) SDo(); };
         Grid.SetColumn(si, 0); Grid.SetColumn(sbtn, 1);
@@ -694,11 +771,29 @@ public sealed class TodoWidget : UserControl, IDisposable
             FontSize = 13,
             Margin = new Thickness(0, 8, 0, 0)
         };
-        delBtn.Click += (_, _) => { _store.Delete(item); _selected = null; _host.SetConfig(nameof(TodoPlugin), "selected_item_id", ""); RebuildTaskList(); };
+        delBtn.Click += (_, _) => { _store.Delete(item); _selected = null; SaveSelection(""); RebuildTaskList(); };
         stack.Children.Add(delBtn);
 
         card.Child = stack;
         _detailHost.Content = card;
+    }
+
+    void SaveDetailEdit()
+    {
+        _store.SaveQuiet();
+        RebuildTaskList(rebuildDetail: false);
+        RefreshTile();
+    }
+
+    void UpdateSubProgress(TodoItem item)
+    {
+        if (_selected != item || item.Subtasks.Count == 0) return;
+        if (_subProgress == null || _subProgressText == null) return;
+        var doneCount = item.Subtasks.Count(s => s.Done);
+        var totalCount = item.Subtasks.Count;
+        _subProgress.Value = (double)doneCount / totalCount * 100;
+        _subProgress.Foreground = doneCount == totalCount ? Res("SystemFillColorSuccessBrush") : Res("AccentFillColorDefaultBrush");
+        _subProgressText.Text = $"{doneCount}/{totalCount}";
     }
 
     static Border Sep() => new() { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") };
@@ -725,14 +820,29 @@ public sealed class TodoWidget : UserControl, IDisposable
     {
         var items = _store.ItemsInList(_currentList);
         var today = DateTime.Today;
-        var todayDone = items.Count(i => i.Done && i.CompletedDate?.Date == today);
-        var totalDoneThisWeek = items.Count(i => i.Done && i.CompletedDate?.Date >= today.AddDays(-6));
-        var weekly = Enumerable.Range(0, 7).Select(offset =>
+        var todayDone = 0;
+        var overdue = 0;
+        var weekly = new int[7];
+        foreach (var i in items)
+        {
+            if (!i.Done)
+            {
+                if (i.Deadline is { } dl && dl < DateTime.Now) overdue++;
+                continue;
+            }
+            if (i.CompletedDate is not { } cd) continue;
+            if (cd.Date == today) todayDone++;
+            for (int k = 0; k < 7; k++)
+            {
+                if (cd.Date == today.AddDays(-k)) { weekly[k]++; break; }
+            }
+        }
+        var totalDoneThisWeek = weekly.Sum();
+        var weeklySeries = Enumerable.Range(0, 7).Select(offset =>
         {
             var d = today.AddDays(-offset);
-            return (d.ToString("MM-dd"), (double)items.Count(i => i.Done && i.CompletedDate?.Date == d));
+            return (d.ToString("MM-dd"), (double)weekly[offset]);
         }).Reverse().ToList();
-        var overdue = items.Count(i => !i.Done && i.Deadline is { } dl && dl < DateTime.Now);
 
         var primary = Res("TextFillColorPrimaryBrush");
         var secondary = Res("TextFillColorSecondaryBrush");
@@ -749,11 +859,20 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         void AddStat(int col, string label, string value)
         {
-            var s = new StackPanel { Spacing = 2 };
+            var s = new StackPanel { Spacing = 1 };
             s.Children.Add(new TextBlock { Text = value, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = primary });
             s.Children.Add(new TextBlock { Text = label, FontSize = 12, Foreground = secondary });
-            Grid.SetColumn(s, col);
-            grid.Children.Add(s);
+            var chip = new Border
+            {
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(14, 8, 14, 10),
+                Background = Res("CardBackgroundFillColorSecondaryBrush"),
+                BorderThickness = new Thickness(1),
+                BorderBrush = Res("CardStrokeColorDefaultBrush"),
+                Child = s
+            };
+            Grid.SetColumn(chip, col);
+            grid.Children.Add(chip);
         }
 
         AddStat(0, "今日完成", todayDone.ToString());
@@ -764,9 +883,9 @@ public sealed class TodoWidget : UserControl, IDisposable
 
         body.Children.Add(new Border { Height = 1, Background = Res("DividerStrokeColorDefaultBrush") });
         body.Children.Add(new TextBlock { Text = "近 7 天完成趋势", FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = primary });
-        body.Children.Add(MiniChart.Line(weekly, accent, secondary));
+        body.Children.Add(MiniChart.Line(weeklySeries, accent, secondary));
 
-        if (_overlay.IsOpen) _overlay.Close();
+        // 不关闭主界面：统计 overlay 关闭后回到待办主视图
         var statsOverlay = new BasePluginOverlay();
         statsOverlay.Show(this, "待办统计", body, _host.Log);
     }
