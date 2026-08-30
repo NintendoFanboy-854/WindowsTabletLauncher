@@ -450,10 +450,10 @@ public sealed class PomodoroWidget : UserControl
         if (_overlay.IsOpen) return;
         var theme = ((FrameworkElement)this).ActualTheme;
 
-        // 两列自适应（横屏）：左=计时主卡（视觉重心），右=任务/统计/记录
+        // 两列自适应（横屏）：左=计时主卡（含三按钮，需更宽），右=任务/统计/记录
         var body = new Grid { ColumnSpacing = Fluent.SpaceM };
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55, GridUnitType.Star) });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(45, GridUnitType.Star) });
         var leftCol = new StackPanel { Spacing = Fluent.SpaceM };
         var rightCol = new StackPanel { Spacing = Fluent.SpaceM };
         Grid.SetColumn(leftCol, 0);

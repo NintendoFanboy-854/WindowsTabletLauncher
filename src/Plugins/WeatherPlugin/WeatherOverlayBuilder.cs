@@ -196,7 +196,10 @@ public sealed class WeatherOverlayBuilder
         content.Children.Add(LoadingPlaceholder());
 
         var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Fluent.SpaceS };
-        header.Children.Add(Fluent.SectionTitle(title, _theme));
+        var headerTitle = Fluent.SectionTitle(title, _theme);
+        // 标题与右侧高元素（如 44px 切换胶囊）同行时垂直居中，否则默认顶对齐会偏上
+        headerTitle.VerticalAlignment = VerticalAlignment.Center;
+        header.Children.Add(headerTitle);
         if (headerExtra != null) header.Children.Add(headerExtra);
 
         var body = new StackPanel { Spacing = Fluent.SpaceS };
@@ -586,7 +589,7 @@ public sealed class WeatherOverlayBuilder
                 new ColumnDefinition { Width = new GridLength(32) },
                 new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) },
                 new ColumnDefinition { Width = new GridLength(44) },
-                new ColumnDefinition { Width = new GridLength(160) },
+                new ColumnDefinition { Width = new GridLength(1.6, GridUnitType.Star) },
                 new ColumnDefinition { Width = new GridLength(44) }
             }
         };
@@ -613,20 +616,23 @@ public sealed class WeatherOverlayBuilder
         Grid.SetColumn(min, 3);
         grid.Children.Add(min);
 
+        // 温度区间轨道：贯穿中间剩余宽度（Apple Weather 式），蓝色区段按全周最低/最高温比例定位，
+        // 用星号权重表达比例——任意宽度下都居中铺满，不再留出中段空洞
         var track = new Grid { Height = 4, VerticalAlignment = VerticalAlignment.Center };
-        track.Children.Add(new Border { CornerRadius = new CornerRadius(2), Background = Fluent.Divider(_theme) });
         var loVal = tMin ?? weekMin;
         var hiVal = tMax ?? weekMin;
-        var left = Math.Clamp((loVal - weekMin) / span, 0, 1);
-        var width = Math.Clamp((hiVal - loVal) / span, 0.04, 1 - left);
-        track.Children.Add(new Border
-        {
-            CornerRadius = new CornerRadius(2),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(left * 160, 0, 0, 0),
-            Width = Math.Max(4, width * 160),
-            Background = Fluent.Accent()
-        });
+        var leftF = Math.Clamp((loVal - weekMin) / span, 0, 1);
+        var blueF = Math.Clamp((hiVal - loVal) / span, 0.04, 1 - leftF);
+        var rightF = Math.Max(0, 1 - leftF - blueF);
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(leftF, GridUnitType.Star) });
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(blueF, 0.001), GridUnitType.Star) });
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(rightF, 0.001), GridUnitType.Star) });
+        var gray = new Border { CornerRadius = new CornerRadius(2), Background = Fluent.Divider(_theme) };
+        Grid.SetColumnSpan(gray, 3);
+        track.Children.Add(gray);
+        var blue = new Border { CornerRadius = new CornerRadius(2), Background = Fluent.Accent() };
+        Grid.SetColumn(blue, 1);
+        track.Children.Add(blue);
         Grid.SetColumn(track, 4);
         grid.Children.Add(track);
 
