@@ -224,6 +224,8 @@ export function VoiceStage({
             style={{
               width: 'clamp(76px, 15vmin, 124px)',
               height: 'clamp(76px, 15vmin, 124px)',
+              // Fluent 的 circular 按钮自带 max-width（large = 40px），这里要一起放开
+              maxWidth: 'clamp(76px, 15vmin, 124px)',
             }}
             appearance={recording ? 'primary' : 'outline'}
             checked={recording}

@@ -114,9 +114,8 @@ body {
 
 .desktop-dock {
   position: fixed;
-  left: 50%;
+  right: 18px;
   bottom: 16px;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -127,3 +126,4 @@ body {
   border: 1px solid var(--colorNeutralStroke2, rgba(255, 255, 255, 0.08));
   z-index: 10;
 }
+

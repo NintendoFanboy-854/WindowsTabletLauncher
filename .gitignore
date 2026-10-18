@@ -85,3 +85,8 @@ src-tauri/gen/
 # 截图回归输出
 shots/
 
+
+# 本地密钥（不进仓库）
+public/secrets.json
+secrets.json
+

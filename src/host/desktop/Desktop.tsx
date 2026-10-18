@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
-import { Button, MessageBar, MessageBarBody, Spinner, Text, mergeClasses } from '@fluentui/react-components';
+import { Button, MessageBar, MessageBarBody, Spinner, Text, mergeClasses, useThemeClassName } from '@fluentui/react-components';
 import { getHostBridge } from '../bridge';
 import type { BridgeServices, HostBridge } from '../bridge';
 import type { ShowReminderParams, ThemePayload, WidgetInstance, WidgetSize } from '../bridge/types';
@@ -221,13 +221,15 @@ export default function Desktop({
   const { viewport, metrics, origin } = useViewportMetrics(rootRef);
 
   // 主题注入：从 FluentProvider 实际生效的 CSS 变量读 token，发给每个插件 iframe
-  // （必须读 provider 内部的元素；读 body 拿不到 provider 上定义的变量）
+  // （必须读 provider 内部的元素；读 body 拿不到 provider 上定义的变量。
+  //  useThemeClassName 随主题切换换值，effect 重新读一次。）
+  const themeClassName = useThemeClassName();
   const [theme, setTheme] = useState<ThemePayload | undefined>(undefined);
   useEffect(() => {
     const element = rootRef.current;
     if (!element) return;
     setTheme(readFluentThemePayload(element));
-  }, []);
+  }, [themeClassName]);
 
   const [layout, setLayout] = useState<LayoutState | null>(null);
   const [editMode, setEditMode] = useState(readInitialEditMode);
@@ -280,18 +282,20 @@ export default function Desktop({
 
   // ---------- 桥接层注入：通知 / 强提醒 / 插件按 Esc 把焦点交还桌面 ----------
 
+  // 桥接层 services：外壳（NotificationsProvider）会通过 App 注入 bridge 并注册
+  // notify / showReminder，此时不要覆盖；只有单独挂 <Desktop />（无外壳）时才用本地兜底
   useEffect(() => {
+    if (bridgeProp) return;
     const services: BridgeServices = {
       notify: (text) => notify(text),
       showReminder: (params: ShowReminderParams) => {
         const text = params.message ? `${params.title}：${params.message}` : params.title;
         notify(text);
-        // 强提醒遮罩属于通知层（B2）；接通前先用 Toast 兜底，不阻塞插件
         return Promise.resolve({});
       },
     };
     bridge.setServices(services);
-  }, [bridge, notify]);
+  }, [bridge, bridgeProp, notify]);
 
   useEffect(
     () =>

@@ -283,22 +283,3 @@ if (scenario === 'interact') {
     suggestion?.click();
   }, 800);
 }
-
-// TEMP 诊断：打印麦克风按钮的计算样式
-if (scenario === 'voice') {
-  const probe = document.createElement('div');
-  probe.id = 'agent-style-probe';
-  probe.style.cssText = 'position:fixed;left:8px;top:64px;color:#fff;font:12px monospace;z-index:99999;background:#000a;padding:6px;white-space:pre';
-  document.body.appendChild(probe);
-  window.setTimeout(() => {
-    const el = document.querySelector('[aria-label="开始录音"]') as HTMLElement | null;
-    if (!el) { probe.textContent = 'mic not found'; return; }
-    const cs = getComputedStyle(el);
-    probe.textContent = [
-      'rect ' + JSON.stringify(el.getBoundingClientRect()),
-      'styleAttr ' + el.getAttribute('style'),
-      'computed width=' + cs.width + ' height=' + cs.height + ' minW=' + cs.minWidth + ' flex=' + cs.flex,
-      'class ' + el.className,
-    ].join('\n');
-  }, 1200);
-}

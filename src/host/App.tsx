@@ -12,6 +12,7 @@ import { Button, FluentProvider, webDarkTheme, webLightTheme } from '@fluentui/r
 
 import { getHostBridge } from './bridge';
 import type { HostBridge } from './bridge';
+import { applySeeds } from './bootstrap/seeds';
 import Desktop from './desktop/Desktop';
 import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
@@ -33,7 +34,20 @@ function readThemeMode(): ThemeMode {
 
 export default function App() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(readThemeMode);
+  const [seeded, setSeeded] = useState(false);
   const bridge = useMemo(() => getHostBridge(), []);
+
+  // 先把 public/secrets.json 里的本地密钥写进 localStorage，再渲染界面，
+  // 避免插件 iframe 用空配置初始化。
+  useEffect(() => {
+    let alive = true;
+    void applySeeds().finally(() => {
+      if (alive) setSeeded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const changeTheme = useCallback((mode: ThemeMode) => {
     setThemeMode(mode);
@@ -46,9 +60,11 @@ export default function App() {
 
   return (
     <FluentProvider theme={themeMode === 'light' ? webLightTheme : webDarkTheme} style={{ height: '100%' }}>
-      <NotificationsProvider bridge={bridge}>
-        <HostShell bridge={bridge} themeMode={themeMode} onThemeModeChange={changeTheme} />
-      </NotificationsProvider>
+      {seeded && (
+        <NotificationsProvider bridge={bridge}>
+          <HostShell bridge={bridge} themeMode={themeMode} onThemeModeChange={changeTheme} />
+        </NotificationsProvider>
+      )}
     </FluentProvider>
   );
 }

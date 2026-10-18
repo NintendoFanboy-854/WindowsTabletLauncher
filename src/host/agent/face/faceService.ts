@@ -10,9 +10,12 @@
  * - 触发后冷却 10 秒，避免讲话时反复唤醒。
  */
 
-import tinyFaceDetectorUrl from '../models/tiny_face_detector_model.bin?url';
-import faceLandmark68TinyUrl from '../models/face_landmark_68_tiny_model.bin?url';
-import faceRecognitionUrl from '../models/face_recognition_model.bin?url';
+import tinyFaceDetectorManifest from '../models/tiny_face_detector_model-weights_manifest.json';
+import faceLandmark68TinyManifest from '../models/face_landmark_68_tiny_model-weights_manifest.json';
+import faceRecognitionManifest from '../models/face_recognition_model-weights_manifest.json';
+import tinyFaceDetectorShardUrl from '../models/tiny_face_detector_model.bin?url';
+import faceLandmark68TinyShardUrl from '../models/face_landmark_68_tiny_model.bin?url';
+import faceRecognitionShardUrl from '../models/face_recognition_model.bin?url';
 
 type FaceApi = typeof import('@vladmandic/face-api');
 
@@ -67,10 +70,64 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-async function loadWeights(url: string): Promise<Float32Array> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`人脸模型加载失败（HTTP ${response.status}）`);
-  return new Float32Array(await response.arrayBuffer());
+/** face-api 的模型是 tfjs 量化权重（uint8 + quantization 元数据），
+ * 不能用裸 Float32Array 直接灌；这里把权重包装成“虚拟目录 + 临时 fetch 拦截”，
+ * 让 face-api 走官方 loadFromUri 路径，由 tfjs 自己解量化。权重来自 Vite 打包后的资源 URL，
+ * dev 与构建产物都不依赖 CDN。 */
+interface ModelAssets {
+  manifestFileName: string;
+  manifest: unknown;
+  /** manifest 里的 shard 文件名 → 构建后的资源 URL */
+  shardUrls: Record<string, string>;
+}
+
+const MODEL_VIRTUAL_DIR = 'wtsl-face-models';
+
+async function loadModelsWithAssets(
+  faceapi: FaceApi,
+  items: Array<{
+    net: { loadFromUri(uri?: string): Promise<void> };
+    assets: ModelAssets;
+  }>,
+): Promise<void> {
+  const env = faceapi.env.getEnv() as { fetch?: typeof fetch };
+  const originalWindowFetch = window.fetch.bind(window);
+  const originalEnvFetch = env.fetch;
+
+  const manifests = new Map(items.map((item) => [item.assets.manifestFileName, JSON.stringify(item.assets.manifest)]));
+  const shards = new Map(items.flatMap((item) => Object.entries(item.assets.shardUrls)));
+
+  const patchedFetch: typeof fetch = async (input, init) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const fileName = url.split('/').pop() ?? '';
+    const manifest = manifests.get(fileName);
+    if (manifest) {
+      return new Response(manifest, { headers: { 'content-type': 'application/json' } });
+    }
+    const shardUrl = shards.get(fileName);
+    if (shardUrl) {
+      const response = await originalWindowFetch(shardUrl);
+      if (!response.ok) {
+        throw new Error(`人脸模型权重加载失败（HTTP ${response.status}）`);
+      }
+      return new Response(await response.arrayBuffer(), {
+        headers: { 'content-type': 'application/octet-stream' },
+      });
+    }
+    return originalWindowFetch(input, init);
+  };
+
+  env.fetch = patchedFetch;
+  window.fetch = patchedFetch;
+  try {
+    for (const item of items) {
+      await item.net.loadFromUri(MODEL_VIRTUAL_DIR);
+    }
+  } finally {
+    env.fetch = originalEnvFetch;
+    window.fetch = originalWindowFetch;
+  }
 }
 
 class FaceService {
@@ -104,14 +161,44 @@ class FaceService {
       this.apiPromise = (async () => {
         this.setState({ status: 'loading', detail: '正在加载人脸模型（约 6.7MB）…' });
         const faceapi = await import('@vladmandic/face-api');
-        const [detector, landmark, recognition] = await Promise.all([
-          loadWeights(tinyFaceDetectorUrl),
-          loadWeights(faceLandmark68TinyUrl),
-          loadWeights(faceRecognitionUrl),
+        // tfjs 的 backend API 不在 face-api 的精简类型里，这里按运行时能力做窄化声明
+        const tfRuntime = faceapi.tf as unknown as {
+          setBackend(name: string): Promise<boolean>;
+          ready(): Promise<void>;
+        };
+        // tfjs 不会自动初始化 backend：官方 demo 的做法是先显式选后端再 tf.ready()
+        const webglReady = await tfRuntime.setBackend('webgl').catch(() => false);
+        if (!webglReady) {
+          // 无 WebGL（远程桌面 / headless）时退回 CPU
+          await tfRuntime.setBackend('cpu').catch(() => false);
+        }
+        await tfRuntime.ready();
+        await loadModelsWithAssets(faceapi, [
+          {
+            net: faceapi.nets.tinyFaceDetector,
+            assets: {
+              manifestFileName: 'tiny_face_detector_model-weights_manifest.json',
+              manifest: tinyFaceDetectorManifest,
+              shardUrls: { 'tiny_face_detector_model.bin': tinyFaceDetectorShardUrl },
+            },
+          },
+          {
+            net: faceapi.nets.faceLandmark68TinyNet,
+            assets: {
+              manifestFileName: 'face_landmark_68_tiny_model-weights_manifest.json',
+              manifest: faceLandmark68TinyManifest,
+              shardUrls: { 'face_landmark_68_tiny_model.bin': faceLandmark68TinyShardUrl },
+            },
+          },
+          {
+            net: faceapi.nets.faceRecognitionNet,
+            assets: {
+              manifestFileName: 'face_recognition_model-weights_manifest.json',
+              manifest: faceRecognitionManifest,
+              shardUrls: { 'face_recognition_model.bin': faceRecognitionShardUrl },
+            },
+          },
         ]);
-        await faceapi.nets.tinyFaceDetector.load(detector);
-        await faceapi.nets.faceLandmark68TinyNet.load(landmark);
-        await faceapi.nets.faceRecognitionNet.load(recognition);
         this.api = faceapi;
         this.setState({ status: 'ready', detail: '' });
         return faceapi;
