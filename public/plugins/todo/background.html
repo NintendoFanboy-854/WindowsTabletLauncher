@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>待办 · 后台</title>
+    <link rel="stylesheet" href="./fluent-tokens.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 后台常驻 iframe：只跑提醒定时器与 Agent 工具，不渲染界面（宿主 manifest.background=true 时挂载）。 -->
+    <script type="module" src="./js/background.js"></script>
+  </body>
+</html>

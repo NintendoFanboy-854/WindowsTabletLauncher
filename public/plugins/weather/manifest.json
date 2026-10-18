@@ -1,0 +1,20 @@
+{
+  "id": "weather",
+  "name": "天气",
+  "version": "0.1.0",
+  "widgets": [
+    {
+      "id": "weather-card",
+      "title": "天气",
+      "sizes": [
+        [1, 1],
+        [2, 1],
+        [2, 2],
+        [3, 2],
+        [4, 2]
+      ],
+      "defaultSize": [3, 2],
+      "cell": [1, 1]
+    }
+  ]
+}

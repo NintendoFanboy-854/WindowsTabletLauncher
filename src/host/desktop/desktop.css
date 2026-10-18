@@ -1,0 +1,7 @@
+/*
+ * 项目材质 token（DESIGN.md §6 的唯一例外）：Fluent web 端没有 Acrylic token，
+ * 卡片统一用这一处模糊值。定义在桌面根上，卡片/工具栏/页面指示器共用。
+ */
+:root {
+  --wtsl-material-blur: 24px;
+}

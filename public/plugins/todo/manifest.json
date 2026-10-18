@@ -1,13 +1,22 @@
 {
   "id": "todo",
   "name": "待办",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "background": true,
   "widgets": [
     {
       "id": "todo-list",
       "title": "待办",
-      "size": [3, 3],
-      "cell": [5, 0]
+      "sizes": [
+        [1, 1],
+        [2, 2],
+        [3, 2],
+        [3, 3],
+        [4, 2]
+      ],
+      "defaultSize": [3, 3],
+      "cell": [5, 0],
+      "size": [3, 3]
     }
   ]
 }

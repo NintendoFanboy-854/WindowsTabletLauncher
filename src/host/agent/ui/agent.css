@@ -1,0 +1,55 @@
+/*
+ * Agent 面板用到的关键帧。
+ * 时长/曲线全部由 TS 里的 motionTokens 通过内联 animation 提供，这里只定义形状。
+ * 动画元素都带 data-wtsl-agent-animated，在“减少动态效果”下统一关掉。
+ */
+
+@keyframes wtsl-agent-fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wtsl-agent-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes wtsl-agent-wave {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes wtsl-agent-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-wtsl-agent-animated='true'] {
+    animation: none !important;
+  }
+}

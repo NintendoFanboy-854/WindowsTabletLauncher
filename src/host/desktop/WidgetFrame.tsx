@@ -1,51 +1,116 @@
-import { useEffect, useRef } from 'react';
+/**
+ * 桌面小组件的 iframe 适配层（A5 集成）：
+ * - 内部直接用插件管理器提供的 `PluginWidgetFrame`（协议收发、init/resize/theme 都在那里）；
+ * - 把它接到宿主桥接层 `HostBridge`：注册 iframe 句柄（reply / focusPlugin / toolCall），
+ *   插件 API 调用走 `bridge.handleApiCall`，`host:init` 的 config 用 `bridge.configSnapshot`；
+ * - 对外只暴露桌面层需要的 `focusPlugin()`（宿主按 Enter 进入组件时用）。
+ *
+ * 旧原型插件的 `wtsl:notify` 也在这里兜住（老插件升级前仍能弹通知）。
+ */
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { getHostBridge } from '../bridge';
+import type { HostBridge, PluginFrameHandle } from '../bridge';
+import type { PluginCallMessage, PluginToHostMessage, ThemePayload, WidgetSize } from '../bridge/types';
+import { PluginWidgetFrame } from '../plugins';
+import type { PluginWidgetFrameHandle } from '../plugins';
+import { useStyles } from './desktop.styles';
 
-interface Props {
+export interface WidgetFrameHandle {
+  /** 把键盘焦点交给插件（含 iframe 的 DOM 焦点） */
+  focusPlugin(): void;
+}
+
+interface WidgetFrameProps {
+  bridge?: HostBridge;
   pluginId: string;
   widgetId: string;
-  onNotify: (text: string) => void;
+  src: string;
+  size: WidgetSize;
+  /** FluentProvider 现读的主题 token；不传 PluginWidgetFrame 会自己从 body 读（可能读不到 provider 变量） */
+  theme?: ThemePayload;
+  notify(text: string): void;
 }
 
-/** 小组件的内容：一个 iframe，宿主只负责初始化和收消息 */
-export default function WidgetFrame({ pluginId, widgetId, onNotify }: Props) {
-  const ref = useRef<HTMLIFrameElement>(null);
+export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(function WidgetFrame(
+  { bridge: bridgeProp, pluginId, widgetId, src, size, theme, notify },
+  ref,
+) {
+  const styles = useStyles();
+  const bridge = bridgeProp ?? getHostBridge();
+  const frameRef = useRef<PluginWidgetFrameHandle>(null);
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
 
+  // host:init 的配置快照来自桥接层（持久化命名空间 plugin.<id>.<key>）
+  const config = bridge.configSnapshot(pluginId);
+
+  // 桥接层需要 iframe 句柄：回复插件请求、把焦点交给插件、替 Agent 调插件工具
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== ref.current?.contentWindow) return;
-      const data = event.data as { type?: string; text?: string };
-      if (data?.type === 'wtsl:notify' && typeof data.text === 'string') {
-        onNotify(data.text);
-      }
+    const handle: PluginFrameHandle = {
+      reply: (id, ok, result, error) => frameRef.current?.reply(id, ok, result, error),
+      focusPlugin: () => frameRef.current?.focusPlugin(),
+      toolCall: (id, name, args) => frameRef.current?.toolCall(id, name, args),
     };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [onNotify]);
+    return bridge.registerFrame(pluginId, handle);
+  }, [bridge, pluginId]);
 
-  const sendInit = () => {
-    ref.current?.contentWindow?.postMessage(
-      {
-        type: 'wtsl:init',
-        pluginId,
-        widgetId,
-        theme: {
-          background: 'rgba(28, 28, 30, 0.55)',
-          foreground: '#f3f3f3',
-          muted: 'rgba(243, 243, 243, 0.6)',
-          accent: '#7cb3ff',
-        },
+  const handleApiCall = useCallback(
+    (message: PluginCallMessage, reply: (ok: boolean, result?: unknown, error?: string) => void) => {
+      void bridge.handleApiCall(pluginId, message, reply);
+    },
+    [bridge, pluginId],
+  );
+
+  const handleMessage = useCallback(
+    (message: PluginToHostMessage) => {
+      switch (message.type) {
+        case 'plugin:ready':
+          bridge.handleReady(message);
+          break;
+        case 'plugin:tool-result':
+          bridge.handleToolResult(message);
+          break;
+        case 'plugin:focus-exit':
+          bridge.handleFocusExit(message);
+          break;
+        default: {
+          const legacy = message as unknown as { type?: string; text?: unknown };
+          if (legacy.type === 'wtsl:notify' && typeof legacy.text === 'string' && legacy.text) {
+            notifyRef.current(legacy.text);
+          }
+          break;
+        }
+      }
+    },
+    [bridge],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focusPlugin() {
+        const frame = frameRef.current;
+        if (!frame) return;
+        frame.contentWindow?.focus();
+        frame.focusPlugin();
       },
-      '*',
-    );
-  };
+    }),
+    [],
+  );
 
   return (
-    <iframe
-      ref={ref}
-      className="widget-frame"
+    <PluginWidgetFrame
+      ref={frameRef}
+      className={styles.frame}
+      src={src}
+      pluginId={pluginId}
+      widgetId={widgetId}
+      size={size}
+      theme={theme}
+      config={config}
       title={`${pluginId} / ${widgetId}`}
-      src={`/plugins/${pluginId}/index.html?widget=${encodeURIComponent(widgetId)}`}
-      onLoad={sendInit}
+      onApiCall={handleApiCall}
+      onMessage={handleMessage}
     />
   );
-}
+});

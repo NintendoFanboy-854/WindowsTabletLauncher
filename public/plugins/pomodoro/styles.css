@@ -1,0 +1,1106 @@
+/*
+ * 番茄钟 —— Fluent 2 小组件样式。
+ *
+ * iframe 视口 = 卡片本身：尺寸用 vw / vh / vmin + clamp()，不写死像素布局。
+ * 颜色、字体、圆角、动效全部吃 Fluent token（宿主 init(theme) 注入同名变量；
+ * 默认值为 Fluent webDarkTheme 深色 token，供独立打开时兜底）。
+ */
+
+:root {
+  color-scheme: dark;
+
+  --fontFamilyBase: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --fontFamilyDisplay: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --fontWeightRegular: 400;
+  --fontWeightMedium: 500;
+  --fontWeightSemibold: 600;
+  --fontWeightBold: 700;
+  --fontSizeBase100: 10px;
+  --fontSizeBase200: 12px;
+  --fontSizeBase300: 14px;
+  --fontSizeBase400: 16px;
+  --fontSizeBase500: 20px;
+  --fontSizeBase600: 24px;
+  --lineHeightBase100: 14px;
+  --lineHeightBase200: 16px;
+  --lineHeightBase300: 20px;
+  --lineHeightBase400: 22px;
+  --lineHeightBase500: 28px;
+
+  --colorNeutralForeground1: #ffffff;
+  --colorNeutralForeground2: #d6d6d6;
+  --colorNeutralForeground3: #adadad;
+  --colorNeutralForeground4: #999999;
+  --colorNeutralForegroundDisabled: #5c5c5c;
+  --colorNeutralBackground1: #292929;
+  --colorNeutralBackground2: #242424;
+  --colorNeutralBackground3: #1f1f1f;
+  --colorNeutralBackground4: #1a1a1a;
+  --colorNeutralBackground1Hover: #3d3d3d;
+  --colorNeutralBackground1Pressed: #414141;
+  --colorSubtleBackground: transparent;
+  --colorSubtleBackgroundHover: #383838;
+  --colorSubtleBackgroundPressed: #414141;
+  --colorNeutralStroke1: #666666;
+  --colorNeutralStroke2: #525252;
+  --colorNeutralStroke3: #3d3d3d;
+  --colorNeutralStrokeAccessible: #adadad;
+  --colorStrokeFocus2: #ffffff;
+
+  --colorBrandForeground1: #479ef5;
+  --colorBrandForeground2: #62abf5;
+  --colorBrandBackground: #115ea3;
+  --colorBrandBackgroundHover: #0f548c;
+  --colorBrandBackgroundPressed: #0c3b5e;
+  --colorBrandBackground2: #082338;
+  --colorBrandStroke1: #479ef5;
+  --colorNeutralForegroundOnBrand: #ffffff;
+  --colorNeutralForegroundInverted: #0b0b0b;
+
+  --colorPaletteRedForeground1: #e37d80;
+  --colorPaletteGreenForeground1: #54b054;
+  --colorPaletteGreenBackground2: #093a09;
+  --colorPaletteDarkOrangeForeground1: #f98845;
+  --colorPaletteBlueForeground1: #6cb8f6;
+  --colorPaletteBlueForeground2: #b4d6fa;
+  --colorPaletteBlueBackground2: #082338;
+  --colorPalettePurpleForeground1: #b696d7;
+
+  --borderRadiusSmall: 2px;
+  --borderRadiusMedium: 4px;
+  --borderRadiusLarge: 8px;
+  --borderRadiusXLarge: 12px;
+  --borderRadiusCircular: 10000px;
+  --strokeWidthThin: 1px;
+  --strokeWidthThick: 2px;
+  --spacingHorizontalXS: 4px;
+  --spacingHorizontalS: 8px;
+  --spacingHorizontalM: 12px;
+  --spacingHorizontalL: 16px;
+  --spacingHorizontalXL: 20px;
+  --spacingVerticalXS: 4px;
+  --spacingVerticalS: 8px;
+  --spacingVerticalM: 12px;
+  --spacingVerticalL: 16px;
+  --spacingVerticalXL: 20px;
+
+  --shadow4: 0 2px 4px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.12);
+  --shadow8: 0 4px 8px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.12);
+  --shadow16: 0 8px 16px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.12);
+  --shadow28: 0 14px 28px rgba(0, 0, 0, 0.24), 0 0 8px rgba(0, 0, 0, 0.2);
+
+  --durationFaster: 100ms;
+  --durationFast: 150ms;
+  --durationNormal: 200ms;
+  --durationSlow: 300ms;
+  --curveAccelerateMid: cubic-bezier(0.7, 0, 1, 0.5);
+  --curveDecelerateMid: cubic-bezier(0, 0, 0, 1);
+  --curveEasyEase: cubic-bezier(0.33, 0, 0.67, 1);
+  --curveLinear: linear;
+
+  --wtsl-material-blur: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.is-standalone {
+  background:
+    radial-gradient(150% 170% at 8% -30%, rgba(84, 128, 214, 0.3), transparent 56%),
+    radial-gradient(130% 150% at 112% 132%, rgba(140, 96, 200, 0.22), transparent 62%),
+    #1f1f1f;
+}
+
+:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: -2px;
+  border-radius: var(--borderRadiusMedium);
+}
+
+/* 阶段色：专注品牌色 / 短休绿 / 长休蓝 */
+html[data-phase='focus'] {
+  --phase-color: var(--colorBrandForeground1);
+  --phase-soft: var(--colorBrandBackground2);
+}
+
+html[data-phase='shortBreak'] {
+  --phase-color: var(--colorPaletteGreenForeground1);
+  --phase-soft: var(--colorPaletteGreenBackground2);
+}
+
+html[data-phase='longBreak'] {
+  --phase-color: var(--colorPaletteBlueForeground2);
+  --phase-soft: var(--colorPaletteBlueBackground2);
+}
+
+/* ---------------- 画布 ---------------- */
+
+.app {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: clamp(8px, 3vmin, 18px);
+  min-width: 0;
+  min-height: 0;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1.6vmin, 12px);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.side {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(4px, 1.6vmin, 12px);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------------- 环形进度 ---------------- */
+
+.visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  width: min(86vw, 86vh);
+  border-radius: var(--borderRadiusCircular);
+  cursor: pointer;
+  touch-action: manipulation;
+  flex: 0 1 auto;
+  min-height: 0;
+  transition: background var(--durationFaster) var(--curveEasyEase);
+}
+
+.visual:hover {
+  background: color-mix(in srgb, var(--colorNeutralForeground1) 4%, transparent);
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.ring-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--colorNeutralForeground1) 10%, transparent);
+  stroke-width: 4.5;
+}
+
+.ring-progress {
+  fill: none;
+  stroke: var(--phase-color);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 282.743;
+  stroke-dashoffset: 282.743;
+  transition:
+    stroke-dashoffset var(--durationFast) var(--curveLinear),
+    stroke var(--durationNormal) var(--curveEasyEase);
+}
+
+.visual-center {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1px, 0.6vmin, 4px);
+  max-width: 86%;
+  text-align: center;
+}
+
+.phase-label {
+  color: var(--phase-color);
+  font-size: clamp(9px, 2.8vmin, 13px);
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.time {
+  font-family: var(--fontFamilyDisplay);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------------- 2×1 的纯文本时间 ---------------- */
+
+.plain {
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(2px, 1vmin, 6px);
+  min-width: 0;
+}
+
+.phase-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16em 0.6em;
+  border-radius: var(--borderRadiusCircular);
+  background: color-mix(in srgb, var(--phase-color) 16%, transparent);
+  color: var(--phase-color);
+  font-size: clamp(10px, 3vmin, 13px);
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.time-plain {
+  font-family: var(--fontFamilyDisplay);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------------- 按钮 ---------------- */
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 1.6vmin, 12px);
+  flex: 0 0 auto;
+}
+
+.ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorSubtleBackground);
+  color: var(--colorNeutralForeground2);
+  cursor: pointer;
+  transition:
+    background var(--durationFaster) var(--curveEasyEase),
+    border-color var(--durationFaster) var(--curveEasyEase),
+    color var(--durationFaster) var(--curveEasyEase),
+    transform var(--durationFast) var(--curveDecelerateMid);
+}
+
+.ctrl-btn:hover {
+  background: var(--colorSubtleBackgroundHover);
+  color: var(--colorNeutralForeground1);
+}
+
+.ctrl-btn:active {
+  background: var(--colorSubtleBackgroundPressed);
+  transform: scale(0.96);
+}
+
+.ctrl-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.ctrl-btn.small {
+  min-width: 32px;
+  min-height: 32px;
+  border-color: transparent;
+}
+
+.ctrl-btn.small svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ctrl-btn.primary {
+  border-color: transparent;
+  background: var(--colorBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+}
+
+.ctrl-btn.primary:hover {
+  background: var(--colorBrandBackgroundHover);
+}
+
+.ctrl-btn.primary:active {
+  background: var(--colorBrandBackgroundPressed);
+}
+
+/* ---------------- 右侧信息 ---------------- */
+
+.task-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--colorNeutralForeground1);
+  font-size: clamp(12px, 3.4vmin, 16px);
+  font-weight: var(--fontWeightSemibold);
+  min-width: 0;
+}
+
+.phase-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--colorNeutralForeground3);
+  font-size: clamp(10px, 2.8vmin, 12px);
+  min-width: 0;
+}
+
+.stats {
+  color: var(--colorNeutralForeground2);
+  font-size: clamp(11px, 3vmin, 14px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rounds {
+  display: flex;
+  align-items: center;
+  gap: clamp(3px, 1.2vmin, 6px);
+}
+
+.round-dot {
+  width: clamp(6px, 1.8vmin, 9px);
+  height: clamp(6px, 1.8vmin, 9px);
+  border-radius: var(--borderRadiusCircular);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAccessible);
+  background: transparent;
+  transition: background var(--durationNormal) var(--curveEasyEase);
+}
+
+.round-dot.is-done {
+  border-color: var(--phase-color);
+  background: var(--phase-color);
+}
+
+.noise-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 1.4vmin, 10px);
+  min-width: 0;
+}
+
+.noise-label {
+  color: var(--colorNeutralForeground3);
+  font-size: clamp(10px, 2.8vmin, 12px);
+  white-space: nowrap;
+}
+
+.noise-btn.is-on {
+  color: var(--colorBrandForeground1);
+  border-color: color-mix(in srgb, var(--colorBrandForeground1) 50%, transparent);
+}
+
+/* Fluent Slider */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: clamp(60px, 22vw, 140px);
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorNeutralStroke3);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorBrandBackground);
+  border: var(--strokeWidthThin) solid var(--colorNeutralBackground1);
+  transition: transform var(--durationFaster) var(--curveEasyEase);
+}
+
+.slider:hover::-webkit-slider-thumb {
+  transform: scale(1.08);
+}
+
+.slider:focus-visible {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+/* ---------------- 尺寸档布局 ---------------- */
+
+/* 1×1：环形进度 + 剩余时间 + 当前阶段 */
+html[data-size='1x1'] .app {
+  padding: clamp(4px, 2.4vmin, 10px);
+}
+
+html[data-size='1x1'] .left {
+  justify-content: center;
+}
+
+html[data-size='1x1'] .visual {
+  width: min(90vw, 90vh);
+}
+
+html[data-size='1x1'] .time {
+  font-size: min(15vw, 15vh);
+}
+
+html[data-size='1x1'] .phase-label {
+  font-size: clamp(8px, 4vw, 10px);
+}
+
+html[data-size='1x1'] .plain,
+html[data-size='1x1'] .controls,
+html[data-size='1x1'] .side,
+html[data-size='1x1'] .settings-btn {
+  display: none;
+}
+
+/* 2×1：时间 + 开始/暂停/跳过/重置 */
+html[data-size='2x1'] .app {
+  align-items: center;
+  gap: clamp(6px, 2.4vmin, 16px);
+}
+
+html[data-size='2x1'] .left {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 2.4vmin, 16px);
+}
+
+html[data-size='2x1'] .visual {
+  display: none;
+}
+
+html[data-size='2x1'] .plain {
+  display: flex;
+}
+
+html[data-size='2x1'] .time-plain {
+  font-size: min(20vw, 42vh);
+}
+
+html[data-size='2x1'] .phase-chip {
+  font-size: clamp(10px, 3vmin, 13px);
+}
+
+html[data-size='2x1'] .controls {
+  gap: clamp(2px, 1.2vmin, 8px);
+}
+
+html[data-size='2x1'] .side {
+  display: none;
+}
+
+/* 2×2：时间 + 任务 + 按钮 + 白噪音 */
+html[data-size='2x2'] .app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    'visual'
+    'task'
+    'controls'
+    'noise';
+  align-items: center;
+  justify-items: center;
+  gap: clamp(4px, 1.8vmin, 12px);
+}
+
+html[data-size='2x2'] .left,
+html[data-size='2x2'] .side {
+  display: contents;
+}
+
+html[data-size='2x2'] .visual {
+  grid-area: visual;
+  width: min(54vw, 54vh);
+}
+
+html[data-size='2x2'] .time {
+  font-size: min(9vw, 9vh);
+}
+
+html[data-size='2x2'] .plain,
+html[data-size='2x2'] .phase-line,
+html[data-size='2x2'] .stats,
+html[data-size='2x2'] .rounds {
+  display: none;
+}
+
+html[data-size='2x2'] .task-line {
+  grid-area: task;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(12px, 2.6vw, 15px);
+}
+
+html[data-size='2x2'] .controls {
+  grid-area: controls;
+}
+
+html[data-size='2x2'] .noise-row {
+  grid-area: noise;
+}
+
+html[data-size='2x2'] .slider {
+  width: clamp(56px, 16vw, 90px);
+}
+
+/* 3×2：完整信息 + 今日统计 + 设置入口 */
+html[data-size='3x2'] .app {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto;
+  grid-template-areas:
+    'visual task'
+    'visual phase'
+    'controls stats'
+    'controls rounds'
+    'controls noise';
+  align-items: center;
+  justify-items: start;
+  column-gap: clamp(8px, 3vmin, 20px);
+  row-gap: clamp(2px, 1.2vmin, 8px);
+}
+
+html[data-size='3x2'] .left,
+html[data-size='3x2'] .side {
+  display: contents;
+}
+
+html[data-size='3x2'] .visual {
+  grid-area: visual;
+  width: min(35vw, 66vh);
+  justify-self: center;
+  align-self: center;
+}
+
+html[data-size='3x2'] .time {
+  font-size: min(6vw, 11vh);
+}
+
+html[data-size='3x2'] .plain {
+  display: none;
+}
+
+html[data-size='3x2'] .task-line {
+  grid-area: task;
+  align-self: end;
+  padding-inline-end: 44px;
+  font-size: clamp(13px, 3vmin, 17px);
+}
+
+html[data-size='3x2'] .phase-line {
+  grid-area: phase;
+  align-self: start;
+}
+
+html[data-size='3x2'] .controls {
+  grid-area: controls;
+  justify-self: center;
+  align-self: center;
+}
+
+html[data-size='3x2'] .stats {
+  grid-area: stats;
+  align-self: center;
+}
+
+html[data-size='3x2'] .rounds {
+  grid-area: rounds;
+  align-self: center;
+}
+
+html[data-size='3x2'] .noise-row {
+  grid-area: noise;
+  align-self: center;
+}
+
+html[data-size='3x2'] .task-line,
+html[data-size='3x2'] .phase-line,
+html[data-size='3x2'] .stats,
+html[data-size='3x2'] .rounds,
+html[data-size='3x2'] .noise-row {
+  max-width: 100%;
+}
+
+/* ---------------- 设置按钮 ---------------- */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorSubtleBackground);
+  color: var(--colorNeutralForeground2);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--durationFaster) var(--curveEasyEase),
+    color var(--durationFaster) var(--curveEasyEase);
+}
+
+.icon-btn:hover {
+  background: var(--colorSubtleBackgroundHover);
+  color: var(--colorNeutralForeground1);
+}
+
+.icon-btn:active {
+  background: var(--colorSubtleBackgroundPressed);
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.settings-btn {
+  position: absolute;
+  top: clamp(2px, 1.2vmin, 8px);
+  right: clamp(2px, 1.2vmin, 8px);
+  z-index: 5;
+  opacity: 0;
+  transition: opacity var(--durationNormal) var(--curveEasyEase);
+}
+
+html[data-size='3x2'] .settings-btn {
+  opacity: 0.8;
+}
+
+body.sheet-open .settings-btn,
+.settings-btn:hover,
+.settings-btn:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .settings-btn {
+    opacity: 0.85;
+  }
+}
+
+/* ---------------- 沉浸模式 ---------------- */
+
+.immersive {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 4vmin, 24px);
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 96%, transparent);
+  opacity: 0;
+  transition: opacity var(--durationNormal) var(--curveEasyEase);
+}
+
+.immersive.is-open {
+  opacity: 1;
+}
+
+.immersive-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 2vmin, 14px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  text-align: center;
+}
+
+.immersive-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalS);
+  width: 100%;
+  position: relative;
+}
+
+.immersive-head .icon-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.immersive-phase {
+  color: var(--phase-color);
+  font-size: clamp(12px, 3.4vmin, 18px);
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: 0.12em;
+}
+
+.immersive-time {
+  font-family: var(--fontFamilyDisplay);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-size: min(19vw, 34vh);
+}
+
+.immersive-task {
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--colorNeutralForeground2);
+  font-size: clamp(12px, 3.6vmin, 18px);
+}
+
+.immersive-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacingHorizontalM);
+}
+
+.immersive-stats {
+  color: var(--colorNeutralForeground3);
+  font-size: clamp(11px, 2.8vmin, 14px);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 通用控件 / 设置面板 ---------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacingHorizontalXS);
+  min-height: 40px;
+  padding: 0 var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
+  cursor: pointer;
+  transition:
+    background var(--durationFaster) var(--curveEasyEase),
+    border-color var(--durationFaster) var(--curveEasyEase);
+}
+
+.btn:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--colorBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+}
+
+.btn-primary:hover {
+  background: var(--colorBrandBackgroundHover);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transition: opacity var(--durationNormal) var(--curveEasyEase);
+}
+
+.scrim.is-open {
+  opacity: 1;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  max-height: 94%;
+  overflow: auto;
+  padding: var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-bottom: none;
+  border-radius: var(--borderRadiusXLarge) var(--borderRadiusXLarge) 0 0;
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 92%, transparent);
+  backdrop-filter: blur(var(--wtsl-material-blur));
+  box-shadow: var(--shadow16);
+  transform: translateY(100%);
+  transition: transform var(--durationNormal) var(--curveDecelerateMid);
+  scrollbar-width: thin;
+}
+
+.sheet.is-open {
+  transform: translateY(0);
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  margin-bottom: var(--spacingVerticalS);
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: var(--fontSizeBase400);
+  line-height: var(--lineHeightBase400);
+  font-weight: var(--fontWeightSemibold);
+}
+
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalS);
+}
+
+.num-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacingVerticalS) var(--spacingHorizontalM);
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacingVerticalXS);
+}
+
+.field-label {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground3);
+}
+
+.text-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--spacingHorizontalM);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke1);
+  border-bottom-width: var(--strokeWidthThick);
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorNeutralBackground3);
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  transition: border-color var(--durationFaster) var(--curveEasyEase);
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--colorBrandStroke1);
+}
+
+.slider {
+  align-self: stretch;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalM);
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+
+.row-desc {
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground3);
+}
+
+.divider {
+  height: var(--strokeWidthThin);
+  background: var(--colorNeutralStroke3);
+  margin: var(--spacingVerticalXS) 0;
+}
+
+/* Fluent Switch */
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.switch-track {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 20px;
+  border-radius: var(--borderRadiusCircular);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAccessible);
+  background: transparent;
+  transition:
+    background var(--durationNormal) var(--curveEasyEase),
+    border-color var(--durationNormal) var(--curveEasyEase);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--borderRadiusCircular);
+  background: var(--colorNeutralStrokeAccessible);
+  transform: translateY(-50%);
+  transition:
+    transform var(--durationNormal) var(--curveDecelerateMid),
+    background var(--durationNormal) var(--curveEasyEase);
+}
+
+.switch input:checked + .switch-track {
+  border-color: var(--colorBrandBackground);
+  background: var(--colorBrandBackground);
+}
+
+.switch input:checked + .switch-track .switch-thumb {
+  transform: translate(20px, -50%);
+  background: var(--colorNeutralForegroundOnBrand);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2);
+  outline-offset: 2px;
+}
+
+/* 白噪音分段选择 */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacingHorizontalXS);
+}
+
+.seg-btn {
+  flex: 1 1 0;
+  min-height: 40px;
+  padding: 0 var(--spacingHorizontalS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground2);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  cursor: pointer;
+  transition:
+    background var(--durationFaster) var(--curveEasyEase),
+    border-color var(--durationFaster) var(--curveEasyEase),
+    color var(--durationFaster) var(--curveEasyEase);
+}
+
+.seg-btn:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.seg-btn[aria-pressed='true'] {
+  border-color: var(--colorBrandStroke1);
+  background: color-mix(in srgb, var(--colorBrandForeground1) 16%, transparent);
+  color: var(--colorNeutralForeground1);
+}
+
+.hint {
+  margin: 0;
+  color: var(--colorNeutralForeground4);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+}
+
+.hint code {
+  font-family: var(--fontFamilyBase);
+  color: var(--colorNeutralForeground3);
+}
+
+#set-volume {
+  width: 100%;
+}
+
+@media (forced-colors: active) {
+  .app,
+  .sheet,
+  .immersive,
+  .ctrl-btn {
+    forced-color-adjust: auto;
+  }
+}

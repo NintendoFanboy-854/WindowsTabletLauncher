@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN" data-phase="focus">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>番茄钟</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <div class="left">
+        <div class="visual" id="visual" role="button" tabindex="0" title="进入沉浸模式" aria-label="进入沉浸模式">
+          <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="ring-track" cx="50" cy="50" r="45"></circle>
+            <circle class="ring-progress" id="ring-progress" cx="50" cy="50" r="45"></circle>
+          </svg>
+          <div class="visual-center">
+            <span class="phase-label" id="phase-label">专注</span>
+            <span class="time" id="time-main">25:00</span>
+          </div>
+        </div>
+
+        <div class="plain">
+          <span class="phase-chip" id="phase-chip">专注</span>
+          <span class="time-plain" id="time-plain">25:00</span>
+        </div>
+
+        <div class="controls">
+          <button class="ctrl-btn primary" id="toggle-btn" type="button" aria-label="开始专注" title="开始 / 暂停">
+            <svg viewBox="0 0 20 20" aria-hidden="true" id="toggle-icon">
+              <path
+                fill="currentColor"
+                d="M17.22 8.69a1.5 1.5 0 0 1 0 2.62l-10 5.5A1.5 1.5 0 0 1 5 15.5v-11A1.5 1.5 0 0 1 7.22 3.2zm-.48 1.75a.5.5 0 0 0 0-.88l-10-5.5A.5.5 0 0 0 6 4.5v11c0 .38.4.62.74.44z"
+              />
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="skip-btn" type="button" aria-label="跳过本轮" title="跳过本轮">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M13.5 5a.5.5 0 0 1 .5.41v9.09a.5.5 0 0 1-1 .09V5.5c0-.28.22-.5.5-.5m-7.85.15a.5.5 0 0 1 .63-.06l.07.06 4.5 4.5c.18.17.2.44.06.63l-.06.07-4.5 4.5a.5.5 0 0 1-.76-.63l.06-.07L9.79 10 5.65 5.85a.5.5 0 0 1 0-.7"
+              />
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="reset-btn" type="button" aria-label="重置" title="重置">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M5.85 2.65c.2.2.2.5 0 .7L4.21 5H11a6 6 0 1 1-6 6 .5.5 0 0 1 1 0 5 5 0 1 0 5-5H4.2l1.65 1.65a.5.5 0 1 1-.7.7l-2.5-2.5a.5.5 0 0 1 0-.7l2.5-2.5c.2-.2.5-.2.7 0"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="task-line" id="task-line">未关联任务</div>
+        <div class="phase-line" id="phase-line">专注 · 25 分钟</div>
+        <div class="stats" id="stats">今日 0 个 · 0 分钟</div>
+        <div class="rounds" id="rounds" aria-label="本轮专注进度"></div>
+        <div class="noise-row">
+          <button class="ctrl-btn small" id="noise-btn" type="button" aria-label="白噪音开关" title="白噪音开关">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 3a1 1 0 0 0-1.68-.73l-3.88 3.6A.5.5 0 0 1 6.1 6H3.5C2.67 6 2 6.67 2 7.5v5c0 .83.67 1.5 1.5 1.5h2.6a.5.5 0 0 1 .34.13l3.88 3.6a1 1 0 0 0 1.68-.74zM7.12 6.6 11 3v14l-3.88-3.6A1.5 1.5 0 0 0 6.1 13H3.5a.5.5 0 0 1-.5-.5v-5c0-.28.22-.5.5-.5h2.6c.38 0 .75-.14 1.02-.4m8.14-1.97a.5.5 0 0 1 .7.04 8 8 0 0 1 0 10.66.5.5 0 0 1-.74-.66 7 7 0 0 0 0-9.34.5.5 0 0 1 .04-.7m-1.18 8.3a.5.5 0 0 1-.18-.68 4.5 4.5 0 0 0 0-4.5.5.5 0 1 1 .86-.5 5.5 5.5 0 0 1 0 5.5.5.5 0 0 1-.68.18"
+              />
+            </svg>
+          </button>
+          <span class="noise-label" id="noise-label">白噪音关</span>
+          <input class="slider" id="volume-slider" type="range" min="0" max="100" step="1" value="40" aria-label="白噪音音量" />
+        </div>
+      </div>
+
+      <button class="icon-btn settings-btn" id="settings-btn" type="button" title="番茄钟设置" aria-label="打开番茄钟设置">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M1.91 7.38A8.5 8.5 0 0 1 3.7 4.3a.5.5 0 0 1 .54-.13l1.92.68a1 1 0 0 0 1.32-.76l.36-2a.5.5 0 0 1 .4-.4 9 9 0 0 1 3.55 0q.32.08.38.4l.37 2a1 1 0 0 0 1.32.76l1.92-.68a.5.5 0 0 1 .54.13 8.5 8.5 0 0 1 1.78 3.08q.08.31-.15.54l-1.56 1.32a1 1 0 0 0 0 1.52l1.56 1.32a.5.5 0 0 1 .15.54 8.5 8.5 0 0 1-1.78 3.08.5.5 0 0 1-.54.13l-1.92-.68a1 1 0 0 0-1.32.76l-.37 2a.5.5 0 0 1-.38.4 8.5 8.5 0 0 1-3.56 0 .5.5 0 0 1-.39-.4l-.36-2a1 1 0 0 0-1.32-.76l-1.92.68a.5.5 0 0 1-.54-.13 8.5 8.5 0 0 1-1.78-3.08.5.5 0 0 1 .15-.54l1.56-1.32a1 1 0 0 0 0-1.52L2.06 7.92a.5.5 0 0 1-.15-.54m1.06 0 1.3 1.1a2 2 0 0 1 0 3.04l-1.3 1.1q.45 1.19 1.25 2.16l1.6-.58a2 2 0 0 1 2.63 1.53l.3 1.67a8 8 0 0 0 2.5 0l.3-1.67a2 2 0 0 1 2.64-1.53l1.6.58a8 8 0 0 0 1.24-2.16l-1.3-1.1a2 2 0 0 1 0-3.04l1.3-1.1a8 8 0 0 0-1.25-2.16l-1.6.58a2 2 0 0 1-2.63-1.53l-.3-1.67a8 8 0 0 0-2.5 0l-.3 1.67A2 2 0 0 1 5.81 5.8l-1.6-.58a8 8 0 0 0-1.24 2.16M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0m1 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- 沉浸模式：覆盖整张卡片 -->
+    <div class="immersive" id="immersive" hidden>
+      <div class="immersive-inner">
+        <div class="immersive-head">
+          <span class="immersive-phase" id="immersive-phase">专注</span>
+          <button class="icon-btn" id="immersive-close" type="button" title="退出沉浸模式" aria-label="退出沉浸模式">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="immersive-time" id="immersive-time">25:00</div>
+        <div class="immersive-task" id="immersive-task">未关联任务</div>
+        <div class="immersive-actions">
+          <button class="btn" id="immersive-toggle" type="button">暂停</button>
+          <button class="btn btn-primary" id="immersive-stop" type="button">结束本轮</button>
+        </div>
+        <div class="immersive-stats" id="immersive-stats">今日 0 个 · 0 分钟</div>
+      </div>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <section class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="settings-title">番茄钟设置</h2>
+        <button class="icon-btn" id="settings-close" type="button" title="关闭" aria-label="关闭设置">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <div class="num-grid">
+          <label class="form-row">
+            <span class="field-label">专注（分钟）</span>
+            <input class="text-input num-input" id="set-focus" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+          <label class="form-row">
+            <span class="field-label">短休（分钟）</span>
+            <input class="text-input num-input" id="set-short" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+          <label class="form-row">
+            <span class="field-label">长休（分钟）</span>
+            <input class="text-input num-input" id="set-long" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+          <label class="form-row">
+            <span class="field-label">长休前轮数</span>
+            <input class="text-input num-input" id="set-rounds" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <label class="row" for="set-auto">
+          <span class="row-text">
+            <span class="row-title">自动开始下一阶段</span>
+            <span class="row-desc">关闭时阶段结束停在「待开始」</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-auto" role="switch" aria-label="自动开始下一阶段" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <label class="row" for="set-sound">
+          <span class="row-text">
+            <span class="row-title">阶段结束提示音</span>
+            <span class="row-desc">用 WebAudio 合成，不联网</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-sound" role="switch" aria-label="阶段结束提示音" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <label class="row" for="set-keepawake">
+          <span class="row-text">
+            <span class="row-title">专注时阻止息屏</span>
+            <span class="row-desc">通过宿主 setKeepAwake 实现</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-keepawake" role="switch" aria-label="专注时阻止息屏" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <div class="divider"></div>
+
+        <div class="form-row">
+          <span class="field-label" id="noise-group-label">白噪音</span>
+          <div class="segmented" id="noise-options" role="radiogroup" aria-labelledby="noise-group-label"></div>
+        </div>
+
+        <div class="form-row">
+          <label class="field-label" for="set-volume">音量：<span id="volume-value">40</span></label>
+          <input class="slider" id="set-volume" type="range" min="0" max="100" step="1" />
+        </div>
+
+        <p class="hint">修改仅影响下一轮；进行中的这一轮不改变时长。白噪音随阶段结束淡出。</p>
+        <p class="hint">关联待办：通过 Agent 工具 <code>pomodoro.start({ taskId })</code> 指定；待办列表读取需宿主 Agent 桥接，本期未接。</p>
+      </div>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

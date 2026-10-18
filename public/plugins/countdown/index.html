@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>倒数日</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="widget">
+      <div class="bar" id="bar">
+        <div class="bar-title">
+          <strong>倒数日</strong>
+          <span class="bar-count" id="bar-count"></span>
+        </div>
+        <div class="bar-actions">
+          <button class="icon-btn" id="add-btn" type="button" title="新增倒数日" aria-label="新增倒数日">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M10 2.5c.28 0 .5.22.5.5v6.5H17a.5.5 0 0 1 0 1h-6.5V17a.5.5 0 0 1-1 0v-6.5H3a.5.5 0 0 1 0-1h6.5V3c0-.28.22-.5.5-.5"
+              />
+            </svg>
+          </button>
+          <button class="icon-btn" id="settings-btn" type="button" title="倒数日设置" aria-label="打开倒数日设置">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M1.91 7.38A8.5 8.5 0 0 1 3.7 4.3a.5.5 0 0 1 .54-.13l1.92.68a1 1 0 0 0 1.32-.76l.36-2a.5.5 0 0 1 .4-.4 9 9 0 0 1 3.55 0q.32.08.38.4l.37 2a1 1 0 0 0 1.32.76l1.92-.68a.5.5 0 0 1 .54.13 8.5 8.5 0 0 1 1.78 3.08q.08.31-.15.54l-1.56 1.32a1 1 0 0 0 0 1.52l1.56 1.32a.5.5 0 0 1 .15.54 8.5 8.5 0 0 1-1.78 3.08.5.5 0 0 1-.54.13l-1.92-.68a1 1 0 0 0-1.32.76l-.37 2a.5.5 0 0 1-.38.4 8.5 8.5 0 0 1-3.56 0 .5.5 0 0 1-.39-.4l-.36-2a1 1 0 0 0-1.32-.76l-1.92.68a.5.5 0 0 1-.54-.13 8.5 8.5 0 0 1-1.78-3.08.5.5 0 0 1 .15-.54l1.56-1.32a1 1 0 0 0 0-1.52L2.06 7.92a.5.5 0 0 1-.15-.54m1.06 0 1.3 1.1a2 2 0 0 1 0 3.04l-1.3 1.1q.45 1.19 1.25 2.16l1.6-.58a2 2 0 0 1 2.63 1.53l.3 1.67a8 8 0 0 0 2.5 0l.3-1.67a2 2 0 0 1 2.64-1.53l1.6.58a8 8 0 0 0 1.24-2.16l-1.3-1.1a2 2 0 0 1 0-3.04l1.3-1.1a8 8 0 0 0-1.25-2.16l-1.6.58a2 2 0 0 1-2.63-1.53l-.3-1.67a8 8 0 0 0-2.5 0l-.3 1.67A2 2 0 0 1 5.81 5.8l-1.6-.58a8 8 0 0 0-1.24 2.16M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0m1 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="single" id="single" role="button" tabindex="0"></div>
+      <div class="list" id="list" role="list"></div>
+
+      <div class="empty" id="empty">
+        <div class="empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20">
+            <path
+              fill="currentColor"
+              d="M7 11a1 1 0 1 0 0-2 1 1 0 0 0 0 2m1 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0m2-2a1 1 0 1 0 0-2 1 1 0 0 0 0 2m1 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0m2-2a1 1 0 1 0 0-2 1 1 0 0 0 0 2m4-5.5A2.5 2.5 0 0 0 14.5 3h-9A2.5 2.5 0 0 0 3 5.5v9A2.5 2.5 0 0 0 5.5 17h9a2.5 2.5 0 0 0 2.5-2.5zM4 7h12v7.5c0 .83-.67 1.5-1.5 1.5h-9A1.5 1.5 0 0 1 4 14.5zm1.5-3h9c.83 0 1.5.67 1.5 1.5V6H4v-.5C4 4.67 4.67 4 5.5 4"
+            />
+          </svg>
+        </div>
+        <div class="empty-title">还没有倒数日</div>
+        <button class="btn btn-primary" id="empty-add" type="button">添加倒数日</button>
+      </div>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <section class="sheet" id="form-sheet" role="dialog" aria-modal="true" aria-labelledby="form-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="form-title">新增倒数日</h2>
+        <button class="icon-btn" id="form-close" type="button" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <div class="msgbar" id="form-error" role="alert"></div>
+        <div class="form-row">
+          <label class="field-label" for="form-name">标题</label>
+          <input class="text-input" id="form-name" type="text" placeholder="例如：期末考试" autocomplete="off" />
+        </div>
+        <div class="form-row">
+          <label class="field-label" for="form-date">日期</label>
+          <input class="text-input" id="form-date" type="date" />
+        </div>
+        <label class="row" for="form-repeat">
+          <span class="row-text">
+            <span class="row-title">每年重复</span>
+            <span class="row-desc">生日 / 纪念日按「月-日」每年循环</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="form-repeat" role="switch" aria-label="每年重复" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+        <div class="form-row">
+          <span class="field-label" id="color-label">颜色</span>
+          <div class="swatches" id="form-colors" role="radiogroup" aria-labelledby="color-label"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-danger" id="form-delete" type="button">删除</button>
+          <span class="spacer"></span>
+          <button class="btn" id="form-cancel" type="button">取消</button>
+          <button class="btn btn-primary" id="form-save" type="button">保存</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="settings-title">倒数日设置</h2>
+        <button class="icon-btn" id="settings-close" type="button" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <label class="row" for="set-show-past">
+          <span class="row-text">
+            <span class="row-title">显示已过去的事件</span>
+            <span class="row-desc">关闭后只显示今天与未来的事件</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-show-past" role="switch" aria-label="显示已过去的事件" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+        <label class="row" for="set-highlight-soon">
+          <span class="row-text">
+            <span class="row-title">强调 7 天内的事件</span>
+            <span class="row-desc">不足 7 天的天数用事件颜色强调</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-highlight-soon" role="switch" aria-label="强调 7 天内的事件" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="sheet" id="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="confirm-title">删除倒数日</h2>
+        <button class="icon-btn" id="confirm-close" type="button" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <p class="confirm-text" id="confirm-text"></p>
+        <div class="form-actions">
+          <span class="spacer"></span>
+          <button class="btn" id="confirm-cancel" type="button">取消</button>
+          <button class="btn btn-primary" id="confirm-delete" type="button">删除</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

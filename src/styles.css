@@ -105,3 +105,25 @@ body {
 .reset-layout:hover {
   background: rgba(255, 255, 255, 0.14);
 }
+
+/* ---------- 宿主容器与桌面入口 ---------- */
+
+.host-root {
+  height: 100%;
+}
+
+.desktop-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  background: var(--colorNeutralBackground1, rgba(255, 255, 255, 0.06));
+  box-shadow: var(--shadow8, 0 4px 16px rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--colorNeutralStroke2, rgba(255, 255, 255, 0.08));
+  z-index: 10;
+}

@@ -1,0 +1,298 @@
+/**
+ * 复盘页的数据层（B3）。
+ *
+ * 数据来自各插件注册的 `*.stats` Agent 工具（A5 桥接层 listTools / callTool）。
+ * 各插件约定的统计参数/返回不完全一致，所以这里做两件事：
+ * 1. 用“最大公约数”参数调用：`{ range, from, to }` —— 支持 range 的插件（pomodoro.stats）
+ *    用 range，支持 from/to 的插件（todo.stats）用时间范围；
+ * 2. 把返回统一收口成数字字段，插件没给的就留空（页面显示“—”而不是编数据）。
+ *
+ * 没有插件提供 `*.stats` 时返回空快照，页面显示空状态。
+ */
+
+import type { AgentToolDecl } from '../../bridge/types';
+
+export type ReviewRange = 'yesterday' | 'week' | 'month';
+
+/** 复盘页只需要桥接层的两个能力，方便测试替换（demo 用 mock） */
+export interface ReviewBridge {
+  listTools(): AgentToolDecl[];
+  callTool(name: string, args: unknown, options?: { signal?: AbortSignal }): Promise<unknown>;
+}
+
+export interface ProviderRangeStats {
+  tool: string;
+  /** 插件 id（工具名前缀，如 todo） */
+  provider: string;
+  label: string;
+  range: ReviewRange;
+  ok: boolean;
+  error?: string;
+  completed?: number;
+  created?: number;
+  focusMinutes?: number;
+  streakDays?: number;
+}
+
+export interface ProviderDailyStats {
+  provider: string;
+  label: string;
+  byDay: Record<string, number>;
+}
+
+export interface HeatmapDay {
+  date: string;
+  count: number;
+}
+
+export interface ReviewSnapshot {
+  tools: string[];
+  ranges: Record<ReviewRange, ProviderRangeStats[]>;
+  daily: ProviderDailyStats[];
+  heatmap: { days: HeatmapDay[]; max: number; total: number };
+  yesterday: Record<string, number>;
+  fetchedAt: number;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** 热力图窗口：16 周（取整周，避免半截列） */
+export const HEATMAP_WEEKS = 16;
+
+const PROVIDER_LABELS: Record<string, string> = {
+  todo: '待办',
+  pomodoro: '番茄钟',
+  sedentary: '久坐',
+  clock: '时钟',
+  countdown: '倒数日',
+  weather: '天气',
+};
+
+const PROVIDER_UNITS: Record<string, string> = {
+  todo: '项任务',
+  pomodoro: '轮专注',
+  sedentary: '次',
+  countdown: '个事件',
+};
+
+export function providerLabel(provider: string): string {
+  return PROVIDER_LABELS[provider] ?? provider;
+}
+
+export function completedUnit(provider: string): string {
+  return PROVIDER_UNITS[provider] ?? '条';
+}
+
+// ---------- 日期工具（本地时区） ----------
+
+function startOfDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function startOfWeek(date: Date): Date {
+  const day = startOfDay(date);
+  const offset = (day.getDay() + 6) % 7; // 周一为一周开始
+  return addDays(day, -offset);
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+export function dayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readNumber(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+function readByDay(record: Record<string, unknown>): Record<string, number> | null {
+  const raw = asRecord(record.byDay);
+  if (!raw) return null;
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'number' && Number.isFinite(value)) result[key] = value;
+  }
+  return result;
+}
+
+function providerOf(toolName: string): string {
+  const prefix = toolName.split('.')[0];
+  return prefix || toolName;
+}
+
+/** 工具名过滤：约定统计工具以 `.stats` 结尾（todo.stats / pomodoro.stats） */
+export function isStatsTool(tool: AgentToolDecl): boolean {
+  return /\.stats$/i.test(tool.name);
+}
+
+interface RangeArgs {
+  range: 'today' | 'week' | 'month';
+  from: string;
+  to: string;
+}
+
+function rangeArgs(range: ReviewRange, now: Date): RangeArgs {
+  const to = now.toISOString();
+  switch (range) {
+    case 'week':
+      return { range: 'week', from: startOfWeek(now).toISOString(), to };
+    case 'month':
+      return { range: 'month', from: startOfMonth(now).toISOString(), to };
+    case 'yesterday':
+    default:
+      return { range: 'today', from: startOfDay(now).toISOString(), to };
+  }
+}
+
+function dailyArgs(now: Date): RangeArgs {
+  const end = startOfDay(now);
+  const start = addDays(startOfWeek(end), -(HEATMAP_WEEKS - 1) * 7);
+  return { range: 'month', from: start.toISOString(), to: now.toISOString() };
+}
+
+function heatmapWindow(now: Date): { start: Date; end: Date; days: HeatmapDay[] } {
+  const end = startOfDay(now);
+  const start = addDays(startOfWeek(end), -(HEATMAP_WEEKS - 1) * 7);
+  const days: HeatmapDay[] = [];
+  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
+    days.push({ date: dayKey(cursor), count: 0 });
+  }
+  return { start, end, days };
+}
+
+export function emptySnapshot(): ReviewSnapshot {
+  return {
+    tools: [],
+    ranges: { yesterday: [], week: [], month: [] },
+    daily: [],
+    heatmap: { days: [], max: 0, total: 0 },
+    yesterday: {},
+    fetchedAt: Date.now(),
+  };
+}
+
+/** 拉取并聚合复盘数据；单个插件的工具失败只影响它自己的那一格 */
+export async function loadReviewSnapshot(
+  bridge: ReviewBridge,
+  options: { signal?: AbortSignal; now?: Date } = {},
+): Promise<ReviewSnapshot> {
+  const now = options.now ?? new Date();
+  const tools = bridge.listTools().filter(isStatsTool);
+  if (tools.length === 0) return emptySnapshot();
+
+  const rangeKeys: ReviewRange[] = ['week', 'month'];
+  const window = heatmapWindow(now);
+
+  const call = async (toolName: string, args: RangeArgs) => {
+    try {
+      const result = await bridge.callTool(toolName, args, options.signal ? { signal: options.signal } : undefined);
+      return { ok: true as const, result };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  };
+
+  const [rangeResults, dailyResults] = await Promise.all([
+    Promise.all(
+      rangeKeys.map(async (range) => {
+        const args = rangeArgs(range, now);
+        const settled = await Promise.all(tools.map((tool) => call(tool.name, args)));
+        return { range, settled };
+      }),
+    ),
+    Promise.all(tools.map((tool) => call(tool.name, dailyArgs(now)))),
+  ]);
+
+  const ranges: ReviewSnapshot['ranges'] = { yesterday: [], week: [], month: [] };
+  for (const { range, settled } of rangeResults) {
+    ranges[range] = settled.map((outcome, index): ProviderRangeStats => {
+      const tool = tools[index];
+      const provider = providerOf(tool.name);
+      const base: ProviderRangeStats = {
+        tool: tool.name,
+        provider,
+        label: providerLabel(provider),
+        range,
+        ok: outcome.ok,
+      };
+      if (!outcome.ok) return { ...base, error: outcome.error };
+      const record = asRecord(outcome.result);
+      if (!record) return { ...base, ok: false, error: '统计工具返回了非对象结果' };
+      return {
+        ...base,
+        completed: readNumber(record, ['completed', 'done', 'finished']),
+        created: readNumber(record, ['created', 'added']),
+        focusMinutes: readNumber(record, ['focusMinutes', 'focusMinutesTotal', 'minutes']),
+        streakDays: readNumber(record, ['streakDays', 'streak']),
+      };
+    });
+  }
+
+  const daily: ProviderDailyStats[] = [];
+  const yesterday: Record<string, number> = {};
+  const merged: Record<string, number> = {};
+  dailyResults.forEach((outcome, index) => {
+    const tool = tools[index];
+    const provider = providerOf(tool.name);
+    if (!outcome.ok) return;
+    const record = asRecord(outcome.result);
+    if (!record) return;
+    const byDay = readByDay(record);
+    if (!byDay || Object.keys(byDay).length === 0) return;
+    daily.push({ provider, label: providerLabel(provider), byDay });
+    for (const [date, count] of Object.entries(byDay)) {
+      merged[date] = (merged[date] ?? 0) + count;
+    }
+  });
+
+  for (const day of window.days) {
+    day.count = merged[day.date] ?? 0;
+  }
+  // 昨日：优先用按天数据；插件没给 byDay 的，页面显示“无按日数据”
+  const yesterdayDate = dayKey(addDays(startOfDay(now), -1));
+  for (const entry of daily) {
+    const count = entry.byDay[yesterdayDate];
+    if (typeof count === 'number') yesterday[entry.provider] = count;
+  }
+
+  const max = window.days.reduce((current, day) => Math.max(current, day.count), 0);
+  const total = window.days.reduce((current, day) => current + day.count, 0);
+
+  return {
+    tools: tools.map((tool) => tool.name),
+    ranges,
+    daily,
+    heatmap: { days: window.days, max, total },
+    yesterday,
+    fetchedAt: Date.now(),
+  };
+}
+
+export function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}

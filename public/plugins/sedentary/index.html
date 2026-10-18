@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>久坐提醒</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- 桌面卡片（显示层：只读状态，动作通过后台引擎执行） -->
+    <div class="app" id="app">
+      <div class="headline">
+        <span class="headline-row">
+          <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+          <span class="streak"><span id="streak-num">0</span><span class="unit">分钟</span></span>
+        </span>
+        <span class="status-text" id="status-text">还没有久坐记录</span>
+      </div>
+
+      <div class="today-block">
+        <span class="today-label">今日久坐</span>
+        <span class="today-value"><span id="today-min">0</span><span class="unit">分钟</span></span>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">最长连续</span>
+          <span class="metric-value" id="metric-longest">0 分钟</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">起身次数</span>
+          <span class="metric-value" id="metric-breaks">0 次</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">当前连续</span>
+          <span class="metric-value" id="metric-current">0 分钟</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">距离提醒</span>
+          <span class="metric-value" id="metric-next">—</span>
+        </div>
+      </div>
+
+      <div class="config-line" id="config-line">提醒阈值 45 分钟 · 免打扰关</div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="break-btn" type="button">我起来了</button>
+      </div>
+
+      <button class="icon-btn settings-btn" id="settings-btn" type="button" title="久坐提醒设置" aria-label="打开久坐提醒设置">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M1.91 7.38A8.5 8.5 0 0 1 3.7 4.3a.5.5 0 0 1 .54-.13l1.92.68a1 1 0 0 0 1.32-.76l.36-2a.5.5 0 0 1 .4-.4 9 9 0 0 1 3.55 0q.32.08.38.4l.37 2a1 1 0 0 0 1.32.76l1.92-.68a.5.5 0 0 1 .54.13 8.5 8.5 0 0 1 1.78 3.08q.08.31-.15.54l-1.56 1.32a1 1 0 0 0 0 1.52l1.56 1.32a.5.5 0 0 1 .15.54 8.5 8.5 0 0 1-1.78 3.08.5.5 0 0 1-.54.13l-1.92-.68a1 1 0 0 0-1.32.76l-.37 2a.5.5 0 0 1-.38.4 8.5 8.5 0 0 1-3.56 0 .5.5 0 0 1-.39-.4l-.36-2a1 1 0 0 0-1.32-.76l-1.92.68a.5.5 0 0 1-.54-.13 8.5 8.5 0 0 1-1.78-3.08.5.5 0 0 1 .15-.54l1.56-1.32a1 1 0 0 0 0-1.52L2.06 7.92a.5.5 0 0 1-.15-.54m1.06 0 1.3 1.1a2 2 0 0 1 0 3.04l-1.3 1.1q.45 1.19 1.25 2.16l1.6-.58a2 2 0 0 1 2.63 1.53l.3 1.67a8 8 0 0 0 2.5 0l.3-1.67a2 2 0 0 1 2.64-1.53l1.6.58a8 8 0 0 0 1.24-2.16l-1.3-1.1a2 2 0 0 1 0-3.04l1.3-1.1a8 8 0 0 0-1.25-2.16l-1.6.58a2 2 0 0 1-2.63-1.53l-.3-1.67a8 8 0 0 0-2.5 0l-.3 1.67A2 2 0 0 1 5.81 5.8l-1.6-.58a8 8 0 0 0-1.24 2.16M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0m1 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- 后台引擎仪表盘（只在独立打开 ?background=1 时显示，用于截图/调试） -->
+    <div class="engine" id="engine-view" hidden>
+      <div class="engine-head">
+        <span class="engine-title">久坐提醒 · 后台引擎</span>
+        <span class="engine-state" id="engine-state">运行中</span>
+      </div>
+      <div class="engine-grid">
+        <div class="engine-item"><span class="engine-label">当前状态</span><strong id="engine-status">—</strong></div>
+        <div class="engine-item"><span class="engine-label">提醒阈值</span><strong id="engine-threshold">—</strong></div>
+        <div class="engine-item"><span class="engine-label">今日累计</span><strong id="engine-today">—</strong></div>
+        <div class="engine-item"><span class="engine-label">起身次数</span><strong id="engine-breaks">—</strong></div>
+        <div class="engine-item"><span class="engine-label">免打扰</span><strong id="engine-quiet">—</strong></div>
+        <div class="engine-item"><span class="engine-label">上次提醒</span><strong id="engine-lastremind">—</strong></div>
+      </div>
+      <div class="engine-log" id="engine-log" aria-live="polite"></div>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <section class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="settings-title">久坐提醒设置</h2>
+        <button class="icon-btn" id="settings-close" type="button" title="关闭" aria-label="关闭设置">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <label class="row" for="set-enabled">
+          <span class="row-text">
+            <span class="row-title">启用久坐提醒</span>
+            <span class="row-desc">关闭后不计时不提醒</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-enabled" role="switch" aria-label="启用久坐提醒" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <div class="num-grid">
+          <label class="form-row">
+            <span class="field-label">提醒阈值（分钟）</span>
+            <input class="text-input" id="set-threshold" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+          <label class="form-row">
+            <span class="field-label">未起身再催（分钟）</span>
+            <input class="text-input" id="set-remind" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+          <label class="form-row">
+            <span class="field-label">空闲判定起身（分钟）</span>
+            <input class="text-input" id="set-idle" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+        </div>
+
+        <div class="divider"></div>
+
+        <label class="row" for="set-strong">
+          <span class="row-text">
+            <span class="row-title">全屏强提醒</span>
+            <span class="row-desc">关闭时只用一条通知</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-strong" role="switch" aria-label="全屏强提醒" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <div class="divider"></div>
+
+        <label class="row" for="set-quiet">
+          <span class="row-text">
+            <span class="row-title">免打扰时段</span>
+            <span class="row-desc">时段内不提醒但继续计时；跨零点按当天时段处理</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="set-quiet" role="switch" aria-label="免打扰时段" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <div class="quiet-times" id="quiet-times">
+          <label class="form-row">
+            <span class="field-label">开始</span>
+            <input class="text-input" id="set-quiet-start" type="time" />
+          </label>
+          <span class="quiet-sep">至</span>
+          <label class="form-row">
+            <span class="field-label">结束</span>
+            <input class="text-input" id="set-quiet-end" type="time" />
+          </label>
+        </div>
+
+        <p class="hint">判定依据：宿主 getIdleSeconds 的输入空闲时长。空闲超过「空闲判定起身」分钟数、锁屏或休眠都算一次起身。</p>
+        <p class="hint">后台常驻由 manifest 的 <code>"background": true</code> 驱动；桌面卡片只负责显示与打卡。</p>
+      </div>
+    </section>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

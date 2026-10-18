@@ -1,0 +1,15 @@
+{
+  "id": "sedentary",
+  "name": "久坐提醒",
+  "version": "0.1.0",
+  "background": true,
+  "widgets": [
+    {
+      "id": "sedentary",
+      "title": "久坐提醒",
+      "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
+      "defaultSize": [2, 1],
+      "cell": [0, 2]
+    }
+  ]
+}

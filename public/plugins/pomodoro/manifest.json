@@ -1,0 +1,14 @@
+{
+  "id": "pomodoro",
+  "name": "番茄钟",
+  "version": "0.1.0",
+  "widgets": [
+    {
+      "id": "pomodoro",
+      "title": "番茄钟",
+      "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
+      "defaultSize": [2, 1],
+      "cell": [2, 1]
+    }
+  ]
+}

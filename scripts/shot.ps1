@@ -18,7 +18,8 @@ param(
   [string]$Out = 'shots/shot.png',
   [int]$Width = 1440,
   [int]$Height = 960,
-  [int]$BudgetMs = 8000,
+  [int]$BudgetMs = 12000,
+  [int]$WaitSec = 120,
   [switch]$Serve,
   [int]$Port = 4173
 )
@@ -50,8 +51,18 @@ $args = @(
 )
 Start-Process -FilePath $edge -ArgumentList $args -WindowStyle Hidden | Out-Null
 
-$deadline = (Get-Date).AddSeconds(30)
-while (-not (Test-Path $outPath) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 300 }
+$deadline = (Get-Date).AddSeconds($WaitSec)
+while (-not (Test-Path $outPath) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+
+# 等文件写稳定（Edge 有时先建空文件）
+if (Test-Path $outPath) {
+  $last = -1
+  while ((Get-Item $outPath).Length -ne $last -and (Get-Date) -lt $deadline) {
+    $last = (Get-Item $outPath).Length
+    Start-Sleep -Milliseconds 300
+  }
+}
 
 if (-not (Test-Path $outPath)) { throw '截图失败：没有生成文件' }
 "截图: $outPath ($((Get-Item $outPath).Length) bytes, ${Width}x${Height})"
+

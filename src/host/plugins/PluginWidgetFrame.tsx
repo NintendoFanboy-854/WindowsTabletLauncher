@@ -1,0 +1,229 @@
+/**
+ * 一个小组件 = 一个 iframe。
+ *
+ * 宿主这一侧只做三件事：
+ * 1. iframe 加载完成后发 `host:init`（协议、尺寸、主题、配置）；
+ * 2. 尺寸 / 主题变化时发 `host:resize` / `host:theme`；
+ * 3. 把插件发来的消息按协议分发给宿主（桥接层 / 桌面层）。
+ *
+ * 8 个宿主 API 的 `host:reply` 由桥接层（A5）通过 `onApiCall` 注入；没注入时
+ * 直接回 `ok:false`，免得插件 await 一个永远不来的响应。
+ */
+
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+
+import { PROTOCOL_VERSION } from '../bridge/types';
+import type {
+  HostToPluginMessage,
+  PluginCallMessage,
+  PluginToHostMessage,
+  ThemePayload,
+  WidgetSize,
+} from '../bridge/types';
+import { readFluentThemePayload } from './theme';
+
+export type HostApiReply = (ok: boolean, result?: unknown, error?: string) => void;
+
+export interface PluginWidgetFrameProps {
+  /** iframe 地址（用 PluginManager.widgetFrameSrc / backgroundFrameSrc 生成） */
+  src: string;
+  pluginId: string;
+  /** 后台 iframe 没有组件 id，传空字符串 */
+  widgetId: string;
+  /** 当前尺寸（列跨 × 行跨），插件据此决定显示内容 */
+  size: WidgetSize;
+  /** 不传就读当前 FluentProvider 生效的 token */
+  theme?: ThemePayload;
+  /** 该插件的配置快照（桥接层负责持久化） */
+  config?: Record<string, unknown>;
+  /** iframe 的 accessible name */
+  title?: string;
+  className?: string;
+  style?: CSSProperties;
+  /** 全部插件消息（ready / tool-result / focus-exit / call 都会先经过这里） */
+  onMessage?: (message: PluginToHostMessage) => void;
+  /** 插件调用宿主 API；最后一个参数是把结果写回去的 reply */
+  onApiCall?: (message: PluginCallMessage, reply: HostApiReply) => void;
+  /** 不可见的常驻 iframe（后台插件用） */
+  hidden?: boolean;
+}
+
+export interface PluginWidgetFrameHandle {
+  /** 直接发一条协议消息 */
+  send(message: HostToPluginMessage): void;
+  resize(size: WidgetSize): void;
+  updateTheme(theme: ThemePayload): void;
+  /** 把键盘焦点交给插件（A5 焦点交接用） */
+  focusPlugin(): void;
+  /** 宿主替 Agent 调插件工具 */
+  toolCall(id: string, name: string, args: unknown): void;
+  /** 回插件请求（桥接层用） */
+  reply(id: string, ok: boolean, result?: unknown, error?: string): void;
+  /** 重载 iframe（热重载 / 崩溃兜底） */
+  reload(): void;
+  readonly contentWindow: Window | null;
+}
+
+const HIDDEN_FRAME_STYLE: CSSProperties = {
+  position: 'fixed',
+  left: -10000,
+  top: 0,
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+  border: 0,
+};
+
+const VISIBLE_FRAME_STYLE: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  border: 0,
+  background: 'transparent',
+};
+
+function sameSize(a: WidgetSize, b: WidgetSize): boolean {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidgetFrameProps>(
+  function PluginWidgetFrame(props, ref) {
+    const {
+      src,
+      pluginId,
+      widgetId,
+      size,
+      theme,
+      config,
+      title,
+      className,
+      style,
+      onMessage,
+      onApiCall,
+      hidden = false,
+    } = props;
+
+    const frameRef = useRef<HTMLIFrameElement>(null);
+    const [loadedAt, setLoadedAt] = useState(0);
+    const lastSize = useRef<WidgetSize | null>(null);
+    const lastTheme = useRef<ThemePayload | undefined>(theme);
+
+    // init 要拿“加载那一刻”的最新 props，用 ref 避免把 init 绑死到首次渲染
+    const latest = useRef({ pluginId, widgetId, size, theme, config });
+    latest.current = { pluginId, widgetId, size, theme, config };
+
+    const post = useCallback((message: HostToPluginMessage) => {
+      frameRef.current?.contentWindow?.postMessage(message, '*');
+    }, []);
+
+    // 每次 iframe 加载完都重新 init（热重载 / 换 src 后同样需要）
+    useEffect(() => {
+      if (!loadedAt) return;
+      const current = latest.current;
+      post({
+        v: PROTOCOL_VERSION,
+        type: 'host:init',
+        payload: {
+          pluginId: current.pluginId,
+          widgetId: current.widgetId,
+          size: current.size,
+          theme: current.theme ?? readFluentThemePayload(),
+          config: current.config ?? {},
+        },
+      });
+      // 只依赖 loadedAt：尺寸/主题的后续变化走 resize / theme 消息
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loadedAt, post]);
+
+    // 尺寸变化：init 已带当前尺寸，首帧之后的变化才补 host:resize
+    useEffect(() => {
+      if (!loadedAt) return;
+      const previous = lastSize.current;
+      if (previous && sameSize(previous, size)) return;
+      lastSize.current = [size[0], size[1]];
+      if (!previous) return;
+      post({ type: 'host:resize', payload: { size: [size[0], size[1]] } });
+    }, [loadedAt, size, post]);
+
+    // 主题变化
+    useEffect(() => {
+      if (!loadedAt || !theme) return;
+      if (lastTheme.current === theme) return;
+      lastTheme.current = theme;
+      post({ type: 'host:theme', payload: { theme } });
+    }, [loadedAt, theme, post]);
+
+    // 插件 → 宿主
+    useEffect(() => {
+      const onWindowMessage = (event: MessageEvent) => {
+        if (event.source !== frameRef.current?.contentWindow) return;
+        const data = event.data as PluginToHostMessage | null | undefined;
+        if (!data || typeof data !== 'object' || typeof data.type !== 'string') return;
+
+        onMessage?.(data);
+        if (data.type !== 'plugin:call') return;
+
+        const reply: HostApiReply = (ok, result, error) => {
+          post({ type: 'host:reply', id: data.id, ok, result, error });
+        };
+        if (onApiCall) {
+          try {
+            onApiCall(data, reply);
+          } catch (error) {
+            reply(false, undefined, error instanceof Error ? error.message : String(error));
+          }
+        } else {
+          reply(false, undefined, '宿主桥接层尚未接入');
+        }
+      };
+      window.addEventListener('message', onWindowMessage);
+      return () => window.removeEventListener('message', onWindowMessage);
+    }, [onMessage, onApiCall, post]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        send: post,
+        resize: (nextSize) => post({ type: 'host:resize', payload: { size: nextSize } }),
+        updateTheme: (nextTheme) => post({ type: 'host:theme', payload: { theme: nextTheme } }),
+        focusPlugin: () => post({ type: 'host:focus' }),
+        toolCall: (id, name, args) => post({ type: 'host:tool-call', id, name, args }),
+        reply: (id, ok, result, error) => post({ type: 'host:reply', id, ok, result, error }),
+        reload: () => {
+          const frame = frameRef.current;
+          if (frame) frame.src = frame.src;
+        },
+        get contentWindow() {
+          return frameRef.current?.contentWindow ?? null;
+        },
+      }),
+      [post],
+    );
+
+    return (
+      <iframe
+        ref={frameRef}
+        src={src}
+        title={title ?? `${pluginId}/${widgetId}`}
+        className={className}
+        style={{ ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE), ...style }}
+        allow="autoplay; clipboard-write; fullscreen"
+        tabIndex={hidden ? -1 : undefined}
+        aria-hidden={hidden || undefined}
+        onLoad={() => {
+          lastSize.current = null;
+          setLoadedAt((value) => value + 1);
+        }}
+      />
+    );
+  },
+);

@@ -1,0 +1,213 @@
+/**
+ * 桌面层样式：全部走 Griffel（Fluent 的 makeStyles），颜色/间距/圆角/阴影用 token，
+ * 过渡时长和曲线用 motionTokens，不写自定义时长。
+ *
+ * 材质：Fluent web 端没有 Acrylic token（DESIGN.md §6），卡片用
+ * colorNeutralBackground* 的半透明混合 + 项目 token `--wtsl-material-blur`。
+ */
+import { makeStyles, tokens, motionTokens } from '@fluentui/react-components';
+
+/** 卡片圆角：Fluent 的 borderRadiusXLarge 是 8px，平板卡片取它的 2 倍（16px） */
+export const CARD_RADIUS = `calc(${tokens.borderRadiusXLarge} * 2)`;
+
+const MATERIAL_BACKGROUND = `color-mix(in srgb, ${tokens.colorNeutralBackground2} 72%, transparent)`;
+
+/** 卡片材质底色：Fluent 没有 Acrylic token，统一用 colorNeutralBackground2 半透明 + 模糊 */
+export const CARD_MATERIAL = {
+  backgroundColor: MATERIAL_BACKGROUND,
+  backdropFilter: 'blur(var(--wtsl-material-blur))',
+} as const;
+
+export const useStyles = makeStyles({
+  root: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    touchAction: 'none',
+    userSelect: 'none',
+    color: tokens.colorNeutralForeground1,
+  },
+  pagesViewport: {
+    position: 'absolute',
+    inset: '0',
+    overflow: 'hidden',
+  },
+  track: {
+    display: 'flex',
+    height: '100%',
+    willChange: 'transform',
+    transitionProperty: 'transform',
+    transitionDuration: `${motionTokens.durationSlow}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
+  trackDragging: {
+    transitionDuration: '0ms',
+  },
+  page: {
+    position: 'relative',
+    flex: '0 0 auto',
+    height: '100%',
+  },
+  card: {
+    willChange: 'transform',
+    transformOrigin: 'center center',
+    transitionProperty: 'transform, width, height, opacity',
+    transitionDuration: `${motionTokens.durationNormal}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+    overflow: 'hidden',
+    padding: '0',
+    gap: '0',
+  },
+  cardDragging: {
+    opacity: 0.25,
+    transitionProperty: 'opacity',
+    transitionDuration: `${motionTokens.durationFast}ms`,
+  },
+  cardEditing: {
+    boxShadow: tokens.shadow8,
+  },
+  frame: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    border: '0',
+    padding: '0',
+    background: 'transparent',
+  },
+  editOverlay: {
+    position: 'absolute',
+    inset: '0',
+    zIndex: 2,
+    cursor: 'grab',
+    touchAction: 'none',
+  },
+  editControls: {
+    position: 'absolute',
+    top: tokens.spacingHorizontalXS,
+    right: tokens.spacingHorizontalXS,
+    zIndex: 3,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    padding: tokens.spacingHorizontalXXS,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: MATERIAL_BACKGROUND,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow4,
+  },
+  toolbar: {
+    position: 'absolute',
+    top: tokens.spacingHorizontalM,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 10,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    padding: tokens.spacingHorizontalXXS,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: MATERIAL_BACKGROUND,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow8,
+  },
+  toolbarText: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+    paddingLeft: tokens.spacingHorizontalXS,
+    paddingRight: tokens.spacingHorizontalXS,
+    whiteSpace: 'nowrap',
+  },
+  indicator: {
+    position: 'absolute',
+    bottom: tokens.spacingHorizontalM,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 6,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    padding: `${tokens.spacingHorizontalXS} ${tokens.spacingHorizontalM}`,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: MATERIAL_BACKGROUND,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow4,
+  },
+  indicatorDot: {
+    width: tokens.spacingHorizontalS,
+    height: tokens.spacingHorizontalS,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorNeutralStroke1,
+    transitionProperty: 'background-color, width',
+    transitionDuration: `${motionTokens.durationNormal}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
+  indicatorDotActive: {
+    backgroundColor: tokens.colorBrandBackground,
+  },
+  indicatorCapsule: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+    whiteSpace: 'nowrap',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  placeholder: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    zIndex: 1,
+    borderRadius: CARD_RADIUS,
+    border: `calc(${tokens.strokeWidthThick}) dashed ${tokens.colorBrandStroke1}`,
+    backgroundColor: `color-mix(in srgb, ${tokens.colorBrandBackground} 14%, transparent)`,
+    pointerEvents: 'none',
+    transitionProperty: 'transform, width, height',
+    transitionDuration: `${motionTokens.durationFast}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
+  dragGhost: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    zIndex: 20,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: CARD_RADIUS,
+    backgroundColor: MATERIAL_BACKGROUND,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow16,
+    pointerEvents: 'none',
+    color: tokens.colorNeutralForeground2,
+  },
+  centerHint: {
+    position: 'absolute',
+    inset: '0',
+    zIndex: 30,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingHorizontalXXL,
+    pointerEvents: 'none',
+  },
+  centerHintCard: {
+    pointerEvents: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingHorizontalXXL,
+    borderRadius: tokens.borderRadiusXLarge,
+    backgroundColor: MATERIAL_BACKGROUND,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow8,
+  },
+  dialogText: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingHorizontalS,
+    color: tokens.colorNeutralForeground2,
+  },
+});

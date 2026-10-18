@@ -1,0 +1,14 @@
+{
+  "id": "countdown",
+  "name": "倒数日",
+  "version": "0.1.0",
+  "widgets": [
+    {
+      "id": "countdown",
+      "title": "倒数日",
+      "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
+      "defaultSize": [2, 1],
+      "cell": [5, 0]
+    }
+  ]
+}

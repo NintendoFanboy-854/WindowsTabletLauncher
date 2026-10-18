@@ -1,0 +1,38 @@
+/* 天气插件的全局重置与宿主透明背景；视觉样式全部走 Fluent token（React 内 makeStyles）。 */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  overflow: hidden;
+  color-scheme: dark light;
+}
+
+body {
+  overflow: hidden;
+  background: transparent;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 卡片里可能需要滚动的区域（详情 Drawer 用 Fluent 自带样式，这里只兜底） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.4);
+}

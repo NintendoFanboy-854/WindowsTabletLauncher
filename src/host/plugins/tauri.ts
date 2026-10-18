@@ -1,0 +1,81 @@
+/**
+ * Tauri 命令的前端调用面（A1 的 Rust command 一一对应）。
+ *
+ * 所有 `@tauri-apps/api` 都是动态 import：浏览器里跑演示页时这些模块不会被求值，
+ * 也不影响 vite 打包。命令名与 `src-tauri/src/lib.rs` 的 `invoke_handler` 对应。
+ */
+
+import type { GeoLocation, PluginEnv, PluginRecord } from './types';
+
+export type { GeoLocation } from './types';
+
+type InvokeArgs = Record<string, unknown>;
+
+/** 是否跑在 Tauri WebView 里（浏览器 / headless 截图时为 false） */
+export function isTauriRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  const internals = (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  return typeof internals === 'object' && internals !== null;
+}
+
+export async function invokeCommand<T>(command: string, args?: InvokeArgs): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(command, args);
+}
+
+// ---------- 插件目录（A2） ----------
+
+export const pluginEnv = () => invokeCommand<PluginEnv>('plugin_env');
+
+export const pluginList = () => invokeCommand<PluginRecord[]>('plugin_list');
+
+export const pluginReadManifest = (pluginId: string) =>
+  invokeCommand<string>('plugin_read_manifest', { pluginId });
+
+export const pluginReadText = (pluginId: string, relPath: string) =>
+  invokeCommand<string>('plugin_read_text', { pluginId, relPath });
+
+export const pluginWriteText = (pluginId: string, relPath: string, contents: string) =>
+  invokeCommand<void>('plugin_write_text', { pluginId, relPath, contents });
+
+export const pluginRemove = (pluginId: string) =>
+  invokeCommand<void>('plugin_remove', { pluginId });
+
+/** 解压 zip 到 plugins/<id>/，返回新插件的记录 */
+export const pluginInstallZip = (zipPath: string) =>
+  invokeCommand<PluginRecord>('plugin_install_zip', { zipPath });
+
+// ---------- 窗口 / 应用（A1） ----------
+
+export const windowSetFullscreen = (enabled: boolean) =>
+  invokeCommand<void>('window_set_fullscreen', { enabled });
+
+export const windowToggleFullscreen = () => invokeCommand<boolean>('window_toggle_fullscreen');
+
+export const windowIsFullscreen = () => invokeCommand<boolean>('window_is_fullscreen');
+
+/**
+ * 切换主窗口可见性，返回切换后是否可见。
+ * Rust 侧注册的全局热键 Ctrl+Shift+H 调的是同一个命令，隐藏状态下也能恢复。
+ */
+export const windowToggleVisible = () => invokeCommand<boolean>('window_toggle_visible');
+
+export const appExit = () => invokeCommand<void>('app_exit');
+
+// ---------- 开机自启（A1） ----------
+
+export const autostartIsEnabled = () => invokeCommand<boolean>('autostart_is_enabled');
+
+export const autostartSetEnabled = (enabled: boolean) =>
+  invokeCommand<boolean>('autostart_set_enabled', { enabled });
+
+// ---------- 系统状态（A1，桥接层用） ----------
+
+/** 系统级空闲秒数 */
+export const getIdleSeconds = () => invokeCommand<number>('get_idle_seconds');
+
+/** 阻止息屏 */
+export const setKeepAwake = (on: boolean) => invokeCommand<void>('set_keep_awake', { on });
+
+/** 系统定位，失败/未授权返回 null */
+export const getLocation = () => invokeCommand<GeoLocation | null>('get_location');

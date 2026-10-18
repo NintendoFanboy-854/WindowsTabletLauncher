@@ -23,3 +23,18 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.12.4", features = [] }
 tauri-plugin-log = "2"
+tauri-plugin-global-shortcut = "2"
+
+# A1 系统能力
+flate2 = "1.1"            # zip 解压（deflate）
+percent-encoding = "2.3"  # 自定义协议里的路径解码
+winreg = "0.56"           # 开机自启（HKCU Run）
+windows = { version = "0.62", features = [
+  "Devices_Geolocation",              # Windows Geolocator
+  "Foundation",
+  "Win32_System_Power",               # SetThreadExecutionState
+  "Win32_System_SystemInformation",   # GetTickCount
+  "Win32_System_WinRT",               # RoInitialize（WinRT 线程初始化）
+  "Win32_UI_Input_KeyboardAndMouse",  # GetLastInputInfo
+] }
+
