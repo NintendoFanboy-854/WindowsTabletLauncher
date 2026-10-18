@@ -67,6 +67,7 @@ ehthumbs.db
 $RECYCLE.BIN/
 
 # Third-party cloned repos
+references/
 Assets/pi/
 Assets/BluetoothAudioReceiver
 Assets/windows-dev-docs
