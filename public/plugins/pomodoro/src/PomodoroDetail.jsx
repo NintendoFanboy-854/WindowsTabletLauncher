@@ -108,7 +108,7 @@ export default function PomodoroDetail() {
       </div>
       <Divider />
       <Text className={styles.hint} size={200}>
-        计时、跳过、重置与沉浸模式都在卡片上的 ⋯ 菜单里；统计会写入 Session 记录并汇总到复盘。
+        计时、跳过、重置与沉浸模式都在卡片上的 ⋯ 菜单里；每次专注都会被记录，并汇总到复盘。
       </Text>
     </div>
   );

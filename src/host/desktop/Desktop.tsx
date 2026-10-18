@@ -1020,7 +1020,7 @@ export default function Desktop({
               <MessageBarBody>
                 {pluginsError
                   ? `插件加载失败：${pluginsError.message}`
-                  : '没有找到可用的插件，检查 public/plugins/index.json 与各插件的 manifest.json。'}
+                  : '没有找到可用的插件，请检查插件是否安装完整，或在插件管理里重新扫描。'}
               </MessageBarBody>
             </MessageBar>
             <Button

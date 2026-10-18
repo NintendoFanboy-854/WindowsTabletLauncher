@@ -1,0 +1,11 @@
+public\plugins\weather\src\components\CityMenu.jsx:31  gap: '6px'
+public\plugins\weather\src\components\forecast.jsx:14  gap: 'clamp(2px
+public\plugins\weather\src\components\forecast.jsx:24  gap: 'clamp(1px
+public\plugins\weather\src\components\forecast.jsx:51  gap: 'clamp(2px
+public\plugins\weather\src\components\forecast.jsx:59  gap: 'clamp(1px
+public\plugins\weather\src\components\forecast.jsx:91  gap: 'clamp(2px
+public\plugins\weather\src\views\panels.jsx:98  gap: '2px'
+src\host\desktop\desktop.styles.ts:62  gap: '0'
+src\host\desktop\WidgetCard.tsx:130  gap: 0
+src\host\layout\types.ts:34  gap: number;
+src\host\pages\review\Heatmap.tsx:33  gap: CELL_GAP

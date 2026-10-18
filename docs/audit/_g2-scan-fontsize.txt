@@ -1,0 +1,10 @@
+public\plugins\todo\src\config.js:11  fontSize: 'default'
+public\plugins\todo\src\config.js:34  fontSize: source.fontSize === 'large' ? 'large' : 'default'
+public\plugins\todo\src\settings.jsx:185  fontSize: data.value
+public\plugins\todo\src\todoData.js:59  fontSize: config.fontSize
+public\plugins\weather\src\components\atoms.jsx:82  fontSize: size
+public\plugins\weather\src\components\forecast.jsx:30  fontSize: 'clamp(9px
+public\plugins\weather\src\components\forecast.jsx:36  fontSize: 'clamp(11px
+public\plugins\weather\src\components\forecast.jsx:118  fontSize: 'clamp(16px
+public\plugins\weather\src\components\forecast.jsx:123  fontSize: 'clamp(9px
+public\plugins\weather\src\components\forecast.jsx:128  fontSize: 'clamp(10px

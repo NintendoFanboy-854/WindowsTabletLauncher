@@ -9,6 +9,8 @@
 - 背景：Fluent 2 设计规范圆角表为 Medium 4 / Large 8 / X-Large 12；Fluent UI React v9 的 `borderRadius*` token 实际值为 Medium 4 / Large 6 / X-Large 8，两套数值不完全一致（审计报告 V-02 指出）。
 - 以设计规范为准，在项目 token 层固定 12px，**不允许各组件用 calc 再算、也不允许混用 6/8/16/**。
 - 文档修订：`FLUENT2.md §5` 已补"token 值映射注意"。
+- 例外：Fluent 自带的 `Dialog` / `DialogSurface` 弹层按 Fluent 组件默认圆角（8px）渲染，不覆写项目 token；项目 token 用于卡片（桌面卡片 / 页面卡片）。
+- G2 补充：宿主插件设置/详情浮层（`?view=` 全窗口 Dialog）同样沿 Fluent 默认圆角（8px），已与审计口径对齐。
 
 ## D-02 插件控件实现策略（V-03）——已由 D-02b 取代
 
@@ -43,7 +45,7 @@
 
 | 项 | 处置 |
 |---|---|
-| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 ≥40×40 |
+| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 ≥40×40；G2 后宿主页面按钮、编辑工具条、Agent 建议按钮已统一 large，实测 0 项 <40 |
 | V-10 预警组件 | plugin-weather 改 Fluent MessageBar/Badge |
 | V-11 空态死胡同 | countdown / pomodoro / todo 按任务卡补主操作 |
 | V-12 久坐重复值 | plugin-pack 改阈值/激励提示 |

@@ -3,27 +3,33 @@
 > **审计类型**：Fluent 2 规范符合性 + 信息密度规范符合性（独立审计，非实现者自评）
 > **审计基线**：`ad7ea0a`（2026-10-18 23:37:05 +08:00），审计时工作区 clean
 > **审计时间**：2026-10-18 22:56 – 2026-10-19 00:1x（+08:00）
-> **审计工具**：PowerShell 7 + Edge 155.0.4283.62 headless（CDP 截图）+ ripgrep 静态扫描
+> **G2 复检（本次更新）**：修复后提交 `e6e57b7`（2026-10-19 01:59:53），复检时间 2026-10-19 02:00–03:0x；判定口径见 `docs/DECISIONS.md`（D-01~D-05 / D-02b）、`docs/PLUGIN-REACT.md`。基线结论与 §1~§7 原文保留不篡改，复检结果见 §0、§8、§9。
+> **审计工具**：PowerShell 7 + Edge 155.0.4283.62 headless（CDP 截图/DOM 测量）+ ripgrep 静态扫描
 > **截图目录**：`shots/audit/`（本报告引用的截图均在此目录）
 > **扫描原始输出**：`docs/audit/_scan-*.txt`、`docs/audit/_shots-*.log`、`docs/audit/_baseline-manifest.txt`
 > **审计者立场**：只对照规范与产物；不接受"整体良好"结论；每条违规均带截图或 `文件:行` 证据。
 
-## 0. 结论摘要
+## 0. 结论摘要（G2 复检后，2026-10-19）
 
-| 严重度 | 数量 | 含义 |
-|---|---|---|
-| **P0（阻断）** | **0** | 未发现导致功能不可用/信息不可读的阻断级缺陷 |
-| **P1（应修）** | **8** | 明确违反 FLUENT2 / DENSITY 硬规则，应在发布前修复 |
-| **P2（可优化）** | **15** | 有风险/体验退化/规范内部冲突，可排期修复 |
-| **P3（备注）** | 3 | 个人偏好/产品决策，不计入违规 |
+> **基线（`ad7ea0a`）**：P0=0 / P1=8 / P2=15 / P3=3（§1~§7 为基线原文，保留）。
+> **G2 复检（`e6e57b7`）**：按 `docs/DECISIONS.md`（D-01~D-05 / D-02b）与 `docs/PLUGIN-REACT.md` 重新判定，结果如下。
 
-**最严重 3 条**
+| 严重度 | 基线 | G2 复检后 | 说明 |
+|---|---|---|---|
+| **P0（阻断）** | 0 | **0** | 未发现阻断级缺陷 |
+| **P1（应修）** | 8 | **1（部分残留）** | V-01/02/03/07/08 已修；V-04/05 按 D-02b 新口径降为 P2 残留；**V-06 部分修**：桌面 dock、编辑卡片按钮、插件任务行/图标按钮、Agent 头部/输入区已 ≥40px，仍余 host 页面级按钮、编辑工具条、Agent 空态建议按钮 32px |
+| **P2（可优化）** | 15 | **5 项残留/新增** | 13 项已修、1 项豁免（V-14，D-03）；残留：V-17 部分（文案）、V-04/V-05 天气 clamp 残留、新增 N-01、N-02（见 §9.4） |
+| **P3（备注）** | 3 | 9 | 见 §9.4 末尾 P3 清单 |
 
-1. **桌面卡片圆角 16px**（规范要求 X-Large 12px，且代码用 `calc(borderRadiusXLarge * 2)` 自造值）——`src/host/desktop/desktop.styles.ts:11`；
-2. **五款插件全部手绘控件（按钮/开关/单选/底部弹层/菜单），只有天气用了 Fluent React 组件**——违反 DESIGN §6「一律用 Fluent UI React v9…不自己画控件」，证据 `public/plugins/clock/index.html:38-77` 等；
-3. **插件字号/间距体系整体脱离 token ramp**：CSS 字号 113/153（74%）、gap 113/152（74%）非 token，todo 更是 52/52、63/63 全量自定 ——`docs/audit/_scan-fontsize.txt`、`_scan-gap.txt`。
+**G2 最严重 3 条（均为残留/新增）**
 
-**可发布性**：**当前状态不建议发布**。P0 为 0，但 8 项 P1 中 V-01/V-03/V-04/V-05/V-06/V-07 属于"设计语言与无障碍"红线，须修复或由需求方书面豁免后方可发布（见 §7）。
+1. **V-06 部分修（唯一 P1 残留）**：host 页面级按钮（`返回桌面`/`复盘`/`退出应用`/`Agent 复盘`/`重新读取`/`重新扫描`）、编辑模式顶部工具条 5 个按钮、Agent 空态 3 个建议按钮实测高 **32px**（Fluent medium），低于 DESIGN §1.2 / D-05 的 40×40；已达标项：桌面 dock 40、编辑卡片按钮 41、插件任务行 40、插件图标按钮 40、Agent 头部按钮 40、设置纵向 Tab 38（仍差 2px）。证据：`docs/audit/_g2-measure-host.log`、`final-agent-overlay-1440x960.png`、`final-desktop-edit-1440x960.png`。
+2. **V-17 部分修**：仍有 5 处用户可见文案泄漏工程实现：`PomodoroSettings.jsx:160`（WebAudio）、`PomodoroDetail.jsx:111`（Session 记录）、`todo/src/settings.jsx:179`（Fluent type ramp）、`PluginsPage.tsx:406`（isPluginEnabled）、`PluginsPage.tsx:339/:423` 与 `Desktop.tsx:1023`（index.json/manifest.json）。
+3. **新增 N-01**：倒数日 3×2 正常模式常驻「设置」齿轮按钮（`CountdownApp.jsx:431-439`，截图 `final-p-countdown-3x2.png` 右上角），违反 DENSITY 硬规则 3「chrome on demand」与该组件规格「齿轮（如有）去掉」；建议收进 `⋯` 菜单或长按菜单。
+
+**可发布性：有条件可发布（Conditional Go）。** P0=0；基线 P1 共 8 项：V-01/02/03/07/08 已关闭（5 项），V-04/V-05 按 D-02b 新口径降为 P2 残留（2 项），仅 V-06 部分残留（host 页面按钮/编辑工具条/Agent 建议按钮 32px，改动量小，一次 `size="large"`/`minHeight:40` 即可关闭；若需求方书面豁免 32px Fluent 默认控件，则 P1 可清零）。P2 残留 5 项均有明确处置路径（§9.4），不阻断发布。**建议**：关闭 V-06 残留（或书面豁免）后即可发布；N-01/V-17/V-04/V-05 排入下一迭代。
+
+**G2 复检通过的关键项（摘要）**：六插件全部 React + `FluentProvider` + Fluent 组件（V-03 已修，D-02b 达标）；插件设置/详情全部走宿主 `?view=settings|detail` 全窗口 Fluent Dialog，无 iframe 内裁切（截图 §9.2）；卡片圆角统一 12px 项目 token（V-01/02 已修，实测 6 张卡片 radius=12px）；页面切换零 `react-motion` 报错（V-07 已修）；信息密度按 D-04 落地（todo 2×2=4 / 3×2=6 / 3×3=10 行，weather 2×2 逐时 ≤6；V-08/09 已修）。
 
 ---
 
@@ -297,35 +303,132 @@
 
 ---
 
-## 8. 复检记录表（待填）
+## 8. 复检记录表（G2 已填）
 
-> 复检基线：`ad7ea0a`；复检时请在同一路径复查并记录证据。状态填写：`未修 / 已修 / 部分修 / 豁免（需方书面）`。
+> 复检基线：`ad7ea0a` → 修复后 `e6e57b7`（2026-10-19 01:59:53，工作区 clean）。复检时间 2026-10-19 02:00–03:00。状态：`已修 / 部分修 / 豁免（需方书面）/ 未修`。证据文件中 `final-*` 为 G2 截图（`shots/audit/`），`_g2-*` 为 G2 日志/扫描。
 
-| 编号 | 严重度 | 复检状态 | 复检证据（截图/文件:行/计数） | 复检时间 | 复检人 |
+| 编号 | 基线严重度 | 复检状态 | 复检证据（截图/文件:行/计数） | 复检时间 | 复检人 |
 |---|---|---|---|---|---|
-| V-01 | P1 | 未复检 | | | |
-| V-02 | P1 | 未复检 | | | |
-| V-03 | P1 | 未复检 | | | |
-| V-04 | P1 | 未复检 | | | |
-| V-05 | P1 | 未复检 | | | |
-| V-06 | P1 | 未复检 | | | |
-| V-07 | P1 | 未复检 | | | |
-| V-08 | P1 | 未复检 | | | |
-| V-09 | P2 | 未复检 | | | |
-| V-10 | P2 | 未复检 | | | |
-| V-11 | P2 | 未复检 | | | |
-| V-12 | P2 | 未复检 | | | |
-| V-13 | P2 | 未复检 | | | |
-| V-14 | P2 | 未复检 | | | |
-| V-15 | P2 | 未复检 | | | |
-| V-16 | P2 | 未复检 | | | |
-| V-17 | P2 | 未复检 | | | |
-| V-18 | P2 | 未复检 | | | |
-| V-19 | P2 | 未复检 | | | |
-| V-20 | P2 | 未复检 | | | |
-| V-21 | P2 | 未复检 | | | |
-| V-22 | P2 | 未复检 | | | |
-| V-23 | P2 | 未复检 | | | |
+| V-01 | P1 | **已修** | `desktop.styles.ts:13` `CARD_RADIUS = 'var(--wtsl-card-radius)'`；`src/styles.css:9` `--wtsl-card-radius: 12px`；DOM 实测 6 张卡片 `border-radius: 12px`（`_g2-measure-host.log`）；截图 `final-desktop-1440x960.png` | 2026-10-19 02:0x | design-auditor |
+| V-02 | P1 | **已修** | FLUENT2 §5 已补 token 值映射说明（D-01）；桌面卡片 12px、页面卡片 `ReviewPage.tsx:60`/`PluginsPage.tsx:106` 均改用 `var(--wtsl-card-radius)`；弹层由 Fluent Dialog 默认承载（见 §9.4 P3 备注） | 同上 | design-auditor |
+| V-03 | P1 | **已修** | 六插件均 `src/main.jsx` + `FluentProvider` + `@fluentui/react-components`；Fluent JSX 组件计数 clock 19 / countdown 42 / pomodoro 54 / sedentary 46 / todo 163 / weather 73；无小写原生控件（唯一 `<form>` 为语义容器，内部均为 Fluent 组件）；插件 CSS 仅剩视口重置（`base.css` 319B）；设置/详情全部 `?view=` 全窗口浮层（`final-overlay-*.png`，Dialog 880×680、内嵌 iframe 834×582、关闭按钮 40×40）。详见 §9.2 | 同上 | design-auditor |
+| V-04 | P1→P2 | **部分修（P2 残留）** | 五插件字号已全部 token 化；残留仅天气：`forecast.jsx:118/123/128` 等 `clamp(16px,4.4vh,32px)`、`clamp(9px,1.8vh,12px)`、`clamp(10px,2vh,13px)` 含非 ramp 端点 9/10/11px（`_g2-scan-fontsize.txt` 10 处） | 同上 | design-auditor |
+| V-05 | P1→P2 | **部分修（P2 残留）** | 宿主/五插件间距已 token 化；残留仅天气 `forecast.jsx`/`panels.jsx`/`CityMenu.jsx` 的 `clamp(1px/2px…)`、`gap:'6px'` 等 11 处（`_g2-scan-gap.txt`）；padding 残留 10 处为 0/auto 或同类 clamp | 同上 | design-auditor |
+| V-06 | P1 | **部分修（P1 残留）** | 已达标：桌面 dock 按钮 58×40、50×40（`_g2-measure-host.log`）；编辑卡片按钮 41×41；插件任务行 40px；Agent 头部 5 个按钮 40×40、语音/发送 40×40。**未达标**：host 页头/页面操作按钮 32px（`返回桌面/复盘/退出应用/Agent 复盘/重新读取/重新扫描`）、编辑工具条 5 按钮 32px、Agent 空态建议按钮 340×32、设置纵向 Tab 38px（`_g2-measure-host.log`；截图 `final-settings-1440x960.png`、`final-agent-overlay-1440x960.png`、`final-desktop-edit-1440x960.png`） | 同上 | design-auditor |
+| V-07 | P1 | **已修** | `PageTransition.tsx` 改为 `createMotionComponent` + 单个 `<div>` child；G2 全部日志 0 条 `react-motion`/`Invalid child element` 报错（`_g2-shots-*.log`） | 同上 | design-auditor |
+| V-08 | P1 | **已修** | D-04 落地：`todo/src/sizes.js` rowBudget = 4/6/10；实测 2×2 行数 4、3×2 行数 6、3×3 行数 10、均 40px 行高；4×2 双栏内部滚动（scrollHeight 1040 / clientHeight 270，`_g2-measure-plugins2.log`）；截图 `final-p-todo-*.png` | 同上 | design-auditor |
+| V-09 | P2 | **已修（D-04 口径）** | weather 4×2 AQI 分类文字不再裁切（"良" top 190 / bottom 210 / parentBottom 210，`_g2-measure-plugins2.log`）；2×2 逐时 6 项、3×2/4×2 7 天按 D-04「内容列表例外」计；截图 `final-p-weather-*.png` | 同上 | design-auditor |
+| V-10 | P2 | **已修** | `weather/src/components/atoms.jsx:117-129` 预警条改为 Fluent `MessageBar`（intent warning）；截图 `final-p-weather-2x2/3x2/4x2.png` | 同上 | design-auditor |
+| V-11 | P2 | **已修** | countdown 空态含「添加倒数日」按钮（`CountdownApp.jsx:377-385`，`final-desktop-1440x960.png`）；pomodoro 2×1 有 40px 主按钮（`final-p-pomodoro-2x1.png`）；todo 空态单一主操作（`final-p-todo-2x2.png`） | 同上 | design-auditor |
+| V-12 | P2 | **已修** | `SedentaryApp.jsx` 改为状态 Badge + 阈值提示（"距提醒还有 38 分钟"），不再重复数值；截图 `final-p-sedentary-2x1/3x2.png` | 同上 | design-auditor |
+| V-13 | P2 | **已修** | `WidgetCard.tsx:217` 新增 `data-edit-scrim` 渐变遮罩（`desktop.styles.ts:107-115`）；截图 `final-desktop-edit-1440x960.png` 内容不再被标题直接压住 | 同上 | design-auditor |
+| V-14 | P2 | **豁免（产品决策）** | `docs/DECISIONS.md` D-03：保留常驻 dock，按钮 ≥40px（实测 40px 达标）；审计按 P3 记录 | 同上 | design-auditor |
+| V-15 | P2 | **已修** | `ConversationPane` 头部/`MessageBubble` 气泡/来源区/全屏左右竖线已移除（`grep border*` 仅剩 `Composer.tsx:32` 输入区顶线与 `FaceSetup` 头像卡边界，见 §9.4 P3） | 同上 | design-auditor |
+| V-16 | P2 | **已修** | 新增 `markdown.ts`：支持带括号 URL、`stripSourceSection` 去重；`MessageBubble.tsx:154` 有 sources 时裁掉正文"来源："清单；placeholder 改为"问点什么…"（`Composer.tsx:188`）；截图 `final-agent-search-1440x960.png`（无原始 markdown、无重复来源） | 同上 | design-auditor |
+| V-17 | P2 | **部分修（P2 残留）** | agent/weather 文案已改用户语言；残留 5 处工程术语（见 §9.4 表）：`PomodoroSettings.jsx:160`、`PomodoroDetail.jsx:111`、`todo/src/settings.jsx:179`、`PluginsPage.tsx:406`、`PluginsPage.tsx:339/:423` 与 `Desktop.tsx:1023` | 同上 | design-auditor |
+| V-18 | P2 | **已修** | 插件 CSS 140 条 hex 兜底全部删除（`base.css` 仅视口重置，`_g2-scan-hex.txt` 7 处：4 处天气对比度算法常量、2 处宿主项目 token 声明、1 处演示页）；宿主壁纸改为 `--wtsl-desktop-backdrop` token（`src/styles.css:10-14`） | 同上 | design-auditor |
+| V-19 | P2 | **已修** | 非 token 圆角 0（唯一 `CARD_RADIUS` 为项目 token）、非 token 阴影 0（`_g2-scan-radius/shadow.txt`）；`ReminderDialog` 不再覆写 `shadow64`/加边框（`ReminderDialog.tsx:37` 注释）；插件状态光晕/inset 阴影已移除 | 同上 | design-auditor |
+| V-20 | P2 | **已修** | `src/styles.css` 壁纸/前景/字体集中为项目 token（`:root`），dock 间距/圆角/阴影/背景全部 `var(--spacing*/--borderRadius*/--shadow*/--color*)`，无 rgba fallback | 同上 | design-auditor |
+| V-21 | P2 | **已修** | 复盘空态仅保留「重新读取」一个入口（`final-review-1440x960.png`，实测 refreshBtns=1）；插件管理"操作"列改为启用/禁用 Switch（`PluginsPage.tsx:160-176`），浏览器模式不渲染删除按钮；截图 `final-plugins-1440x960.png` | 同上 | design-auditor |
+| V-22 | P2 | **已修** | `breakpoints.ts` 新增 480/360 断点（8/6/4/3/2 列）；320×640 实测 `scrollWidth=clientWidth=320`，2 列布局无横向溢出；截图 `final-desktop-320x640.png`（竖向仍为"一屏不滚动"，320 宽下部分组件在视口外，属产品最小窗口定义，见 §9.4 P3） | 同上 | design-auditor |
+| V-23 | P2 | **已修** | 宿主页面（桌面/编辑/三页面/Agent 三形态）G2 日志 0 条 Keyborg 报错（`_g2-shots-plain.log`、`_g2-shots-remaining.log` 中 Keyborg 仅出现在 `src/host/agent/demo.html` 演示页，见 §9.4 P3） | 同上 | design-auditor |
+
+---
+
+## 9. G2 复检详情（`e6e57b7`，2026-10-19）
+
+### 9.1 复检方法与环境
+
+- **对象**：修复后提交 `e6e57b7`（2026-10-19 01:59:53），复检时 `git status` 干净。
+- **依据**：`docs/FLUENT2.md`、`docs/DENSITY.md`、`docs/DESIGN.md`、`docs/PLUGIN-REACT.md`、`docs/DECISIONS.md`（D-01~D-05 / D-02b）、`docs/RELEASE.md` §3。
+- **工具**：Edge 155.0.4283.62 headless + CDP（`scripts` 外置审计脚本：截图/DOM 测量/`postMessage` 触发插件浮层）；静态扫描 PowerShell/ripgrep；对照 `shots/audit/final-*.png` 与 `_g2-*.txt`。
+- **运行时**：dev server `http://localhost:5173`（Vite），深色主题；插件浮层通过页面内 `contentWindow.eval("parent.postMessage({type:'plugin:request-overlay'…})")` 触发（与真实插件点击同一协议）。
+- **限制**：宿主亮色主题仍无 headless 入口（未截图，静态 token 覆盖已查）；Toast 仍无 URL 触发入口（静态审查 Fluent `Toaster`，未变）；插件独立页截图含 `?demo=1` 演示数据，宿主截图前已清空 localStorage。
+
+### 9.2 新增判定（D-02b / 浮层机制）
+
+| 插件 | `src/main.jsx` + `FluentProvider` | Fluent JSX 组件数 | 原生控件 | 设置/详情浮层（`?view=`） |
+|---|---|---|---|---|
+| clock | ✓ | 19 | 无 | settings ✓（`final-overlay-clock-settings-1440x960.png`） |
+| countdown | ✓ | 42 | 无 | settings / edit ✓（`final-overlay-countdown-settings-1440x960.png`） |
+| pomodoro | ✓ | 54 | 无 | settings / detail ✓（`final-overlay-pomodoro-detail-1440x960.png`） |
+| sedentary | ✓ | 46 | 无 | settings / detail ✓（`final-overlay-sedentary-settings-1440x960.png`） |
+| todo | ✓ | 163 | 仅 `<form>` 语义容器 | settings / detail / all ✓（`final-overlay-todo-settings-1440x960.png`） |
+| weather | ✓ | 73 | 无 | settings / detail ✓（`final-overlay-weather-detail-1440x960.png`） |
+
+- **浮层机制核查**：宿主机 `src/host/plugins/PluginWidgetFrame.tsx:259-267` 接收 `plugin:request-overlay` → `openOverlay` → `?view=<name>` 加载同页 iframe，装在 Fluent `Dialog`（实测 880×680，内嵌 iframe 834×582，关闭按钮 40×40，Esc 关闭协议 `plugin:request-overlay-close`）。逐插件截图中**未出现 iframe 卡片内被裁切的 Dialog/Drawer**；插件内 `grep Dialog/Drawer` 无卡片视图内弹层（`CountdownEditor`/`SettingsView` 等均为 `?view=` 独立视图）。
+- **V-03 判定：已修（P1 关闭）**，满足 D-02b「全部 React + Fluent UI React、不自绘控件」。
+
+### 9.3 静态扫描统计（G2 vs 基线）
+
+| 扫描项 | 基线（ad7ea0a） | G2（e6e57b7） | 说明 |
+|---|---|---|---|
+| 手写 hex | 151 处 / 7 文件 | **7 处 / 3 文件** | 4 处为天气 `utils.js:29-50` 对比度**算法常量**；2 处为 `src/styles.css:13-14` **项目 token 声明**（D-01/材质例外）；1 处为 Agent 演示页背景。组件样式 0 处 |
+| 非 token 字号 | 113 / 153（74%） | **10 处** | 均为 weather `clamp()` 端点（9/10/11/16px）与配置值，见 §9.4 |
+| 非 token 间距 gap | 113 / 152（74%） | **11 处** | weather clamp 1/2px + 归零/布局常量，见 §9.4 |
+| 非 token padding / margin | 101/124、42/53 | **10 / 12 处** | 0、auto、`clamp(2px…)` 等，无任意大间距 |
+| 非 token 圆角 / 阴影 | 15/92、8/21 | **3 / 0 处** | 3 处均为 `CARD_RADIUS = var(--wtsl-card-radius)`（项目 token，非字面量） |
+| 自定义动效时长/曲线 | 0（2 处 reduced-motion 例外） | **0** | 全部 `motionTokens`/`--duration*/--curve*` |
+| 插件 CSS 手绘控件 | 5 插件自绘 | **0** | 六插件 `base.css` 仅视口重置（各 319–366B） |
+
+扫描原始输出：`docs/audit/_g2-scan-{hex,fontsize,radius,shadow,gap,padding,margin}.txt`；命令口径同 §4.1（插件 `src/**` React 源码 + 宿主 `src/host/**` + `src/styles.css`，排除构建产物 `app/app.js`、图标集、`dist/`、`references/`）。
+
+### 9.4 残留问题清单（P1/P2/P3）
+
+| 编号 | 级别 | 状态 | 内容 | 证据 |
+|---|---|---|---|---|
+| V-06 | **P1 残留** | 部分修 | host 页面级按钮（`返回桌面`/`复盘`/`退出应用`/`Agent 复盘`/`重新读取`/`重新扫描`）32px；编辑工具条 5 按钮 32px；Agent 空态建议按钮 340×32；设置纵向 Tab 38px | `_g2-measure-host.log`；`final-settings-1440x960.png`、`final-desktop-edit-1440x960.png`、`final-agent-overlay-1440x960.png` |
+| V-04 | P2 残留 | 部分修 | weather `forecast.jsx:118/123/128` 等 `clamp()` 端点 9/10/11px 非 type ramp | `_g2-scan-fontsize.txt` |
+| V-05 | P2 残留 | 部分修 | weather `forecast.jsx:14/24/27/51/59/61/66/91`、`panels.jsx:98`、`CityMenu.jsx:31` clamp/`6px` 非 spacing ramp | `_g2-scan-gap.txt`、`_g2-scan-padding.txt` |
+| V-17 | P2 残留 | 部分修 | 5 处工程文案：`PomodoroSettings.jsx:160`（WebAudio 合成，不联网）、`PomodoroDetail.jsx:111`（Session 记录）、`todo/src/settings.jsx:179`（Fluent type ramp）、`PluginsPage.tsx:406`（isPluginEnabled）、`PluginsPage.tsx:339/:423`、`Desktop.tsx:1023`（index.json/manifest.json） | 对应文件行；`final-overlay-pomodoro-detail-1440x960.png`、`final-overlay-todo-settings-1440x960.png` |
+| N-01 | **P2 新增** | 未修 | countdown 3×2 正常模式常驻「设置」齿轮（`CountdownApp.jsx:431-439`），违反 DENSITY 硬规则 3 / §4 countdown「齿轮（如有）去掉」 | `final-p-countdown-3x2.png` |
+| N-02 | **P2 新增** | 未修 | pomodoro 1×1 无进度指示（组件规格要求 1×1 = 剩余时间 + 环形进度 + 阶段；实测 `role=progressbar` 0 个，仅文字） | `_g2-measure-plugins2.log`；`final-p-pomodoro-1x1.png` |
+
+**P3 备注（不计入违规）**
+
+1. `V-14` dock 保留（D-03 产品决策），按钮 40px 达标。
+2. `Composer.tsx:32` 输入区顶部 1px 分隔线保留（输入区边界，非内容分组；DENSITY 原条款针对卡片内部）。
+3. `weather/src/utils.js:29-50` 4 处 hex 为对比度算法常量（非样式 token，函数内计算用），建议后续改用相对亮度函数参数化。
+4. 插件独立页（无宿主 `host:init`）时钟为白底主题回退（`final-p-clock-2x1.png`）；产品内始终由宿主注入主题，不影响发布。
+5. 320×640 下桌面按"一屏不滚动"定义仅显示前 4 个组件，todo/weather 在视口外；属产品最小窗口定义，建议 Tauri 窗口设 `minWidth ≥ 960` 并在发布说明记录。
+6. `sedentary` 3×2 展示「今日久坐/起身次数」与 DENSITY §4 组件级表述「只留状态点+连续分钟+打卡」存在措辞冲突，但符合 §2 预算表（Secondary 5 项）与组件文档，建议修订 DENSITY 组件段。
+7. `pomodoro` 3×2 视觉重心略偏下（progress 条 + 大时间），不影响信息层级。
+8. Fluent Dialog 默认圆角 8px（`PluginWidgetFrame`/`ReminderDialog` 未覆写），与 D-01「弹层卡片统一 12px」措辞不一致，建议 D-01 补「Dialog 沿用 Fluent 默认」例外。
+9. Agent 演示页（`src/host/agent/demo.html`）仍打印 Keyborg disposal warning；产品宿主页面 0 报错（V-23 已修）。
+
+### 9.5 文档口径一致性复核
+
+| 文档 | 与实现/决策一致性 | 备注 |
+|---|---|---|
+| `DECISIONS.md` D-01（卡片 12px） | ✓（桌面/页面卡片均为 `--wtsl-card-radius`） | P3-8 弹层 Dialog 默认 8px 建议补例外 |
+| `DECISIONS.md` D-02b（插件 React+Fluent） | ✓（六插件全部达标，§9.2） | — |
+| `DECISIONS.md` D-03（dock 保留、≥40） | ✓（实测 40px） | — |
+| `DECISIONS.md` D-04（内容列表例外/行数上限） | ✓（todo 4/6/10 行、weather 2×2 逐时 6） | — |
+| `FLUENT2.md` §5 token 值映射 | ✓（已补说明，实现用项目 token） | — |
+| `FLUENT2.md` §14 item 5/9 | 基本一致 | item 5 称"由组件默认字阶保证"，weather clamp 残留（P2）建议补一句例外 |
+| `DENSITY.md` §2 内容列表例外 | ✓ | 与 D-04 数值一致 |
+| `DESIGN.md` §1.1 断点 8/6/4/3/2 | ✓（`breakpoints.ts:30-34`） | — |
+| `DESIGN.md` §3 插件 React 约定 / §1.2 触控 40 | React 约定 ✓；触控仍有 V-06 残留 | — |
+| `RELEASE.md` §3 设计合规 | 已含新增 React/浮层检查项 | "无手写 hex、无非 token 字号"与 weather clamp 残留不完全一致（P2） |
+| `PLUGIN-REACT.md` | ✓（入口/主题/浮层/触控约定与实现一致） | — |
+
+### 9.6 最终判定
+
+- **P0 = 0**（无阻断）。
+- **P1 残留 = 1（V-06 触控目标）**：11 项基线 P1 中已关闭 7 项；V-04/V-05 按 D-02b 新口径降为 P2；V-06 大部分已修，仅剩 **host 页面级按钮 / 编辑工具条 / Agent 空态建议按钮 32px + 设置 Tab 38px**。
+- **P2 残留 = 5**（V-04 weather clamp、V-05 weather clamp、V-17 文案、N-01 countdown 齿轮、N-02 pomodoro 1×1 进度）；均有明确修法、不阻断发布。
+- **可发布判定：有条件可发布**。
+  1. **必须**：关闭 V-06 残留（统一 `size="large"`/`minHeight:40`，预计 30 分钟）——或由需求方在 `DECISIONS.md` 书面豁免「Fluent 默认 32px 控件」；
+  2. **必须**：N-01 倒计时齿轮移入 `⋯`/长按菜单（3 行改动）；
+  3. **建议本迭代**：V-17 文案清理、V-04/V-05 weather clamp 端点改为 ramp 值、N-02 1×1 进度指示；
+  4. 发布说明记录 P3 项（dock 决策、320 最小窗口、Dialog 圆角例外）。
+  
+  满足 1+2 后，P0=0 / P1=0，可发布。
+
+### 9.7 G2 截图遗漏与替代证据
+
+- 插件 1×1/2×2 等未逐尺寸截图（clock 1×1/3×2、countdown 1×1/2×2、sedentary 1×1/2×2、todo 1×1、weather 1×1/2×1）：以宿主桌面在 1440×960/1024×768/960×1440 三档的实测卡片 + 代码尺寸分支（`sizes.js`/`sizeKey===` 判定）交叉验证；关键判定（V-03/V-04/V-08/V-11/V-12）均有对应截图或 DOM 实测。
+- 亮色主题宿主、Toast 运行时截图仍缺（与基线限制相同）；静态 token 审查覆盖。
 
 ---
 
@@ -351,3 +454,30 @@
 | `docs/audit/_scan-ts-visual.txt` | 宿主 TS 非 token 视觉属性（8 处） |
 | `docs/audit/_shots-plugins2.log` / `_shots-host-final.log` | 最终截图批次日志（含控制台报错原文） |
 | `docs/audit/_shots-host2.log` / `_shots-log.txt` | 过程截图日志（基线期间，供追溯） |
+
+---
+
+
+## 附录 C：G2 截图索引（`shots/audit/final-*.png`）
+
+**宿主（19）**：`final-desktop-{1440x960,1024x768,960x1440,320x640}.png`、`final-desktop-edit-{1440x960,1024x768,960x1440}.png`、`final-settings-{1440x960,1024x768,960x1440}.png`、`final-review-{1440x960,1024x768,960x1440}.png`、`final-plugins-{1440x960,1024x768,960x1440}.png`
+
+**Agent（10）**：`final-agent-overlay-{1440x960,1024x768,960x1440}.png`、`final-agent-demo-overlay-1440x960.png`、`final-agent-sidebar-1440x960.png`、`final-agent-fullscreen-1440x960.png`、`final-agent-voice-1440x960.png`、`final-agent-settings-1440x960.png`、`final-agent-search-1440x960.png`
+
+**插件浮层（7）**：`final-overlay-{clock-settings-1440x960,clock-settings-1024x768,countdown-settings-1440x960,pomodoro-detail-1440x960,sedentary-settings-1440x960,todo-settings-1440x960,weather-detail-1440x960}.png`
+
+**插件卡片（16）**：`final-p-{clock-2x1,clock-settings-2x1,countdown-2x1,countdown-3x2,pomodoro-1x1,pomodoro-2x1,pomodoro-3x2,sedentary-2x1,sedentary-3x2,todo-2x2,todo-3x2,todo-3x3,todo-4x2,weather-2x2,weather-3x2,weather-4x2}.png`
+
+**通知（1）**：`final-reminder-1440x960.png`
+
+**对照图（2）**：`_g2-sheet-small.png`、`_g2-sheet-todo-weather.png`
+
+## 附录 D：G2 证据文件
+
+| 文件 | 内容 |
+|---|---|
+| `docs/audit/_g2-scan-hex.txt`、`_g2-scan-fontsize.txt`、`_g2-scan-radius.txt`、`_g2-scan-shadow.txt`、`_g2-scan-gap.txt`、`_g2-scan-padding.txt`、`_g2-scan-margin.txt`、`_g2-scan-transition.txt` | G2 静态扫描明细 |
+| `docs/audit/_g2-measure-host.log` | 宿主 DOM 实测（dock/编辑按钮/页面按钮/Tab/320 溢出/Agent 头部） |
+| `docs/audit/_g2-measure-plugins2.log` | 插件 DOM 实测（todo 行高/行数、weather AQI、pomodoro 1×1、countdown 3×2 按钮） |
+| `docs/audit/_g2-shots-plain.log`、`_g2-shots-remaining.log` | G2 截图批次日志（含控制台报错原文：0 条 react-motion；Keyborg 仅演示页） |
+| `docs/audit/_g2-overlays.log`、`_g2-overlay-todo-retry.log` | 插件全窗口浮层截图日志（Dialog 尺寸/关闭按钮 40×40） |

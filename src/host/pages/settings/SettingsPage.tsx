@@ -26,6 +26,9 @@ import {
 } from '@fluentui/react-components';
 
 import { getPluginManager, usePlugins } from '../../plugins';
+
+/** 平板触控目标 ≥40（DESIGN §1.2 / AUDIT V-06）：Fluent Tab 默认 38px，这里统一抬到 40 */
+const TAB_TOUCH_TARGET = { minHeight: '40px' };
 import {
   autostartIsEnabled,
   autostartSetEnabled,
@@ -289,7 +292,7 @@ export function SettingsPage({
 
       <SettingsGroup title="退出" hint="Esc 只返回桌面，不退出应用；退出走这里或 Ctrl + Q。">
         <SettingsRow label="退出启动器" description="插件 iframe 随应用关闭，缓存数据由各插件自己保存">
-          <Button appearance="secondary" onClick={() => void quitApplication(notify)}>
+          <Button appearance="secondary" size="large" onClick={() => void quitApplication(notify)}>
             退出应用
           </Button>
         </SettingsRow>
@@ -345,6 +348,7 @@ export function SettingsPage({
       <SettingsRow label="已安装" description={pluginSummary}>
         <Button
           appearance="secondary"
+          size="large"
           onClick={() => {
             void reloadPlugins();
             notify('已重新扫描插件目录');
@@ -352,12 +356,12 @@ export function SettingsPage({
         >
           重新扫描
         </Button>
-        <Button appearance="primary" onClick={() => onNavigate('plugins')}>
+        <Button appearance="primary" size="large" onClick={() => onNavigate('plugins')}>
           插件管理
         </Button>
       </SettingsRow>
       <SettingsRow label="安装插件" description="把插件 zip 拖进窗口即解压到 plugins/<id>/">
-        <Button appearance="secondary" onClick={() => onNavigate('plugins')}>
+        <Button appearance="secondary" size="large" onClick={() => onNavigate('plugins')}>
           去安装
         </Button>
       </SettingsRow>
@@ -370,7 +374,7 @@ export function SettingsPage({
         label="Agent 面板"
         description={onOpenAgent ? '对话与工具调用入口' : 'D 阶段接入，接线后可从桌面或这里打开'}
       >
-        <Button appearance="primary" disabled={!onOpenAgent} onClick={onOpenAgent}>
+        <Button appearance="primary" size="large" disabled={!onOpenAgent} onClick={onOpenAgent}>
           打开 Agent
         </Button>
       </SettingsRow>
@@ -399,7 +403,7 @@ export function SettingsPage({
       subtitle="启动行为、外观、快捷键与插件入口"
       onBack={onBack}
       actions={
-        <Button appearance="secondary" onClick={() => onNavigate('review')}>
+        <Button appearance="secondary" size="large" onClick={() => onNavigate('review')}>
           复盘
         </Button>
       }
@@ -417,7 +421,7 @@ export function SettingsPage({
           aria-label="设置分区"
         >
           {(Object.keys(SECTION_TITLES) as SettingsSection[]).map((key) => (
-            <Tab key={key} value={key}>
+            <Tab key={key} value={key} style={TAB_TOUCH_TARGET}>
               {SECTION_TITLES[key]}
             </Tab>
           ))}

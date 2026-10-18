@@ -176,7 +176,7 @@ export default function TodoSettings() {
           <div className={styles.rowText}>
             <Text size={300}>字号</Text>
             <Text size={200} className={styles.subtle}>
-              按 Fluent type ramp 切档，不做连续缩放
+              字号只按档位切换，不连续缩放
             </Text>
           </div>
           <RadioGroup

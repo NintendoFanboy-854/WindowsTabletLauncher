@@ -270,7 +270,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
     return (
       <Button
         appearance="subtle"
-        size="small"
+        size="large"
         onClick={() => setConfirmTarget(plugin)}
         disabled={busy === plugin.id}
         title="删除插件目录"
@@ -293,7 +293,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
       onBack={onBack}
       actions={
         <div className={styles.toolbar}>
-          <Button appearance="secondary" onClick={() => void refresh()} disabled={loading}>
+          <Button appearance="secondary" size="large" onClick={() => void refresh()} disabled={loading}>
             重新扫描
           </Button>
         </div>
@@ -312,6 +312,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
             />
             <Button
               appearance="primary"
+              size="large"
               onClick={() => void installFromPath()}
               disabled={busy === 'install'}
             >
@@ -336,7 +337,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
         )}
 
         {!loading && !error && plugins.length === 0 && (
-          <EmptyState title="还没有插件" description="检查 index.json / manifest.json，或者装一个插件 zip。" />
+          <EmptyState title="还没有插件" description="安装插件后这里会列出它们，也可以拖入插件压缩包安装。" />
         )}
 
         {!loading && !error && plugins.length > 0 && (
@@ -403,7 +404,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
             )}
 
             <Text size={200} className={styles.hint}>
-              启用/禁用是本地偏好，桌面按 isPluginEnabled 过滤后生效。
+              启用/禁用会保存在本机，桌面重新加载后生效。
             </Text>
           </>
         )}
@@ -419,15 +420,15 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
           <DialogBody>
             <DialogTitle>删除插件？</DialogTitle>
             <DialogContent>
-              将从 plugins/ 删除「{confirmTarget?.name}」（{confirmTarget?.id}），并移出
-              index.json。不可撤销。
+              将删除「{confirmTarget?.name}」的插件文件，不可撤销。
             </DialogContent>
             <DialogActions>
-              <Button appearance="secondary" onClick={() => setConfirmTarget(null)}>
+              <Button appearance="secondary" size="large" onClick={() => setConfirmTarget(null)}>
                 取消
               </Button>
               <Button
                 appearance="primary"
+                size="large"
                 onClick={() => confirmTarget && void removePlugin(confirmTarget)}
               >
                 删除

@@ -157,7 +157,7 @@ export default function PomodoroSettings() {
           <div className={styles.rowText}>
             <Text size={300}>阶段结束提示音</Text>
             <Text className={styles.subtle} size={200}>
-              WebAudio 合成，不联网
+              由系统合成，不占用网络
             </Text>
           </div>
           <Switch

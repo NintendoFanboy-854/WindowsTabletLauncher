@@ -1,0 +1,12 @@
+public\plugins\weather\src\views\SettingsView.jsx:60  margin: '0 auto'
+src\host\agent\ui\ConversationPane.tsx:61  marginInline: 'auto'
+src\host\agent\ui\MessageContent.tsx:19  margin: 0
+src\host\agent\ui\MessageContent.tsx:24  margin: 0
+src\host\agent\ui\MessageContent.tsx:31  margin: 0
+src\host\agent\ui\MessageContent.tsx:35  margin: 0
+src\host\agent\ui\MessageList.tsx:24  margin: 'auto'
+src\host\agent\ui\ToolCallCard.tsx:65  margin: 0
+src\host\agent\ui\ToolCallCard.tsx:75  margin: 0
+src\host\notifications\ReminderDialog.tsx:47  margin: 0
+src\host\pages\shared\PageScaffold.tsx:73  marginInline: 'auto'
+src\styles.css:26  margin: 0;

@@ -4,8 +4,11 @@
  *
  * 常驻 DOM、用 `visible` 切换 opacity/transform 过渡（motionTokens），
  * 隐藏时 inert + pointer-events:none，不参与布局也不响应点击。
+ *
+ * 触控：ToolbarButton 没有 size 入口（Fluent v9），按钮内部改用 Button size="large"
+ * 保证 ≥40×40（DESIGN §1.2 / AUDIT V-06）。
  */
-import { Text, Toolbar, ToolbarButton, ToolbarDivider, mergeClasses } from '@fluentui/react-components';
+import { Button, Text, Toolbar, ToolbarDivider, mergeClasses } from '@fluentui/react-components';
 import {
   Add20Regular,
   Checkmark20Regular,
@@ -43,16 +46,19 @@ export function EditToolbar({
       aria-hidden={!visible}
       inert={!visible}
       data-no-desktop-gesture="true"
-      size="small"
     >
-      <ToolbarButton
+      <Button
+        size="large"
+        appearance="subtle"
         icon={<ChevronLeft20Regular />}
         aria-label="当前页左移"
         title="当前页左移"
         disabled={activePage <= 0}
         onClick={() => onMovePage(activePage, activePage - 1)}
       />
-      <ToolbarButton
+      <Button
+        size="large"
+        appearance="subtle"
         icon={<ChevronRight20Regular />}
         aria-label="当前页右移"
         title="当前页右移"
@@ -61,13 +67,17 @@ export function EditToolbar({
       />
       <Text className={styles.toolbarText}>{`第 ${activePage + 1} / ${pages} 页`}</Text>
       <ToolbarDivider />
-      <ToolbarButton
+      <Button
+        size="large"
+        appearance="subtle"
         icon={<Add20Regular />}
         aria-label="添加一页"
         title="添加一页"
         onClick={onAddPage}
       />
-      <ToolbarButton
+      <Button
+        size="large"
+        appearance="subtle"
         icon={<Delete20Regular />}
         aria-label="删除当前页"
         title="删除当前页"
@@ -75,13 +85,9 @@ export function EditToolbar({
         onClick={onRemovePage}
       />
       <ToolbarDivider />
-      <ToolbarButton
-        appearance="primary"
-        icon={<Checkmark20Regular />}
-        onClick={onDone}
-      >
+      <Button size="large" appearance="primary" icon={<Checkmark20Regular />} onClick={onDone}>
         完成
-      </ToolbarButton>
+      </Button>
     </Toolbar>
   );
 }

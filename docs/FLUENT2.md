@@ -166,7 +166,7 @@
 | 2 | 卡片阴影 `0 18px 40px` 自定 | shadow4/8 + stroke | 同上 |
 | 3 | 每张卡片常驻标题栏/齿轮 | chrome on demand | task-15 处理 |
 | 4 | 待办列表元信息过密 | 渐进披露 | task-12 处理 |
-| 5 | 插件内字号未统一走 type ramp | 字阶表 | 插件迁移 Fluent UI React 后由组件默认字阶保证 |
+| 5 | 插件内字号未统一走 type ramp | 字阶表 | 已修（G2）：迁移 Fluent UI React 后由组件默认字阶保证；天气 forecast 的 clamp 字号已换成 `fontSizeBase*` token；仅图标/环形图等内容图形尺寸保留 clamp（不是字号） |
 | 6 | 桌面网格 gap 14px | 间距 ramp | 改为 12 或 16 |
 | 7 | 天气图标非 Fluent | 仅内容图形例外 | 已记录，保持 |
 | 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |

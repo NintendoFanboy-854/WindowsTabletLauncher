@@ -24484,7 +24484,7 @@ var Zx = qn({
 		gridAutoFlow: "column",
 		gridAutoColumns: "minmax(0, 1fr)",
 		gridAutoRows: "1fr",
-		gap: "clamp(2px, 1vw, 8px)",
+		gap: Y.spacingHorizontalXS,
 		minHeight: 0,
 		height: "100%",
 		alignItems: "stretch"
@@ -24494,19 +24494,19 @@ var Zx = qn({
 		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: "clamp(1px, 0.8vh, 4px)",
+		gap: Y.spacingVerticalXXS,
 		minWidth: 0,
 		borderRadius: Y.borderRadiusMedium,
-		padding: "clamp(2px, 1vh, 6px) 0"
+		paddingBlock: Y.spacingVerticalXS
 	},
 	hourLabel: {
-		fontSize: "clamp(9px, 1.9vh, 12px)",
+		fontSize: Y.fontSizeBase100,
 		color: Y.colorNeutralForeground3,
 		fontVariantNumeric: "tabular-nums",
 		whiteSpace: "nowrap"
 	},
 	hourTemp: {
-		fontSize: "clamp(11px, 2.4vh, 16px)",
+		fontSize: Y.fontSizeBase300,
 		color: Y.colorNeutralForeground1,
 		fontWeight: Y.fontWeightSemibold,
 		fontVariantNumeric: "tabular-nums"
@@ -24521,7 +24521,7 @@ var Zx = qn({
 		gridAutoFlow: "column",
 		gridAutoColumns: "minmax(0, 1fr)",
 		gridAutoRows: "1fr",
-		gap: "clamp(2px, 0.8vw, 6px)",
+		gap: Y.spacingHorizontalXXS,
 		minHeight: 0
 	},
 	dayColumn: {
@@ -24529,14 +24529,14 @@ var Zx = qn({
 		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: "clamp(1px, 0.8vh, 6px)",
+		gap: Y.spacingVerticalXXS,
 		minWidth: 0,
-		padding: "clamp(2px, 1vh, 8px) 0",
+		paddingBlock: Y.spacingVerticalXS,
 		borderRadius: Y.borderRadiusMedium
 	},
 	dayColumnSpread: {
 		justifyContent: "space-between",
-		padding: "clamp(4px, 1.6vh, 14px) 0"
+		paddingBlock: Y.spacingVerticalS
 	},
 	dayLabel: {
 		fontSize: Y.fontSizeBase200,
@@ -24561,7 +24561,7 @@ var Zx = qn({
 		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: "clamp(2px, 0.8vh, 6px)",
+		gap: Y.spacingVerticalXXS,
 		minWidth: 0,
 		height: "100%"
 	},
@@ -24588,17 +24588,17 @@ var Zx = qn({
 		lineHeight: 1.05
 	},
 	aqiValue: {
-		fontSize: "clamp(16px, 4.4vh, 32px)",
+		fontSize: Y.fontSizeBase400,
 		fontWeight: Y.fontWeightSemibold,
 		fontVariantNumeric: "tabular-nums"
 	},
 	aqiLabel: {
-		fontSize: "clamp(9px, 1.8vh, 12px)",
+		fontSize: Y.fontSizeBase100,
 		color: Y.colorNeutralForeground3,
 		whiteSpace: "nowrap"
 	},
 	aqiCategory: {
-		fontSize: "clamp(10px, 2vh, 13px)",
+		fontSize: Y.fontSizeBase200,
 		whiteSpace: "nowrap",
 		fontWeight: Y.fontWeightSemibold
 	}
@@ -26931,14 +26931,14 @@ var YC = qn({
 		minWidth: 0,
 		maxWidth: "100%",
 		justifyContent: "flex-start",
-		paddingLeft: "2px",
-		paddingRight: "4px",
-		gap: "6px",
+		paddingLeft: Y.spacingHorizontalXXS,
+		paddingRight: Y.spacingHorizontalXS,
+		gap: Y.spacingHorizontalS,
 		color: Y.colorNeutralForeground1,
 		fontWeight: Y.fontWeightSemibold,
 		fontSize: Y.fontSizeBase400,
 		lineHeight: 1,
-		height: "clamp(28px, 5vh, 36px)"
+		minHeight: "40px"
 	},
 	cityName: {
 		overflow: "hidden",

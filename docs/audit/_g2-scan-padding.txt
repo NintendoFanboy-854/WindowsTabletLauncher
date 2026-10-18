@@ -1,0 +1,10 @@
+public\plugins\weather\src\components\forecast.jsx:27  padding: 'clamp(2px
+public\plugins\weather\src\components\forecast.jsx:61  padding: 'clamp(2px
+public\plugins\weather\src\components\forecast.jsx:66  padding: 'clamp(4px
+src\host\agent\ui\AgentPanel.tsx:45  padding: 0
+src\host\agent\ui\MessageContent.tsx:32  padding: 0
+src\host\desktop\desktop.styles.ts:61  padding: '0'
+src\host\desktop\desktop.styles.ts:77  padding: '0'
+src\host\desktop\WidgetCard.tsx:129  padding: 0
+src\host\layout\types.ts:36  padding: number;
+src\host\plugins\PluginWidgetFrame.tsx:138  padding: 0

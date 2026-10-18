@@ -87,7 +87,7 @@ export function PageScaffold({
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <Button appearance="subtle" onClick={onBack}>
+        <Button appearance="subtle" size="large" onClick={onBack}>
           {backLabel}
         </Button>
         <div className={styles.headerText}>

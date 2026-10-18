@@ -97,6 +97,7 @@ export function MessageList({ session }: { session: AgentSession }) {
               <Button
                 key={suggestion.text}
                 appearance="outline"
+                size="large"
                 icon={suggestion.icon}
                 onClick={() => void session.send(suggestion.text)}
               >

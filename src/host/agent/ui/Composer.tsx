@@ -104,13 +104,13 @@ export function Composer({
           </MessageBarBody>
           <MessageBarActions
             containerAction={
-              <Button appearance="transparent" size="small" onClick={onOpenSettings}>
+              <Button appearance="transparent" size="large" onClick={onOpenSettings}>
                 打开设置
               </Button>
             }
           >
             <Button
-              size="small"
+              size="large"
               appearance="outline"
               onClick={() => session.updateSettings({ mock: true })}
             >
@@ -130,7 +130,7 @@ export function Composer({
             containerAction={
               <Button
                 appearance="transparent"
-                size="small"
+                size="large"
                 icon={<DismissRegular />}
                 aria-label="关闭错误提示"
                 onClick={session.dismissError}
@@ -139,7 +139,7 @@ export function Composer({
           >
             {session.error.action ? (
               <Button
-                size="small"
+                size="large"
                 appearance="primary"
                 onClick={() => {
                   const url = session.error?.action?.url;
@@ -151,7 +151,7 @@ export function Composer({
             ) : null}
             {session.error.retryable ? (
               <Button
-                size="small"
+                size="large"
                 appearance="outline"
                 icon={<ArrowClockwiseRegular />}
                 onClick={() => void session.retry()}
@@ -170,7 +170,7 @@ export function Composer({
             containerAction={
               <Button
                 appearance="transparent"
-                size="small"
+                size="large"
                 icon={<DismissRegular />}
                 aria-label="关闭语音提示"
                 onClick={session.dismissVoiceError}

@@ -1,0 +1,7 @@
+public\plugins\weather\src\utils.js:29  #ffffff
+public\plugins\weather\src\utils.js:46  #ffffff
+public\plugins\weather\src\utils.js:50  #1a1a1a
+public\plugins\weather\src\utils.js:50  #ffffff
+src\host\agent\demo\main.tsx:185  #0e0f13
+src\styles.css:13  #0e0f13
+src\styles.css:14  #f3f3f3

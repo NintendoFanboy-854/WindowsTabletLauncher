@@ -1,0 +1,3 @@
+src\host\desktop\desktop.styles.ts:255  borderRadius: CARD_RADIUS
+src\host\desktop\desktop.styles.ts:272  borderRadius: CARD_RADIUS
+src\host\desktop\WidgetCard.tsx:131  borderRadius: CARD_RADIUS

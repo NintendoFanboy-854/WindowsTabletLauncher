@@ -271,11 +271,11 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
             </Badge>
           )}
           {!emptyState && (
-            <Button appearance="secondary" onClick={refresh} disabled={loading}>
+            <Button appearance="secondary" size="large" onClick={refresh} disabled={loading}>
               刷新
             </Button>
           )}
-          <Button appearance="primary" onClick={onOpenAgent} disabled={!onOpenAgent}>
+          <Button appearance="primary" size="large" onClick={onOpenAgent} disabled={!onOpenAgent}>
             Agent 复盘
           </Button>
         </div>
@@ -292,7 +292,7 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
         <MessageBar intent="error">
           <MessageBarBody>
             读取复盘数据失败：{error.message}
-            <Button appearance="transparent" onClick={refresh}>
+            <Button appearance="transparent" size="large" onClick={refresh}>
               重试
             </Button>
           </MessageBarBody>
@@ -304,7 +304,7 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
           title="还没有可复盘的数据"
           description="插件提供 stats 工具后，这里会自动汇总。"
           action={
-            <Button appearance="secondary" onClick={refresh}>
+            <Button appearance="secondary" size="large" onClick={refresh}>
               重新读取
             </Button>
           }

@@ -14,8 +14,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  Menu,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MenuTrigger,
   Text,
-  Tooltip,
   makeStyles,
   mergeClasses,
   tokens,
@@ -23,6 +27,7 @@ import {
 import {
   Add20Regular,
   CalendarLtr20Regular,
+  MoreHorizontal20Regular,
   Settings20Regular,
 } from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
@@ -419,24 +424,28 @@ export default function CountdownApp({ fallbackSizeKey }) {
             </Text>
           </div>
           <div className={styles.actions}>
-            <Tooltip content="新增倒数日" relationship="label">
-              <Button
-                appearance="subtle"
-                size="large"
-                icon={<Add20Regular />}
-                aria-label="新增倒数日"
-                onClick={() => openEditor(null)}
-              />
-            </Tooltip>
-            <Tooltip content="倒数日设置" relationship="label">
-              <Button
-                appearance="subtle"
-                size="large"
-                icon={<Settings20Regular />}
-                aria-label="倒数日设置"
-                onClick={() => requestSettings('倒数日设置')}
-              />
-            </Tooltip>
+            {/* chrome on demand（DENSITY 规则 3 / AUDIT N-01）：3×2 正常模式只留一个 ⋯ 菜单，
+                新增与设置都收进菜单，不再常驻齿轮按钮 */}
+            <Menu>
+              <MenuTrigger disableButtonEnhancement>
+                <Button
+                  appearance="subtle"
+                  size="large"
+                  icon={<MoreHorizontal20Regular />}
+                  aria-label="倒数日操作"
+                />
+              </MenuTrigger>
+              <MenuPopover>
+                <MenuList>
+                  <MenuItem icon={<Add20Regular />} onClick={() => openEditor(null)}>
+                    新增倒数日
+                  </MenuItem>
+                  <MenuItem icon={<Settings20Regular />} onClick={() => requestSettings('倒数日设置')}>
+                    设置
+                  </MenuItem>
+                </MenuList>
+              </MenuPopover>
+            </Menu>
           </div>
         </div>
       )}
