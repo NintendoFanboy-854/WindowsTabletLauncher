@@ -12,6 +12,7 @@ import { Button, FluentProvider, webDarkTheme, webLightTheme } from '@fluentui/r
 
 import { getHostBridge } from './bridge';
 import type { HostBridge } from './bridge';
+import { AgentSurface } from './agent';
 import { applySeeds } from './bootstrap/seeds';
 import Desktop from './desktop/Desktop';
 import { NotificationsProvider, useHostNotifications } from './notifications';
@@ -29,6 +30,15 @@ function readThemeMode(): ThemeMode {
     return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
   } catch {
     return 'dark';
+  }
+}
+
+/** 截图/调试用：`?agent=1` 直接打开 Agent 面板 */
+function readAgentParam(): boolean {
+  try {
+    return new URLSearchParams(location.search).has('agent');
+  } catch {
+    return false;
   }
 }
 
@@ -91,7 +101,8 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
   });
 
   const back = useCallback(() => navigate('desktop'), [navigate]);
-  const openAgent = useCallback(() => notify('Agent 面板正在接入（D 阶段）'), [notify]);
+  const [agentOpen, setAgentOpen] = useState<boolean>(readAgentParam);
+  const openAgent = useCallback(() => setAgentOpen(true), []);
 
   let content;
   switch (page) {
@@ -121,6 +132,7 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
     <div className="host-root">
       <PageTransition key={page}>{content}</PageTransition>
       {page === 'desktop' && <DesktopDock navigate={navigate} onOpenAgent={openAgent} />}
+      <AgentSurface open={agentOpen} onOpenChange={setAgentOpen} hideFab />
     </div>
   );
 }

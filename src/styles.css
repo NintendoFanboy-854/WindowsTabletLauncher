@@ -127,3 +127,15 @@ body {
   z-index: 10;
 }
 
+
+/* ---------- Agent 侧栏让宽（AgentSurface 在 documentElement 上写变量与标记） ---------- */
+
+html[data-agent-panel='sidebar'] .host-root {
+  padding-right: var(--wtsl-agent-panel-width, 0px);
+  transition: padding-right var(--durationNormal, 200ms) var(--curveEasyEase, ease);
+}
+
+html[data-agent-panel='sidebar'] .desktop-dock {
+  right: calc(18px + var(--wtsl-agent-panel-width, 0px));
+  transition: right var(--durationNormal, 200ms) var(--curveEasyEase, ease);
+}

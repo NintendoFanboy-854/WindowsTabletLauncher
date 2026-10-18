@@ -112,7 +112,8 @@ export function AgentSurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.voice.active]);
 
-  // 人脸唤醒
+  // 人脸唤醒：只在启用状态、阈值或样本数量变化时重建识别循环，
+  // 避免改其他设置（如输 API Key）时反复重启摄像头
   useEffect(() => {
     const faceSettings = session.settings.face;
     if (!faceSettings.enabled || faceSettings.descriptors.length === 0) {
@@ -142,7 +143,7 @@ export function AgentSurface({
   }, [
     session.settings.face.enabled,
     session.settings.face.threshold,
-    session.settings.face.descriptors,
+    session.settings.face.descriptors.length,
   ]);
 
   useEffect(

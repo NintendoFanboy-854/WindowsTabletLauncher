@@ -38,6 +38,12 @@ export interface PluginWidgetFrameProps {
   pluginId: string;
   /** 后台 iframe 没有组件 id，传空字符串 */
   widgetId: string;
+  /**
+   * 实例 uid：同一插件多个组件实例时用来区分 iframe 句柄。
+   * 不传默认 `pluginId:widgetId`（后台 iframe 为 `pluginId:background`）；
+   * 桌面层建议传 `WidgetInstance.uid`。
+   */
+  instanceUid?: string;
   /** 当前尺寸（列跨 × 行跨），插件据此决定显示内容 */
   size: WidgetSize;
   /** 不传就读当前 FluentProvider 生效的 token */
@@ -57,6 +63,10 @@ export interface PluginWidgetFrameProps {
 }
 
 export interface PluginWidgetFrameHandle {
+  /** 实例 uid（`pluginId:widgetId` / `pluginId:background`），桥接层按它登记句柄 */
+  readonly uid: string;
+  /** 是否收到过插件的 plugin:ready（iframe 加载完成不等于插件初始化完成） */
+  isReady(): boolean;
   /** 直接发一条协议消息 */
   send(message: HostToPluginMessage): void;
   resize(size: WidgetSize): void;
@@ -101,6 +111,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       src,
       pluginId,
       widgetId,
+      instanceUid,
       size,
       theme,
       config,
@@ -112,8 +123,13 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       hidden = false,
     } = props;
 
+    /** 实例句柄的 key：同一插件多实例靠它区分（后台 iframe 用 pluginId:background） */
+    const frameUid =
+      instanceUid?.trim() || (widgetId ? `${pluginId}:${widgetId}` : `${pluginId}:background`);
+
     const frameRef = useRef<HTMLIFrameElement>(null);
     const [loadedAt, setLoadedAt] = useState(0);
+    const readyRef = useRef(false);
     const lastSize = useRef<WidgetSize | null>(null);
     const lastTheme = useRef<ThemePayload | undefined>(theme);
 
@@ -169,6 +185,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         const data = event.data as PluginToHostMessage | null | undefined;
         if (!data || typeof data !== 'object' || typeof data.type !== 'string') return;
 
+        if (data.type === 'plugin:ready') readyRef.current = true;
         onMessage?.(data);
         if (data.type !== 'plugin:call') return;
 
@@ -192,6 +209,8 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     useImperativeHandle(
       ref,
       () => ({
+        uid: frameUid,
+        isReady: () => readyRef.current,
         send: post,
         resize: (nextSize) => post({ type: 'host:resize', payload: { size: nextSize } }),
         updateTheme: (nextTheme) => post({ type: 'host:theme', payload: { theme: nextTheme } }),
@@ -206,7 +225,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           return frameRef.current?.contentWindow ?? null;
         },
       }),
-      [post],
+      [post, frameUid],
     );
 
     return (
@@ -221,6 +240,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         aria-hidden={hidden || undefined}
         onLoad={() => {
           lastSize.current = null;
+          readyRef.current = false;
           setLoadedAt((value) => value + 1);
         }}
       />

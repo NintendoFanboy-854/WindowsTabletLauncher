@@ -152,6 +152,7 @@ export function WidgetCard({
           ref={frameRef}
           bridge={bridge}
           theme={theme}
+          instanceUid={widget.uid}
           pluginId={widget.pluginId}
           widgetId={widget.widgetId}
           src={src}

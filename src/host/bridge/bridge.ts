@@ -27,6 +27,13 @@ import type {
 
 /** 桌面层 / PluginWidgetFrame 需要暴露给桥接层的能力 */
 export interface PluginFrameHandle {
+  /**
+   * 帧实例唯一 id（约定 `pluginId:widgetId`，后台 iframe 用 `pluginId:background`）。
+   * 不传时桥接层用 `pluginId@<自增序号>` 兜底，多个实例仍然不会互相覆盖。
+   */
+  readonly uid?: string;
+  /** iframe / 插件是否已经就绪（收到过 `plugin:ready`）；不传视为就绪 */
+  isReady?(): boolean;
   reply(id: string, ok: boolean, result?: unknown, error?: string): void;
   focusPlugin(): void;
   toolCall(id: string, name: string, args: unknown): void;
@@ -46,8 +53,16 @@ export interface ToolCallOptions {
 const CONFIG_PREFIX = 'plugin.';
 
 export class HostBridge {
+  /**
+   * 帧句柄表：key = 实例 uid（`pluginId:widgetId` / `pluginId:background`）。
+   * 同一个插件的多个组件实例各自一个句柄，不再互相覆盖。
+   */
   private frames = new Map<string, PluginFrameHandle>();
-  private toolOwners = new Map<string, string>();
+  /** 插件 id → 该插件的实例 uid 列表（按注册顺序，工具路由取第一个可用的） */
+  private pluginFrames = new Map<string, string[]>();
+  private frameSeq = 0;
+  /** Agent 工具声明 + 归属插件：模型需要 description/parameters 才知道怎么调 */
+  private toolDecls = new Map<string, { decl: AgentToolDecl; pluginId: string }>();
   private pendingTools = new Map<
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -67,20 +82,52 @@ export class HostBridge {
 
   // ---------- iframe 注册 ----------
 
+  /**
+   * 注册一个实例 iframe 句柄。
+   *
+   * key 用实例 uid（`handle.uid`；没有就用 `pluginId@序号` 兜底），同一个插件的
+   * 多个组件实例可以同时挂载；工具归属仍按 pluginId 记录，`callTool` 按插件挑
+   * “第一个已就绪的实例句柄”。返回注销函数（实例卸载时调用）。
+   */
   registerFrame(pluginId: string, handle: PluginFrameHandle): () => void {
-    this.frames.set(pluginId, handle);
+    const uid = handle.uid?.trim() || `${pluginId}@${++this.frameSeq}`;
+    this.frames.set(uid, handle);
+    const uids = this.pluginFrames.get(pluginId) ?? [];
+    if (!uids.includes(uid)) uids.push(uid);
+    this.pluginFrames.set(pluginId, uids);
     return () => {
-      if (this.frames.get(pluginId) === handle) this.frames.delete(pluginId);
+      if (this.frames.get(uid) === handle) this.frames.delete(uid);
+      const remaining = (this.pluginFrames.get(pluginId) ?? []).filter((entry) => entry !== uid);
+      if (remaining.length > 0) this.pluginFrames.set(pluginId, remaining);
+      else this.pluginFrames.delete(pluginId);
     };
   }
 
-  private frame(pluginId: string): PluginFrameHandle | undefined {
-    return this.frames.get(pluginId);
+  /** 某个插件当前注册的全部实例句柄（按注册顺序） */
+  private framesForPlugin(pluginId: string): PluginFrameHandle[] {
+    return (this.pluginFrames.get(pluginId) ?? [])
+      .map((uid) => this.frames.get(uid))
+      .filter((handle): handle is PluginFrameHandle => !!handle);
   }
 
-  /** 把键盘焦点交给某个插件的 iframe */
+  /** 第一个已就绪的实例句柄；没有 isReady 的句柄视为就绪 */
+  private readyFrameForPlugin(pluginId: string): PluginFrameHandle | undefined {
+    return this.framesForPlugin(pluginId).find(
+      (handle) => !handle.isReady || handle.isReady(),
+    );
+  }
+
+  /** 按实例 uid（或 pluginId，返回该插件第一个实例）取句柄，主要用于焦点交接/调试 */
+  frame(key: string): PluginFrameHandle | undefined {
+    const direct = this.frames.get(key);
+    if (direct) return direct;
+    return this.framesForPlugin(key)[0];
+  }
+
+  /** 把键盘焦点交给某个插件的 iframe（优先第一个就绪实例） */
   focusPlugin(pluginId: string): void {
-    this.frame(pluginId)?.focusPlugin();
+    const handle = this.readyFrameForPlugin(pluginId) ?? this.framesForPlugin(pluginId)[0];
+    handle?.focusPlugin();
   }
 
   onFocusExit(handler: () => void): () => void {
@@ -90,11 +137,11 @@ export class HostBridge {
 
   // ---------- 插件消息分流 ----------
 
-  /** 处理 plugin:ready：记录该插件提供的 Agent 工具 */
+  /** 处理 plugin:ready：记录该插件提供的 Agent 工具（完整声明） */
   handleReady(message: PluginReadyMessage): void {
     const pluginId = message.payload.pluginId;
     for (const tool of message.payload.tools ?? []) {
-      this.toolOwners.set(tool.name, pluginId);
+      this.ownTool(tool, pluginId);
     }
   }
 
@@ -204,28 +251,50 @@ export class HostBridge {
 
   // ---------- Agent 工具 ----------
 
+  /** 工具声明（带 description / parameters JSON Schema），按注册顺序 */
   listTools(): AgentToolDecl[] {
-    return [...this.toolOwners.keys()].map((name) => ({ name, description: '' }));
+    return [...this.toolDecls.values()].map((entry) => ({ ...entry.decl }));
   }
 
-  /** 更新工具描述（插件 ready 时带过来了） */
+  /** 记录工具及其归属插件；同名工具后注册者覆盖，并 warn 一条 */
+  private ownTool(decl: AgentToolDecl, pluginId: string): void {
+    if (!decl || typeof decl.name !== 'string' || !decl.name) return;
+    const existing = this.toolDecls.get(decl.name);
+    if (existing && existing.pluginId !== pluginId) {
+      console.warn(
+        `[bridge] 工具 ${decl.name} 被插件 ${pluginId} 覆盖（之前属于 ${existing.pluginId}）`,
+      );
+    }
+    this.toolDecls.set(decl.name, { decl, pluginId });
+  }
+
+  /** 更新/覆盖单个工具声明（插件 ready 时带过来了） */
   registerToolDecl(decl: AgentToolDecl, pluginId: string): void {
-    this.toolOwners.set(decl.name, pluginId);
+    this.ownTool(decl, pluginId);
   }
 
   hasTool(name: string): boolean {
-    return this.toolOwners.has(name);
+    return this.toolDecls.has(name);
   }
 
   /**
    * 替 Agent 调用插件工具。
-   * 插件未注册 / iframe 不在 → reject；结果由 plugin:tool-result 唤醒。
+   *
+   * 工具归属按 pluginId 记录（同一插件多个实例只注册一份工具），执行时挑该插件
+   * “第一个已就绪的实例句柄”：桌面上的组件 iframe 优先；组件不在桌面时，
+   * background:true 插件注册的常驻 iframe 会兜住（todo.stats / sedentary.status）。
+   * 插件未注册 / 没有可用 iframe → reject；结果由 plugin:tool-result 唤醒。
    */
   callTool(name: string, args: unknown, options: ToolCallOptions = {}): Promise<unknown> {
-    const pluginId = this.toolOwners.get(name);
-    if (!pluginId) return Promise.reject(new Error(`没有插件提供工具: ${name}`));
-    const handle = this.frame(pluginId);
-    if (!handle) return Promise.reject(new Error(`插件 ${pluginId} 当前不在桌面`));
+    const owner = this.toolDecls.get(name);
+    if (!owner) return Promise.reject(new Error(`没有插件提供工具: ${name}`));
+    const pluginId = owner.pluginId;
+    const frames = this.framesForPlugin(pluginId);
+    if (frames.length === 0) return Promise.reject(new Error(`插件 ${pluginId} 当前不在桌面`));
+    const handle = this.readyFrameForPlugin(pluginId);
+    if (!handle) {
+      return Promise.reject(new Error(`插件 ${pluginId} 的 iframe 还没就绪（没有收到 plugin:ready）`));
+    }
 
     const id = `t${++this.toolSeq}`;
     return new Promise((resolve, reject) => {
