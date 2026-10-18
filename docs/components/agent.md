@@ -49,9 +49,9 @@ interface Settings {
     threshold: number;     // 默认 0.5
   };
   search: {
-    provider: 'tavily';    // 目前只接 tavily，留扩展位
-    apiKey: string;
-
+    enabled: boolean;      // 联网搜索开关，默认 true
+    maxKeyword: number;    // 每轮最多并发关键词，默认 3
+    forceSearch: boolean;  // 强制搜索，默认 false（交给模型判断）
   };
 }
 ```
@@ -78,12 +78,11 @@ interface Settings {
 
 | 工具 | 参数 | 说明 |
 |---|---|---|
-| `web.search` | `{ query }` | 联网搜索，默认 Tavily，返回标题 + 链接 + 摘要 |
-| `web.fetch` | `{ url }` | 抓取网页正文并转纯文本（去导航/广告），用于深读 |
 | `system.time` | — | 当前时间/日期/时区 |
 
-联网搜索说明：由宿主实现，不依赖模型厂商的搜索功能；未配置 Key 时工具返回“未配置搜索服务”。
-搜索路由：简单问题只答不搜；需要实时信息（新闻、价格、天气以外的最新消息）才搜；搜到的内容要在回复里给出来源链接。
+联网搜索不自己实现，用 MiMo 原生 `web_search`（见文末）。
+
+
 
 ## 语音
 
@@ -112,8 +111,10 @@ interface Settings {
 
 多用户、长期记忆向量库、插件自定义提示词、Agent 自主后台任务（定时自动执行）。
 
-## 联网搜索（后来加的需求）
+## 联网搜索：用 MiMo 原生能力
 
-- 用 Tavily API（后续可换 Serper/Bing），Key 在设置里填。
-- 只在需要实时信息时调用；回答里必须带来源。
-- 不做：内置浏览器、深度爬虫、多轮检索策略。
+- 用 MiMo 自带的 `web_search` 工具：请求里加 `{"type":"web_search","max_keyword":3,"force_search":false,"limit":1}`，与函数工具混用，`tool_choice: "auto"`。
+- 来源来自响应 `message.annotations`（`url_citation`：url / title / site_name / summary / publish_time / logo_url），按 Fluent 2 的来源 chips 展示；流式首个数据包会先带来源。
+- **需要先在 MiMo 控制台 → 插件管理开通 Web Search Plugin**；未开通时接口返回 400（`webSearchEnabled is false`），面板要映射成可读提示并给出控制台链接。
+- 设置项：联网搜索开关（默认开）、`max_keyword`（默认 3）、`force_search`（默认关，交给模型判断）。
+- 不做：自建搜索/抓取 Provider（Tavily 等已删除）、内置浏览器、深度爬虫、多轮检索策略。

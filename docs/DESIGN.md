@@ -111,11 +111,13 @@
 
 ## 6. Fluent 2 规范
 
+> 官方设计语言的完整落地规则（颜色/字阶/间距/圆角/阴影/材质/动效/图标/无障碍/文案/等待）见 **[FLUENT2.md](FLUENT2.md)**。本节只保留工程约定；冲突时以 FLUENT2.md 为准。
+
 - **组件**：一律用 Fluent UI React v9（`@fluentui/react-components`）的 Button、Card、Dialog、Drawer、TabList、Menu、Toast、Skeleton、MessageBar、Spinner、Input、Switch、Slider…；不自己画控件。
 - **主题**：`FluentProvider` + 深色主题，亮色作为可选项；颜色全部取 `tokens.*`，不手写 hex。
 - **字体**：Fluent 字体 token（`fontFamilyBase` → Segoe UI Variable），字阶用 `fontSizeBase*` 档位。
 - **圆角 / 间距 / 阴影**：`borderRadius*`、`spacing*`、`shadow*` token。
-- **材质**：Fluent 的 web 端没有 Acrylic token，卡片用 `colorNeutralBackground*` 的半透明色 + 统一的 `backdrop-filter` 模糊（模糊值定义成项目 token `--wtsl-material-blur`，只此一处例外）。
+- **材质**：Fluent 的 web 端没有 Acrylic/Mica 的官方实现，也不做系统级窗口材质（已决定）。卡片用 `colorNeutralBackground*` 的半透明色 + 统一的 `backdrop-filter` 模糊（模糊值定义成项目 token `--wtsl-material-blur`，只此一处例外）。未来若升 Windows 11 再考虑 Mica。
 - **图标**：界面图标用 Fluent System Icons；**天气现象图标是唯一例外**（用和风 SVG，因为 Fluent 天气图标覆盖不全），只作为内容图形，颜色/间距仍按 Fluent 排。
 - **焦点态 / 高对比度**：用 Fluent 默认焦点样式，不覆写。
 - 本地参考：`references/fluentui-docs/`。

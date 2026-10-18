@@ -1,0 +1,183 @@
+# Fluent 2 设计规范（本项目落地版）
+
+> 来源：Fluent 2 官网（fluent2.microsoft.design）15 个设计语言页面，已抓取到本地 `references/fluentui-design/`（design-principles / color / typography / layout / shapes / elevation / material / motion / iconography / accessibility / content-design / design-tokens / handoffs / onboarding / wait-ux）。
+>
+> 三份文档的分工：
+> - **本文**：官方设计语言 → 可执行的视觉规则与数值（颜色/字阶/间距/圆角/阴影/材质/动效/图标/无障碍/文案/等待）。
+> - [DESIGN.md](DESIGN.md)：工程约定（插件协议、宿主 API、自适应布局、数据）。
+> - [DENSITY.md](DENSITY.md)：信息密度与层级（每尺寸信息预算、渐进披露）。
+
+## 1. 设计原则（官方四条）
+
+| 原则 | 含义 | 本项目对应 |
+|---|---|---|
+| **Natural on every platform** | 体验适配设备、沿用熟悉模式 | 自适应网格、触控优先、键盘/鼠标都能用 |
+| **Built for focus** | 减少视觉噪音，让人保持专注 | 卡片 glanceable、chrome on demand、渐进披露 |
+| **One for all, all for one** | 包容不同能力与视角 | 对比度/焦点/缩放、中文界面 |
+| **Unmistakably Microsoft** | 一致、可识别的 Microsoft 气质 | Fluent 组件 + token + 动效，不用自造控件 |
+
+## 2. 颜色
+
+**官方结构**：三套色板 —— `neutral`（黑/白/灰，承载表面、文字、层级）、`shared`（跨 M365 组件的强调色，谨慎使用）、`brand`（品牌/主操作）。其中一部分 shared 颜色是 **semantic colors**：只表达反馈/状态/紧急，不做装饰；可与别的指示（图标、文案）配合降低认知负担。
+
+**本项目落地**：
+
+- 只允许用 Fluent token：`colorNeutralBackground*`（表面）、`colorNeutralForeground1/2/3`（文字层级）、`colorNeutralStroke*`（轮廓）、`colorBrandBackground*`（主操作）、`colorStatus*`（semantic）。
+- **不手写 hex**；需要新语义色先找 token。
+- 层级表达顺序：字号 → foreground 层级 → 间距。颜色最后用。
+- 深色/浅色主题都由 `FluentProvider` 切换，组件不硬编码主题。
+
+## 3. 字体与字阶（官方 type ramp，Web）
+
+| 名称 | 字重 | 字号 / 行高 | 本项目用途 |
+|---|---|---|---|
+| Caption 2 | Regular | 10 / 14 | 极次要（时间戳、辅助说明） |
+| Caption 1 | Regular / Semibold | 12 / 16 | 次要标签、元信息 |
+| Body 1 | Regular / Semibold | 14 / 20 | 正文、列表项 |
+| Subtitle 2 | Semibold | 16 / 22 | 卡片标题 |
+| Subtitle 1 | Semibold | 20 / 26 | 段落小标题 |
+| Title 3 | Semibold | 24 / 32 | 页面标题 |
+| Title 2 | Semibold | 28 / 36 | 页面大标题 |
+| Title 1 | Semibold | 32 / 40 | 强调数值 |
+| Large Title | Semibold | 40 / 52 | 主数值（时钟/计时器） |
+| Display | Semibold | 68 / 92 | 极限大标题（少用） |
+
+**本项目落地**：
+
+- 字体：`fontFamilyBase`（Segoe UI Variable），中文回退系统字体。
+- 组件内字号只取上表对应 token（`fontSizeBase100/200/300/400/500/600/700/800/900/1000`）。
+- 卡片 Primary 允许在 Large Title/Display 区间按视口 `clamp()` 缩放，但**比例参照 type ramp**，不临时拍脑袋。
+- 层级用 `colorNeutralForeground1/2/3` 区分，不靠加粗堆叠。
+
+## 4. 布局与间距
+
+**官方要点**：基础单位 **4px**；间距 ramp 包含 2/6/10（为图标对齐 4px 网格）。间距用来表达**分组**，不是画分隔线；更多留白 = 更高重要性；信息过密会让人失去方向。
+
+**本项目落地**：
+
+- 只用 `spacingHorizontal*/spacingVertical*` token（2/4/6/8/10/12/16/20/24/32/40/48）。
+- 卡片内分组：组间 ≥ `spacingVerticalM`，组内 ≤ `spacingVerticalXS`。
+- 不新增分割线/边框来表达分组（DENSITY 已列为硬规则）。
+- 页面级留白：桌面网格 gap 用 token（当前 14px 属于自定义值，密度返工时改为 `spacingHorizontalL`(16) 或 `spacingHorizontalM`(12)）。
+
+## 5. 形状与圆角（官方 token）
+
+| Token | 值 | 用途 |
+|---|---|---|
+| None | 0 | 导航栏、tab bar |
+| Small | 2px | 小徽章、小于 32px 的控件 |
+| Medium | **4px** | 按钮、下拉（默认圆角） |
+| Large | 8px | 大按钮 |
+| X-Large | 12px | 浮层、popover、大容器 |
+| Circle | 50% | 头像、圆形状态点 |
+
+**本项目落地**：
+
+- 卡片：**X-Large 12px**（当前 CSS 写了 20px，超规格，随密度返工改）。
+- 按钮/输入框：Medium 4px；小徽章：Small 2px；圆形状态点：Circle。
+- 不允许出现规范之外的圆角数值。
+
+## 6. 高度与阴影（官方 shadow ramp）
+
+**官方要点**：阴影 2/4/8/16/28/64 表示从近到远的六档；阴影 = 方向锐利 key shadow + 柔和 ambient shadow；**Windows 用 stroke 而不是 key shadow 来描边**。
+
+**本项目落地**：
+
+- 卡片：`shadow4`（普通）/ `shadow8`（浮起，如被拖动时）；菜单/浮层由 Fluent 组件自带。
+- 卡片轮廓用 `colorNeutralStroke2`（stroke 表达边界），**不要同时叠自定义大阴影**（当前 `0 18px 40px` 属于自定义值，需改）。
+- 对话/抽屉的 scrim 用 Fluent 的 Smoke 语义（Dialog/Drawer 自带 backdrop）。
+
+## 7. 材质
+
+**官方四类**：solid（默认、不透明）、acrylic（半透明磨砂，用于菜单/浮层）、mica（Win11 窗口底材）、smoke（遮罩，永远半透明黑）。
+
+**本项目决定**（已和需求方确认）：
+
+- **不做系统级 Mica/Acrylic**（Web 端无官方实现；Win10 19044 无 Mica）。
+- 桌面卡片与面板用 **solid + 半透明 Fluent 颜色 + 单一 `backdrop-filter` 模糊 token**（`--wtsl-material-blur`），这是官方在 web 上"近似材质"的合理做法。
+- 弹层/菜单/遮罩一律用 Fluent 组件自带的材质与 scrim，不自己画。
+
+## 8. 动效（官方原则 + 时长/曲线）
+
+**官方原则**：Functional（有目的）、Natural（符合物理：惯性/重力/速度）、Consistent（统一）、Appealing（有温度但不喧宾夺主）。
+
+**官方指导**：
+
+- 元素越大/移动距离越远，时长越长；反之要快。
+- 缓动：进入/退出用 ease-out，移动/变换用 ease-in-out；linear 只用于旋转等恒定速率场景。
+- 常见过渡：Enter/Exit、容器变形（container transform）、列表 stagger（短偏移，可递减）。
+
+**本项目落地**：
+
+- 只用 `motionTokens` 的时长与曲线（`durationUltraFast/Faster/Fast/Normal/Slow/Slower/UltraSlow`、`curveAccelerate*/curveDecelerate*/curveEasyEase`）。
+- Enter/Exit 用 Fluent 的 `createPresenceComponent`；页面切换、编辑模式、拖拽吸附统一走 Fluent 曲线。
+- 禁止组件各写一套时长常量（DENSITY 检查项）。
+
+## 9. 图标（官方 Iconography）
+
+**官方要点**：三套图标 —— system / product launch / file。System icons 有两套主题：**Regular**（常规动作/导航）与 **Filled**（选中态或需要更强视觉重量）。12px 图标只传达信息，不用于交互；触摸场景要放大图标；**不缩放图标，而是用对应的尺寸**。
+
+**本项目落地**：
+
+- 界面图标统一 Fluent System Icons；导航/动作 Regular，选中态 Filled。
+- 常用尺寸 16 / 20 / 24；交互目标 ≥ 40×40（见无障碍）。
+- 唯一例外：天气现象图标用和风 SVG（Fluent 覆盖不全），只作为内容图形，尺寸/颜色按本规范排。
+
+## 10. 无障碍（官方 A11y）
+
+- 正文对比度 ≥ **4.5:1**；大文本（≥18.5px Bold 或 ≥24px Regular）≥ **3:1**；交互控件与非文本元素 ≥ 3:1。
+- 焦点顺序遵循 z 字形（左→右、上→下）；弹窗关闭后焦点要回到触发处（本项目：Agent/Dialog 关闭恢复焦点）。
+- 支持 **400% 缩放**与 **320px 宽**回流；文字 200% 缩放不裁切。
+- 内容需有可读的 alt/aria-label；键盘可达所有功能（Tab/Enter/Esc/方向键已在桌面层实现）。
+
+## 11. 内容设计（官方 Content Design）
+
+- **sentence case**（句首大写）用于 Windows/Android/web；本项目中文界面 = 短句、不加句号、动词开头。
+- UI 元素（标题、按钮、标签、列表）**不加句号**；疑问句用问号；不用感叹号。
+- 主动语态、短句、可扫读；一个句子只说一件事。
+- 中英文混排：数字与单位之间空格（`25 分钟`），英文词前后留空格。
+- 空状态/错误文案：说明现状 + 下一步动作，不超过两行。
+
+## 12. 等待体验（官方 Wait UX）
+
+| 等待时长 | 官方要求 | 本项目落地 |
+|---|---|---|
+| < 1 秒 | **不显示**任何加载动画 | 插件初始化、配置读写不加 spinner |
+| 1–3 秒 | Spinner + `-ing` 文案（"加载中…"） | 天气刷新、复盘聚合、工具调用 |
+| > 3 秒 | 进度条或明确的状态文案 | 大模型首包前：立即显示"正在思考…"流式占位 |
+| AI 对话 | 响应指示器**立即出现**，不估算时间 | Agent 发送后立刻显示 running 状态与工具卡片 |
+
+- 骨架屏用于内容加载（表格/列表首次渲染），不用 spinner 占位整页。
+- 不用多个 spinner 同时出现。
+
+## 13. 上手与引导（官方 Onboarding）
+
+- 首次使用用渐进式引导（coach mark / 空状态里的主操作），不要一次性弹多层教程。
+- 空状态负责"教会下一步"，不是展示文档。
+- 本项目落地：桌面首次启动已有默认布局；插件空状态里给 1 个主操作（如待办空状态的"添加任务"）。
+
+## 14. 当前项目已知偏离项（审计）
+
+| # | 偏离 | 规范要求 | 处理 |
+|---|---|---|---|
+| 1 | 卡片圆角 20px | X-Large 12px 上限 | 接入密度返工改为 12 |
+| 2 | 卡片阴影 `0 18px 40px` 自定 | shadow4/8 + stroke | 同上 |
+| 3 | 每张卡片常驻标题栏/齿轮 | chrome on demand | task-15 处理 |
+| 4 | 待办列表元信息过密 | 渐进披露 | task-12 处理 |
+| 5 | 插件内字号未统一走 type ramp | 字阶表 | 各插件密度返工时校准 |
+| 6 | 桌面网格 gap 14px | 间距 ramp | 改为 12 或 16 |
+| 7 | 天气图标非 Fluent | 仅内容图形例外 | 已记录，保持 |
+| 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |
+
+## 15. 检查清单（每个组件/页面上线前）
+
+1. 颜色全部来自 Fluent token？有没有手写 hex？
+2. 字号是否落在 type ramp 上（10/12/14/16/20/24/28/32/40/68）？
+3. 间距是否来自 spacing ramp（含 2/6/10）？
+4. 圆角是否只用 0/2/4/8/12/Circle？
+5. 阴影是否只用 shadow4/8/16 且没有和自定大阴影叠加？
+6. 动效是否只用 motionTokens，没有自定义时长/曲线？
+7. 图标是否 Regular/Filled 得当、交互目标 ≥40×40？
+8. 对比度（正文 4.5:1 / 大文本 3:1）是否达标？
+9. 加载态是否按 1s/3s 阈值选择（无/Spinner/进度条/AI 立即指示）？
+10. 文案是否短句、无句号、动词开头、空状态给了下一步？
