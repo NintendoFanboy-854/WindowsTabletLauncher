@@ -193,14 +193,14 @@ body.is-standalone {
   transition: font-size var(--durationFast) var(--curveEasyEase);
 }
 
-/* 秒：跟主时间同一基线上的小号数字 */
+/* 秒：次要信息 —— foreground3 + 比主时间小一档，不抢 Primary */
 .time-sec {
   font-family: var(--fontFamilyDisplay);
-  font-weight: var(--fontWeightMedium);
+  font-weight: var(--fontWeightRegular);
   font-variant-numeric: tabular-nums;
   color: var(--colorNeutralForeground3);
-  font-size: 0.34em;
-  letter-spacing: 0;
+  font-size: 0.28em;
+  letter-spacing: 0.01em;
   line-height: 1;
 }
 
@@ -327,37 +327,7 @@ html[data-size='3x2'] .meta-dot {
   display: block;
 }
 
-.settings-btn {
-  position: absolute;
-  top: clamp(2px, 1.4vmin, 8px);
-  right: clamp(2px, 1.4vmin, 8px);
-  z-index: 2;
-  opacity: 0;
-  transition: opacity var(--durationNormal) var(--curveEasyEase);
-}
-
-.clock:hover ~ .settings-btn,
-.settings-btn:hover,
-.settings-btn:focus-visible,
-body.sheet-open .settings-btn {
-  opacity: 1;
-}
-
-/* 触屏没有 hover：直接常显；3×2 空间大，也常显 */
-@media (hover: none) {
-  .settings-btn {
-    opacity: 1;
-  }
-}
-
-html[data-size='3x1'] .settings-btn,
-html[data-size='3x2'] .settings-btn {
-  opacity: 0.75;
-}
-
-html[data-size='1x1'] .settings-btn {
-  display: none;
-}
+/* 正常模式无常驻 chrome：设置只从长按 / 宿主编辑模式打开 */
 
 /* ---------------- 设置面板（Fluent 覆盖层 + 底部抽屉） ---------------- */
 

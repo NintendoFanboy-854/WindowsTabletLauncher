@@ -7,9 +7,12 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- 桌面卡片（显示层：只读状态，动作通过后台引擎执行） -->
+    <!--
+      正常模式（卡片）：状态点 + 连续分钟（Primary）+ 一句话状态 + 3×2/2×2 的主操作「我起来了」。
+      统计与设置全部收进详情（点击/长按）与详情里的设置入口，无常驻齿轮。
+    -->
     <div class="app" id="app">
-      <div class="headline">
+      <div class="headline" id="headline">
         <span class="headline-row">
           <span class="status-dot" id="status-dot" aria-hidden="true"></span>
           <span class="streak"><span id="streak-num">0</span><span class="unit">分钟</span></span>
@@ -17,44 +20,20 @@
         <span class="status-text" id="status-text">还没有久坐记录</span>
       </div>
 
-      <div class="today-block">
-        <span class="today-label">今日久坐</span>
-        <span class="today-value"><span id="today-min">0</span><span class="unit">分钟</span></span>
-      </div>
-
-      <div class="metrics">
-        <div class="metric">
-          <span class="metric-label">最长连续</span>
-          <span class="metric-value" id="metric-longest">0 分钟</span>
+      <div class="secondary-row" id="secondary-row">
+        <div class="stat">
+          <span class="stat-label">今日久坐</span>
+          <span class="stat-value" id="stat-today">0 分钟</span>
         </div>
-        <div class="metric">
-          <span class="metric-label">起身次数</span>
-          <span class="metric-value" id="metric-breaks">0 次</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">当前连续</span>
-          <span class="metric-value" id="metric-current">0 分钟</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">距离提醒</span>
-          <span class="metric-value" id="metric-next">—</span>
+        <div class="stat">
+          <span class="stat-label">起身次数</span>
+          <span class="stat-value" id="stat-breaks">0 次</span>
         </div>
       </div>
-
-      <div class="config-line" id="config-line">提醒阈值 45 分钟 · 免打扰关</div>
 
       <div class="actions">
         <button class="btn btn-primary" id="break-btn" type="button">我起来了</button>
       </div>
-
-      <button class="icon-btn settings-btn" id="settings-btn" type="button" title="久坐提醒设置" aria-label="打开久坐提醒设置">
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M1.91 7.38A8.5 8.5 0 0 1 3.7 4.3a.5.5 0 0 1 .54-.13l1.92.68a1 1 0 0 0 1.32-.76l.36-2a.5.5 0 0 1 .4-.4 9 9 0 0 1 3.55 0q.32.08.38.4l.37 2a1 1 0 0 0 1.32.76l1.92-.68a.5.5 0 0 1 .54.13 8.5 8.5 0 0 1 1.78 3.08q.08.31-.15.54l-1.56 1.32a1 1 0 0 0 0 1.52l1.56 1.32a.5.5 0 0 1 .15.54 8.5 8.5 0 0 1-1.78 3.08.5.5 0 0 1-.54.13l-1.92-.68a1 1 0 0 0-1.32.76l-.37 2a.5.5 0 0 1-.38.4 8.5 8.5 0 0 1-3.56 0 .5.5 0 0 1-.39-.4l-.36-2a1 1 0 0 0-1.32-.76l-1.92.68a.5.5 0 0 1-.54-.13 8.5 8.5 0 0 1-1.78-3.08.5.5 0 0 1 .15-.54l1.56-1.32a1 1 0 0 0 0-1.52L2.06 7.92a.5.5 0 0 1-.15-.54m1.06 0 1.3 1.1a2 2 0 0 1 0 3.04l-1.3 1.1q.45 1.19 1.25 2.16l1.6-.58a2 2 0 0 1 2.63 1.53l.3 1.67a8 8 0 0 0 2.5 0l.3-1.67a2 2 0 0 1 2.64-1.53l1.6.58a8 8 0 0 0 1.24-2.16l-1.3-1.1a2 2 0 0 1 0-3.04l1.3-1.1a8 8 0 0 0-1.25-2.16l-1.6.58a2 2 0 0 1-2.63-1.53l-.3-1.67a8 8 0 0 0-2.5 0l-.3 1.67A2 2 0 0 1 5.81 5.8l-1.6-.58a8 8 0 0 0-1.24 2.16M7.5 10a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0m1 0a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"
-          />
-        </svg>
-      </button>
     </div>
 
     <!-- 后台引擎仪表盘（只在独立打开 ?background=1 时显示，用于截图/调试） -->
@@ -75,6 +54,37 @@
     </div>
 
     <div class="scrim" id="scrim" hidden></div>
+
+    <!-- 详情：统计 + 打卡 + 设置入口（点击/长按卡片打开） -->
+    <section class="sheet" id="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden>
+      <header class="sheet-head">
+        <h2 class="sheet-title" id="detail-title">久坐状态</h2>
+        <button class="icon-btn" id="detail-close" type="button" title="关闭" aria-label="关闭详情">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <div class="detail-grid">
+          <div class="detail-row"><span class="detail-label">今日累计久坐</span><strong id="detail-today">0 分钟</strong></div>
+          <div class="detail-row"><span class="detail-label">最长连续</span><strong id="detail-longest">0 分钟</strong></div>
+          <div class="detail-row"><span class="detail-label">起身次数</span><strong id="detail-breaks">0 次</strong></div>
+          <div class="detail-row"><span class="detail-label">当前连续</span><strong id="detail-current">0 分钟</strong></div>
+          <div class="detail-row"><span class="detail-label">距离提醒</span><strong id="detail-next">—</strong></div>
+          <div class="detail-row"><span class="detail-label">最近起身</span><strong id="detail-lastbreak">—</strong></div>
+        </div>
+        <p class="detail-hint" id="detail-config">提醒阈值 45 分钟 · 免打扰关</p>
+        <div class="form-actions">
+          <button class="btn btn-primary" id="detail-break" type="button">我起来了</button>
+          <span class="spacer"></span>
+          <button class="btn" id="detail-settings" type="button">设置</button>
+        </div>
+      </div>
+    </section>
 
     <section class="sheet" id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
       <header class="sheet-head">

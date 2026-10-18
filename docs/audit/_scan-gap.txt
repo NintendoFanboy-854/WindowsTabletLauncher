@@ -1,0 +1,151 @@
+public\plugins\clock\styles.css:161  clamp(2px, 1vmin, 8px)
+public\plugins\clock\styles.css:182  0.08em
+public\plugins\clock\styles.css:220  0.5em
+public\plugins\clock\styles.css:377  var(--spacingHorizontalS)
+public\plugins\clock\styles.css:391  var(--spacingVerticalXS)
+public\plugins\clock\styles.css:398  var(--spacingHorizontalM)
+public\plugins\clock\styles.css:407  2px
+public\plugins\clock\styles.css:511  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:153  clamp(3px, 1.4vmin, 10px)
+public\plugins\countdown\styles.css:165  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:172  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:191  clamp(2px, 1vmin, 6px)
+public\plugins\countdown\styles.css:201  0.14em
+public\plugins\countdown\styles.css:208  clamp(1px, 0.8vmin, 5px)
+public\plugins\countdown\styles.css:217  var(--spacingHorizontalM)
+public\plugins\countdown\styles.css:236  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:256  clamp(1px, 0.6vmin, 4px)
+public\plugins\countdown\styles.css:273  0.12em
+public\plugins\countdown\styles.css:311  clamp(1px, 0.8vmin, 5px)
+public\plugins\countdown\styles.css:335  var(--spacingHorizontalM)
+public\plugins\countdown\styles.css:341  clamp(1px, 0.8vmin, 5px)
+public\plugins\countdown\styles.css:363  clamp(2px, 1vmin, 6px)
+public\plugins\countdown\styles.css:378  clamp(6px, 2vmin, 12px)
+public\plugins\countdown\styles.css:426  0.14em
+public\plugins\countdown\styles.css:473  clamp(6px, 2.4vmin, 14px)
+public\plugins\countdown\styles.css:518  var(--spacingHorizontalXS)
+public\plugins\countdown\styles.css:640  2px
+public\plugins\countdown\styles.css:739  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:756  var(--spacingVerticalS)
+public\plugins\countdown\styles.css:762  var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:803  var(--spacingHorizontalM)
+public\plugins\countdown\styles.css:811  2px
+public\plugins\countdown\styles.css:893  var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:950  var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:173  clamp(4px, 1.6vmin, 12px)
+public\plugins\pomodoro\styles.css:183  clamp(4px, 1.6vmin, 12px)
+public\plugins\pomodoro\styles.css:243  clamp(1px, 0.6vmin, 4px)
+public\plugins\pomodoro\styles.css:272  clamp(2px, 1vmin, 6px)
+public\plugins\pomodoro\styles.css:304  clamp(4px, 1.6vmin, 10px)
+public\plugins\pomodoro\styles.css:312  var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:461  clamp(4px, 1.8vmin, 12px)
+public\plugins\pomodoro\styles.css:636  var(--spacingVerticalXS) var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:643  var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:692  clamp(4px, 2vmin, 14px)
+public\plugins\pomodoro\styles.css:703  var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:742  var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:757  var(--spacingHorizontalXS)
+public\plugins\pomodoro\styles.css:831  var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:845  var(--spacingVerticalS)
+public\plugins\pomodoro\styles.css:851  var(--spacingVerticalS) var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:857  var(--spacingVerticalXS)
+public\plugins\pomodoro\styles.css:894  var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:902  2px
+public\plugins\pomodoro\styles.css:990  var(--spacingHorizontalXS)
+public\plugins\sedentary\styles.css:150  clamp(4px, 1.8vmin, 12px)
+public\plugins\sedentary\styles.css:159  clamp(4px, 1.6vmin, 10px)
+public\plugins\sedentary\styles.css:166  clamp(4px, 1.6vmin, 10px)
+public\plugins\sedentary\styles.css:200  0.12em
+public\plugins\sedentary\styles.css:229  clamp(10px, 4vmin, 24px)
+public\plugins\sedentary\styles.css:236  1px
+public\plugins\sedentary\styles.css:257  var(--spacingHorizontalS)
+public\plugins\sedentary\styles.css:267  clamp(2px, 1.2vmin, 6px)
+public\plugins\sedentary\styles.css:275  clamp(2px, 1.4vmin, 8px)
+public\plugins\sedentary\styles.css:281  clamp(2px, 1.6vmin, 8px)
+public\plugins\sedentary\styles.css:302  clamp(2px, 1.2vmin, 6px)
+public\plugins\sedentary\styles.css:309  clamp(4px, 1.6vmin, 10px)
+public\plugins\sedentary\styles.css:324  clamp(6px, 2.4vmin, 16px)
+public\plugins\sedentary\styles.css:330  clamp(2px, 1.2vmin, 6px)
+public\plugins\sedentary\styles.css:360  clamp(10px, 4vmin, 26px)
+public\plugins\sedentary\styles.css:366  clamp(2px, 1.2vmin, 6px)
+public\plugins\sedentary\styles.css:389  var(--spacingHorizontalXS)
+public\plugins\sedentary\styles.css:462  clamp(6px, 2vmin, 14px)
+public\plugins\sedentary\styles.css:471  var(--spacingHorizontalS)
+public\plugins\sedentary\styles.css:482  6px
+public\plugins\sedentary\styles.css:499  clamp(6px, 2vmin, 14px)
+public\plugins\sedentary\styles.css:505  2px
+public\plugins\sedentary\styles.css:533  2px
+public\plugins\sedentary\styles.css:591  var(--spacingHorizontalS)
+public\plugins\sedentary\styles.css:605  var(--spacingVerticalS)
+public\plugins\sedentary\styles.css:611  var(--spacingVerticalS) var(--spacingHorizontalM)
+public\plugins\sedentary\styles.css:617  var(--spacingVerticalXS)
+public\plugins\sedentary\styles.css:655  var(--spacingHorizontalM)
+public\plugins\sedentary\styles.css:663  2px
+public\plugins\sedentary\styles.css:688  var(--spacingHorizontalS)
+public\plugins\sedentary\styles.css:782  var(--spacingVerticalXS) var(--spacingHorizontalM)
+public\plugins\sedentary\styles.css:789  var(--spacingHorizontalS)
+public\plugins\todo\app.css:76  0.35rem
+public\plugins\todo\app.css:111  0.25rem
+public\plugins\todo\app.css:131  2px
+public\plugins\todo\app.css:138  0.3rem
+public\plugins\todo\app.css:181  1px
+public\plugins\todo\app.css:189  0.3rem
+public\plugins\todo\app.css:256  0.3rem
+public\plugins\todo\app.css:312  0.4rem
+public\plugins\todo\app.css:343  0.5rem
+public\plugins\todo\app.css:371  0.4rem
+public\plugins\todo\app.css:500  0.15rem
+public\plugins\todo\app.css:593  0.1rem
+public\plugins\todo\app.css:664  1px
+public\plugins\todo\app.css:672  0.45rem
+public\plugins\todo\app.css:707  0.2rem
+public\plugins\todo\app.css:722  1px
+public\plugins\todo\app.css:734  0.3rem
+public\plugins\todo\app.css:763  0.35rem
+public\plugins\todo\app.css:817  0.3rem
+public\plugins\todo\app.css:889  0.5rem
+public\plugins\todo\app.css:897  0.45rem
+public\plugins\todo\app.css:917  0.35rem
+public\plugins\todo\app.css:949  0.2rem
+public\plugins\todo\app.css:966  1px
+public\plugins\todo\app.css:988  0.2rem
+public\plugins\todo\app.css:1001  0.4rem
+public\plugins\todo\app.css:1029  1px
+public\plugins\todo\app.css:1036  0.25rem
+public\plugins\todo\app.css:1044  0.2rem
+public\plugins\todo\app.css:1050  0.4rem
+public\plugins\todo\app.css:1063  0.5rem
+public\plugins\todo\app.css:1080  0.3rem
+public\plugins\todo\app.css:1101  1px
+public\plugins\todo\app.css:1115  0.5rem
+public\plugins\todo\app.css:1122  1px
+public\plugins\todo\app.css:1147  1px
+public\plugins\todo\app.css:1163  0.4rem
+public\plugins\todo\app.css:1170  0.25rem
+public\plugins\todo\app.css:1202  2px
+public\plugins\todo\app.css:1237  1px
+public\plugins\todo\app.css:1290  0.15rem
+public\plugins\todo\app.css:1315  2px
+public\plugins\todo\app.css:1332  1px
+public\plugins\todo\app.css:1372  2px
+public\plugins\todo\app.css:1422  0.25rem
+public\plugins\todo\app.css:1444  0.05rem
+public\plugins\todo\app.css:1479  2px
+public\plugins\todo\app.css:1521  2px
+public\plugins\todo\app.css:1587  1px
+public\plugins\todo\app.css:1664  0.5rem
+public\plugins\todo\app.css:1826  0.5rem
+public\plugins\todo\app.css:1859  0.5rem
+public\plugins\todo\app.css:1881  0.7rem
+public\plugins\todo\app.css:1885  0.9rem
+public\plugins\todo\app.css:1892  0.25rem
+public\plugins\todo\app.css:1909  0.35rem
+public\plugins\todo\app.css:1948  2px
+public\plugins\todo\app.css:1992  0.5rem
+public\plugins\todo\app.css:2049  0.3rem
+public\plugins\todo\app.css:2062  0.15rem
+public\plugins\todo\app.css:2068  0.4rem
+public\plugins\todo\app.css:2109  0.45rem
+public\plugins\todo\app.css:2185  0.3rem
+src\styles.css:32  14px
+src\styles.css:121  4px

@@ -280,6 +280,69 @@ async function runChecks(): Promise<CheckResult[]> {
     `A=[${repliesA.join(',')}] B=[${repliesB.join(',')}]`,
   );
 
+  // ---------- 8. listTools 保留完整声明 / 同名覆盖 ----------
+  const declBridge = new HostBridge(defaultBridgeServices);
+  declBridge.handleReady({
+    type: 'plugin:ready',
+    payload: {
+      pluginId: 'alpha',
+      widgetId: '',
+      tools: [
+        {
+          name: 'alpha.stats',
+          description: 'alpha 的统计工具',
+          parameters: { type: 'object', properties: { range: { type: 'string' } } },
+        },
+      ],
+    },
+  });
+  const alphaTool = declBridge.listTools().find((tool) => tool.name === 'alpha.stats');
+  check(
+    'listTools 返回完整声明（description / parameters 不丢）',
+    alphaTool?.description === 'alpha 的统计工具' && !!alphaTool.parameters,
+    JSON.stringify(alphaTool ?? null),
+  );
+
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((arg) => String(arg)).join(' '));
+  };
+  try {
+    declBridge.handleReady({
+      type: 'plugin:ready',
+      payload: {
+        pluginId: 'beta',
+        widgetId: '',
+        tools: [{ name: 'alpha.stats', description: 'beta 覆盖后的统计工具' }],
+      },
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  const betaFrame = createMockFrame('beta:widget');
+  declBridge.registerFrame('beta', betaFrame.handle);
+  const overriddenTool = declBridge.listTools().find((tool) => tool.name === 'alpha.stats');
+  check(
+    '同名工具后注册覆盖且保留 warning 日志',
+    overriddenTool?.description === 'beta 覆盖后的统计工具' &&
+      warnings.some((line) => line.includes('alpha.stats')),
+    `warnings=${warnings.length}`,
+  );
+  const overridePromise = declBridge.callTool('alpha.stats', {});
+  check(
+    '覆盖后 callTool 路由到新归属插件',
+    betaFrame.toolCalls.length === 1,
+    `beta toolCalls=${betaFrame.toolCalls.length}`,
+  );
+  declBridge.handleToolResult({
+    type: 'plugin:tool-result',
+    id: betaFrame.toolCalls[0]?.id ?? 'missing',
+    ok: true,
+    result: { owner: 'beta' },
+  });
+  await overridePromise;
+
   return results;
 }
 

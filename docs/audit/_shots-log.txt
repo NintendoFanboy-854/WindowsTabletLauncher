@@ -1,0 +1,75 @@
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-1440x960.png 1440x960 22.1s {"text":49,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-1024x768.png 1024x768 23.2s {"text":49,"scrollH":768}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-960x1440.png 960x1440 24.1s {"text":49,"scrollH":1440}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-edit-1440x960.png 1440x960 22.7s {"text":49,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-edit-1024x768.png 1024x768 29.0s {"text":49,"scrollH":768}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-desktop-edit-960x1440.png 960x1440 28.9s {"text":49,"scrollH":1440}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-settings-1440x960.png 1440x960 34.1s {"text":207,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-settings-1024x768.png 1024x768 24.1s {"text":207,"scrollH":768}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-settings-960x1440.png 960x1440 15.8s {"text":207,"scrollH":1440}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-review-1440x960.png 1440x960 22.9s {"text":81,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-review-1024x768.png 1024x768 24.4s {"text":81,"scrollH":768}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-review-960x1440.png 960x1440 24.1s {"text":81,"scrollH":1440}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-plugins-1440x960.png 1440x960 19.9s {"text":473,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-plugins-1024x768.png 1024x768 18.2s {"text":473,"scrollH":768}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-plugins-960x1440.png 960x1440 18.3s {"text":473,"scrollH":1440}

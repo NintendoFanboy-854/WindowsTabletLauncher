@@ -1,0 +1,150 @@
+public\plugins\clock\styles.css:202  0.28em
+public\plugins\clock\styles.css:211  0.22em
+public\plugins\clock\styles.css:229  clamp(11px, 2.9vmin, 20px)
+public\plugins\clock\styles.css:238  clamp(12px, 3.1vmin, 24px)
+public\plugins\clock\styles.css:248  clamp(10px, 2.6vmin, 16px)
+public\plugins\clock\styles.css:255  min(32vw, 50vh)
+public\plugins\clock\styles.css:267  min(20vw, 44vh)
+public\plugins\clock\styles.css:271  clamp(11px, 3.2vmin, 15px)
+public\plugins\clock\styles.css:280  min(22vw, 40vh)
+public\plugins\clock\styles.css:284  clamp(13px, 4.4vmin, 26px)
+public\plugins\clock\styles.css:288  clamp(13px, 4.4vmin, 26px)
+public\plugins\clock\styles.css:383  var(--fontSizeBase400)
+public\plugins\clock\styles.css:412  var(--fontSizeBase300)
+public\plugins\clock\styles.css:418  var(--fontSizeBase200)
+public\plugins\clock\styles.css:503  var(--fontSizeBase300)
+public\plugins\clock\styles.css:514  var(--fontSizeBase300)
+public\plugins\clock\styles.css:577  var(--fontSizeBase200)
+public\plugins\countdown\styles.css:177  clamp(13px, 3.4vmin, 17px)
+public\plugins\countdown\styles.css:183  clamp(11px, 2.8vmin, 13px)
+public\plugins\countdown\styles.css:287  0.34em
+public\plugins\countdown\styles.css:315  clamp(10px, 7vw, 13px)
+public\plugins\countdown\styles.css:319  min(34vw, 40vh)
+public\plugins\countdown\styles.css:323  0.3em
+public\plugins\countdown\styles.css:327  min(13vw, 15vh)
+public\plugins\countdown\styles.css:345  clamp(13px, 4.2vmin, 17px)
+public\plugins\countdown\styles.css:349  min(21vw, 42vh)
+public\plugins\countdown\styles.css:354  min(8.5vw, 17vh)
+public\plugins\countdown\styles.css:419  clamp(12px, 3.8vmin, 16px)
+public\plugins\countdown\styles.css:433  clamp(15px, 5.4vmin, 22px)
+public\plugins\countdown\styles.css:438  clamp(9px, 2.6vmin, 11px)
+public\plugins\countdown\styles.css:448  clamp(10px, 3.1vmin, 13px)
+public\plugins\countdown\styles.css:458  clamp(13px, 3.4vmin, 17px)
+public\plugins\countdown\styles.css:462  clamp(16px, 4.6vmin, 24px)
+public\plugins\countdown\styles.css:494  clamp(11px, 3.4vmin, 14px)
+public\plugins\countdown\styles.css:526  var(--fontSizeBase300)
+public\plugins\countdown\styles.css:650  var(--fontSizeBase300)
+public\plugins\countdown\styles.css:660  var(--fontSizeBase200)
+public\plugins\countdown\styles.css:676  var(--fontSizeBase300)
+public\plugins\countdown\styles.css:745  var(--fontSizeBase400)
+public\plugins\countdown\styles.css:766  var(--fontSizeBase200)
+public\plugins\countdown\styles.css:781  var(--fontSizeBase300)
+public\plugins\countdown\styles.css:816  var(--fontSizeBase300)
+public\plugins\countdown\styles.css:821  var(--fontSizeBase200)
+public\plugins\countdown\styles.css:965  var(--fontSizeBase200)
+public\plugins\countdown\styles.css:975  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:250  clamp(9px, 2.8vmin, 13px)
+public\plugins\pomodoro\styles.css:283  clamp(10px, 3vmin, 13px)
+public\plugins\pomodoro\styles.css:320  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:356  clamp(12px, 3.2vmin, 16px)
+public\plugins\pomodoro\styles.css:415  min(15vw, 15vh)
+public\plugins\pomodoro\styles.css:419  clamp(8px, 4vw, 10px)
+public\plugins\pomodoro\styles.css:444  min(20vw, 42vh)
+public\plugins\pomodoro\styles.css:448  clamp(10px, 3vmin, 13px)
+public\plugins\pomodoro\styles.css:469  min(9vw, 9vh)
+public\plugins\pomodoro\styles.css:478  clamp(12px, 2.8vw, 15px)
+public\plugins\pomodoro\styles.css:511  min(6vw, 11vh)
+public\plugins\pomodoro\styles.css:522  clamp(13px, 3vmin, 17px)
+public\plugins\pomodoro\styles.css:617  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:651  var(--fontSizeBase200)
+public\plugins\pomodoro\styles.css:660  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:716  clamp(12px, 3.4vmin, 18px)
+public\plugins\pomodoro\styles.css:727  min(19vw, 34vh)
+public\plugins\pomodoro\styles.css:736  clamp(12px, 3.6vmin, 18px)
+public\plugins\pomodoro\styles.css:747  clamp(11px, 2.8vmin, 14px)
+public\plugins\pomodoro\styles.css:765  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:837  var(--fontSizeBase400)
+public\plugins\pomodoro\styles.css:861  var(--fontSizeBase200)
+public\plugins\pomodoro\styles.css:876  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:907  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:912  var(--fontSizeBase200)
+public\plugins\pomodoro\styles.css:1002  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:1023  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:210  0.32em
+public\plugins\sedentary\styles.css:222  clamp(10px, 2.9vmin, 13px)
+public\plugins\sedentary\styles.css:242  clamp(9px, 2.6vmin, 12px)
+public\plugins\sedentary\styles.css:248  clamp(11px, 3vmin, 14px)
+public\plugins\sedentary\styles.css:285  min(34vw, 38vh)
+public\plugins\sedentary\styles.css:313  min(20vw, 40vh)
+public\plugins\sedentary\styles.css:317  clamp(10px, 3vmin, 13px)
+public\plugins\sedentary\styles.css:334  min(23vw, 23vh)
+public\plugins\sedentary\styles.css:338  clamp(10px, 2.8vmin, 13px)
+public\plugins\sedentary\styles.css:371  min(16vw, 30vh)
+public\plugins\sedentary\styles.css:397  var(--fontSizeBase300)
+public\plugins\sedentary\styles.css:475  clamp(12px, 3.2vmin, 16px)
+public\plugins\sedentary\styles.css:487  clamp(10px, 2.6vmin, 12px)
+public\plugins\sedentary\styles.css:515  clamp(9px, 2.3vmin, 11px)
+public\plugins\sedentary\styles.css:519  clamp(11px, 2.8vmin, 14px)
+public\plugins\sedentary\styles.css:535  clamp(9px, 2.3vmin, 11px)
+public\plugins\sedentary\styles.css:597  var(--fontSizeBase400)
+public\plugins\sedentary\styles.css:622  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:637  var(--fontSizeBase300)
+public\plugins\sedentary\styles.css:668  var(--fontSizeBase300)
+public\plugins\sedentary\styles.css:673  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:699  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:768  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:797  var(--fontSizeBase200)
+public\plugins\sedentary\styles.css:806  var(--fontSizeBase300)
+public\plugins\sedentary\styles.css:817  var(--fontSizeBase200)
+public\plugins\todo\app.css:24  var(--fs, 13px)
+public\plugins\todo\app.css:37  1rem
+public\plugins\todo\app.css:146  0.86rem
+public\plugins\todo\app.css:198  0.9rem
+public\plugins\todo\app.css:232  0.78rem
+public\plugins\todo\app.css:277  0.88rem
+public\plugins\todo\app.css:305  0.72rem
+public\plugins\todo\app.css:315  0.78rem
+public\plugins\todo\app.css:325  0.85em
+public\plugins\todo\app.css:436  0.94rem
+public\plugins\todo\app.css:463  0.72rem
+public\plugins\todo\app.css:508  inherit
+public\plugins\todo\app.css:677  0.88rem
+public\plugins\todo\app.css:715  0.9em
+public\plugins\todo\app.css:747  0.86rem
+public\plugins\todo\app.css:754  0.74rem
+public\plugins\todo\app.css:784  0.9rem
+public\plugins\todo\app.css:823  0.88rem
+public\plugins\todo\app.css:901  2.5rem
+public\plugins\todo\app.css:910  0.75rem
+public\plugins\todo\app.css:918  0.82rem
+public\plugins\todo\app.css:1007  0.72rem
+public\plugins\todo\app.css:1017  0.72rem
+public\plugins\todo\app.css:1084  0.7rem
+public\plugins\todo\app.css:1106  0.78rem
+public\plugins\todo\app.css:1172  0.78rem
+public\plugins\todo\app.css:1189  0.72rem
+public\plugins\todo\app.css:1251  0.9em
+public\plugins\todo\app.css:1270  0.78rem
+public\plugins\todo\app.css:1303  0.92rem
+public\plugins\todo\app.css:1323  0.68rem
+public\plugins\todo\app.css:1365  0.82rem
+public\plugins\todo\app.css:1460  0.68rem
+public\plugins\todo\app.css:1465  0.92rem
+public\plugins\todo\app.css:1492  0.68rem
+public\plugins\todo\app.css:1569  0.76rem
+public\plugins\todo\app.css:1602  0.64rem
+public\plugins\todo\app.css:1629  0.64rem
+public\plugins\todo\app.css:1673  0.84rem
+public\plugins\todo\app.css:1726  0.82em
+public\plugins\todo\app.css:1839  1.05rem
+public\plugins\todo\app.css:1846  0.75rem
+public\plugins\todo\app.css:1872  0.9rem
+public\plugins\todo\app.css:1897  0.76rem
+public\plugins\todo\app.css:1903  0.7rem
+public\plugins\todo\app.css:1975  0.8rem
+public\plugins\todo\app.css:1999  0.85rem
+public\plugins\todo\app.css:2043  0.78rem
+public\plugins\todo\app.css:2057  0.84rem
+public\plugins\todo\app.css:2092  0.88rem
+public\plugins\todo\app.css:2132  0.74rem
+public\plugins\todo\app.css:2153  0.8rem

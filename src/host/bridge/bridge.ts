@@ -281,8 +281,8 @@ export class HostBridge {
    * 替 Agent 调用插件工具。
    *
    * 工具归属按 pluginId 记录（同一插件多个实例只注册一份工具），执行时挑该插件
-   * “第一个已就绪的实例句柄”：桌面上的组件 iframe 优先；组件不在桌面时，
-   * background:true 插件注册的常驻 iframe 会兜住（todo.stats / sedentary.status）。
+   * “第一个已就绪的实例句柄”（组件 iframe 与后台 iframe 按注册顺序，谁先就绪谁先用）；
+   * 后台 iframe 常驻，组件 iframe 不在桌面时由它兜住（todo.stats / sedentary.status）。
    * 插件未注册 / 没有可用 iframe → reject；结果由 plugin:tool-result 唤醒。
    */
   callTool(name: string, args: unknown, options: ToolCallOptions = {}): Promise<unknown> {

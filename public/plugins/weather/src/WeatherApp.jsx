@@ -479,13 +479,8 @@ export default function WeatherApp({ plugin, initial }) {
           place={place}
           data={data}
           status={status}
-          now={now}
-          mock={mock}
-          locatedPlace={locatedPlace}
           onOpenDetail={() => openDetail()}
           onOpenSettings={() => setSettingsOpen(true)}
-          onSelectPlace={handleSelectPlace}
-          onManageCities={() => setSettingsOpen(true)}
           onRefresh={() => refresh()}
           onUseMock={useMock}
         />
@@ -500,6 +495,9 @@ export default function WeatherApp({ plugin, initial }) {
             ensureForTab(drawer.tab);
           }}
           onOpenSettings={() => setSettingsOpen(true)}
+          onSelectPlace={handleSelectPlace}
+          onManageCities={() => setSettingsOpen(true)}
+          locatedPlace={locatedPlace}
           settings={settings}
           place={place}
           data={data}

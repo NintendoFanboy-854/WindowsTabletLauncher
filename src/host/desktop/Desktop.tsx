@@ -155,15 +155,38 @@ function refreshWidgets(state: LayoutState, catalog: Catalog): LayoutState {
 }
 
 /**
+ * 把插件目录展开成默认实例（每个 manifest widget 一个，page 由调用方给）。
+ *
+ * 不用 `PluginManager.createInstances`：它只在单页里找位置，放不下就跳过，
+ * 小窗口下会把组件悄悄丢掉。这里交给布局引擎 autoPlace——单页放不下就顺延到下一页。
+ */
+function instancesFromCatalog(catalog: Catalog, page: number): WidgetInstance[] {
+  const instances: WidgetInstance[] = [];
+  for (const { plugin, widget } of catalog.values()) {
+    instances.push({
+      uid: widgetKey(plugin.id, widget.id),
+      pluginId: plugin.id,
+      widgetId: widget.id,
+      title: widget.title,
+      page,
+      col: widget.cell?.[0] ?? -1,
+      row: widget.cell?.[1] ?? -1,
+      size: [widget.defaultSize[0], widget.defaultSize[1]],
+      sizes: widget.sizes.map((size) => [size[0], size[1]] as WidgetSize),
+    });
+  }
+  return instances;
+}
+
+/**
  * 布局与插件目录合并（首次初始化 / 热重载 / zip 安装后都会走这里）：
  * - 有存档 → 校验并丢弃已不存在的实例；
- * - 没有任何可用实例 → 用 manager.createInstances 摆默认布局；
+ * - 没有任何可用实例 → 按插件目录摆全部组件（autoPlace 负责分页）；
  * - 有新插件/新组件 → 追加到当前页的空位（autoPlace 保证不重叠）。
  */
 function reconcileLayout(
   previous: LayoutState | null,
   catalog: Catalog,
-  manager: PluginManager,
   columns: number,
   rows: number,
 ): LayoutState {
@@ -181,7 +204,7 @@ function reconcileLayout(
   }
 
   if (!state) {
-    const placed = autoPlace(manager.createInstances({ cols: columns, rows }), columns, rows);
+    const placed = autoPlace(instancesFromCatalog(catalog, 0), columns, rows);
     return { widgets: placed, pages: pagesUsed(placed, 1), activePage: 0 };
   }
 
@@ -189,10 +212,9 @@ function reconcileLayout(
   const present = new Set(
     refreshed.widgets.map((widget) => widgetKey(widget.pluginId, widget.widgetId)),
   );
-  const additions = manager
-    .createInstances({ cols: columns, rows })
-    .filter((instance) => !present.has(widgetKey(instance.pluginId, instance.widgetId)))
-    .map((instance) => ({ ...instance, page: refreshed.activePage }));
+  const additions = instancesFromCatalog(catalog, refreshed.activePage).filter(
+    (instance) => !present.has(widgetKey(instance.pluginId, instance.widgetId)),
+  );
 
   if (additions.length === 0) return refreshed;
 
@@ -321,7 +343,7 @@ export default function Desktop({
   useEffect(() => {
     if (pluginsLoading) return;
     setLayout((previous) =>
-      reconcileLayout(previous, catalog, manager, metricsRef.current.columns, metricsRef.current.rows),
+      reconcileLayout(previous, catalog, metricsRef.current.columns, metricsRef.current.rows),
     );
   }, [catalog, pluginsLoading, manager]);
 
@@ -959,8 +981,9 @@ export default function Desktop({
         </div>
       </div>
 
-      {editMode && layout && (
+      {layout && (
         <EditToolbar
+          visible={editMode}
           pages={layout.pages}
           activePage={layout.activePage}
           onAddPage={handleAddPage}

@@ -67,6 +67,15 @@ public/plugins/weather/
 
 宿主内运行时，尺寸/主题从 `plugin.onInit/onResize/onTheme` 拿，URL 参数不再生效（mock 参数除外）。
 
+## 信息密度（docs/DENSITY.md）
+
+- 每张卡片只有一个 Primary：当前温度；现象、今日高低温是仅有的 Secondary。
+- 正常模式无 chrome：没有刷新按钮、更新时间文字、齿轮。城市切换/刷新/设置都在详情 Drawer 里（点卡片或长按卡片打开，非正常模式不占位）。
+- 卡片只保留 城市 + 温度 + 现象 + 今日高低温；2×2 的逐时、3×2/4×2 的 7 天、4×2 的 AQI 是该尺寸声明的内容，不是额外的 chrome；预警条只在有预警时出现。
+- `3×2` 的 7 天每格只留 星期 / 图标 / 高温（低温省略）。
+- 详情 Drawer 用 Fluent type ramp（base200/300/400/Hero）与 foreground1/2/3 分层，不靠分割线；预警默认折叠成一行，点开才看描述与防御指南。
+- 离线时卡片只在右上角显示一个 6px 状态点（不占文字），详细更新时间/离线状态在 Drawer 顶部。
+
 ## 宿主协议
 
 - 通过 `/plugin-sdk.js` 的 `plugin` 对象通信：`onInit` / `onResize` / `onTheme` / `onFocus` / `onToolCall` / `ready`。

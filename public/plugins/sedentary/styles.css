@@ -206,8 +206,7 @@ body.is-hidden {
   white-space: nowrap;
 }
 
-.streak .unit,
-.today-value .unit {
+.streak .unit {
   font-size: 0.32em;
   color: var(--colorNeutralForeground3);
   font-weight: var(--fontWeightRegular);
@@ -223,70 +222,37 @@ body.is-hidden {
   font-size: clamp(10px, 2.9vmin, 13px);
 }
 
-.today-block {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(1px, 0.6vmin, 4px);
-  min-width: 0;
-}
-
-.today-label {
-  color: var(--colorNeutralForeground3);
-  font-size: clamp(10px, 2.8vmin, 13px);
-}
-
-.today-value {
-  display: inline-flex;
+/* 2×2 才有的一行次要信息（今日累计 / 起身次数） */
+.secondary-row {
+  display: none;
   align-items: baseline;
-  gap: 0.12em;
-  font-family: var(--fontFamilyDisplay);
-  font-weight: var(--fontWeightSemibold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(4px, 2vmin, 14px) clamp(8px, 2.4vmin, 18px);
+  gap: clamp(10px, 4vmin, 24px);
   min-width: 0;
 }
 
-.metric {
+.stat {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
 }
 
-.metric-label {
+.stat-label {
   color: var(--colorNeutralForeground3);
   font-size: clamp(9px, 2.6vmin, 12px);
   white-space: nowrap;
 }
 
-.metric-value {
-  color: var(--colorNeutralForeground1);
-  font-size: clamp(12px, 3.4vmin, 16px);
+.stat-value {
+  color: var(--colorNeutralForeground2);
+  font-size: clamp(11px, 3vmin, 14px);
   font-weight: var(--fontWeightMedium);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.config-line {
-  color: var(--colorNeutralForeground3);
-  font-size: clamp(9px, 2.5vmin, 12px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
 }
 
 .actions {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--spacingHorizontalS);
   min-width: 0;
@@ -294,7 +260,7 @@ body.is-hidden {
 
 /* ---------------- 尺寸档 ---------------- */
 
-/* 1×1：状态点 + 当前连续分钟 */
+/* 1×1：状态点 + 当前连续分钟（Primary），点击 = 打卡 */
 html[data-size='1x1'] .app {
   align-items: center;
   justify-content: center;
@@ -323,20 +289,10 @@ html[data-size='1x1'] .status-text {
   display: none;
 }
 
-html[data-size='1x1'] .today-block,
-html[data-size='1x1'] .metrics,
-html[data-size='1x1'] .config-line,
-html[data-size='1x1'] .actions,
-html[data-size='1x1'] .settings-btn {
-  display: none;
-}
-
-/* 2×1：当前连续 + 提示语 + 打卡按钮 */
+/* 2×1：连续分钟 + 一句状态；无按钮，点击 = 打卡 */
 html[data-size='2x1'] .app {
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(6px, 2.4vmin, 16px);
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -361,108 +317,67 @@ html[data-size='2x1'] .status-text {
   font-size: clamp(10px, 3vmin, 13px);
 }
 
-html[data-size='2x1'] .today-block,
-html[data-size='2x1'] .metrics,
-html[data-size='2x1'] .config-line {
-  display: none;
-}
-
-html[data-size='2x1'] .actions {
-  flex: 0 0 auto;
-}
-
-html[data-size='2x1'] .actions .btn {
-  min-height: clamp(36px, 16vh, 48px);
-  padding-inline: clamp(12px, 5vw, 24px);
-  font-size: clamp(12px, 3.6vmin, 15px);
-}
-
-/* 2×2：今日累计 + 指标 + 打卡 */
+/* 2×2：连续分钟 + 状态 + 今日累计/起身次数 + 主按钮 */
 html[data-size='2x2'] .app {
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: clamp(6px, 2.4vmin, 16px);
 }
 
-html[data-size='2x2'] .headline,
-html[data-size='2x2'] .config-line {
-  display: none;
+html[data-size='2x2'] .headline {
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2px, 1.2vmin, 6px);
 }
 
-html[data-size='2x2'] .today-block {
+html[data-size='2x2'] .streak {
+  font-size: min(23vw, 23vh);
+}
+
+html[data-size='2x2'] .status-text {
+  font-size: clamp(10px, 2.8vmin, 13px);
+}
+
+html[data-size='2x2'] .secondary-row {
+  display: flex;
+  justify-content: center;
   margin-top: clamp(2px, 1.4vmin, 8px);
 }
 
-html[data-size='2x2'] .today-value {
-  font-size: min(15vw, 26vh);
-}
-
-html[data-size='2x2'] .metrics {
-  flex: 1 1 auto;
-  align-content: center;
-  gap: clamp(6px, 2.4vmin, 16px) clamp(8px, 3vmin, 20px);
-}
-
-html[data-size='2x2'] .metric-value {
-  font-size: clamp(13px, 3.8vmin, 18px);
+html[data-size='2x2'] .stat {
+  align-items: center;
 }
 
 html[data-size='2x2'] .actions {
-  justify-content: flex-start;
+  display: flex;
 }
 
-/* 3×2：完整信息 + 阈值 / 免打扰入口 */
+/* 3×2：状态点 + 连续分钟（Primary）+「我起来了」；统计/设置全进详情 */
 html[data-size='3x2'] .app {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'headline metrics'
-    'today metrics'
-    'config actions';
+  flex-direction: row;
   align-items: center;
-  justify-items: start;
-  column-gap: clamp(10px, 4vmin, 26px);
-  row-gap: clamp(4px, 1.6vmin, 12px);
+  justify-content: space-between;
+  gap: clamp(10px, 4vmin, 26px);
 }
 
 html[data-size='3x2'] .headline {
-  grid-area: headline;
-  align-self: end;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(2px, 1.2vmin, 6px);
+  min-width: 0;
 }
 
 html[data-size='3x2'] .streak {
-  font-size: clamp(20px, 6.5vmin, 34px);
+  font-size: min(16vw, 30vh);
 }
 
 html[data-size='3x2'] .status-text {
-  font-size: clamp(10px, 2.6vmin, 13px);
-}
-
-html[data-size='3x2'] .today-block {
-  grid-area: today;
-  align-self: center;
-}
-
-html[data-size='3x2'] .today-value {
-  font-size: min(11vw, 21vh);
-}
-
-html[data-size='3x2'] .metrics {
-  grid-area: metrics;
-  align-self: center;
-  justify-self: stretch;
-  padding-inline-end: 44px;
-}
-
-html[data-size='3x2'] .config-line {
-  grid-area: config;
-  align-self: end;
+  display: none;
 }
 
 html[data-size='3x2'] .actions {
-  grid-area: actions;
-  align-self: end;
-  justify-self: end;
+  display: flex;
+  flex: 0 0 auto;
 }
 
 /* ---------------- 通用控件 ---------------- */
@@ -535,32 +450,7 @@ html[data-size='3x2'] .actions {
   display: block;
 }
 
-.settings-btn {
-  position: absolute;
-  top: clamp(2px, 1.2vmin, 8px);
-  right: clamp(2px, 1.2vmin, 8px);
-  z-index: 5;
-  opacity: 0;
-  transition: opacity var(--durationNormal) var(--curveEasyEase);
-}
-
-html[data-size='3x2'] .settings-btn {
-  opacity: 0.8;
-}
-
-body.sheet-open .settings-btn,
-.settings-btn:hover,
-.settings-btn:focus-visible,
-.app:hover ~ .settings-btn,
-.app:hover .settings-btn {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .settings-btn {
-    opacity: 0.85;
-  }
-}
+/* 正常模式无常驻 chrome：设置从详情里进入（详情由点击/长按卡片打开） */
 
 /* ---------------- 后台引擎仪表盘 ---------------- */
 
@@ -882,6 +772,50 @@ input[type='time'].text-input {
 .hint code {
   font-family: var(--fontFamilyBase);
   color: var(--colorNeutralForeground3);
+}
+
+/* ---------------- 详情（统计与扩展信息都收在这里） ---------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalM);
+}
+
+.detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  min-height: 34px;
+  padding: 0 var(--spacingHorizontalXS);
+  min-width: 0;
+}
+
+.detail-label {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase300);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-row strong {
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.detail-hint {
+  margin: 0;
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
 }
 
 @media (forced-colors: active) {

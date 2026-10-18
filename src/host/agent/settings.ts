@@ -82,8 +82,15 @@ export function normalizeSettings(raw: unknown): AgentSettings {
       threshold: clampNumber(face.threshold, 0.05, 1, DEFAULT_SETTINGS.face.threshold),
     },
     search: {
-      provider: 'tavily',
-      apiKey: typeof search.apiKey === 'string' ? search.apiKey : '',
+      enabled: typeof search.enabled === 'boolean' ? search.enabled : DEFAULT_SETTINGS.search.enabled,
+      // max_keyword 是检索关键词数量：1-10 足以覆盖常见检索需要
+      maxKeyword: Math.round(
+        clampNumber(search.maxKeyword, 1, 10, DEFAULT_SETTINGS.search.maxKeyword),
+      ),
+      forceSearch:
+        typeof search.forceSearch === 'boolean'
+          ? search.forceSearch
+          : DEFAULT_SETTINGS.search.forceSearch,
     },
     mimo: {
       apiKey: typeof mimo.apiKey === 'string' ? mimo.apiKey : '',

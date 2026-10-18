@@ -1,0 +1,3 @@
+src\host\agent\voice\recorder.ts:8  durationSec: number;
+src\host\agent\voice\recorder.ts:75  durationSec: rendered.duration
+src\host\shell\PageTransition.tsx:13  duration: motionTokens.durationNormal

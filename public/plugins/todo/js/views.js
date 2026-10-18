@@ -5,37 +5,35 @@
  */
 import { icon } from './icons.js';
 import {
-  PRIORITIES,
-  RECURRENCES,
+  DAY,
   addDays,
-  addMonths,
   dayKey,
-  diffDays,
   fmtDate,
-  fmtDue,
-  fmtRemind,
   fmtTime,
   isSameDay,
   priorityMeta,
-  recurrenceLabel,
   startOfDay,
   startOfMonth,
   startOfWeek,
   toDate,
   weekdayLabels,
 } from './date.js';
-import { SORTS, store } from './store.js';
+import { store } from './store.js';
 import { esc } from './ui.js';
 
 const VIEWS = [
-  { id: 'daytodo', label: '今日', icon: 'calendarDay', title: 'Daytodo：今天 / 明天' },
-  { id: 'recent', label: '最近', icon: 'clock', title: '最近待办' },
-  { id: 'category', label: '清单', icon: 'folder', title: '分类清单' },
-  { id: 'calendar', label: '日历', icon: 'calendar', title: '日历 + 任务' },
-  { id: 'weekmonth', label: '周月', icon: 'calendarMonth', title: '周视图 / 月视图' },
+  { id: 'daytodo', label: '今日', menuLabel: '今日（Daytodo）', icon: 'calendarDay', title: 'Daytodo：今天 / 明天' },
+  { id: 'recent', label: '最近', menuLabel: '最近待办', icon: 'clock', title: '最近待办' },
+  { id: 'category', label: '清单', menuLabel: '分类清单', icon: 'folder', title: '分类清单' },
+  { id: 'calendar', label: '日历', menuLabel: '日历 + 任务', icon: 'calendar', title: '日历 + 任务' },
+  { id: 'weekmonth', label: '周月', menuLabel: '周视图 / 月视图', icon: 'calendarMonth', title: '周视图 / 月视图' },
 ];
 
+/** 常驻在工具条上的两个主视图（其余视图收进 ⋯ 菜单） */
+const TAB_VIEWS = VIEWS.filter((view) => view.id === 'daytodo' || view.id === 'recent');
+
 export const VIEW_LIST = VIEWS;
+export const TAB_VIEW_LIST = TAB_VIEWS;
 
 export function scopeInfo(ui) {
   if (ui.listScope === 'all') {
@@ -62,70 +60,41 @@ function dot(color) {
 
 // ---------------------------------------------------------------- 任务行
 
-function metaChips(task, ui, { showList = false } = {}) {
-  const chips = [];
-  if (showList) {
-    const list = store.listById(task.listId);
-    if (list) chips.push(`<span class="chip list-chip">${dot(list.color)}${esc(list.name)}</span>`);
-  }
-  if (task.dueAt) {
-    const due = toDate(task.dueAt);
-    const now = new Date();
-    const overdue = !task.done && due < now;
-    const today = isSameDay(due, now);
-    const text = task.done ? fmtDate(task.dueAt) : fmtDue(task.dueAt);
-    chips.push(`<span class="chip due${overdue ? ' overdue' : today && !task.done ? ' today' : ''}">${icon('calendar')}${esc(text)}</span>`);
+/**
+ * 任务行的唯一主元信息（DENSITY.md：逾期 / 今日时间 / 优先级点 三选一）。
+ * 清单、重复、标签、子任务进度等一律收进长按打开的详情面板。
+ */
+function primaryMeta(task, now = new Date()) {
+  if (task.done) return '';
+  const due = toDate(task.dueAt);
+  if (due) {
+    if (due < now) {
+      const days = Math.floor((now.getTime() - due.getTime()) / DAY);
+      return `<span class="task-meta overdue" title="已逾期">${days >= 1 ? `逾期 ${days} 天` : '已逾期'}</span>`;
+    }
+    if (isSameDay(due, now)) {
+      const hasTime = !(due.getHours() === 23 && due.getMinutes() === 59);
+      if (hasTime) return `<span class="task-meta today" title="今天 ${fmtTime(due)}">${fmtTime(due)}</span>`;
+    }
   }
   if (task.priority > 0) {
     const meta = priorityMeta(task.priority);
-    chips.push(`<span class="chip priority" title="优先级：${esc(meta.label)}">${icon(task.priority >= 3 ? 'flagFilled' : 'flag')}${esc(meta.short)}</span>`);
+    return `<span class="prio-dot p${task.priority}" title="优先级：${esc(meta.label)}" aria-label="优先级${esc(meta.label)}"></span>`;
   }
-  if (task.remindAt && !task.done) chips.push(`<span class="chip muted" title="提醒：${esc(fmtRemind(task.remindAt))}">${icon('alert')}${esc(fmtRemind(task.remindAt))}</span>`);
-  if (task.recurrence) chips.push(`<span class="chip muted" title="重复">${icon('repeat')}${esc(recurrenceLabel(task.recurrence))}</span>`);
-  if (task.note) chips.push(`<span class="chip muted" title="${esc(task.note)}">${icon('textAlign')}</span>`);
-  const tags = task.tags.slice(0, 2);
-  for (const tag of tags) chips.push(`<span class="chip tag">${esc(tag)}</span>`);
-  if (task.tags.length > tags.length) chips.push(`<span class="chip tag">+${task.tags.length - tags.length}</span>`);
-  return chips.join('');
+  return '';
 }
 
-function subtaskProgress(task) {
-  if (!task.subtasks.length) return '';
-  const done = task.subtasks.filter((sub) => sub.done).length;
-  return `<button type="button" class="chip progress${done === task.subtasks.length ? ' complete' : ''}" data-action="toggle-subtasks" data-task-id="${esc(task.id)}" aria-expanded="${task.__expanded ? 'true' : 'false'}" title="子任务 ${done}/${task.subtasks.length}">${icon('taskList')}${done}/${task.subtasks.length}</button>`;
-}
-
-export function taskRow(task, ui, { dense = false, showList = false, subtasks = null } = {}) {
+export function taskRow(task, ui, { dense = false } = {}) {
   const draggable = ui.sort === 'manual' && !task.done;
-  const expanded = subtasks ?? (ui.expandedSubtasks.has(task.id) ? task.subtasks : null);
-  const progress = subtaskProgress({ ...task, __expanded: Boolean(expanded) });
   const classes = ['task'];
   if (task.done) classes.push('done');
   if (dense) classes.push('dense');
-  if (expanded) classes.push('expanded');
-  const row = `
-    <div class="${classes.join(' ')}" role="checkbox" aria-checked="${task.done}" data-task-id="${esc(task.id)}" tabindex="0" title="${esc(task.title)}${task.note ? `\n${esc(task.note)}` : ''}">
+  return `<div class="${classes.join(' ')}" role="checkbox" aria-checked="${task.done}" data-task-id="${esc(task.id)}" tabindex="0" title="${esc(task.title)}">
       ${draggable ? `<span class="drag-handle" data-drag-handle data-noclick title="拖动排序">${icon('reorder')}</span>` : ''}
       <span class="check${task.done ? ' checked' : ''}">${task.done ? icon('check') : ''}</span>
-      <span class="task-main">
-        <span class="task-title">${esc(task.title)}</span>
-        <span class="task-meta">${metaChips(task, ui, { showList })}</span>
-      </span>
-      <span class="task-side">
-        ${progress}
-        <button type="button" class="task-more" data-action="edit-task" data-task-id="${esc(task.id)}" data-noclick aria-label="编辑任务" title="编辑">${icon('more')}</button>
-      </span>
+      <span class="task-title">${esc(task.title)}</span>
+      ${primaryMeta(task)}
     </div>`;
-  const subHtml = expanded
-    ? `<div class="subtasks" data-subtasks-of="${esc(task.id)}">${[...task.subtasks]
-        .sort((a, b) => a.order - b.order)
-        .map(
-          (sub) =>
-            `<div class="subtask${sub.done ? ' done' : ''}" role="checkbox" aria-checked="${sub.done}" data-task-id="${esc(task.id)}" data-sub-id="${esc(sub.id)}" tabindex="0"><span class="check small${sub.done ? ' checked' : ''}">${sub.done ? icon('check') : ''}</span><span class="subtask-title">${esc(sub.title)}</span></div>`,
-        )
-        .join('')}</div>`
-    : '';
-  return row + subHtml;
 }
 
 // ---------------------------------------------------------------- 分组
@@ -147,7 +116,7 @@ export function completedSectionHtml(ui, doneTasks, { allLists = false } = {}) {
   const count = doneTasks.length;
   if (!count) return '';
   const open = ui.completedOpen;
-  const rows = open ? doneTasks.map((task) => taskRow(task, ui, { dense: true, showList: allLists })).join('') : '';
+  const rows = open ? doneTasks.map((task) => taskRow(task, ui, { dense: true })).join('') : '';
   return `<section class="completed">
     <div class="completed-head">
       <button type="button" class="tb-btn subtle-text" data-action="toggle-completed" aria-expanded="${open}">
@@ -194,8 +163,7 @@ function daytodoHtml(ui) {
   const doneToday = scopeTasks(ui).filter(
     (task) => task.done && task.doneAt && isSameDay(task.doneAt, now),
   );
-  const listLabels = ui.listScope === 'all';
-  const row = (task) => taskRow(task, ui, { showList: listLabels });
+  const row = (task) => taskRow(task, ui);
   const weekday = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
   const todayLabel = `今天 · ${now.getMonth() + 1}月${now.getDate()}日 周${weekday}`;
 
@@ -203,7 +171,6 @@ function daytodoHtml(ui) {
     <div class="dtd-grid">
       <section class="dtd-col">
         ${groupHeader(todayLabel, todayAll.length)}
-        <div class="dtd-sub">${overdue.length ? `<span class="warn-text">${overdue.length} 项已逾期</span>` : esc('先做最重要的三件事')}</div>
         ${todayAll.map(row).join('') || emptyBlock('今天没有到期任务', '在下方输入框添加，或从「无日期」里挑一件')}
       </section>
       <section class="dtd-col">
@@ -211,7 +178,7 @@ function daytodoHtml(ui) {
         ${tomorrowAll.map(row).join('') || emptyBlock('明天还空着', '提前安排，明天会轻松一点')}
       </section>
     </div>
-    ${completedSectionHtml(ui, sortDone(doneToday), { allLists: listLabels })}`;
+    ${completedSectionHtml(ui, sortDone(doneToday))}`;
 }
 
 // ---------------------------------------------------------------- 最近待办 + 热力图
@@ -276,18 +243,17 @@ export function heatmapHtml(ui) {
 
 function recentHtml(ui) {
   const groups = recentGroups(ui);
-  const allLists = ui.listScope === 'all';
   const body = groups
     .map(
       (group) => `
       <section class="recent-group">
         ${groupHeader(group.label, group.tasks.length)}
-        ${group.tasks.map((task) => taskRow(task, ui, { showList: allLists })).join('')}
+        ${group.tasks.map((task) => taskRow(task, ui)).join('')}
       </section>`,
     )
     .join('');
   const done = sortDone(scopeTasks(ui).filter((task) => task.done));
-  return `<div class="recent-body">${body}${completedSectionHtml(ui, done, { allLists })}</div>${heatmapHtml(ui)}`;
+  return `<div class="recent-body">${body}${completedSectionHtml(ui, done)}</div>${ui.heatmapOpen ? heatmapHtml(ui) : ''}`;
 }
 
 // ---------------------------------------------------------------- 分类清单
@@ -297,21 +263,17 @@ function categoryHtml(ui) {
   const sections = lists
     .map((list) => {
       const tasks = store.sortTasks(store.state.tasks.filter((task) => task.listId === list.id && !task.done), ui.sort);
-      const done = store.state.tasks.filter((task) => task.listId === list.id && task.done);
       return `<section class="cat-group">
         <div class="group-head cat-head">
           ${dot(list.color)}
           <span class="group-label">${esc(list.name)}</span>
           <span class="group-count">${tasks.length}</span>
-          <span class="cat-done">${done.length ? `已完成 ${done.length}` : ''}</span>
-          <button type="button" class="tb-btn icon-only cat-add" data-action="add-to-list" data-list-id="${esc(list.id)}" title="添加到${esc(list.name)}">${icon('add')}</button>
         </div>
         ${tasks.map((task) => taskRow(task, ui)).join('') || `<p class="cat-empty">这个清单是空的</p>`}
       </section>`;
     })
     .join('');
-  const done = sortDone(store.state.tasks.filter((task) => task.done));
-  return `${sections}${completedSectionHtml(ui, done, { allLists: true })}`;
+  return sections;
 }
 
 // ---------------------------------------------------------------- 日历 + 任务
@@ -406,7 +368,7 @@ function calendarViewHtml(ui) {
         <span class="cal-spacer"></span>
         <button type="button" class="tb-btn subtle-text" data-action="add-on-selected" title="在这一天添加任务">${icon('add')}添加</button>
       </div>
-      ${[...undone.map((task) => taskRow(task, ui, { dense: true, showList: ui.listScope === 'all' })), ...done.map((task) => taskRow(task, ui, { dense: true }))].join('') || emptyBlock('这天没有安排', '点「添加」在这天建一条任务')}
+      ${[...undone.map((task) => taskRow(task, ui, { dense: true })), ...done.map((task) => taskRow(task, ui, { dense: true }))].join('') || emptyBlock('这天没有安排', '点「添加」在这天建一条任务')}
     </section>
   </div>`;
 }
@@ -508,28 +470,29 @@ export function viewBodyHtml(ui) {
 }
 
 function tabsHtml(ui) {
-  return `<div class="tabs" role="tablist" aria-label="视图">${VIEWS.map(
+  return `<div class="tabs" role="tablist" aria-label="视图">${TAB_VIEWS.map(
     (view) =>
-      `<button type="button" role="tab" class="tab${ui.view === view.id ? ' active' : ''}" data-action="set-view" data-view="${view.id}" aria-selected="${ui.view === view.id}" title="${esc(view.title)}">${icon(view.icon)}<span class="tab-label">${esc(view.label)}</span></button>`,
+      `<button type="button" role="tab" class="tab${ui.view === view.id ? ' active' : ''}" data-action="set-view" data-view="${view.id}" aria-selected="${ui.view === view.id}" title="${esc(view.title)}">${esc(view.label)}</button>`,
   ).join('')}</div>`;
 }
 
+/**
+ * 3×3 工具条（DENSITY.md）：常驻只有 今日 / 最近 两个切换 + 搜索图标 + ⋯ 菜单。
+ * 清单切换、日历/周月/清单视图、排序、热力图、设置全部收进 ⋯ 菜单。
+ */
 export function toolbarHtml(ui) {
-  const scope = scopeInfo(ui);
+  const specialView = ui.view !== 'daytodo' && ui.view !== 'recent';
   return `<header class="toolbar" id="toolbar">
-    <button type="button" class="tb-btn list-btn" data-action="open-list-menu" aria-haspopup="menu" title="切换清单">
-      ${dot(scope.color)}
-      <span class="list-btn-label">${esc(scope.name)}</span>
-      ${icon('chevronDown')}
-    </button>
     ${tabsHtml(ui)}
-    <div class="tb-actions">
-      <button type="button" class="tb-btn icon-only${ui.searchOpen ? ' active' : ''}" data-action="toggle-search" aria-label="搜索" title="搜索">${icon('search')}</button>
-      <button type="button" class="tb-btn icon-only" data-action="open-sort-menu" aria-label="排序" title="排序：${esc(SORTS.find((sort) => sort.value === ui.sort)?.label || '')}">${icon('sort')}</button>
-      <button type="button" class="tb-btn icon-only" data-action="open-settings" aria-label="设置" title="设置">${icon('settings')}</button>
-    </div>
+    <span class="tb-spacer"></span>
+    <button type="button" class="tb-btn icon-only${ui.searchOpen ? ' active' : ''}" data-action="toggle-search" aria-label="搜索" title="搜索">${icon('search')}</button>
+    <button type="button" class="tb-btn icon-only${specialView ? ' active' : ''}" data-action="open-more-menu" aria-label="更多" aria-haspopup="menu" title="${esc(specialView ? `${VIEWS.find((view) => view.id === ui.view)?.menuLabel || ''} · 更多` : '更多')}">${icon('more')}</button>
   </header>
-  ${ui.searchOpen ? `<div class="search-row"><span class="search-icon">${icon('search')}</span><input class="input search-input" id="search-input" data-focus-key="search" type="search" value="${esc(ui.query)}" placeholder="搜索标题、备注、标签、子任务" autocomplete="off" /><button type="button" class="tb-btn icon-only" data-action="close-search" aria-label="关闭搜索">${icon('dismiss')}</button></div>` : ''}`;
+  ${
+    ui.searchOpen
+      ? `<div class="search-row"><span class="search-icon">${icon('search')}</span><input class="input search-input" id="search-input" data-focus-key="search" type="search" value="${esc(ui.query)}" placeholder="搜索标题、备注、标签、子任务" autocomplete="off" /><button type="button" class="tb-btn icon-only" data-action="close-search" aria-label="关闭搜索">${icon('dismiss')}</button></div>`
+      : ''
+  }`;
 }
 
 export function composerHtml(ui) {
@@ -538,6 +501,10 @@ export function composerHtml(ui) {
   let placeholder = '添加任务，回车提交';
   if (ui.composerDue) placeholder = `添加到 ${fmtDate(ui.composerDue)}…`;
   else if (!scope.isAll) placeholder = `添加到「${scope.name}」，回车提交`;
+  else {
+    const own = store.listById(ui.listId);
+    if (own) placeholder = `添加到「${own.name}」，回车提交`;
+  }
   return `<form class="composer" id="composer" autocomplete="off">
     ${icon('add', '1em', 'composer-plus')}
     <input class="input composer-input" id="composer-input" data-focus-key="composer" type="text" placeholder="${esc(placeholder)}" enterkeyhint="done" />
@@ -563,17 +530,12 @@ function simpleListTasks(ui) {
 
 export function summaryHtml(ui) {
   const list = currentList(ui);
-  const tasks = store.state.tasks.filter((task) => task.listId === list.id);
-  const undone = tasks.filter((task) => !task.done);
-  const today = new Date();
-  const dueToday = undone.filter((task) => task.dueAt && isSameDay(task.dueAt, today));
-  const overdue = undone.filter((task) => task.dueAt && toDate(task.dueAt) < startOfDay(today));
+  const undone = store.state.tasks.filter((task) => task.listId === list.id && !task.done);
   const first = store.sortTasks(undone, 'due')[0];
   return `<div class="summary">
-    <div class="summary-row">
-      <span class="summary-block"><b class="summary-num">${undone.length}</b><span class="summary-label">未完成</span></span>
-      <span class="summary-sep"></span>
-      <span class="summary-block"><b class="summary-num${overdue.length ? ' warn' : ''}">${dueToday.length}</b><span class="summary-label">今日到期</span></span>
+    <div class="summary-main">
+      <b class="summary-num">${undone.length}</b>
+      <span class="summary-label">未完成</span>
     </div>
     <div class="summary-first" title="${esc(first?.title || '没有待办')}">
       ${first ? `<span class="check">${icon('circle')}</span><span class="summary-title">${esc(first.title)}</span>` : `<span class="summary-title empty-text">${esc('没有待办')}</span>`}
@@ -582,43 +544,39 @@ export function summaryHtml(ui) {
 }
 
 export function miniListHtml(ui) {
-  const { list, undone } = simpleListTasks(ui);
+  const { undone } = simpleListTasks(ui);
   return `<div class="mini">
-    <header class="mini-head">${dot(list.color)}<span class="mini-name">${esc(list.name)}</span><span class="mini-count">${undone.length}/${store.state.tasks.filter((task) => task.listId === list.id).length}</span></header>
-    <div class="mini-list">${undone.map((task) => taskRow(task, ui, { dense: true })).join('') || emptyBlock('没有待办', '')}</div>
+    <div class="mini-list">${undone.map((task) => taskRow(task, ui, { dense: true })).join('') || emptyBlock('没有待办', '长按任务可以编辑')}</div>
   </div>`;
 }
 
 export function mediumListHtml(ui) {
-  const { list, undone, done } = simpleListTasks(ui);
+  const { list, undone } = simpleListTasks(ui);
   return `<div class="medium">
     <header class="medium-head">
-      <button type="button" class="tb-btn list-btn" data-action="open-list-menu" aria-haspopup="menu">${dot(list.color)}<span class="list-btn-label">${esc(list.name)}</span>${icon('chevronDown')}</button>
+      <span class="medium-name">${esc(list.name)}</span>
       <span class="medium-count">${undone.length}</span>
-      <span class="cal-spacer"></span>
-      <button type="button" class="tb-btn icon-only" data-action="toggle-composer" title="添加任务" aria-label="添加任务">${icon('add')}</button>
     </header>
-    <div class="medium-list">${undone.map((task) => taskRow(task, ui, { dense: true })).join('') || emptyBlock('没有待办', '点 + 添加')}</div>
-    ${store.settings.showCompleted && done.length ? `<div class="medium-done"><button type="button" class="tb-btn subtle-text" data-action="toggle-completed" aria-expanded="${ui.completedOpen}">${icon(ui.completedOpen ? 'chevronDown' : 'chevronRight')}已完成 ${done.length}</button><button type="button" class="tb-btn subtle-text danger-text" data-action="clear-completed">清空</button></div>${ui.completedOpen ? `<div class="medium-done-list">${done.map((task) => taskRow(task, ui, { dense: true })).join('')}</div>` : ''}` : ''}
+    <div class="medium-list">${undone.map((task) => taskRow(task, ui, { dense: true })).join('') || emptyBlock('没有待办', '在下方输入框添加')}</div>
   </div>`;
 }
 
 export function wideListHtml(ui) {
   const { list, undone, done } = simpleListTasks(ui);
   return `<div class="wide">
-    <header class="medium-head">
-      <button type="button" class="tb-btn list-btn" data-action="open-list-menu" aria-haspopup="menu">${dot(list.color)}<span class="list-btn-label">${esc(list.name)}</span>${icon('chevronDown')}</button>
+    <header class="wide-head">
+      <span class="medium-name">${esc(list.name)}</span>
       <span class="medium-count">${undone.length}</span>
-      <span class="cal-spacer"></span>
+      <span class="tb-spacer"></span>
       <button type="button" class="tb-btn icon-only" data-action="toggle-composer" title="添加任务" aria-label="添加任务">${icon('add')}</button>
     </header>
     <div class="wide-cols">
       <section class="wide-col">
-        <div class="wide-col-head">${icon('checkCircle')}<span>未完成</span><span class="wide-count">${undone.length}</span></div>
+        <div class="wide-col-head"><span>未完成</span><span class="wide-count">${undone.length}</span></div>
         <div class="wide-col-body">${undone.map((task) => taskRow(task, ui, { dense: true })).join('') || emptyBlock('全部做完了', '')}</div>
       </section>
       <section class="wide-col">
-        <div class="wide-col-head done-head">${icon('check')}<span>已完成</span><span class="wide-count">${done.length}</span><button type="button" class="tb-btn subtle-text danger-text" data-action="clear-completed">清空</button></div>
+        <div class="wide-col-head done-head"><span>已完成</span><span class="wide-count">${done.length}</span></div>
         <div class="wide-col-body">${done.length ? done.map((task) => taskRow(task, ui, { dense: true })).join('') : `<p class="wide-empty">${esc('暂无已完成')}</p>`}</div>
       </section>
     </div>

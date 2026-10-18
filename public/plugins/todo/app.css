@@ -72,8 +72,8 @@ body.standalone #app {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0.85rem 1rem;
-  gap: 0.5rem;
+  padding: 0.75rem 0.95rem;
+  gap: 0.35rem;
 }
 
 .ic {
@@ -102,26 +102,15 @@ body.standalone #app {
   scrollbar-color: var(--colorNeutralStroke1) transparent;
 }
 
-/* ---------------------------------------------------------------- 工具栏 */
+/* ---------------------------------------------------------------- 工具栏
+   常态只有 今日 / 最近 两个切换 + 搜索 + ⋯（清单/日历/周月/排序/热力图/设置都在 ⋯ 里） */
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
   flex: 0 0 auto;
-  min-height: 2.4rem;
-}
-
-.list-btn {
-  max-width: 9rem;
-  padding-inline: 0.45rem;
-}
-
-.list-btn-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.88rem;
+  min-height: 2.15rem;
 }
 
 .list-dot {
@@ -132,21 +121,23 @@ body.standalone #app {
   flex: 0 0 auto;
 }
 
+.tb-spacer {
+  flex: 1 1 auto;
+}
+
 .tabs {
   display: flex;
   align-items: center;
-  gap: 1px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
+  gap: 2px;
+  flex: 0 0 auto;
 }
 
 .tab {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  height: 2.3rem;
-  padding: 0 0.45rem;
+  height: 2rem;
+  padding: 0 0.6rem;
   border: 0;
   border-radius: var(--borderRadiusMedium);
   background: transparent;
@@ -159,11 +150,6 @@ body.standalone #app {
   transition:
     background var(--durationFaster) var(--curveEasyEase),
     color var(--durationFaster) var(--curveEasyEase);
-}
-
-.tab .ic {
-  width: 1.15rem;
-  height: 1.15rem;
 }
 
 .tab:hover {
@@ -201,9 +187,9 @@ body.standalone #app {
   align-items: center;
   justify-content: center;
   gap: 0.3rem;
-  height: 2.3rem;
-  min-width: 2.3rem;
-  padding: 0 0.45rem;
+  height: 2.15rem;
+  min-width: 2.15rem;
+  padding: 0 0.4rem;
   border: 0;
   border-radius: var(--borderRadiusMedium);
   background: transparent;
@@ -346,15 +332,20 @@ body.standalone #app {
   flex: 1 1 auto;
 }
 
-/* ---------------------------------------------------------------- 任务行 */
+/* ---------------------------------------------------------------- 任务行
+   单行：勾选框 + 标题 + 最多 1 个主元信息（逾期 / 今日时间 / 优先级点）。
+   清单、重复、标签、子任务进度、提醒都在长按打开的详情面板里。 */
 
 .task {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 2.75rem;
-  padding: 0.2rem 0.35rem;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.5rem;
+  padding: 0.1rem 0.35rem;
   border-radius: var(--borderRadiusMedium);
   cursor: pointer;
   flex: 0 0 auto;
@@ -376,9 +367,9 @@ body.standalone #app {
 }
 
 .task.dense {
-  min-height: 2.35rem;
-  gap: 0.45rem;
-  padding-block: 0.1rem;
+  min-height: 2.25rem;
+  gap: 0.4rem;
+  padding-block: 0.05rem;
 }
 
 .task.dragging {
@@ -395,8 +386,8 @@ body.standalone #app {
 }
 
 .check {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.3rem;
+  height: 1.3rem;
   border-radius: 50%;
   border: 1.5px solid var(--colorNeutralStrokeAccessible);
   display: grid;
@@ -410,8 +401,8 @@ body.standalone #app {
 }
 
 .check .ic {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .task:hover .check {
@@ -435,21 +426,15 @@ body.standalone #app {
   height: 0.8rem;
 }
 
-.task-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.08rem;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .task-title {
   display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.95rem;
-  line-height: 1.35;
+  font-size: 0.94rem;
+  line-height: 1.4;
   color: var(--colorNeutralForeground1);
 }
 
@@ -458,19 +443,55 @@ body.standalone #app {
   text-decoration: line-through;
 }
 
-.task-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+/* 列表容器统一允许收缩，避免长标题把整行（含右侧元信息）顶出卡片 */
+#view,
+.recent-body,
+.dtd-col,
+.recent-group,
+.completed-list,
+.mini-list,
+.medium-list,
+.wide-col-body,
+.cat-group {
   min-width: 0;
-  overflow: hidden;
-  color: var(--colorNeutralForeground3);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  overflow-x: hidden;
 }
 
-.task-meta:empty {
-  display: none;
+/* 唯一主元信息：只取一个，弱化到 Tertiary 层级；逾期用状态色而不是加粗 */
+.task-meta {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--colorNeutralForeground3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.task-meta.overdue {
+  color: var(--colorPaletteRedForeground2);
+}
+
+.task-meta.today {
+  color: var(--colorNeutralForeground3);
+}
+
+.prio-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.prio-dot.p1 {
+  background: var(--colorPaletteBlueForeground2);
+}
+
+.prio-dot.p2 {
+  background: var(--colorPaletteMarigoldForeground1);
+}
+
+.prio-dot.p3 {
+  background: var(--colorPaletteRedForeground1);
 }
 
 .chip {
@@ -676,8 +697,7 @@ body.standalone #app {
 
 .completed {
   margin-top: auto;
-  padding-top: 0.15rem;
-  border-top: 1px solid var(--colorNeutralStroke2);
+  padding-top: 0.3rem;
   flex: 0 0 auto;
 }
 
@@ -855,7 +875,8 @@ body.standalone #app {
   padding-inline: 0.6rem;
 }
 
-/* ---------------------------------------------------------------- 1×1 摘要 */
+/* ---------------------------------------------------------------- 1×1 摘要
+   信息预算：1 个 Primary 数值 + 1 个标签 + 首条任务（Secondary）。 */
 
 .summary-layout {
   padding: 0.85rem 0.95rem;
@@ -864,27 +885,21 @@ body.standalone #app {
 .summary {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 0.5rem;
   height: 100%;
   min-height: 0;
 }
 
-.summary-row {
+.summary-main {
   display: flex;
-  align-items: flex-end;
-  gap: 0.7rem;
-}
-
-.summary-block {
-  display: flex;
-  flex-direction: column;
-  line-height: 1;
-  min-width: 0;
+  align-items: baseline;
+  gap: 0.45rem;
 }
 
 .summary-num {
-  font-size: 2.4rem;
+  font-size: 2.5rem;
+  line-height: 1;
   font-weight: var(--fontWeightSemibold);
   letter-spacing: -0.02em;
   color: var(--colorNeutralForeground1);
@@ -892,24 +907,14 @@ body.standalone #app {
 }
 
 .summary-label {
-  margin-top: 0.25rem;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: var(--colorNeutralForeground3);
-}
-
-.summary-sep {
-  width: 1px;
-  height: 2.2rem;
-  background: var(--colorNeutralStroke2);
-  margin-bottom: 0.3rem;
 }
 
 .summary-first {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--colorNeutralStroke2);
   font-size: 0.82rem;
   color: var(--colorNeutralForeground2);
   min-width: 0;
@@ -937,11 +942,11 @@ body.standalone #app {
   color: var(--colorNeutralForeground4);
 }
 
-/* ---------------------------------------------------------------- 2×2 */
+/* ---------------------------------------------------------------- 2×2 只列表 */
 
 .mini-layout {
-  padding: 0.7rem 0.8rem;
-  gap: 0.3rem;
+  padding: 0.55rem 0.65rem;
+  gap: 0.2rem;
 }
 
 .mini {
@@ -949,47 +954,25 @@ body.standalone #app {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 0.15rem;
-}
-
-.mini-head {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.2rem 0.3rem;
-  border-bottom: 1px solid var(--colorNeutralStroke2);
-  font-size: 0.8rem;
-  color: var(--colorNeutralForeground3);
-  flex: 0 0 auto;
-}
-
-.mini-name {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--fontWeightSemibold);
-  color: var(--colorNeutralForeground2);
-}
-
-.mini-count {
-  font-variant-numeric: tabular-nums;
 }
 
 .mini-list {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow: auto hidden;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
 .mini-layout .task {
-  min-height: 2.7rem;
+  min-height: 2.45rem;
 }
 
-.mini-layout .task-meta {
+/* 2×2 信息预算最小：只留标题列表，元信息进长按详情 */
+.mini-layout .task-meta,
+.mini-layout .prio-dot {
   display: none;
 }
 
@@ -997,11 +980,12 @@ body.standalone #app {
   padding: 0.8rem 0.4rem;
 }
 
-/* ---------------------------------------------------------------- 3×2 */
+/* ---------------------------------------------------------------- 3×2
+   不显示工具条：只有清单名 + 列表 + 输入框（输入框常驻，由 app 拼在下面）。 */
 
 .medium-layout {
-  padding: 0.7rem 0.9rem;
-  gap: 0.35rem;
+  padding: 0.65rem 0.85rem 0.7rem;
+  gap: 0.2rem;
 }
 
 .medium {
@@ -1009,24 +993,30 @@ body.standalone #app {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 0.1rem;
 }
 
 .medium-head {
   display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-height: 2.1rem;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0 0.2rem 0.25rem;
   flex: 0 0 auto;
 }
 
-.medium-count {
-  padding: 0 0.5rem;
-  border-radius: var(--borderRadiusCircular);
-  background: var(--colorNeutralBackground3);
+.medium-name {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
   color: var(--colorNeutralForeground3);
-  font-size: 0.76rem;
-  line-height: 1.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medium-count {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--colorNeutralForeground4);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1039,29 +1029,11 @@ body.standalone #app {
   gap: 1px;
 }
 
-.medium-done {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  border-top: 1px solid var(--colorNeutralStroke2);
-  padding-top: 0.1rem;
-  flex: 0 0 auto;
-}
-
-.medium-done-list {
-  max-height: 7rem;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  flex: 0 0 auto;
-}
-
 /* ---------------------------------------------------------------- 4×2 */
 
 .wide-layout {
-  padding: 0.7rem 0.9rem;
-  gap: 0.35rem;
+  padding: 0.65rem 0.85rem 0.7rem;
+  gap: 0.25rem;
 }
 
 .wide {
@@ -1069,13 +1041,26 @@ body.standalone #app {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 0.3rem;
+  gap: 0.2rem;
+}
+
+.wide-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0 0.2rem;
+  min-height: 1.8rem;
+  flex: 0 0 auto;
+}
+
+.wide-head .tb-btn {
+  align-self: center;
 }
 
 .wide-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -1093,31 +1078,18 @@ body.standalone #app {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  height: 1.9rem;
-  border-bottom: 1px solid var(--colorNeutralStroke2);
-  margin-bottom: 0.15rem;
+  height: 1.5rem;
+  margin-bottom: 0.1rem;
   color: var(--colorNeutralForeground3);
-  font-size: 0.76rem;
-  font-weight: var(--fontWeightSemibold);
+  font-size: 0.7rem;
+  font-weight: var(--fontWeightRegular);
   flex: 0 0 auto;
-}
-
-.wide-col-head .ic {
-  width: 0.95rem;
-  height: 0.95rem;
 }
 
 .wide-count {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-}
-
-.wide-col-head.done-head .wide-count {
-  margin-left: 0;
-}
-
-.wide-col-head.done-head .tb-btn {
-  margin-left: auto;
+  color: var(--colorNeutralForeground4);
 }
 
 .wide-col-body {
@@ -1141,7 +1113,7 @@ body.standalone #app {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
 }
 
 .dtd-col {
@@ -1152,18 +1124,11 @@ body.standalone #app {
 }
 
 .dtd-col:first-child {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .dtd-col:first-child .task {
   flex: 0 0 auto;
-}
-
-.dtd-sub {
-  padding: 0 0.3rem 0.2rem;
-  font-size: 0.72rem;
-  color: var(--colorNeutralForeground4);
 }
 
 /* ---------------------------------------------------------------- 最近待办 */
@@ -1670,7 +1635,10 @@ body.standalone #app {
   position: fixed;
   z-index: 1000;
   min-width: 10rem;
-  max-width: 16rem;
+  max-width: 17rem;
+  max-height: min(78vh, 30rem);
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 0.25rem;
   border: 1px solid var(--colorNeutralStroke1);
   border-radius: var(--borderRadiusLarge);

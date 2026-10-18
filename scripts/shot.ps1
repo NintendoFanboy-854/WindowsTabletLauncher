@@ -64,5 +64,13 @@ if (Test-Path $outPath) {
 }
 
 if (-not (Test-Path $outPath)) { throw '截图失败：没有生成文件' }
+
+# 清掉本次 headless 实例（Edge 会残留子进程，多人并行截图会累积把机器拖慢）
+try {
+  Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -and $_.CommandLine.Contains($profile) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+} catch { }
 "截图: $outPath ($((Get-Item $outPath).Length) bytes, ${Width}x${Height})"
+
 

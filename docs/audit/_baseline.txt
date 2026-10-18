@@ -1,0 +1,5 @@
+audit baseline
+local time: 2026-10-18 22:56:20 +08:00
+branch: main
+HEAD: 6cb4f36 2026-10-18 22:39:00 +0800 docs: 新增 Fluent 2 官方设计语言落地规范（FLUENT2.md）与信息密度规范（DENSITY.md）
+dirty files: 46

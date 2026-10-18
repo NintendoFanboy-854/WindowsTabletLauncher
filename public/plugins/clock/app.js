@@ -53,7 +53,6 @@ const els = {
   meridiem: $('time-meridiem'),
   date: $('date'),
   weekday: $('weekday'),
-  settingsBtn: $('settings-btn'),
   scrim: $('scrim'),
   sheet: $('sheet'),
   closeSettings: $('close-settings'),
@@ -73,6 +72,7 @@ const state = {
   inited: false,
   settingsTouched: false,
   sheetOpen: false,
+  suppressClick: false,
   toastTimer: 0,
 };
 
@@ -245,7 +245,10 @@ function render() {
   }
 
   const timeForLabel = isTwelve ? `${mainText} ${meridiem}` : mainText;
-  els.clock.setAttribute('aria-label', `当前时间 ${timeForLabel}，点击切换 12 / 24 小时制`);
+  els.clock.setAttribute(
+    'aria-label',
+    `当前时间 ${timeForLabel}，点击切换 12 / 24 小时制，长按打开设置`,
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -309,7 +312,7 @@ function closeSheet() {
     els.sheet.hidden = true;
   };
   window.setTimeout(done, motionMs('--durationNormal') + 20);
-  els.settingsBtn.focus({ preventScroll: true });
+  els.clock.focus({ preventScroll: true });
 }
 
 /* ------------------------------------------------------------------ */
@@ -334,18 +337,52 @@ function toggleHour12() {
   announce(state.settings.hour12 ? '已切换为 12 小时制' : '已切换为 24 小时制');
 }
 
-els.clock.addEventListener('click', toggleHour12);
+els.clock.addEventListener('click', () => {
+  if (state.suppressClick) {
+    state.suppressClick = false;
+    return;
+  }
+  toggleHour12();
+});
 els.clock.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
     toggleHour12();
+  } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+    event.preventDefault();
+    openSheet();
   }
 });
 
-els.settingsBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  openSheet();
+// 长按卡片 = 打开设置（正常模式不出现齿轮）
+const LONG_PRESS_MS = 500; // DESIGN.md 的手势阈值（交互参数，不是动效时长）
+let pressTimer = 0;
+let pressOrigin = null;
+
+els.clock.addEventListener('pointerdown', (event) => {
+  if (state.sheetOpen) return;
+  pressOrigin = { x: event.clientX, y: event.clientY };
+  window.clearTimeout(pressTimer);
+  pressTimer = window.setTimeout(() => {
+    state.suppressClick = true;
+    openSheet();
+  }, LONG_PRESS_MS);
 });
+
+function clearPress() {
+  window.clearTimeout(pressTimer);
+  pressTimer = 0;
+  pressOrigin = null;
+}
+
+els.clock.addEventListener('pointerup', clearPress);
+els.clock.addEventListener('pointercancel', clearPress);
+els.clock.addEventListener('pointerleave', clearPress);
+els.clock.addEventListener('pointermove', (event) => {
+  if (!pressOrigin) return;
+  if (Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > 8) clearPress();
+});
+
 els.closeSettings.addEventListener('click', (event) => {
   event.stopPropagation();
   closeSheet();
@@ -370,7 +407,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-/* 3×2 等大档位直接显示齿轮；1×1 不显示（CSS 已处理） */
+/* 正常模式不显示任何操作 chrome：设置只从长按 / 宿主编辑模式进入 */
 
 /* ------------------------------------------------------------------ */
 /* Agent 工具                                                          */

@@ -30,7 +30,7 @@ export type ToolCallStatus = 'running' | 'success' | 'error';
 /** 面板里可见的一次工具调用 */
 export interface ToolCallRecord {
   id: string;
-  /** 原始工具名，如 `clock.now`、`web.search` */
+  /** 原始工具名，如 `clock.now` */
   name: string;
   args: unknown;
   result?: unknown;
@@ -39,8 +39,22 @@ export interface ToolCallRecord {
 }
 
 /** 回答里引用的来源（web.search 的结果） */
+/**
+ * 回答里引用的来源：来自 MiMo 原生 web_search 的
+ * `message.annotations` / `delta.annotations`（type=url_citation）。
+ */
 export interface SourceRef {
+  url: string;
   title: string;
+  siteName?: string;
+  summary?: string;
+  publishTime?: string;
+  logoUrl?: string;
+}
+
+/** 请求失败时可附带的操作入口（如「去控制台开通插件」） */
+export interface AgentErrorAction {
+  label: string;
   url: string;
 }
 
@@ -54,8 +68,10 @@ export interface Message {
   createdAt: string;
   /** 深度思考内容（MiMo `reasoning_content`），关闭思考时不落库 */
   reasoning?: string;
-  /** 联网搜索来源，渲染为链接 */
+  /** 联网搜索来源（MiMo annotations），渲染为来源 chips */
   sources?: SourceRef[];
+  /** MiMo 原生 web_search 用量（可选，不占卡片主信息） */
+  webSearchUsage?: { toolUsage: number; pageUsage: number };
   status?: MessageStatus;
 }
 
@@ -129,8 +145,12 @@ export interface AgentSettings {
     threshold: number;
   };
   search: {
-    provider: 'tavily';
-    apiKey: string;
+    /** 默认开：是否在请求里携带 MiMo 原生 web_search 工具 */
+    enabled: boolean;
+    /** 每次检索提取的关键词数量，默认 3 */
+    maxKeyword: number;
+    /** 默认关：交给模型判断是否必搜 */
+    forceSearch: boolean;
   };
   /**
    * MiMo 接入。规格要求“API Key 在设置里填，本地存”，但数据模型里漏了字段，
@@ -145,6 +165,9 @@ export interface AgentSettings {
 }
 
 export const MIMO_BASE_URL = 'https://api.xiaomimimo.com/v1';
+
+/** MiMo 控制台 → 插件管理（开通 Web Search Plugin） */
+export const MIMO_PLUGIN_CONSOLE_URL = 'https://platform.xiaomimimo.com/#/console/plugin';
 
 export const DEFAULT_SETTINGS: AgentSettings = {
   model: 'mimo-v2.6-flash',
@@ -162,8 +185,9 @@ export const DEFAULT_SETTINGS: AgentSettings = {
     threshold: 0.5,
   },
   search: {
-    provider: 'tavily',
-    apiKey: '',
+    enabled: true,
+    maxKeyword: 3,
+    forceSearch: false,
   },
   mimo: {
     apiKey: '',
@@ -176,7 +200,7 @@ export const DEFAULT_SETTINGS: AgentSettings = {
 
 export interface ChatToolCall {
   id: string;
-  /** 模型看到的工具名（已按 OpenAI 函数名规则转义，如 `web__search`） */
+  /** 模型看到的工具名（已按 OpenAI 函数名规则转义，如 `clock__now`） */
   name: string;
   /** 已解析的参数；解析失败时为原始字符串加 `parseError` 标记 */
   args: unknown;
@@ -217,6 +241,10 @@ export type ModelStreamEvent =
   | { type: 'content'; text: string }
   | { type: 'reasoning'; text: string }
   | { type: 'tool_call'; call: ChatToolCall }
+  /** MiMo 原生 web_search 返回的来源（annotations / url_citation） */
+  | { type: 'sources'; sources: SourceRef[] }
+  /** MiMo 原生 web_search 用量（usage.web_search_usage） */
+  | { type: 'usage'; webSearchUsage: { toolUsage: number; pageUsage: number } }
   | { type: 'finish'; reason: string };
 
 export interface ChatTurnRequest {
@@ -227,26 +255,13 @@ export interface ChatTurnRequest {
   signal: AbortSignal;
 }
 
-export interface WebSearchResult {
-  title: string;
-  url: string;
-  content: string;
-}
-
-export interface WebPage {
-  url: string;
-  title: string;
-  content: string;
-  truncated: boolean;
-}
-
 export interface ToolRunOptions {
   signal: AbortSignal;
 }
 
 /**
  * Agent 的模型/工具/语音/搜索传输层。
- * 真实实现走 MiMo + Tavily；`MockTransport` 提供离线演示。
+ * 真实实现走 MiMo（含原生 web_search）；`MockTransport` 提供离线演示。
  */
 export interface AgentTransport {
   readonly kind: 'mimo' | 'mock';
@@ -262,8 +277,6 @@ export interface AgentTransport {
     text: string,
     options: ToolRunOptions & { voice: string; rate: number },
   ): AsyncIterable<Int16Array>;
-  searchWeb(query: string, options: ToolRunOptions): Promise<WebSearchResult[]>;
-  fetchPage(url: string, options: ToolRunOptions): Promise<WebPage>;
   listPluginTools(): AgentToolDecl[];
   callPluginTool(name: string, args: unknown, options: ToolRunOptions): Promise<unknown>;
 }

@@ -31,6 +31,7 @@ export { PluginWidgetFrame, type PluginWidgetFrameHandle, type PluginWidgetFrame
 export {
   PluginBackgroundFrames,
   type BackgroundFrame,
+  type PluginBackgroundFramesHandle,
   type PluginBackgroundFramesProps,
 } from './PluginBackgroundFrames';
 export { readFluentThemePayload } from './theme';

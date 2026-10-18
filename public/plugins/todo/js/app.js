@@ -102,8 +102,8 @@ const ui = {
   searchOpen: false,
   sort: store.settings.defaultSort,
   completedOpen: false,
-  expandedSubtasks: new Set(),
   heatWeighted: params.get('heat') === 'weight',
+  heatmapOpen: params.get('heatmap') === '1' || params.get('heat') === 'weight',
   composerOpen: false,
   composerDue: null,
   composerListId: null,
@@ -272,7 +272,8 @@ function fullLayoutHtml() {
 
 function render({ focusKey = null } = {}) {
   const kind = currentKind();
-  ui.showComposer = kind === 'full' || ((kind === 'medium' || kind === 'wide') && ui.composerOpen);
+  // 3×3 与 3×2 常驻输入框；4×2 用 + 展开输入；2×2 / 1×1 无输入
+  ui.showComposer = kind === 'full' || kind === 'medium' || (kind === 'wide' && ui.composerOpen);
 
   const active = document.activeElement;
   const activeKey = focusKey || (active && app.contains(active) ? active.dataset?.focusKey : null);
@@ -332,8 +333,7 @@ const ACTIONS = {
     ui.view = view;
     render();
   },
-  'open-list-menu': (el) => openListMenu(el),
-  'open-sort-menu': (el) => openSortMenu(el),
+  'open-more-menu': (el) => openMoreMenu(el),
   'open-settings': () => openSettingsSheet(),
   'toggle-search': () => {
     ui.searchOpen = !ui.searchOpen;
@@ -424,24 +424,6 @@ const ACTIONS = {
     if (ui.composerOpen) focusComposer();
   },
   'edit-task': (el) => openTaskEditor(el.dataset.taskId),
-  'add-to-list': (el) => {
-    const listId = el.dataset.listId;
-    if (!listId) return;
-    ui.composerListId = listId;
-    ui.listScope = listId;
-    ui.listId = listId;
-    ui.composerDue = null;
-    if (currentKind() !== 'full') ui.composerOpen = true;
-    render({ focusKey: 'composer' });
-    focusComposer();
-  },
-  'toggle-subtasks': (el) => {
-    const taskId = el.dataset.taskId;
-    if (!taskId) return;
-    if (ui.expandedSubtasks.has(taskId)) ui.expandedSubtasks.delete(taskId);
-    else ui.expandedSubtasks.add(taskId);
-    render();
-  },
 };
 
 function dispatchAction(event) {
@@ -460,9 +442,10 @@ function dispatchAction(event) {
 let activeMenu = null;
 
 /** 打开菜单前先关掉上一个，避免点两次按钮叠两个菜单 */
-function showMenu(anchor, items, onPick) {
+function showMenu(anchor, items, onPick, { align = 'start' } = {}) {
   activeMenu?.close();
   activeMenu = uiKit.openMenu(anchor, items, {
+    align,
     onPick(item) {
       activeMenu = null;
       onPick(item);
@@ -470,47 +453,66 @@ function showMenu(anchor, items, onPick) {
   });
 }
 
-function openListMenu(anchor) {
-  const kind = currentKind();
-  const counts = new Map();
-  for (const task of store.state.tasks) if (!task.done) counts.set(task.listId, (counts.get(task.listId) || 0) + 1);
+/**
+ * 3×3 的 ⋯ 菜单（DENSITY.md：常驻工具条只留今日/最近 + 搜索 + ⋯）：
+ * 视图（分类清单 / 日历 / 周月）、清单切换、排序、工作量热力图、设置都在这里。
+ */
+function openMoreMenu(anchor) {
   const items = [];
-  if (kind === 'full') {
-    items.push({ id: '__all', label: '全部清单', icon: 'appsList', checks: true, checked: ui.listScope === 'all' });
-  }
-  for (const list of store.lists) {
+  // 今日 / 最近 常驻在工具条，菜单里只放另外三个视图
+  for (const view of views.VIEW_LIST.filter((entry) => entry.id !== 'daytodo' && entry.id !== 'recent')) {
     items.push({
-      id: list.id,
-      label: list.name,
+      id: `view:${view.id}`,
+      label: view.menuLabel || view.label,
+      icon: view.icon,
       checks: true,
-      checked: kind === 'full' ? ui.listScope === list.id : ui.listId === list.id,
-      hint: String(counts.get(list.id) || 0),
+      checked: ui.view === view.id,
     });
   }
-  items.push({ separator: true }, { id: '__new', label: '新建清单', icon: 'add' });
-  showMenu(anchor, items, (item) => {
-      if (item.id === '__new') {
-        openNewListSheet();
-        return;
-      }
-      if (item.id === '__all') ui.listScope = 'all';
-      else {
-        ui.listScope = item.id;
-        ui.listId = item.id;
-      }
-      render();
-  });
-}
+  items.push({ separator: true });
+  items.push({ id: 'list:__all', label: '全部清单', icon: 'appsList', checks: true, checked: ui.listScope === 'all' });
+  const counts = new Map();
+  for (const task of store.state.tasks) if (!task.done) counts.set(task.listId, (counts.get(task.listId) || 0) + 1);
+  for (const list of store.lists) {
+    items.push({ id: `list:${list.id}`, label: list.name, checks: true, checked: ui.listScope === list.id, hint: String(counts.get(list.id) || 0) });
+  }
+  items.push({ id: 'list:__new', label: '新建清单', icon: 'add' });
+  items.push({ separator: true });
+  const sortIcons = { manual: 'reorder', due: 'calendar', priority: 'flag', created: 'clock' };
+  for (const sort of SORTS) {
+    items.push({ id: `sort:${sort.value}`, label: `排序：${sort.label}`, icon: sortIcons[sort.value], checks: true, checked: ui.sort === sort.value });
+  }
+  items.push({ separator: true });
+  items.push({ id: 'heatmap', label: '工作量热力图', icon: 'histogram', checks: true, checked: Boolean(ui.heatmapOpen) });
+  items.push({ id: 'settings', label: '设置', icon: 'settings' });
 
-function openSortMenu(anchor) {
-  const icons = { manual: 'reorder', due: 'calendar', priority: 'flag', created: 'clock' };
   showMenu(
     anchor,
-    SORTS.map((sort) => ({ id: sort.value, label: sort.label, icon: icons[sort.value], checks: true, checked: ui.sort === sort.value })),
+    items,
     (item) => {
-      ui.sort = item.id;
+      if (item.id.startsWith('view:')) {
+        const view = item.id.slice(5);
+        if (views.VIEW_LIST.some((entry) => entry.id === view)) ui.view = view;
+      } else if (item.id === 'list:__all') {
+        ui.listScope = 'all';
+      } else if (item.id === 'list:__new') {
+        openNewListSheet();
+        return;
+      } else if (item.id.startsWith('list:')) {
+        const listId = item.id.slice(5);
+        ui.listScope = listId;
+        ui.listId = listId;
+      } else if (item.id.startsWith('sort:')) {
+        ui.sort = item.id.slice(5);
+      } else if (item.id === 'heatmap') {
+        ui.heatmapOpen = !ui.heatmapOpen;
+      } else if (item.id === 'settings') {
+        openSettingsSheet();
+        return;
+      }
       render();
     },
+    { align: 'end' },
   );
 }
 
@@ -1227,7 +1229,7 @@ if (isBackground) {
   document.documentElement.dataset.mode = 'background';
 } else {
   initWidget();
-  // 调试/截图钩子：?dev=editor|settings|listmenu|sortmenu|newlist 可直接打开对应浮层
+  // 调试/截图钩子：?dev=editor|settings|newlist|moremenu 可直接打开对应浮层
   const dev = params.get('dev');
   if (dev && standalone) {
     setTimeout(() => {
@@ -1235,8 +1237,7 @@ if (isBackground) {
       if (dev === 'editor' && firstTask) openTaskEditor(firstTask.id);
       else if (dev === 'settings') openSettingsSheet();
       else if (dev === 'newlist') openNewListSheet();
-      else if (dev === 'listmenu') openListMenu(app.querySelector('[data-action="open-list-menu"]'));
-      else if (dev === 'sortmenu') openSortMenu(app.querySelector('[data-action="open-sort-menu"]'));
+      else if (dev === 'moremenu') openMoreMenu(app.querySelector('[data-action="open-more-menu"]'));
     }, 250);
   }
 }

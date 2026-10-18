@@ -16,6 +16,7 @@ import {
   Field,
   Input,
   Label,
+  Link,
   Option,
   Slider,
   Switch,
@@ -29,6 +30,7 @@ import { useViewportWidth } from '../hooks/useViewportWidth';
 import {
   MIMO_BASE_URL,
   MIMO_MODELS,
+  MIMO_PLUGIN_CONSOLE_URL,
   SIDEBAR_MIN_WIDTH,
   TTS_VOICES,
   type PanelMode,
@@ -279,28 +281,57 @@ export function SettingsDialog({
 
             <Divider />
 
-            {/* ---------- 联网搜索 ---------- */}
+            {/* ---------- 联网搜索（MiMo 原生 web_search） ---------- */}
             <div className={styles.section}>
               <Text size={400} weight="semibold">
                 联网搜索
               </Text>
-              <Field
-                label="Tavily API Key"
-                hint="内置 web.search 用 Tavily 实现；没配 Key 时工具会返回“未配置搜索服务”。"
-              >
-                <Input
-                  type="password"
-                  value={settings.search.apiKey}
-                  placeholder="tvly-…"
+              <div className={styles.inline}>
+                <Switch
+                  checked={settings.search.enabled}
                   onChange={(_, data) =>
-                    session.updateSettings({ search: { apiKey: data.value } })
+                    session.updateSettings({ search: { enabled: data.checked } })
                   }
+                  label="启用 MiMo 原生 web_search"
                 />
-              </Field>
+              </div>
+              <div className={styles.inline}>
+                <Label style={{ minWidth: '96px' }}>max_keyword</Label>
+                <Input
+                  style={{ maxWidth: '120px' }}
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={String(settings.search.maxKeyword)}
+                  onChange={(_, data) => {
+                    const value = Number(data.value);
+                    if (Number.isFinite(value)) {
+                      session.updateSettings({
+                        search: { maxKeyword: Math.min(10, Math.max(1, Math.round(value))) },
+                      });
+                    }
+                  }}
+                />
+                <Text size={200} className={styles.hint}>
+                  每次检索提取的关键词数量（默认 3）
+                </Text>
+              </div>
+              <div className={styles.inline}>
+                <Switch
+                  checked={settings.search.forceSearch}
+                  onChange={(_, data) =>
+                    session.updateSettings({ search: { forceSearch: data.checked } })
+                  }
+                  label="force_search：强制每次回答前搜索（默认关，交给模型判断）"
+                />
+              </div>
               <Text size={200} className={styles.hint}>
-                搜索路由由模型判断：只有需要实时信息（新闻、价格、最新消息）才调用；
-                回答必须带来源链接，来源会显示在回答下方。
+                搜索由 MiMo 原生 web_search 提供，来源显示为回答下方的 chips（首屏最多 3 条）。
+                需要先在 MiMo 控制台 → 插件管理开通 Web Search Plugin，否则请求会返回 400。
               </Text>
+              <Link href={MIMO_PLUGIN_CONSOLE_URL} target="_blank" rel="noreferrer">
+                打开 MiMo 控制台 · 插件管理
+              </Link>
             </div>
           </DialogContent>
           <DialogActions>

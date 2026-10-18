@@ -64,14 +64,9 @@ const els = {
   statusDot: $('status-dot'),
   streakNum: $('streak-num'),
   statusText: $('status-text'),
-  todayMin: $('today-min'),
-  metricLongest: $('metric-longest'),
-  metricBreaks: $('metric-breaks'),
-  metricCurrent: $('metric-current'),
-  metricNext: $('metric-next'),
-  configLine: $('config-line'),
+  statToday: $('stat-today'),
+  statBreaks: $('stat-breaks'),
   breakBtn: $('break-btn'),
-  settingsBtn: $('settings-btn'),
   engineView: $('engine-view'),
   engineState: $('engine-state'),
   engineStatus: $('engine-status'),
@@ -82,6 +77,17 @@ const els = {
   engineLastremind: $('engine-lastremind'),
   engineLog: $('engine-log'),
   scrim: $('scrim'),
+  detailSheet: $('detail-sheet'),
+  detailClose: $('detail-close'),
+  detailToday: $('detail-today'),
+  detailLongest: $('detail-longest'),
+  detailBreaks: $('detail-breaks'),
+  detailCurrent: $('detail-current'),
+  detailNext: $('detail-next'),
+  detailLastbreak: $('detail-lastbreak'),
+  detailConfig: $('detail-config'),
+  detailBreak: $('detail-break'),
+  detailSettings: $('detail-settings'),
   settingsSheet: $('settings-sheet'),
   settingsClose: $('settings-close'),
   setEnabled: $('set-enabled'),
@@ -105,7 +111,7 @@ const state = {
   sizeFromUrl: sizeFromUrl(),
   mode: detectMode(),
   engineActive: false,
-  sheetOpen: false,
+  panel: null,
   log: [],
   lastPressTimer: 0,
   suppressClick: false,
@@ -537,19 +543,25 @@ function render() {
 
   els.streakNum.textContent = String(streak);
   els.statusText.textContent = statusTextOf(settings, runtime, now);
-  els.todayMin.textContent = String(Math.round(today.sittingMinutes));
-  els.metricLongest.textContent = `${Math.round(today.longestStreakMin)} 分钟`;
-  els.metricBreaks.textContent = `${today.breaks} 次`;
-  els.metricCurrent.textContent = `${streak} 分钟`;
-  els.metricNext.textContent = nextReminderText(settings, runtime, now);
-  els.configLine.textContent = `提醒阈值 ${settings.thresholdMin} 分钟 · 免打扰 ${
+  els.statToday.textContent = `${Math.round(today.sittingMinutes)} 分钟`;
+  els.statBreaks.textContent = `${today.breaks} 次`;
+
+  // 详情里才显示完整统计
+  const lastBreak = safeDate(runtime.lastBreakAt);
+  els.detailToday.textContent = `${Math.round(today.sittingMinutes)} 分钟`;
+  els.detailLongest.textContent = `${Math.round(today.longestStreakMin)} 分钟`;
+  els.detailBreaks.textContent = `${today.breaks} 次`;
+  els.detailCurrent.textContent = `${streak} 分钟`;
+  els.detailNext.textContent = nextReminderText(settings, runtime, now);
+  els.detailLastbreak.textContent = lastBreak ? formatClock(lastBreak) : '—';
+  els.detailConfig.textContent = `提醒阈值 ${settings.thresholdMin} 分钟 · 免打扰 ${
     settings.quietHours ? `${settings.quietHours.start}–${settings.quietHours.end}` : '关'
   }`;
 
-  const lastBreak = safeDate(runtime.lastBreakAt);
+  const isCompact = (state.size[0] === 1 && state.size[1] === 1) || (state.size[0] === 2 && state.size[1] === 1);
   els.app.setAttribute(
     'aria-label',
-    `${statusTextOf(settings, runtime, now)}${lastBreak ? `，最近一次起身 ${formatClock(lastBreak)}` : ''}，点击打卡我起来了`,
+    `${statusTextOf(settings, runtime, now)}，${isCompact ? '点击打卡我起来了' : '点击查看久坐详情'}，长按查看详情`,
   );
 }
 
@@ -631,34 +643,54 @@ function syncSettingsControls() {
   els.quietTimes.classList.toggle('is-disabled', !settings.quietHours);
 }
 
-function openSettings() {
-  if (state.sheetOpen) return;
-  state.sheetOpen = true;
+const sheets = { detail: els.detailSheet, settings: els.settingsSheet };
+
+function openPanel(name) {
+  if (state.panel === name || !sheets[name]) return;
+  if (state.panel) {
+    const previous = sheets[state.panel];
+    previous.classList.remove('is-open');
+    previous.hidden = true;
+  }
+  state.panel = name;
+  const sheet = sheets[name];
   document.body.classList.add('sheet-open');
-  syncSettingsControls();
+  if (name === 'settings') syncSettingsControls();
   els.scrim.hidden = false;
-  els.settingsSheet.hidden = false;
+  sheet.hidden = false;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       els.scrim.classList.add('is-open');
-      els.settingsSheet.classList.add('is-open');
+      sheet.classList.add('is-open');
     });
   });
-  els.settingsClose.focus({ preventScroll: true });
+  window.setTimeout(() => {
+    (name === 'settings' ? els.settingsClose : els.detailClose).focus({ preventScroll: true });
+  }, 30);
+}
+
+function closePanel() {
+  if (!state.panel) return;
+  const name = state.panel;
+  const sheet = sheets[name];
+  state.panel = null;
+  document.body.classList.remove('sheet-open');
+  els.scrim.classList.remove('is-open');
+  sheet.classList.remove('is-open');
+  window.setTimeout(() => {
+    if (state.panel) return;
+    sheet.hidden = true;
+    els.scrim.hidden = true;
+  }, motionMs('--durationNormal') + 20);
+  els.app.focus({ preventScroll: true });
+}
+
+function openSettings() {
+  openPanel('settings');
 }
 
 function closeSettings() {
-  if (!state.sheetOpen) return;
-  state.sheetOpen = false;
-  document.body.classList.remove('sheet-open');
-  els.scrim.classList.remove('is-open');
-  els.settingsSheet.classList.remove('is-open');
-  window.setTimeout(() => {
-    if (state.sheetOpen) return;
-    els.scrim.hidden = true;
-    els.settingsSheet.hidden = true;
-  }, motionMs('--durationNormal') + 20);
-  els.settingsBtn.focus({ preventScroll: true });
+  closePanel();
 }
 
 /* ------------------------------------------------------------------ */
@@ -694,26 +726,42 @@ els.setQuietEnd.addEventListener('change', () => {
   saveSettings({ quietHours: { start: els.setQuietStart.value || DEFAULT_QUIET.start, end: els.setQuietEnd.value || DEFAULT_QUIET.end } });
 });
 
+function isCompactSize() {
+  return (state.size[0] === 1 && state.size[1] === 1) || (state.size[0] === 2 && state.size[1] === 1);
+}
+
+function primaryAction() {
+  if (isCompactSize()) {
+    // 1×1 / 2×1 没有按钮：点击卡片就是主操作（打卡）
+    sendCommand('break');
+  } else {
+    openPanel('detail');
+  }
+}
+
 els.breakBtn.addEventListener('click', (event) => {
   event.stopPropagation();
   sendCommand('break');
 });
 
-els.settingsBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  openSettings();
+els.detailBreak.addEventListener('click', () => {
+  sendCommand('break');
+  closePanel();
 });
+els.detailSettings.addEventListener('click', () => openPanel('settings'));
+els.detailClose.addEventListener('click', closePanel);
 els.settingsClose.addEventListener('click', closeSettings);
-els.scrim.addEventListener('click', closeSettings);
+els.scrim.addEventListener('click', closePanel);
 
-// 点击卡片 = 打卡；长按 = 设置面板（500ms，宿主若先接走手势则不会触发）
+// 长按 = 详情（统计/设置都在里面），正常模式不出现齿轮
 function startPress(event) {
-  if (event.target.closest?.('.settings-btn, .btn, .sheet')) return;
+  if (state.panel) return;
+  if (event.target.closest?.('.btn, .sheet')) return;
   state.suppressClick = false;
   window.clearTimeout(state.lastPressTimer);
   state.lastPressTimer = window.setTimeout(() => {
     state.suppressClick = true;
-    openSettings();
+    openPanel('detail');
   }, LONG_PRESS_MS);
 }
 
@@ -726,27 +774,31 @@ els.app.addEventListener('pointerdown', startPress);
 for (const name of ['pointerup', 'pointercancel', 'pointerleave']) els.app.addEventListener(name, clearPress);
 
 els.app.addEventListener('click', (event) => {
-  if (event.target.closest?.('.settings-btn, .btn')) return;
+  if (event.target.closest?.('.btn')) return;
+  if (state.panel) return;
   if (state.suppressClick) {
     state.suppressClick = false;
     return;
   }
-  sendCommand('break');
+  primaryAction();
 });
 
 els.app.addEventListener('keydown', (event) => {
   if (event.target !== els.app) return;
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
-    sendCommand('break');
+    primaryAction();
+  } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+    event.preventDefault();
+    openPanel('detail');
   }
 });
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  if (state.sheetOpen) {
+  if (state.panel) {
     event.preventDefault();
-    closeSettings();
+    closePanel();
   } else {
     plugin.exitFocus();
   }
@@ -1032,6 +1084,7 @@ boot();
 
 if (!plugin.inHost) {
   if (state.mode === 'tile' && params.get('settings') === '1') openSettings();
+  else if (state.mode === 'tile' && params.get('detail') === '1') openPanel('detail');
 }
 
 document.addEventListener('visibilitychange', () => {

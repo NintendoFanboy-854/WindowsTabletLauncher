@@ -1,14 +1,16 @@
 /**
- * 插件管理页（B4）：列表 / 启用禁用 / 删除 / 重载 / zip 安装入口。
+ * 插件管理页（B4 + F5 信息密度复核）：列表 / 启用禁用 / 删除 / 重载 / zip 安装入口。
  *
- * 数据来自 A2 的 PluginManager：扫描 / 热重载 / 删除 / zip 安装 / 拖放监听。
- * 宽屏用 Fluent Table，窄屏折叠成卡片（DESIGN.md §8）。
- * 启用/禁用只是宿主偏好（不删目录），桌面层接线时按 `isPluginEnabled` 过滤。
+ * 密度约定（docs/DENSITY.md §4/§5）：
+ * - 一屏一个主任务：管理插件；页头只有一个次要操作（重新扫描）；
+ * - 宽屏表格只留 插件 / 状态 / 操作 三列；名称是 Primary，id / 版本 / 尺寸清单
+ *   收进 base200 + foreground3 的次要行；
+ * - 窄屏折叠成卡片时只保留 名称 / 状态 / 操作，其余全部下沉为次要行；
+ * - 分组靠留白，不用卡片边框/分割线。
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
   Dialog,
   DialogActions,
@@ -16,7 +18,6 @@ import {
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Divider,
   Input,
   MessageBar,
   MessageBarBody,
@@ -29,7 +30,6 @@ import {
   TableHeaderCell,
   TableRow,
   Text,
-  Title3,
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
@@ -67,14 +67,6 @@ const useStyles = makeStyles({
   hint: {
     color: tokens.colorNeutralForeground3,
   },
-  installCard: {
-    display: 'grid',
-    gap: tokens.spacingVerticalS,
-    padding: tokens.spacingHorizontalL,
-    borderRadius: tokens.borderRadiusLarge,
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
   installRow: {
     display: 'flex',
     alignItems: 'center',
@@ -90,30 +82,33 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
   },
-  chips: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalXS,
+  secondary: {
+    color: tokens.colorNeutralForeground2,
+  },
+  tertiary: {
+    color: tokens.colorNeutralForeground3,
   },
   tableWrap: {
     overflowX: 'auto',
   },
+  table: {
+    backgroundColor: 'transparent',
+  },
   cardGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: tokens.spacingHorizontalL,
+    gap: tokens.spacingHorizontalM,
   },
   pluginCard: {
     display: 'grid',
-    gap: tokens.spacingVerticalS,
+    gap: tokens.spacingVerticalXS,
     padding: tokens.spacingHorizontalL,
     borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   cardHead: {
     display: 'flex',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
@@ -121,9 +116,7 @@ const useStyles = makeStyles({
   cardActions: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: tokens.spacingHorizontalS,
-    flexWrap: 'wrap',
   },
   overlay: {
     position: 'fixed',
@@ -135,45 +128,31 @@ const useStyles = makeStyles({
     zIndex: 1000,
     pointerEvents: 'none',
   },
-  dragText: {
-    color: tokens.colorNeutralForeground1,
-  },
 });
 
-function widgetChips(plugin: NormalizedPlugin) {
+function metaSummary(plugin: NormalizedPlugin): string {
+  const parts = [plugin.id, `v${plugin.version}`];
   if (plugin.widgets.length === 0) {
-    return <Text size={200}>纯后台插件</Text>;
+    parts.unshift('纯后台插件');
+  } else {
+    parts.push(
+      plugin.widgets
+        .map((widget) => widget.sizes.map((size) => size.join('×')).join(' / '))
+        .join('，'),
+    );
   }
-  return (
-    <>
-      {plugin.widgets.map((widget) => (
-        <Badge key={widget.id} appearance="outline" color="brand" size="small">
-          {widget.title} · {widget.sizes.map((size) => size.join('×')).join(' / ')}
-        </Badge>
-      ))}
-    </>
-  );
+  return parts.join(' · ');
 }
 
-function PluginIdentity({ plugin }: { plugin: NormalizedPlugin }) {
-  const styles = useStyles();
+function Toggle({ plugin, onChange }: { plugin: NormalizedPlugin; onChange: (enabled: boolean) => void }) {
+  const preferences = usePluginPreferences();
+  const disabled = preferences.disabled.includes(plugin.id);
   return (
-    <div className={styles.pluginCell}>
-      <Text weight="semibold">{plugin.name}</Text>
-      <div className={styles.chips}>
-        <Badge appearance="outline" size="small">
-          {plugin.id}
-        </Badge>
-        <Badge appearance="tint" color="subtle" size="small">
-          v{plugin.version}
-        </Badge>
-        {plugin.background && (
-          <Badge appearance="tint" color="warning" size="small">
-            background
-          </Badge>
-        )}
-      </div>
-    </div>
+    <Switch
+      checked={!disabled}
+      onChange={(_event, data) => onChange(data.checked)}
+      label={disabled ? '已禁用' : '已启用'}
+    />
   );
 }
 
@@ -181,8 +160,6 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
   const styles = useStyles();
   const pluginManager = manager ?? getPluginManager();
   const { plugins, loading, error, reload } = usePlugins(pluginManager);
-  const preferences = usePluginPreferences();
-  const disabledIds = useMemo(() => new Set(preferences.disabled), [preferences.disabled]);
   const wide = useMediaQuery(WIDE_PAGE_QUERY);
   const tauri = isTauriRuntime();
 
@@ -211,6 +188,11 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
       dispose?.();
     };
   }, [pluginManager]);
+
+  const sourceLabel = useMemo(() => {
+    const runtime = tauri ? 'Tauri 运行时' : '浏览器演示模式';
+    return `${runtime} · ${pluginManager.sourceKind ?? '探测中'} 源`;
+  }, [tauri, pluginManager]);
 
   const refresh = async () => {
     await reload();
@@ -257,38 +239,25 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
     );
   };
 
-  const renderStatus = (plugin: NormalizedPlugin) => (
-    <Switch
-      checked={!disabledIds.has(plugin.id)}
-      onChange={(_event, data) => toggleEnabled(plugin, data.checked)}
-      label={disabledIds.has(plugin.id) ? '已禁用' : '已启用'}
-    />
+  const removeButton = (plugin: NormalizedPlugin) => (
+    <Button
+      appearance="subtle"
+      size="small"
+      onClick={() => setConfirmTarget(plugin)}
+      disabled={!tauri || busy === plugin.id}
+      title={tauri ? '删除插件目录' : '浏览器演示模式不支持删除插件'}
+    >
+      删除
+    </Button>
   );
-
-  const renderActions = (plugin: NormalizedPlugin) => (
-    <div className={styles.toolbar}>
-      <Button
-        appearance="subtle"
-        onClick={() => setConfirmTarget(plugin)}
-        disabled={!tauri || busy === plugin.id}
-        title={tauri ? '删除插件目录' : '浏览器演示模式不支持删除插件'}
-      >
-        删除
-      </Button>
-    </div>
-  );
-
-  const renderPluginCell = (plugin: NormalizedPlugin) => <PluginIdentity plugin={plugin} />;
 
   return (
     <PageScaffold
       title="插件管理"
-      subtitle="扫描、安装、删除、启用/禁用 —— 改完即时热重载，不用重启启动器"
+      subtitle={`管理已安装插件 · ${sourceLabel}`}
       onBack={onBack}
       actions={
         <div className={styles.toolbar}>
-          <Badge appearance="outline">数据源：{pluginManager.sourceKind ?? '探测中'}</Badge>
-          <Badge appearance="outline">{tauri ? 'Tauri 运行时' : '浏览器演示模式'}</Badge>
           <Button appearance="secondary" onClick={() => void refresh()} disabled={loading}>
             重新扫描
           </Button>
@@ -297,43 +266,31 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
       maxContentWidth="1180px"
     >
       <div className={styles.stack}>
-        <section className={styles.installCard} aria-label="安装插件">
-          <div className={styles.cardHead}>
-            <Title3>安装插件</Title3>
+        {tauri ? (
+          <div className={styles.installRow}>
+            <Input
+              className={styles.installInput}
+              value={zipPath}
+              placeholder="zip 完整路径，例如 C:\Users\me\Downloads\clock.zip"
+              aria-label="插件 zip 路径"
+              onChange={(_event, data) => setZipPath(data.value)}
+            />
+            <Button
+              appearance="primary"
+              onClick={() => void installFromPath()}
+              disabled={busy === 'install'}
+            >
+              {busy === 'install' ? '安装中…' : '安装 zip'}
+            </Button>
             <Text size={200} className={styles.hint}>
-              解压到 plugins/&lt;id&gt;/ 并自动重扫
+              也可以直接把 .zip 拖进窗口
             </Text>
           </div>
-          {tauri ? (
-            <>
-              <div className={styles.installRow}>
-                <Input
-                  className={styles.installInput}
-                  value={zipPath}
-                  placeholder="zip 完整路径，例如 C:\Users\me\Downloads\clock.zip"
-                  aria-label="插件 zip 路径"
-                  onChange={(_event, data) => setZipPath(data.value)}
-                />
-                <Button
-                  appearance="primary"
-                  onClick={() => void installFromPath()}
-                  disabled={busy === 'install'}
-                >
-                  {busy === 'install' ? '安装中…' : '从路径安装'}
-                </Button>
-              </div>
-              <Text size={200} className={styles.hint}>
-                也可以直接把 .zip 拖进窗口：Rust 解压后写回 index.json，随后自动重扫。
-              </Text>
-            </>
-          ) : (
-            <MessageBar intent="info">
-              <MessageBarBody>
-                浏览器演示模式只能查看插件列表；安装 / 删除 / 拖放要在 Tauri 运行时里用。
-              </MessageBarBody>
-            </MessageBar>
-          )}
-        </section>
+        ) : (
+          <Text size={200} className={styles.hint}>
+            浏览器演示模式只能查看：安装 / 删除 / 拖放需要在 Tauri 运行时里用。
+          </Text>
+        )}
 
         {loading && <Spinner label="扫描插件目录…" />}
 
@@ -344,21 +301,17 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
         )}
 
         {!loading && !error && plugins.length === 0 && (
-          <EmptyState
-            title="还没有插件"
-            description="检查 plugins/index.json 和 plugins/<id>/manifest.json；或者装一个插件 zip。"
-          />
+          <EmptyState title="还没有插件" description="检查 index.json / manifest.json，或者装一个插件 zip。" />
         )}
 
         {!loading && !error && plugins.length > 0 && (
           <>
             {wide ? (
               <div className={styles.tableWrap}>
-                <Table aria-label="已安装插件" size="small">
+                <Table aria-label="已安装插件" size="small" className={styles.table}>
                   <TableHeader>
                     <TableRow>
                       <TableHeaderCell>插件</TableHeaderCell>
-                      <TableHeaderCell>组件</TableHeaderCell>
                       <TableHeaderCell>状态</TableHeaderCell>
                       <TableHeaderCell>操作</TableHeaderCell>
                     </TableRow>
@@ -366,12 +319,18 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                   <TableBody>
                     {plugins.map((plugin) => (
                       <TableRow key={plugin.id}>
-                        <TableCell>{renderPluginCell(plugin)}</TableCell>
                         <TableCell>
-                          <div className={styles.chips}>{widgetChips(plugin)}</div>
+                          <div className={styles.pluginCell}>
+                            <Text size={400}>{plugin.name}</Text>
+                            <Text size={200} className={styles.tertiary}>
+                              {metaSummary(plugin)}
+                            </Text>
+                          </div>
                         </TableCell>
-                        <TableCell>{renderStatus(plugin)}</TableCell>
-                        <TableCell>{renderActions(plugin)}</TableCell>
+                        <TableCell>
+                          <Toggle plugin={plugin} onChange={(enabled) => toggleEnabled(plugin, enabled)} />
+                        </TableCell>
+                        <TableCell>{removeButton(plugin)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -382,22 +341,22 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                 {plugins.map((plugin) => (
                   <article key={plugin.id} className={styles.pluginCard}>
                     <div className={styles.cardHead}>
-                      <PluginIdentity plugin={plugin} />
+                      <Text size={400}>{plugin.name}</Text>
+                      <div className={styles.cardActions}>
+                        <Toggle plugin={plugin} onChange={(enabled) => toggleEnabled(plugin, enabled)} />
+                        {removeButton(plugin)}
+                      </div>
                     </div>
-                    <div className={styles.chips}>{widgetChips(plugin)}</div>
-                    <Divider />
-                    <div className={styles.cardActions}>
-                      {renderStatus(plugin)}
-                      {renderActions(plugin)}
-                    </div>
+                    <Text size={200} className={styles.tertiary}>
+                      {metaSummary(plugin)}
+                    </Text>
                   </article>
                 ))}
               </div>
             )}
 
             <Text size={200} className={styles.hint}>
-              启用/禁用是宿主本地偏好（wtsl.plugins.preferences）；宿主接线时用
-              isPluginEnabled 过滤桌面实例即可生效。
+              启用/禁用是本地偏好，桌面按 isPluginEnabled 过滤后生效。
             </Text>
           </>
         )}
@@ -413,8 +372,8 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
           <DialogBody>
             <DialogTitle>删除插件？</DialogTitle>
             <DialogContent>
-              将从 plugins/ 目录删除「{confirmTarget?.name}」（{confirmTarget?.id}
-              ），并把 id 从 index.json 移除。此操作不可撤销。
+              将从 plugins/ 删除「{confirmTarget?.name}」（{confirmTarget?.id}），并移出
+              index.json。不可撤销。
             </DialogContent>
             <DialogActions>
               <Button appearance="secondary" onClick={() => setConfirmTarget(null)}>
@@ -433,7 +392,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
 
       {dragActive && (
         <div className={styles.overlay}>
-          <Text size={500} weight="semibold" className={styles.dragText}>
+          <Text size={500} weight="semibold">
             松开安装插件 zip
           </Text>
         </div>

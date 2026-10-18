@@ -1,9 +1,11 @@
 /**
  * 全屏页面的公共骨架：返回按钮 + 标题 + 右侧操作 + 可滚动内容。
  * 设置 / 复盘 / 插件管理三个页面共用，保证页头、间距、滚动行为一致。
+ *
+ * 密度约定（docs/DENSITY.md）：页头只用留白与字阶和内容分组，不加分割线。
  */
 import type { ReactNode } from 'react';
-import { Button, Divider, Text, Title2, makeStyles, tokens } from '@fluentui/react-components';
+import { Button, Text, Title2, makeStyles, tokens } from '@fluentui/react-components';
 
 export interface PageScaffoldProps {
   title: string;
@@ -61,17 +63,14 @@ const useStyles = makeStyles({
     minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: `0 ${tokens.spacingHorizontalXXL} ${tokens.spacingVerticalXXL}`,
+    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalXXL} ${tokens.spacingVerticalXXL}`,
     '@media (max-width: 640px)': {
-      padding: `0 ${tokens.spacingHorizontalL} ${tokens.spacingVerticalXL}`,
+      padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalL} ${tokens.spacingVerticalXL}`,
     },
   },
   bodyInner: {
     width: '100%',
     marginInline: 'auto',
-  },
-  divider: {
-    marginBottom: tokens.spacingVerticalL,
   },
 });
 
@@ -104,7 +103,6 @@ export function PageScaffold({
       </header>
       <div className={styles.body}>
         <div className={styles.bodyInner} style={maxContentWidth ? { maxWidth: maxContentWidth } : undefined}>
-          <Divider className={styles.divider} />
           {children}
         </div>
       </div>

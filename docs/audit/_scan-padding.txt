@@ -1,0 +1,124 @@
+public\plugins\clock\styles.css:162  clamp(8px, 4vmin, 24px)
+public\plugins\clock\styles.css:303  0
+public\plugins\clock\styles.css:357  var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL)
+public\plugins\clock\styles.css:400  var(--spacingVerticalXS) 0
+public\plugins\clock\styles.css:497  var(--spacingVerticalXS) 0
+public\plugins\clock\styles.css:501  0
+public\plugins\clock\styles.css:571  6px 12px
+public\plugins\countdown\styles.css:154  clamp(8px, 3.4vmin, 18px)
+public\plugins\countdown\styles.css:237  clamp(2px, 1vmin, 6px)
+public\plugins\countdown\styles.css:296  0.18em 0.6em
+public\plugins\countdown\styles.css:336  0 clamp(4px, 2vmin, 10px)
+public\plugins\countdown\styles.css:381  clamp(2px, 1.2vmin, 8px) clamp(4px, 1.6vmin, 10px)
+public\plugins\countdown\styles.css:520  0 var(--spacingHorizontalL)
+public\plugins\countdown\styles.css:573  0
+public\plugins\countdown\styles.css:618  var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:641  var(--spacingVerticalS) var(--spacingHorizontalS) var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:669  0 var(--spacingHorizontalS)
+public\plugins\countdown\styles.css:719  var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL)
+public\plugins\countdown\styles.css:774  0 var(--spacingHorizontalM)
+public\plugins\countdown\styles.css:895  var(--spacingVerticalXS) 0
+public\plugins\countdown\styles.css:905  0
+public\plugins\countdown\styles.css:960  var(--spacingVerticalS) var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:163  clamp(8px, 3vmin, 18px)
+public\plugins\pomodoro\styles.css:279  0.16em 0.6em
+public\plugins\pomodoro\styles.css:314  0 var(--spacingHorizontalL)
+public\plugins\pomodoro\styles.css:404  clamp(4px, 2.4vmin, 10px)
+public\plugins\pomodoro\styles.css:543  0
+public\plugins\pomodoro\styles.css:586  var(--spacingVerticalXS)
+public\plugins\pomodoro\styles.css:610  0 var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:645  0 var(--spacingHorizontalXS)
+public\plugins\pomodoro\styles.css:677  clamp(10px, 4vmin, 24px)
+public\plugins\pomodoro\styles.css:759  0 var(--spacingHorizontalL)
+public\plugins\pomodoro\styles.css:811  var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL)
+public\plugins\pomodoro\styles.css:869  0 var(--spacingHorizontalM)
+public\plugins\pomodoro\styles.css:996  0 var(--spacingHorizontalS)
+public\plugins\sedentary\styles.css:151  clamp(8px, 3.4vmin, 18px)
+public\plugins\sedentary\styles.css:268  clamp(4px, 2.4vmin, 10px)
+public\plugins\sedentary\styles.css:391  0 var(--spacingHorizontalL)
+public\plugins\sedentary\styles.css:430  0
+public\plugins\sedentary\styles.css:463  clamp(10px, 3.4vmin, 20px)
+public\plugins\sedentary\styles.css:483  0.2em 0.7em
+public\plugins\sedentary\styles.css:506  clamp(4px, 1.6vmin, 10px) clamp(6px, 2vmin, 12px)
+public\plugins\sedentary\styles.css:571  var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL)
+public\plugins\sedentary\styles.css:630  0 var(--spacingHorizontalM)
+public\plugins\sedentary\styles.css:697  10px
+public\plugins\sedentary\styles.css:791  0 var(--spacingHorizontalXS)
+public\plugins\todo\app.css:46  20px
+public\plugins\todo\app.css:75  0.75rem 0.95rem
+public\plugins\todo\app.css:140  0 0.6rem
+public\plugins\todo\app.css:192  0 0.4rem
+public\plugins\todo\app.css:226  0
+public\plugins\todo\app.css:234  0 0.4rem
+public\plugins\todo\app.css:258  0.15rem 0.3rem
+public\plugins\todo\app.css:313  0.45rem 0.25rem 0.2rem
+public\plugins\todo\app.css:322  0 0.45rem
+public\plugins\todo\app.css:348  0.1rem 0.35rem
+public\plugins\todo\app.css:372  0.05rem
+public\plugins\todo\app.css:502  0 0.25rem
+public\plugins\todo\app.css:534  0.3rem
+public\plugins\todo\app.css:541  0.1rem
+public\plugins\todo\app.css:545  0.2rem
+public\plugins\todo\app.css:554  0
+public\plugins\todo\app.css:579  0.35rem
+public\plugins\todo\app.css:602  0
+public\plugins\todo\app.css:665  0 0 0.2rem 2.1rem
+public\plugins\todo\app.css:674  0 0.35rem
+public\plugins\todo\app.css:700  0.3rem
+public\plugins\todo\app.css:712  0 0.4rem
+public\plugins\todo\app.css:735  1.4rem 0.8rem
+public\plugins\todo\app.css:765  0.1rem
+public\plugins\todo\app.css:777  0 0.6rem
+public\plugins\todo\app.css:807  0.45rem
+public\plugins\todo\app.css:819  0 1rem
+public\plugins\todo\app.css:869  0 0.8rem
+public\plugins\todo\app.css:875  0.6rem
+public\plugins\todo\app.css:882  0.85rem 0.95rem
+public\plugins\todo\app.css:948  0.55rem 0.65rem
+public\plugins\todo\app.css:980  0.8rem 0.4rem
+public\plugins\todo\app.css:987  0.65rem 0.85rem 0.7rem
+public\plugins\todo\app.css:1002  0 0.2rem 0.25rem
+public\plugins\todo\app.css:1035  0.65rem 0.85rem 0.7rem
+public\plugins\todo\app.css:1051  0 0.2rem
+public\plugins\todo\app.css:1072  0.25rem 0.4rem
+public\plugins\todo\app.css:1156  0.3rem
+public\plugins\todo\app.css:1204  0.15rem 0 0.2rem
+public\plugins\todo\app.css:1243  0.55rem
+public\plugins\todo\app.css:1267  0.1rem 0.4rem 0.4rem
+public\plugins\todo\app.css:1296  0.2rem 0.5rem
+public\plugins\todo\app.css:1320  0.15rem 0
+public\plugins\todo\app.css:1334  0.1rem 0
+public\plugins\todo\app.css:1405  0.2rem
+public\plugins\todo\app.css:1445  0.3rem 0
+public\plugins\todo\app.css:1480  0 0.15rem 0.2rem
+public\plugins\todo\app.css:1484  0.15rem 0.25rem
+public\plugins\todo\app.css:1530  1px
+public\plugins\todo\app.css:1541  0 0.2rem 0.3rem
+public\plugins\todo\app.css:1546  0 0.7rem
+public\plugins\todo\app.css:1562  0.05rem 0.3rem
+public\plugins\todo\app.css:1594  0 0.2rem
+public\plugins\todo\app.css:1627  0.2rem
+public\plugins\todo\app.css:1642  0.25rem
+public\plugins\todo\app.css:1666  0.4rem 0.5rem
+public\plugins\todo\app.css:1827  1rem 1.1rem 0.6rem
+public\plugins\todo\app.css:1853  0.2rem 1.1rem 1rem
+public\plugins\todo\app.css:1860  0.8rem 1.1rem 1.1rem
+public\plugins\todo\app.css:1886  0.3rem
+public\plugins\todo\app.css:1924  1.8rem
+public\plugins\todo\app.css:1937  0.45rem 0.6rem
+public\plugins\todo\app.css:1949  2px
+public\plugins\todo\app.css:1968  0 0.65rem
+public\plugins\todo\app.css:1993  0
+public\plugins\todo\app.css:2069  0.1rem 0.2rem
+public\plugins\todo\app.css:2079  0
+public\plugins\todo\app.css:2115  0
+public\plugins\todo\app.css:2128  0.4rem
+public\plugins\todo\app.css:2146  0.55rem 0.9rem
+public\plugins\todo\app.css:2174  0 0.5rem
+public\plugins\todo\app.css:2184  0.55rem 0.75rem
+public\plugins\weather\weather.css:13  0
+src\styles.css:27  24px
+src\styles.css:53  0 12px
+src\styles.css:95  6px 14px
+src\styles.css:122  4px 6px
+src\styles.css:134  var(--wtsl-agent-panel-width, 0px)

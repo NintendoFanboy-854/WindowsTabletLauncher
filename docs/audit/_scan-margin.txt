@@ -1,0 +1,53 @@
+public\plugins\clock\styles.css:124  0
+public\plugins\clock\styles.css:214  0.2em
+public\plugins\clock\styles.css:378  var(--spacingVerticalS)
+public\plugins\clock\styles.css:382  0
+public\plugins\clock\styles.css:427  var(--spacingVerticalXS) 0
+public\plugins\clock\styles.css:447  0
+public\plugins\clock\styles.css:496  0
+public\plugins\clock\styles.css:502  var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:120  0
+public\plugins\countdown\styles.css:670  var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:740  var(--spacingVerticalS)
+public\plugins\countdown\styles.css:744  0
+public\plugins\countdown\styles.css:843  0
+public\plugins\countdown\styles.css:931  0
+public\plugins\countdown\styles.css:951  var(--spacingVerticalXS)
+public\plugins\countdown\styles.css:974  0
+public\plugins\pomodoro\styles.css:115  0
+public\plugins\pomodoro\styles.css:384  -6px
+public\plugins\pomodoro\styles.css:611  var(--spacingVerticalXS)
+public\plugins\pomodoro\styles.css:832  var(--spacingVerticalS)
+public\plugins\pomodoro\styles.css:836  0
+public\plugins\pomodoro\styles.css:920  var(--spacingVerticalXS) 0
+public\plugins\pomodoro\styles.css:940  0
+public\plugins\pomodoro\styles.css:1021  0
+public\plugins\sedentary\styles.css:112  0
+public\plugins\sedentary\styles.css:344  clamp(2px, 1.4vmin, 8px)
+public\plugins\sedentary\styles.css:592  var(--spacingVerticalS)
+public\plugins\sedentary\styles.css:596  0
+public\plugins\sedentary\styles.css:681  var(--spacingVerticalXS) 0
+public\plugins\sedentary\styles.css:719  0
+public\plugins\sedentary\styles.css:766  0
+public\plugins\sedentary\styles.css:815  0
+public\plugins\todo\app.css:20  0
+public\plugins\todo\app.css:304  0.1rem 0.3rem
+public\plugins\todo\app.css:385  1px 0
+public\plugins\todo\app.css:699  auto
+public\plugins\todo\app.css:711  0.1rem
+public\plugins\todo\app.css:746  0
+public\plugins\todo\app.css:753  0
+public\plugins\todo\app.css:1082  0.1rem
+public\plugins\todo\app.css:1090  auto
+public\plugins\todo\app.css:1105  0.3rem 0.2rem
+public\plugins\todo\app.css:1155  0.2rem
+public\plugins\todo\app.css:1247  auto
+public\plugins\todo\app.css:1266  0
+public\plugins\todo\app.css:1404  0.3rem
+public\plugins\todo\app.css:1731  0.25rem 0.3rem
+public\plugins\todo\app.css:1837  0
+public\plugins\todo\app.css:1844  0.2rem 0 0
+public\plugins\todo\app.css:1870  0.2rem 0 0.6rem
+public\plugins\todo\app.css:2135  0.2rem 0
+public\plugins\weather\weather.css:12  0
+src\styles.css:9  0

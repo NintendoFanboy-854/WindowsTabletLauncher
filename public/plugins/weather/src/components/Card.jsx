@@ -1,20 +1,23 @@
-/** 天气卡片：五种尺寸 × 加载 / 无 Key / 错误 / 离线状态。 */
+/**
+ * 天气卡片：一眼看懂的五档尺寸。
+ *
+ * 信息密度规则（docs/DENSITY.md）：每张卡片只有一个 Primary（当前温度），
+ * 正常模式不带任何 chrome（无刷新按钮/更新时间/齿轮），预警条只在有预警时出现。
+ * 城市、现象、今日高低温是仅有的 Secondary；更细的信息全部进详情 Drawer。
+ */
 
 import { useCallback, useRef } from 'react';
 import { Button, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { ArrowClockwise20Regular, Key20Regular } from '@fluentui/react-icons';
-import { CityMenu } from './CityMenu.jsx';
 import { AirRing, DailyColumns, HourlyStrip, isNight } from './forecast.jsx';
 import {
   Condition,
-  DemoBadge,
   HiLo,
-  StatusLine,
   WarningBadge,
   WarningStrip,
   WeatherIcon,
 } from './atoms.jsx';
-import { fmtHumidity, fmtTemp, fmtWind } from '../data/format.js';
+import { fmtTemp } from '../data/format.js';
 
 const useStyles = makeStyles({
   card: {
@@ -40,12 +43,29 @@ const useStyles = makeStyles({
     },
   },
   pad1: { padding: '4px' },
-  pad2: { padding: 'clamp(6px, 1.6vmin, 12px) clamp(8px, 2vmin, 16px) clamp(8px, 2vmin, 14px)' },
+  pad2: { padding: 'clamp(6px, 1.4vmin, 10px) clamp(8px, 2vmin, 16px) clamp(8px, 2vmin, 14px)' },
   pad22: { padding: 'clamp(6px, 1.6vmin, 12px) clamp(8px, 2vmin, 16px) clamp(6px, 1.6vmin, 12px)' },
-  padLarge: { padding: 'clamp(8px, 1.8vmin, 14px) clamp(10px, 2.2vmin, 18px) clamp(8px, 1.8vmin, 14px)' },
-  header: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, minWidth: 0 },
-  headerSpacer: { flex: 1, minWidth: 0 },
-  status: { fontSize: 'clamp(9px, 1.8vh, 12px)', flexShrink: 0, maxWidth: '52%' },
+  padLarge: { padding: 'clamp(7px, 1.6vmin, 12px) clamp(10px, 2.2vmin, 18px) clamp(8px, 1.8vmin, 14px)' },
+  cityLine: {
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: tokens.colorNeutralForeground3,
+    letterSpacing: '0.02em',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    flexShrink: 0,
+    maxWidth: '100%',
+  },
+  offlineDot: {
+    position: 'absolute',
+    top: '9%',
+    right: '9%',
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    backgroundColor: tokens.colorStatusWarningForeground1,
+  },
   body: { flex: 1, minHeight: 0, minWidth: 0, display: 'flex' },
 
   // 1×1
@@ -57,50 +77,63 @@ const useStyles = makeStyles({
     position: 'relative',
     paddingBottom: '2vh',
   },
-  temp1: { fontSize: 'clamp(18px, 16vmin, 52px)', lineHeight: 1, fontWeight: tokens.fontWeightSemibold, fontVariantNumeric: 'tabular-nums' },
-
-  // 2×1
-  body2: { flexDirection: 'row', alignItems: 'center', gap: 'clamp(6px, 2vmin, 16px)' },
-  tempBlock: { display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, gap: '2px' },
-  temp2: { fontSize: 'clamp(28px, 12.5vmin, 60px)' },
-  metaBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: '2px',
-    minWidth: 0,
-    flexShrink: 0,
+  temp1: {
+    fontSize: 'clamp(18px, 16vmin, 52px)',
+    lineHeight: 1,
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
   },
 
-  // 2×2
-  body22: { flexDirection: 'column', gap: 'clamp(2px, 1vh, 8px)' },
-  currentRow: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.8vmin, 14px)', flexShrink: 0 },
-  temp22: { fontSize: 'clamp(24px, 8.5vmin, 48px)' },
-  conditions: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 },
-  conditionText: { fontSize: 'clamp(11px, 2.4vh, 16px)' },
-  subMeta: { fontSize: 'clamp(10px, 2.1vh, 14px)', color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  fill: { flex: 1, minHeight: 0, minWidth: 0 },
-
-  // 3×2 / 4×2
-  body32: { flexDirection: 'column', gap: 'clamp(2px, 1vh, 8px)' },
-  heroGrow: { flex: 1 },
-  currentHero: { display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2.4vmin, 18px)', flexShrink: 0, minWidth: 0 },
-  tempHero: { fontSize: 'clamp(30px, 10vmin, 64px)' },
-  heroMeta: { display: 'flex', flexDirection: 'column', gap: 'clamp(1px, 0.5vh, 3px)', minWidth: 0, flex: 1, alignItems: 'flex-start' },
-  heroRight: {
+  // 2×1
+  body2: { flexDirection: 'column', justifyContent: 'center', gap: 'clamp(1px, 0.6vh, 5px)' },
+  row2: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 2vmin, 16px)', minWidth: 0 },
+  temp2: { fontSize: 'clamp(28px, 12vmin, 56px)' },
+  condition2: { fontSize: tokens.fontSizeBase300 },
+  side2: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
     justifyContent: 'center',
     gap: 'clamp(1px, 0.5vh, 3px)',
+    marginLeft: 'auto',
     flexShrink: 0,
-    color: tokens.colorNeutralForeground2,
-    fontSize: 'clamp(10px, 2.1vh, 14px)',
-    whiteSpace: 'nowrap',
   },
-  divider: { width: '1px', alignSelf: 'stretch', backgroundColor: tokens.colorNeutralStroke2, flexShrink: 0 },
-  body42: { flexDirection: 'row', gap: 'clamp(8px, 2vmin, 18px)', alignItems: 'stretch' },
+  subMeta: {
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+    fontVariantNumeric: 'tabular-nums',
+  },
+
+  // 2×2
+  body22: { flexDirection: 'column', gap: 'clamp(3px, 1.2vh, 10px)' },
+  currentRow: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.8vmin, 14px)', flexShrink: 0 },
+  temp22: { fontSize: 'clamp(24px, 8.5vmin, 48px)' },
+  conditions: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 },
+  conditionText: { fontSize: tokens.fontSizeBase300 },
+  fill: { flex: 1, minHeight: 0, minWidth: 0 },
+
+  // 3×2 / 4×2
+  body32: { flexDirection: 'column', gap: 'clamp(3px, 1.2vh, 10px)' },
+  currentHero: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'clamp(8px, 2.4vmin, 18px)',
+    flexShrink: 0,
+    minWidth: 0,
+  },
+  tempHero: { fontSize: 'clamp(30px, 10vmin, 64px)' },
+  heroMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'clamp(1px, 0.5vh, 4px)',
+    minWidth: 0,
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  body42: { flexDirection: 'column', gap: 'clamp(4px, 1.4vh, 12px)' },
+  row42: { display: 'flex', gap: 'clamp(12px, 2.6vmin, 24px)', alignItems: 'stretch', minHeight: 0, flex: 1 },
   col42Current: {
     display: 'flex',
     flexDirection: 'column',
@@ -134,11 +167,16 @@ const useStyles = makeStyles({
     padding: 'clamp(6px, 2vmin, 16px)',
     minHeight: 0,
   },
-  stateTitle: { fontSize: 'clamp(12px, 2.6vh, 16px)', fontWeight: tokens.fontWeightSemibold },
-  stateText: { fontSize: 'clamp(10px, 2.1vh, 13px)', color: tokens.colorNeutralForeground2, maxWidth: '46ch', lineHeight: 1.35 },
+  stateTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
+  stateText: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+    maxWidth: '46ch',
+    lineHeight: tokens.lineHeightBase200,
+  },
   stateButtons: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' },
   keyIcon: { color: tokens.colorNeutralForeground3 },
-  tinyHint: { fontSize: 'clamp(10px, 2.2vh, 13px)', color: tokens.colorNeutralForeground2 },
+  tinyHint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', color: tokens.colorNeutralForeground2 },
 });
 
@@ -219,10 +257,10 @@ function ErrorState({ error, onRetry }) {
 }
 
 const ICON_1 = 'min(46vmin, 52%)';
-const ICON_2 = 'clamp(36px, 26vmin, 96px)';
-const ICON_22 = 'clamp(34px, 20vmin, 78px)';
-const ICON_HERO = 'clamp(40px, 17vmin, 88px)';
-const ICON_42 = 'clamp(34px, 13vmin, 72px)';
+const ICON_2 = 'clamp(34px, 24vmin, 88px)';
+const ICON_22 = 'clamp(32px, 19vmin, 74px)';
+const ICON_HERO = 'clamp(38px, 16vmin, 84px)';
+const ICON_42 = 'clamp(32px, 12.5vmin, 68px)';
 
 export default function Card({
   sizeKey,
@@ -231,15 +269,10 @@ export default function Card({
   place,
   data,
   status,
-  now,
-  locatedPlace,
   onOpenDetail,
   onOpenSettings,
-  onSelectPlace,
-  onManageCities,
   onRefresh,
   onUseMock,
-  mock,
 }) {
   const styles = useStyles();
   const size = sizeKey || '3x2';
@@ -297,13 +330,13 @@ export default function Card({
   const warnings = settings.showWarnings ? data?.warnings : [];
   const current = data?.current;
   const today = data?.daily?.[0];
-  const showHeader = size !== '1x1';
   const currentNight = current
     ? isNight(current.obsTime || new Date().toISOString(), today?.sunrise, today?.sunset)
     : false;
   const loading = status.loading && !data;
   const error = status.error && !data;
   const air = settings.showAir ? data?.air : null;
+  const showOfflineDot = Boolean(status.offline && data);
 
   return (
     <div
@@ -329,31 +362,6 @@ export default function Card({
       }}
       onKeyDown={handleKeyDown}
     >
-      {showHeader && (
-        <div className={styles.header}>
-          <CityMenu
-            settings={settings}
-            locatedPlace={locatedPlace}
-            onSelectPlace={onSelectPlace}
-            onManageCities={onManageCities}
-            onOpenSettings={onOpenSettings}
-            onRefresh={onRefresh}
-            warningCount={warnings?.length || 0}
-          />
-          <span className={styles.headerSpacer} />
-          {mock && <DemoBadge />}
-          {data && !loading && (
-            <StatusLine
-              offline={status.offline}
-              fetchedAt={data.fetchedAt}
-              refreshMin={settings.refreshMin}
-              now={now}
-              className={styles.status}
-            />
-          )}
-        </div>
-      )}
-
       {warnings && warnings.length > 0 && size !== '1x1' && <WarningStrip warnings={warnings} />}
 
       {status.noKey ? (
@@ -381,26 +389,29 @@ export default function Card({
 
           {size === '2x1' && (
             <div className={mergeClasses(styles.body, styles.body2)}>
-              <WeatherIcon
-                code={current.icon}
-                night={currentNight}
-                scheme={scheme}
-                size={ICON_2}
-                title={current.text}
-              />
-              <div className={styles.tempBlock}>
-                <span className={mergeClasses(styles.temp1, styles.temp2)}>{fmtTemp(current.temp, settings.unit)}</span>
-                <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-              </div>
-              <div className={styles.metaBlock}>
-                <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                <span className={styles.subMeta}>{fmtWind(current.windDir, current.windScale)}</span>
+              <span className={styles.cityLine}>{place?.name}</span>
+              <div className={styles.row2}>
+                <WeatherIcon
+                  code={current.icon}
+                  night={currentNight}
+                  scheme={scheme}
+                  size={ICON_2}
+                  title={current.text}
+                />
+                <span className={mergeClasses(styles.temp1, styles.temp2)}>
+                  {fmtTemp(current.temp, settings.unit)}
+                </span>
+                <div className={styles.side2}>
+                  <Condition code={current.icon} text={current.text} className={styles.condition2} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+                </div>
               </div>
             </div>
           )}
 
           {size === '2x2' && (
             <div className={mergeClasses(styles.body, styles.body22)}>
+              <span className={styles.cityLine}>{place?.name}</span>
               <div className={styles.currentRow}>
                 <WeatherIcon
                   code={current.icon}
@@ -410,12 +421,13 @@ export default function Card({
                   title={current.text}
                 />
                 <div className={styles.conditions}>
-                  <span className={mergeClasses(styles.temp1, styles.temp22)}>{fmtTemp(current.temp, settings.unit)}</span>
+                  <span className={mergeClasses(styles.temp1, styles.temp22)}>
+                    {fmtTemp(current.temp, settings.unit)}
+                  </span>
                   <Condition code={current.icon} text={current.text} className={styles.conditionText} />
                 </div>
-                <div className={styles.metaBlock}>
+                <div className={styles.side2}>
                   <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                  <span className={styles.subMeta}>{fmtHumidity(current.humidity)}</span>
                 </div>
               </div>
               <div className={styles.fill}>
@@ -433,6 +445,7 @@ export default function Card({
 
           {size === '3x2' && (
             <div className={mergeClasses(styles.body, styles.body32)}>
+              <span className={styles.cityLine}>{place?.name}</span>
               <div className={styles.currentHero}>
                 <WeatherIcon
                   code={current.icon}
@@ -441,64 +454,59 @@ export default function Card({
                   size={ICON_HERO}
                   title={current.text}
                 />
-                <span className={mergeClasses(styles.temp1, styles.tempHero)}>{fmtTemp(current.temp, settings.unit)}</span>
+                <span className={mergeClasses(styles.temp1, styles.tempHero)}>
+                  {fmtTemp(current.temp, settings.unit)}
+                </span>
                 <div className={styles.heroMeta}>
                   <Condition code={current.icon} text={current.text} className={styles.conditionText} />
                   <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                  <span className={styles.subMeta}>体感 {fmtTemp(current.feelsLike, settings.unit)}</span>
-                </div>
-                <div className={styles.heroRight}>
-                  <span>{fmtWind(current.windDir, current.windScale)}</span>
-                  <span>湿度 {fmtHumidity(current.humidity)}</span>
                 </div>
               </div>
-              <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} className={styles.fill} />
+              <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} className={styles.fill} showLow={false} />
             </div>
           )}
 
           {size === '4x2' && (
             <div className={mergeClasses(styles.body, styles.body42)}>
-              <div className={styles.col42Current}>
-                <div className={styles.currentIconRow}>
-                  <WeatherIcon
-                    code={current.icon}
-                    night={currentNight}
-                    scheme={scheme}
-                    size={ICON_42}
-                    title={current.text}
-                  />
-                  <span className={mergeClasses(styles.temp1, styles.temp42)}>{fmtTemp(current.temp, settings.unit)}</span>
-                </div>
-                <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-                <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                <span className={styles.subMeta}>体感 {fmtTemp(current.feelsLike, settings.unit)}</span>
-                <span className={styles.subMeta}>
-                  {fmtWind(current.windDir, current.windScale)} · 湿度 {fmtHumidity(current.humidity)}
-                </span>
-              </div>
-              <div className={styles.divider} />
-              <div className={styles.col42Daily}>
-                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} className={styles.dailyFull} showText />
-              </div>
-              {air && (
-                <>
-                  <div className={styles.divider} />
-                  <div className={styles.col42Air}>
-                    <AirRing air={air} size="clamp(70px, 24vmin, 140px)" />
+              <span className={styles.cityLine}>{place?.name}</span>
+              <div className={styles.row42}>
+                <div className={styles.col42Current}>
+                  <div className={styles.currentIconRow}>
+                    <WeatherIcon
+                      code={current.icon}
+                      night={currentNight}
+                      scheme={scheme}
+                      size={ICON_42}
+                      title={current.text}
+                    />
+                    <span className={mergeClasses(styles.temp1, styles.temp42)}>
+                      {fmtTemp(current.temp, settings.unit)}
+                    </span>
                   </div>
-                </>
-              )}
+                  <Condition code={current.icon} text={current.text} className={styles.conditionText} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+                </div>
+                <div className={styles.col42Daily}>
+                  <DailyColumns
+                    items={data.daily}
+                    unit={settings.unit}
+                    scheme={scheme}
+                    className={styles.dailyFull}
+                  />
+                </div>
+                {air && (
+                  <div className={styles.col42Air}>
+                    <AirRing air={air} size="clamp(64px, 22vmin, 132px)" />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       )}
 
       {warnings && warnings.length > 0 && size === '1x1' && <WarningBadge warnings={warnings} />}
-      {size === '1x1' && mock && (
-        <span style={{ position: 'absolute', bottom: '4%', right: '6%' }}>
-          <DemoBadge />
-        </span>
-      )}
+      {showOfflineDot && <span className={styles.offlineDot} title="离线数据" />}
     </div>
   );
 }

@@ -1,0 +1,12 @@
+src\host\agent\ui\AgentPanel.tsx:31  boxShadow: tokens.shadow16
+src\host\agent\ui\AgentSurface.tsx:29  boxShadow: tokens.shadow16
+src\host\desktop\desktop.styles.ts:68  boxShadow: tokens.shadow8
+src\host\desktop\desktop.styles.ts:113  boxShadow: tokens.shadow2
+src\host\desktop\desktop.styles.ts:132  boxShadow: tokens.shadow4
+src\host\desktop\desktop.styles.ts:150  boxShadow: tokens.shadow2
+src\host\desktop\desktop.styles.ts:176  boxShadow: tokens.shadow8
+src\host\desktop\desktop.styles.ts:210  boxShadow: tokens.shadow4
+src\host\desktop\desktop.styles.ts:255  boxShadow: tokens.shadow16
+src\host\desktop\desktop.styles.ts:281  boxShadow: tokens.shadow8
+src\host\desktop\WidgetCard.tsx:119  boxShadow: editMode ? tokens.shadow8 : tokens.shadow4
+src\host\notifications\ReminderDialog.tsx:41  boxShadow: tokens.shadow64

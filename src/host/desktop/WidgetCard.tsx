@@ -1,11 +1,12 @@
 /**
  * 桌面上的一个小组件卡片。
  *
- * 普通模式：iframe 占满卡片内容区，宿主只保留一圈很窄的材质边框（长按进编辑模式的手势区，
- * iframe 内部的指针事件不会冒泡给宿主，这是 iframe 隔离的代价）。
- * 编辑模式：卡片上方盖一层宿主控制的浮层，负责拖拽、删除、改尺寸、设置。
+ * 正常模式：**无任何宿主 chrome**——卡片就是圆角 + 材质 + iframe 内容；
+ * 只在悬停时于卡片顶部淡入一个极轻的拖拽提示（overlay，不占布局高度）。
+ * 编辑模式：浮层才出现标题 + 删除 / 改尺寸 / 设置，并用 Fluent motionTokens 做进出过渡
+ * （浮层常驻 DOM，靠 opacity/transform 过渡，避免退出时瞬间消失）。
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import {
   Button,
@@ -15,10 +16,17 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  Text,
   Tooltip,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { Delete20Regular, Resize20Regular, Settings20Regular } from '@fluentui/react-icons';
+import {
+  Delete20Regular,
+  ReOrderDotsHorizontal20Regular,
+  Resize20Regular,
+  Settings20Regular,
+} from '@fluentui/react-icons';
 import type { HostBridge } from '../bridge';
 import type { ThemePayload, WidgetInstance, WidgetSize } from '../bridge/types';
 import type { GridMetrics } from '../layout';
@@ -77,6 +85,7 @@ export function WidgetCard({
 }: WidgetCardProps) {
   const styles = useStyles();
   const frameRef = useRef<WidgetFrameHandle>(null);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     registerFrameHandle(widget.uid, frameRef.current);
@@ -147,6 +156,8 @@ export function WidgetCard({
         onPointerMove={longPress.onPointerMove}
         onPointerUp={longPress.onPointerUp}
         onPointerCancel={longPress.onPointerCancel}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
       >
         <WidgetFrame
           ref={frameRef}
@@ -161,71 +172,89 @@ export function WidgetCard({
         />
       </div>
 
-      {editMode && (
+      {/* 正常模式唯一允许的轻量提示：悬停时出现，overlay 不占布局高度 */}
+      <div
+        className={mergeClasses(
+          styles.dragHint,
+          hovered && !editMode && !dragging && styles.dragHintVisible,
+        )}
+        data-drag-hint="true"
+        aria-hidden="true"
+      >
+        <ReOrderDotsHorizontal20Regular />
+      </div>
+
+      {/* 编辑模式 chrome：标题 + 删除 / 改尺寸 / 设置。常驻 DOM 用 opacity/transform 过渡进出 */}
+      <div
+        className={mergeClasses(styles.editOverlay, editMode && styles.editOverlayVisible)}
+        data-widget-overlay="true"
+        data-edit-chrome="true"
+        aria-hidden={!editMode}
+        inert={!editMode}
+        onPointerDown={(event) => {
+          if (!editMode) return;
+          const target = event.target;
+          if (target instanceof HTMLElement && target.closest('[data-card-controls]')) return;
+          onEditPointerDown(event, widget);
+        }}
+      >
+        <Text className={styles.editTitle} size={200} weight="semibold" truncate>
+          {widget.title}
+        </Text>
         <div
-          className={styles.editOverlay}
-          data-widget-overlay="true"
-          onPointerDown={(event) => {
-            const target = event.target;
-            if (target instanceof HTMLElement && target.closest('[data-card-controls]')) return;
-            onEditPointerDown(event, widget);
-          }}
+          className={styles.editControls}
+          data-card-controls="true"
+          onPointerDown={(event) => event.stopPropagation()}
         >
-          <div
-            className={styles.editControls}
-            data-card-controls="true"
-            onPointerDown={(event) => event.stopPropagation()}
+          <Tooltip content="删除" relationship="label">
+            <Button
+              size="small"
+              appearance="subtle"
+              icon={<Delete20Regular />}
+              aria-label={`删除 ${widget.title}`}
+              onClick={() => onDelete(widget)}
+            />
+          </Tooltip>
+          <Menu
+            defaultCheckedValues={{
+              'widget-size': [`${widget.size[0]}x${widget.size[1]}`],
+            }}
           >
-            <Tooltip content="删除" relationship="label">
+            <MenuTrigger disableButtonEnhancement>
               <Button
                 size="small"
                 appearance="subtle"
-                icon={<Delete20Regular />}
-                aria-label={`删除 ${widget.title}`}
-                onClick={() => onDelete(widget)}
+                icon={<Resize20Regular />}
+                aria-label={`改变 ${widget.title} 的尺寸`}
+                title="改尺寸"
               />
-            </Tooltip>
-            <Menu
-              defaultCheckedValues={{
-                'widget-size': [`${widget.size[0]}x${widget.size[1]}`],
-              }}
-            >
-              <MenuTrigger disableButtonEnhancement>
-                <Button
-                  size="small"
-                  appearance="subtle"
-                  icon={<Resize20Regular />}
-                  aria-label={`改变 ${widget.title} 的尺寸`}
-                  title="改尺寸"
-                />
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  {availableSizes.map((size) => (
-                    <MenuItemRadio
-                      key={`${size[0]}x${size[1]}`}
-                      name="widget-size"
-                      value={`${size[0]}x${size[1]}`}
-                      onClick={() => onChangeSize(widget, size)}
-                    >
-                      {`${size[0]} × ${size[1]}`}
-                    </MenuItemRadio>
-                  ))}
-                </MenuList>
-              </MenuPopover>
-            </Menu>
-            <Tooltip content="设置" relationship="label">
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<Settings20Regular />}
-                aria-label={`${widget.title} 设置`}
-                onClick={() => onOpenSettings(widget)}
-              />
-            </Tooltip>
-          </div>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                {availableSizes.map((size) => (
+                  <MenuItemRadio
+                    key={`${size[0]}x${size[1]}`}
+                    name="widget-size"
+                    value={`${size[0]}x${size[1]}`}
+                    onClick={() => onChangeSize(widget, size)}
+                  >
+                    {`${size[0]} × ${size[1]}`}
+                  </MenuItemRadio>
+                ))}
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+          <Tooltip content="设置" relationship="label">
+            <Button
+              size="small"
+              appearance="subtle"
+              icon={<Settings20Regular />}
+              aria-label={`${widget.title} 设置`}
+              onClick={() => onOpenSettings(widget)}
+            />
+          </Tooltip>
         </div>
-      )}
+      </div>
     </Card>
   );
 }

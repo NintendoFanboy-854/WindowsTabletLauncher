@@ -1,5 +1,6 @@
 /**
- * 工具调用卡片：运行中 / 成功 / 失败三种状态 + 参数与结果（可折叠）。
+ * 工具调用卡片（按 docs/DENSITY.md：默认折叠成一行「图标 + 动作 + 状态」，
+ * 展开后才看参数与结果）。
  */
 
 import {
@@ -8,7 +9,6 @@ import {
   AccordionItem,
   AccordionPanel,
   Badge,
-  Card,
   Spinner,
   Text,
   makeStyles,
@@ -20,25 +20,40 @@ import { summarizeToolArgs, summarizeToolResult } from '../tools/registry';
 
 const useStyles = makeStyles({
   card: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
     backgroundColor: tokens.colorNeutralBackground3,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
-    padding: tokens.spacingHorizontalM,
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+  },
+  header: {
+    paddingInline: tokens.spacingHorizontalS,
   },
   head: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
+    gap: tokens.spacingHorizontalXS,
     minWidth: 0,
+    width: '100%',
   },
   name: {
     fontFamily: tokens.fontFamilyMonospace,
     fontSize: tokens.fontSizeBase200,
+    flexShrink: 0,
+  },
+  action: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase100,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    flex: 1,
+    minWidth: 0,
+  },
+  panel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    paddingBlockEnd: tokens.spacingVerticalS,
   },
   args: {
     fontFamily: tokens.fontFamilyMonospace,
@@ -64,18 +79,18 @@ const useStyles = makeStyles({
   },
 });
 
-/** 模型看到的 `web__search` 还原成人类可读的 `web.search` */
+/** 模型看到的 `clock__now` 还原成人类可读的 `clock.now` */
 function displayName(name: string): string {
   return name.replace(/__/g, '.');
 }
 
 export function ToolCallCard({ record }: { record: ToolCallRecord }) {
   const styles = useStyles();
-  const statusBadge =
+  const resultText = summarizeToolResult(record.result);
+
+  const status =
     record.status === 'running' ? (
-      <Badge appearance="tint" color="informative">
-        运行中
-      </Badge>
+      <Spinner size="extra-tiny" aria-label="工具运行中" />
     ) : record.status === 'success' ? (
       <Badge appearance="tint" color="success">
         已完成
@@ -86,33 +101,33 @@ export function ToolCallCard({ record }: { record: ToolCallRecord }) {
       </Badge>
     );
 
-  const resultText = summarizeToolResult(record.result);
-
   return (
-    <Card size="small" appearance="filled-alternative" className={styles.card}>
-      <div className={styles.head}>
-        {record.status === 'running' ? <Spinner size="extra-tiny" /> : <WrenchRegular />}
-        <Text className={styles.name} weight="semibold">
-          {displayName(record.name)}
-        </Text>
-        {statusBadge}
-      </div>
-      <Text className={styles.args}>{summarizeToolArgs(record.args)}</Text>
-      {record.status === 'error' && record.error ? (
-        <Text className={styles.error} as="p">
-          {record.error}
-        </Text>
-      ) : null}
-      {record.status === 'success' && resultText ? (
-        <Accordion collapsible>
-          <AccordionItem value="result">
-            <AccordionHeader size="small">查看返回结果</AccordionHeader>
-            <AccordionPanel>
+    <Accordion collapsible className={styles.card}>
+      <AccordionItem value="call">
+        <AccordionHeader size="small" className={styles.header}>
+          <span className={styles.head}>
+            <WrenchRegular />
+            <Text className={styles.name} weight="semibold">
+              {displayName(record.name)}
+            </Text>
+            <Text className={styles.action}>{summarizeToolArgs(record.args)}</Text>
+            {status}
+          </span>
+        </AccordionHeader>
+        <AccordionPanel>
+          <div className={styles.panel}>
+            <Text className={styles.args}>{summarizeToolArgs(record.args)}</Text>
+            {record.status === 'error' && record.error ? (
+              <Text className={styles.error} as="p">
+                {record.error}
+              </Text>
+            ) : null}
+            {record.status === 'success' && resultText ? (
               <pre className={styles.result}>{resultText}</pre>
-            </AccordionPanel>
-          </AccordionItem>
-        </Accordion>
-      ) : null}
-    </Card>
+            ) : null}
+          </div>
+        </AccordionPanel>
+      </AccordionItem>
+    </Accordion>
   );
 }

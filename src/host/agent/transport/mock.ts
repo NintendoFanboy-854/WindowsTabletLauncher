@@ -1,9 +1,9 @@
 /**
- * 离线 Mock 传输层：没有 MiMo / Tavily Key 时用来验证完整 UI 流程
- * （流式回复、工具调用卡片、语音状态机、连续朗读）。
+ * 离线 Mock 传输层：没有 MiMo Key 时用来验证完整 UI 流程
+ * （流式回复、原生联网搜索来源 chips、工具调用卡片、语音状态机、连续朗读）。
  *
- * 它只模拟传输层，工具执行仍走真实的注册表（内置工具走 mock 的 searchWeb/fetchPage，
- * 插件工具走 mock 的 listPluginTools/callPluginTool），因此面板里的工具卡片是真流程。
+ * 它只模拟传输层：插件工具走 mock 的 listPluginTools/callPluginTool；
+ * 联网搜索模拟 MiMo 原生 web_search 的 annotations / usage 事件，因此来源 chips 是真流程。
  */
 
 import type {
@@ -12,9 +12,8 @@ import type {
   ChatRequestMessage,
   ChatTurnRequest,
   ModelStreamEvent,
+  SourceRef,
   ToolRunOptions,
-  WebPage,
-  WebSearchResult,
 } from '../types';
 
 function abortError(): DOMException {
@@ -88,20 +87,35 @@ function pickPluginTool(available: Set<string>, candidates: string[]): string | 
   return candidates.find((name) => available.has(name)) ?? null;
 }
 
-/** 从工具结果 JSON 里取标题/链接，mock 也要真的拼出来源 */
-function extractSources(toolContent: string): Array<{ title: string; url: string }> {
-  try {
-    const parsed = JSON.parse(toolContent) as {
-      results?: Array<{ title?: string; url?: string }>;
-    };
-    return (parsed.results ?? [])
-      .filter((item) => typeof item.url === 'string')
-      .slice(0, 3)
-      .map((item) => ({ title: item.title ?? item.url ?? '', url: item.url as string }));
-  } catch {
-    return [];
-  }
-}
+/** 模拟 MiMo annotations：故意给 4 条，验证“首屏 3 条 + 折叠” */
+const MOCK_SEARCH_SOURCES: SourceRef[] = [
+  {
+    url: 'https://mimo.mi.com/docs/zh-CN/updates/model',
+    title: 'MiMo V2.6 系列模型更新：1M 上下文、128K 输出',
+    siteName: 'mimo.mi.com',
+    summary: 'MiMo V2.6 支持文本生成、全模态理解、深度思考、流式输出、函数调用、结构化输出和联网搜索。',
+    publishTime: '2026-10-08',
+    logoUrl: 'https://mimo.mi.com/favicon.ico',
+  },
+  {
+    url: 'https://mimo.mi.com/docs/zh-CN/api/chat/openai-api',
+    title: 'OpenAI Chat Completions API 兼容',
+    siteName: 'mimo.mi.com',
+    summary: '请求地址 https://api.xiaomimimo.com/v1/chat/completions，SSE 流式返回。',
+  },
+  {
+    url: 'https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/text-generation/tool-calling/web-search',
+    title: '联网搜索（web_search）使用指南',
+    siteName: 'mimo.mi.com',
+    summary: 'tools 里加 { type: "web_search", max_keyword, force_search, limit }，来源通过 annotations 返回。',
+  },
+  {
+    url: 'https://platform.xiaomimimo.com/#/console/plugin',
+    title: 'MiMo 控制台 · 插件管理',
+    siteName: 'platform.xiaomimimo.com',
+    summary: '在控制台开通 Web Search Plugin 后，请求才允许携带 web_search 工具。',
+  },
+];
 
 const MOCK_PLUGIN_TOOLS: AgentToolDecl[] = [
   {
@@ -161,9 +175,9 @@ export class MockTransport implements AgentTransport {
       }
     }
 
-    // 第二轮：已经有工具结果，生成最终回答
+    // 第二轮：已经有插件工具结果，生成最终回答
     if (previousTool) {
-      const answer = this.composeAnswer(previousTool.name, previousTool.content, userText);
+      const answer = this.composeAnswer(previousTool.name, previousTool.content);
       for (const chunk of chunkText(answer)) {
         await sleep(14, signal);
         onEvent({ type: 'content', text: chunk });
@@ -172,12 +186,26 @@ export class MockTransport implements AgentTransport {
       return;
     }
 
-    // 第一轮：按关键词决定调用哪个工具
+    // 联网搜索：模拟 MiMo 原生 web_search —— 首个数据包带来源，再流式输出总结
+    const wantsSearch = /搜索|最新|新闻|价格|查一下|搜一下|实时/.test(userText);
+    if (wantsSearch) {
+      await sleep(260, signal);
+      onEvent({ type: 'sources', sources: MOCK_SEARCH_SOURCES });
+      onEvent({ type: 'usage', webSearchUsage: { toolUsage: 1, pageUsage: 4 } });
+      const answer = `我联网查了一下「${userText.replace(/\s+/g, ' ').slice(0, 24)}」。MiMo V2.6 三个型号都支持 1M 上下文和 128K 输出，深度思考、函数调用、流式输出、联网搜索都已支持。\n\n来源：\n1. [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)\n2. [OpenAI Chat Completions API 兼容](https://mimo.mi.com/docs/zh-CN/api/chat/openai-api)`;
+      for (const chunk of chunkText(answer)) {
+        await sleep(14, signal);
+        onEvent({ type: 'content', text: chunk });
+      }
+      onEvent({ type: 'finish', reason: 'stop' });
+      return;
+    }
+
+    // 插件工具：按关键词决定调用哪个
     const wantsTime = /几点|时间|日期|星期/.test(userText);
     const wantsTodo = /待办|任务|日程|今天要做/.test(userText);
     const wantsPomodoro = /番茄|专注/.test(userText);
     const wantsWeather = /天气|气温|下雨/.test(userText);
-    const wantsSearch = /搜索|最新|新闻|价格|查一下|搜一下|实时/.test(userText);
 
     const toolName = wantsTime
       ? pickPluginTool(available, ['system__time'])
@@ -187,9 +215,7 @@ export class MockTransport implements AgentTransport {
           ? pickPluginTool(available, ['pomodoro__start'])
           : wantsWeather
             ? pickPluginTool(available, ['weather__queryPlace'])
-            : wantsSearch
-              ? pickPluginTool(available, ['web__search'])
-              : null;
+            : null;
 
     if (toolName) {
       const toolCall = (args: unknown) => {
@@ -200,7 +226,6 @@ export class MockTransport implements AgentTransport {
       };
       if (toolName === 'pomodoro__start') toolCall({ minutes: 25 });
       else if (toolName === 'weather__queryPlace') toolCall({ place: '上海' });
-      else if (toolName === 'web__search') toolCall({ query: userText.replace(/\s+/g, ' ').slice(0, 40) });
       else toolCall({});
       onEvent({ type: 'finish', reason: 'tool_calls' });
       return;
@@ -214,14 +239,7 @@ export class MockTransport implements AgentTransport {
     onEvent({ type: 'finish', reason: 'stop' });
   }
 
-  private composeAnswer(toolName: string, toolContent: string, userText: string): string {
-    if (toolName === 'web__search') {
-      const sources = extractSources(toolContent);
-      const list = sources
-        .map((source, index) => `${index + 1}. [${source.title}](${source.url})`)
-        .join('\n');
-      return `我联网查了一下「${userText.slice(0, 24)}」。Mock 搜索结果显示：MiMo V2.6 支持 1M 上下文与 128K 输出，工具调用和流式输出都在支持列表里。\n\n来源：\n${list || '1. [MiMo 模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)'}`;
-    }
+  private composeAnswer(toolName: string, toolContent: string): string {
     if (toolName === 'system__time') {
       try {
         const parsed = JSON.parse(toolContent) as { local?: string; weekday?: string };
@@ -258,38 +276,6 @@ export class MockTransport implements AgentTransport {
       await sleep(90, options.signal);
       yield silence;
     }
-  }
-
-  async searchWeb(query: string, options: ToolRunOptions): Promise<WebSearchResult[]> {
-    await sleep(400, options.signal);
-    return [
-      {
-        title: 'MiMo V2.6 系列模型更新：1M 上下文、128K 输出',
-        url: 'https://mimo.mi.com/docs/zh-CN/updates/model',
-        content: `与「${query}」相关的 Mock 搜索结果：MiMo V2.6 支持文本生成、全模态理解、深度思考、流式输出、函数调用、结构化输出和联网搜索。`,
-      },
-      {
-        title: 'Windows 平板桌面启动器 · 设计约定',
-        url: 'https://example.com/wtsl/design',
-        content: '自适应网格、Fluent 2 组件、插件 iframe 隔离、Agent 面板浮层宽度 min(420px, 92vw)。',
-      },
-      {
-        title: 'Tavily Search API Reference',
-        url: 'https://docs.tavily.com/documentation/api-reference/endpoint/search',
-        content: 'Tavily 返回 results[].title / url / content，适合给模型做联网检索。',
-      },
-    ];
-  }
-
-  async fetchPage(url: string, options: ToolRunOptions): Promise<WebPage> {
-    await sleep(400, options.signal);
-    return {
-      url,
-      title: 'Mock 网页正文',
-      content:
-        '这是 Mock 模式抓取到的网页正文示例。真实模式会用宿主实现抓取网页并转纯文本，CORS 失败时退到 Jina Reader。',
-      truncated: false,
-    };
   }
 
   listPluginTools(): AgentToolDecl[] {

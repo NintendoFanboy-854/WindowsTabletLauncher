@@ -1,0 +1,7 @@
+public\plugins\clock\styles.css:362  blur(var(--wtsl-material-blur))
+public\plugins\countdown\styles.css:622  blur(var(--wtsl-material-blur))
+public\plugins\countdown\styles.css:724  blur(var(--wtsl-material-blur))
+public\plugins\pomodoro\styles.css:590  blur(var(--wtsl-material-blur))
+public\plugins\pomodoro\styles.css:816  blur(var(--wtsl-material-blur))
+public\plugins\sedentary\styles.css:576  blur(var(--wtsl-material-blur))
+public\plugins\todo\app.css:58  blur(var(--wtsl-material-blur))

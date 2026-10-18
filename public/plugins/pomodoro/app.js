@@ -74,25 +74,26 @@ const THEME_ALIASES = {
 
 const $ = (id) => document.getElementById(id);
 const els = {
+  app: $('app'),
   phaseLabel: $('phase-label'),
   timeMain: $('time-main'),
   timePlain: $('time-plain'),
   phaseChip: $('phase-chip'),
-  phaseLine: $('phase-line'),
   taskLine: $('task-line'),
-  stats: $('stats'),
-  rounds: $('rounds'),
   ringProgress: $('ring-progress'),
   toggleBtn: $('toggle-btn'),
   toggleIcon: $('toggle-icon'),
-  skipBtn: $('skip-btn'),
-  resetBtn: $('reset-btn'),
+  toggleLabel: $('toggle-label'),
   visual: $('visual'),
-  plain: document.querySelector('.plain'),
-  noiseBtn: $('noise-btn'),
-  noiseLabel: $('noise-label'),
-  volumeSlider: $('volume-slider'),
-  settingsBtn: $('settings-btn'),
+  plain: $('plain'),
+  actions: $('actions'),
+  menuBtn: $('menu-btn'),
+  menuBackdrop: $('menu-backdrop'),
+  actionMenu: $('action-menu'),
+  menuDetail: $('menu-detail'),
+  menuSkip: $('menu-skip'),
+  menuReset: $('menu-reset'),
+  menuSettings: $('menu-settings'),
   immersive: $('immersive'),
   immersivePhase: $('immersive-phase'),
   immersiveTime: $('immersive-time'),
@@ -102,6 +103,16 @@ const els = {
   immersiveClose: $('immersive-close'),
   immersiveStats: $('immersive-stats'),
   scrim: $('scrim'),
+  detailSheet: $('detail-sheet'),
+  detailClose: $('detail-close'),
+  detailCompleted: $('detail-completed'),
+  detailMinutes: $('detail-minutes'),
+  detailRounds: $('detail-rounds'),
+  detailNoise: $('detail-noise'),
+  detailSkip: $('detail-skip'),
+  detailReset: $('detail-reset'),
+  detailSettings: $('detail-settings'),
+  detailImmersive: $('detail-immersive'),
   settingsSheet: $('settings-sheet'),
   settingsClose: $('settings-close'),
   setFocus: $('set-focus'),
@@ -201,7 +212,9 @@ const state = {
   runtime: null,
   size: resolveSize(),
   sizeFromUrl: sizeFromUrl(),
-  sheetOpen: false,
+  panel: null,
+  menuOpen: false,
+  suppressClick: false,
   immersiveOpen: false,
   keepAwakeOn: false,
   lastNoiseKind: 'rain',
@@ -744,18 +757,8 @@ function syncSlider(input, value) {
   if (input.value !== next) input.value = next;
 }
 
-function renderRounds() {
-  const count = state.settings.roundsBeforeLongBreak;
-  const done = state.runtime.focusRound;
-  const signature = `${count}:${done}`;
-  if (els.rounds.dataset.signature === signature) return;
-  els.rounds.dataset.signature = signature;
-  els.rounds.textContent = '';
-  for (let index = 0; index < count; index += 1) {
-    const dot = document.createElement('span');
-    dot.className = 'round-dot' + (index < done ? ' is-done' : '');
-    els.rounds.append(dot);
-  }
+function isCompactSize() {
+  return (state.size[0] === 1 && state.size[1] === 1) || (state.size[0] === 2 && state.size[1] === 1);
 }
 
 function render() {
@@ -774,36 +777,47 @@ function render() {
   els.phaseLabel.textContent = phaseLabel;
   els.phaseChip.textContent = phaseLabel;
   els.immersivePhase.textContent = phaseLabel;
-  els.phaseLine.textContent = `${phaseLabel} · ${Math.round(runtime.totalMs / 60000)} 分钟 · ${phaseStatusText()}`;
 
   const ratio = runtime.totalMs > 0 ? clamp(remaining / runtime.totalMs, 0, 1) : 0;
   els.ringProgress.style.strokeDashoffset = String(RING_CIRCUMFERENCE * ratio);
   els.ringProgress.style.opacity = ratio >= 0.999 ? '0' : '1';
 
   const running = runtime.running;
-  els.toggleIcon.innerHTML = `<path fill="currentColor" d="${running ? ICON_PAUSE : ICON_PLAY}"/>`;
   const toggleLabel = running ? '暂停' : runtime.session && runtime.remainingMs < runtime.totalMs ? '继续' : '开始';
-  els.toggleBtn.setAttribute('aria-label', toggleLabel);
-  els.toggleBtn.title = `${toggleLabel}（点击时间区域进入沉浸模式）`;
+  els.toggleIcon.innerHTML = `<path fill="currentColor" d="${running ? ICON_PAUSE : ICON_PLAY}"/>`;
+  els.toggleLabel.textContent = toggleLabel;
+  els.toggleBtn.setAttribute('aria-label', `${toggleLabel}本轮`);
+  els.toggleBtn.title = `${toggleLabel} / 暂停`;
 
   const task = taskText();
   els.taskLine.textContent = task;
   els.immersiveTask.textContent = task;
 
-  const today = todayLine();
-  els.stats.textContent = today;
-  els.immersiveStats.textContent = today;
+  const today = statsForRange('today');
+  els.immersiveStats.textContent = `今日 ${today.completed} 个 · ${today.focusMinutes} 分钟`;
   els.immersiveToggle.textContent = running ? '暂停' : '继续';
 
-  renderRounds();
-
+  // 详情层（只在打开时可见，但更新成本很低）
   const noiseKind = state.settings.whiteNoise;
-  const noiseLabel = NOISE_BY_ID.get(noiseKind)?.label ?? '无';
-  els.noiseBtn.classList.toggle('is-on', noiseKind !== 'none');
-  els.noiseLabel.textContent = noiseKind === 'none' ? '白噪音关' : `${noiseLabel} · ${state.settings.whiteNoiseVolume}%`;
-  syncSlider(els.volumeSlider, state.settings.whiteNoiseVolume);
-  if (state.sheetOpen) syncSlider(els.setVolume, state.settings.whiteNoiseVolume);
+  const roundsDone = runtime.focusRound;
+  const roundsTotal = state.settings.roundsBeforeLongBreak;
+  els.detailCompleted.textContent = `${today.completed} 个`;
+  els.detailMinutes.textContent = `${today.focusMinutes} 分钟`;
+  els.detailRounds.textContent = `${roundsDone} / ${roundsTotal}`;
+  els.detailNoise.textContent = noiseKind === 'none' ? '关' : `${NOISE_BY_ID.get(noiseKind)?.label ?? ''} · ${state.settings.whiteNoiseVolume}%`;
+  for (const button of els.noiseOptions.querySelectorAll('.seg-btn')) {
+    button.setAttribute('aria-pressed', String(button.dataset.kind === noiseKind));
+  }
+  if (state.panel === 'detail') syncSlider(els.setVolume, state.settings.whiteNoiseVolume);
+  els.volumeValue.textContent = String(state.settings.whiteNoiseVolume);
   els.immersive.classList.toggle('is-running', running);
+
+  els.visual.setAttribute(
+    'aria-label',
+    isCompactSize()
+      ? `${phaseLabel} ${text}，点击开始或暂停，长按查看详情`
+      : `${phaseLabel} ${text}，点击查看详情`,
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -892,63 +906,210 @@ function setWhiteNoise(kind) {
   saveSettings({ whiteNoise: kind }, { restartNoise: true });
 }
 
-function openSettings() {
-  if (state.sheetOpen) return;
-  state.sheetOpen = true;
+const sheets = { detail: els.detailSheet, settings: els.settingsSheet };
+
+function openPanel(name) {
+  if (!sheets[name] || state.panel === name) return;
+  closeMenu();
+  if (state.panel) {
+    const previous = sheets[state.panel];
+    previous.classList.remove('is-open');
+    previous.hidden = true;
+  }
+  state.panel = name;
+  const sheet = sheets[name];
   document.body.classList.add('sheet-open');
-  syncSettingsControls();
+  if (name === 'settings') syncSettingsControls();
+  render();
   els.scrim.hidden = false;
-  els.settingsSheet.hidden = false;
+  sheet.hidden = false;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       els.scrim.classList.add('is-open');
-      els.settingsSheet.classList.add('is-open');
+      sheet.classList.add('is-open');
     });
   });
-  els.settingsClose.focus({ preventScroll: true });
+  window.setTimeout(() => {
+    (name === 'settings' ? els.settingsClose : els.detailClose).focus({ preventScroll: true });
+  }, 30);
+}
+
+function closePanel() {
+  if (!state.panel) return;
+  const name = state.panel;
+  const sheet = sheets[name];
+  state.panel = null;
+  document.body.classList.remove('sheet-open');
+  els.scrim.classList.remove('is-open');
+  sheet.classList.remove('is-open');
+  window.setTimeout(() => {
+    if (state.panel) return;
+    sheet.hidden = true;
+    els.scrim.hidden = true;
+  }, motionMs('--durationNormal') + 20);
+  els.visual.focus({ preventScroll: true });
+}
+
+function openSettings() {
+  openPanel('settings');
 }
 
 function closeSettings() {
-  if (!state.sheetOpen) return;
-  state.sheetOpen = false;
-  document.body.classList.remove('sheet-open');
-  els.scrim.classList.remove('is-open');
-  els.settingsSheet.classList.remove('is-open');
+  closePanel();
+}
+
+/* ---------------- ⋯ 菜单（3×2 的唯一 Tertiary 入口） ---------------- */
+
+function positionMenu() {
+  const margin = 8;
+  const menu = els.actionMenu;
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  const rect = menu.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  const anchor = els.menuBtn.getBoundingClientRect();
+  let left = anchor.right - rect.width;
+  let top = anchor.bottom + margin;
+  if (left < margin) left = margin;
+  if (left + rect.width > viewportWidth - margin) left = viewportWidth - rect.width - margin;
+  if (top + rect.height > viewportHeight - margin) {
+    top = Math.max(margin, anchor.top - rect.height - margin);
+  }
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function openMenu() {
+  if (state.menuOpen || state.panel) return;
+  state.menuOpen = true;
+  els.menuBackdrop.hidden = false;
+  els.actionMenu.hidden = false;
+  positionMenu();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => els.actionMenu.classList.add('is-open'));
+  });
+  els.menuDetail.focus({ preventScroll: true });
+}
+
+function closeMenu() {
+  if (!state.menuOpen) return;
+  state.menuOpen = false;
+  els.actionMenu.classList.remove('is-open');
+  els.menuBackdrop.hidden = true;
   window.setTimeout(() => {
-    if (state.sheetOpen) return;
-    els.scrim.hidden = true;
-    els.settingsSheet.hidden = true;
-  }, motionMs('--durationNormal') + 20);
-  els.settingsBtn.focus({ preventScroll: true });
+    if (!state.menuOpen) els.actionMenu.hidden = true;
+  }, motionMs('--durationFast') + 20);
 }
 
 /* ------------------------------------------------------------------ */
 /* UI 事件                                                             */
 /* ------------------------------------------------------------------ */
 
+function primaryAction() {
+  ensureAudio();
+  if (isCompactSize()) {
+    // 1×1 / 2×1 没有按钮：点击就是主操作（开始/暂停）
+    toggleTimer();
+  } else {
+    // 2×2 / 3×2：点击环形打开详情
+    openPanel('detail');
+  }
+}
+
 els.toggleBtn.addEventListener('click', (event) => {
   event.stopPropagation();
   ensureAudio();
   toggleTimer();
 });
-els.skipBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  skipPhase();
-});
-els.resetBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  resetTimer();
-});
 
 for (const node of [els.visual, els.plain]) {
-  node.addEventListener('click', () => openImmersive());
+  node.addEventListener('click', () => {
+    if (state.suppressClick) {
+      state.suppressClick = false;
+      return;
+    }
+    primaryAction();
+  });
   node.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openImmersive();
+      primaryAction();
+    } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      openPanel('detail');
     }
   });
 }
+
+// 长按 = 详情（正常模式不出现齿轮）
+const LONG_PRESS_MS = 500; // DESIGN.md 的手势阈值（交互参数，不是动效时长）
+let longPressTimer = 0;
+let longPressOrigin = null;
+
+function startLongPress(event) {
+  if (state.panel || state.menuOpen) return;
+  if (event.target.closest?.('.primary-btn, .icon-btn, .menu, .sheet, .immersive')) return;
+  longPressOrigin = { x: event.clientX, y: event.clientY };
+  window.clearTimeout(longPressTimer);
+  longPressTimer = window.setTimeout(() => {
+    state.suppressClick = true;
+    openPanel('detail');
+  }, LONG_PRESS_MS);
+}
+
+function clearLongPress() {
+  window.clearTimeout(longPressTimer);
+  longPressTimer = 0;
+  longPressOrigin = null;
+}
+
+els.app.addEventListener('pointerdown', startLongPress);
+for (const name of ['pointerup', 'pointercancel', 'pointerleave']) els.app.addEventListener(name, clearLongPress);
+els.app.addEventListener('pointermove', (event) => {
+  if (!longPressOrigin) return;
+  if (Math.hypot(event.clientX - longPressOrigin.x, event.clientY - longPressOrigin.y) > 8) clearLongPress();
+});
+
+els.menuBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (state.menuOpen) closeMenu();
+  else openMenu();
+});
+els.menuBackdrop.addEventListener('click', closeMenu);
+els.menuDetail.addEventListener('click', () => {
+  closeMenu();
+  openPanel('detail');
+});
+els.menuSkip.addEventListener('click', () => {
+  closeMenu();
+  skipPhase();
+});
+els.menuReset.addEventListener('click', () => {
+  closeMenu();
+  resetTimer();
+});
+els.menuSettings.addEventListener('click', () => {
+  closeMenu();
+  openSettings();
+});
+
+els.detailSkip.addEventListener('click', () => {
+  skipPhase();
+  closePanel();
+});
+els.detailReset.addEventListener('click', () => {
+  resetTimer();
+  closePanel();
+});
+els.detailSettings.addEventListener('click', () => openPanel('settings'));
+els.detailImmersive.addEventListener('click', () => {
+  closePanel();
+  openImmersive();
+});
+els.detailClose.addEventListener('click', closePanel);
+els.settingsClose.addEventListener('click', closeSettings);
+els.scrim.addEventListener('click', closePanel);
 
 els.immersiveToggle.addEventListener('click', () => {
   ensureAudio();
@@ -956,26 +1117,19 @@ els.immersiveToggle.addEventListener('click', () => {
 });
 els.immersiveStop.addEventListener('click', () => {
   stopTimer();
+  closeImmersive();
 });
 els.immersiveClose.addEventListener('click', closeImmersive);
 
-els.noiseBtn.addEventListener('click', () => {
-  ensureAudio();
-  const next = state.settings.whiteNoise === 'none' ? state.lastNoiseKind : 'none';
-  setWhiteNoise(next);
-});
-els.volumeSlider.addEventListener('input', () => {
-  const volume = clamp(Math.round(Number(els.volumeSlider.value)), 0, 100);
+els.setVolume.addEventListener('input', () => {
+  const volume = clamp(Math.round(Number(els.setVolume.value)), 0, 100);
+  els.volumeValue.textContent = String(volume);
   state.settings.whiteNoiseVolume = volume;
   writeJSON(SETTINGS_KEY, state.settings);
   plugin.setConfig(SETTINGS_KEY, state.settings);
   setNoiseVolume(volume);
   render();
 });
-
-els.settingsBtn.addEventListener('click', () => openSettings());
-els.settingsClose.addEventListener('click', closeSettings);
-els.scrim.addEventListener('click', closeSettings);
 
 function wireNumberInput(input, key) {
   input.addEventListener('change', () => {
@@ -996,21 +1150,15 @@ wireNumberInput(els.setRounds, 'roundsBeforeLongBreak');
 els.setAuto.addEventListener('change', () => saveSettings({ autoStartNext: els.setAuto.checked }));
 els.setSound.addEventListener('change', () => saveSettings({ sound: els.setSound.checked }));
 els.setKeepAwake.addEventListener('change', () => saveSettings({ keepAwake: els.setKeepAwake.checked }));
-els.setVolume.addEventListener('input', () => {
-  const volume = clamp(Math.round(Number(els.setVolume.value)), 0, 100);
-  els.volumeValue.textContent = String(volume);
-  state.settings.whiteNoiseVolume = volume;
-  writeJSON(SETTINGS_KEY, state.settings);
-  plugin.setConfig(SETTINGS_KEY, state.settings);
-  setNoiseVolume(volume);
-  render();
-});
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  if (state.sheetOpen) {
+  if (state.menuOpen) {
     event.preventDefault();
-    closeSettings();
+    closeMenu();
+  } else if (state.panel) {
+    event.preventDefault();
+    closePanel();
   } else if (state.immersiveOpen) {
     event.preventDefault();
     closeImmersive();
@@ -1327,7 +1475,7 @@ plugin.onResize((size) => {
 plugin.onTheme((theme) => applyTheme(theme));
 
 plugin.onFocus(() => {
-  const target = state.size[0] === 1 ? els.visual : els.toggleBtn;
+  const target = state.size[0] === 1 && state.size[1] === 1 ? els.visual : state.size[0] === 2 && state.size[1] === 1 ? els.plain : els.toggleBtn;
   target.focus({ preventScroll: true });
 });
 
@@ -1341,6 +1489,8 @@ if (!plugin.inHost) {
   boot();
   if (urlParams.get('immersive') === '1') openImmersive();
   else if (urlParams.get('settings') === '1') openSettings();
+  else if (urlParams.get('detail') === '1') openPanel('detail');
+  else if (urlParams.get('menu') === '1') window.setTimeout(() => openMenu(), 400);
 } else {
   boot();
 }

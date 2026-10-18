@@ -268,7 +268,7 @@ html[data-phase='longBreak'] {
 .plain {
   display: none;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: clamp(2px, 1vmin, 6px);
   min-width: 0;
 }
@@ -295,147 +295,85 @@ html[data-phase='longBreak'] {
   white-space: nowrap;
 }
 
-/* ---------------- 按钮 ---------------- */
+/* ---------------- 主按钮（唯一 Primary Action） ---------------- */
 
-.controls {
+.side {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 2.4vmin, 14px);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(4px, 1.6vmin, 12px);
+  gap: clamp(4px, 1.6vmin, 10px);
   flex: 0 0 auto;
 }
 
-.ctrl-btn {
+.primary-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
+  gap: var(--spacingHorizontalS);
   min-height: 40px;
-  padding: 0;
-  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
-  border-radius: var(--borderRadiusCircular);
-  background: var(--colorSubtleBackground);
-  color: var(--colorNeutralForeground2);
+  padding: 0 var(--spacingHorizontalL);
+  border: var(--strokeWidthThin) solid transparent;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--colorBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  font-weight: var(--fontWeightSemibold);
+  line-height: var(--lineHeightBase300);
   cursor: pointer;
   transition:
     background var(--durationFaster) var(--curveEasyEase),
-    border-color var(--durationFaster) var(--curveEasyEase),
-    color var(--durationFaster) var(--curveEasyEase),
     transform var(--durationFast) var(--curveDecelerateMid);
 }
 
-.ctrl-btn:hover {
-  background: var(--colorSubtleBackgroundHover);
-  color: var(--colorNeutralForeground1);
-}
-
-.ctrl-btn:active {
-  background: var(--colorSubtleBackgroundPressed);
-  transform: scale(0.96);
-}
-
-.ctrl-btn svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-}
-
-.ctrl-btn.small {
-  min-width: 32px;
-  min-height: 32px;
-  border-color: transparent;
-}
-
-.ctrl-btn.small svg {
-  width: 16px;
-  height: 16px;
-}
-
-.ctrl-btn.primary {
-  border-color: transparent;
-  background: var(--colorBrandBackground);
-  color: var(--colorNeutralForegroundOnBrand);
-}
-
-.ctrl-btn.primary:hover {
+.primary-btn:hover {
   background: var(--colorBrandBackgroundHover);
 }
 
-.ctrl-btn.primary:active {
+.primary-btn:active {
   background: var(--colorBrandBackgroundPressed);
+  transform: scale(0.97);
 }
 
-/* ---------------- 右侧信息 ---------------- */
+.primary-btn .btn-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.primary-btn .btn-label {
+  white-space: nowrap;
+}
+
+/* ---------------- 当前任务（1 行，Secondary） ---------------- */
 
 .task-line {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--colorNeutralForeground1);
-  font-size: clamp(12px, 3.4vmin, 16px);
-  font-weight: var(--fontWeightSemibold);
-  min-width: 0;
-}
-
-.phase-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--colorNeutralForeground3);
-  font-size: clamp(10px, 2.8vmin, 12px);
-  min-width: 0;
-}
-
-.stats {
   color: var(--colorNeutralForeground2);
-  font-size: clamp(11px, 3vmin, 14px);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.rounds {
-  display: flex;
-  align-items: center;
-  gap: clamp(3px, 1.2vmin, 6px);
-}
-
-.round-dot {
-  width: clamp(6px, 1.8vmin, 9px);
-  height: clamp(6px, 1.8vmin, 9px);
-  border-radius: var(--borderRadiusCircular);
-  border: var(--strokeWidthThin) solid var(--colorNeutralStrokeAccessible);
-  background: transparent;
-  transition: background var(--durationNormal) var(--curveEasyEase);
-}
-
-.round-dot.is-done {
-  border-color: var(--phase-color);
-  background: var(--phase-color);
-}
-
-.noise-row {
-  display: flex;
-  align-items: center;
-  gap: clamp(4px, 1.4vmin, 10px);
+  font-size: clamp(12px, 3.2vmin, 16px);
+  font-weight: var(--fontWeightRegular);
   min-width: 0;
-}
-
-.noise-label {
-  color: var(--colorNeutralForeground3);
-  font-size: clamp(10px, 2.8vmin, 12px);
-  white-space: nowrap;
-}
-
-.noise-btn.is-on {
-  color: var(--colorBrandForeground1);
-  border-color: color-mix(in srgb, var(--colorBrandForeground1) 50%, transparent);
+  max-width: 100%;
+  text-align: center;
 }
 
 /* Fluent Slider */
 .slider {
   -webkit-appearance: none;
   appearance: none;
-  width: clamp(60px, 22vw, 140px);
+  width: 100%;
   height: 20px;
   background: transparent;
   cursor: pointer;
@@ -470,13 +408,12 @@ html[data-phase='longBreak'] {
 
 /* ---------------- 尺寸档布局 ---------------- */
 
-/* 1×1：环形进度 + 剩余时间 + 当前阶段 */
+/* 1×1：环形时间 + 阶段标签；点击 = 开始/暂停，长按 = 详情 */
 html[data-size='1x1'] .app {
   padding: clamp(4px, 2.4vmin, 10px);
-}
-
-html[data-size='1x1'] .left {
+  align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 html[data-size='1x1'] .visual {
@@ -492,23 +429,15 @@ html[data-size='1x1'] .phase-label {
 }
 
 html[data-size='1x1'] .plain,
-html[data-size='1x1'] .controls,
-html[data-size='1x1'] .side,
-html[data-size='1x1'] .settings-btn {
+html[data-size='1x1'] .side {
   display: none;
 }
 
-/* 2×1：时间 + 开始/暂停/跳过/重置 */
+/* 2×1：时间 + 阶段；点击 = 开始/暂停，长按 = 详情 */
 html[data-size='2x1'] .app {
   align-items: center;
-  gap: clamp(6px, 2.4vmin, 16px);
-}
-
-html[data-size='2x1'] .left {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(6px, 2.4vmin, 16px);
+  justify-content: center;
+  cursor: pointer;
 }
 
 html[data-size='2x1'] .visual {
@@ -527,96 +456,56 @@ html[data-size='2x1'] .phase-chip {
   font-size: clamp(10px, 3vmin, 13px);
 }
 
-html[data-size='2x1'] .controls {
-  gap: clamp(2px, 1.2vmin, 8px);
-}
-
 html[data-size='2x1'] .side {
   display: none;
 }
 
-/* 2×2：时间 + 任务 + 按钮 + 白噪音 */
+/* 2×2：环形时间 + 当前任务（1 行）+ 主按钮；点击环形 = 详情 */
 html[data-size='2x2'] .app {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto auto auto;
-  grid-template-areas:
-    'visual'
-    'task'
-    'controls'
-    'noise';
+  flex-direction: column;
   align-items: center;
-  justify-items: center;
+  justify-content: center;
   gap: clamp(4px, 1.8vmin, 12px);
 }
 
-html[data-size='2x2'] .left,
-html[data-size='2x2'] .side {
-  display: contents;
-}
-
 html[data-size='2x2'] .visual {
-  grid-area: visual;
-  width: min(54vw, 54vh);
+  width: min(52vw, 52vh);
 }
 
 html[data-size='2x2'] .time {
   font-size: min(9vw, 9vh);
 }
 
-html[data-size='2x2'] .plain,
-html[data-size='2x2'] .phase-line,
-html[data-size='2x2'] .stats,
-html[data-size='2x2'] .rounds {
+html[data-size='2x2'] .plain {
   display: none;
 }
 
-html[data-size='2x2'] .task-line {
-  grid-area: task;
+html[data-size='2x2'] .side {
+  display: flex;
   width: 100%;
-  text-align: center;
-  font-size: clamp(12px, 2.6vw, 15px);
 }
 
-html[data-size='2x2'] .controls {
-  grid-area: controls;
+html[data-size='2x2'] .task-line {
+  width: 100%;
+  font-size: clamp(12px, 2.8vw, 15px);
 }
 
-html[data-size='2x2'] .noise-row {
-  grid-area: noise;
+html[data-size='2x2'] .menu-btn {
+  display: none;
 }
 
-html[data-size='2x2'] .slider {
-  width: clamp(56px, 16vw, 90px);
-}
-
-/* 3×2：完整信息 + 今日统计 + 设置入口 */
+/* 3×2：环形时间 + 当前任务（1 行）+ 主按钮 + ⋯ 菜单 */
 html[data-size='3x2'] .app {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  grid-template-rows: auto auto auto auto auto;
-  grid-template-areas:
-    'visual task'
-    'visual phase'
-    'controls stats'
-    'controls rounds'
-    'controls noise';
   align-items: center;
-  justify-items: start;
-  column-gap: clamp(8px, 3vmin, 20px);
-  row-gap: clamp(2px, 1.2vmin, 8px);
-}
-
-html[data-size='3x2'] .left,
-html[data-size='3x2'] .side {
-  display: contents;
+  justify-items: center;
+  column-gap: clamp(10px, 4vmin, 24px);
 }
 
 html[data-size='3x2'] .visual {
-  grid-area: visual;
-  width: min(35vw, 66vh);
+  width: min(33vw, 64vh);
   justify-self: center;
-  align-self: center;
 }
 
 html[data-size='3x2'] .time {
@@ -627,48 +516,22 @@ html[data-size='3x2'] .plain {
   display: none;
 }
 
-html[data-size='3x2'] .task-line {
-  grid-area: task;
-  align-self: end;
-  padding-inline-end: 44px;
-  font-size: clamp(13px, 3vmin, 17px);
-}
-
-html[data-size='3x2'] .phase-line {
-  grid-area: phase;
-  align-self: start;
-}
-
-html[data-size='3x2'] .controls {
-  grid-area: controls;
-  justify-self: center;
-  align-self: center;
-}
-
-html[data-size='3x2'] .stats {
-  grid-area: stats;
-  align-self: center;
-}
-
-html[data-size='3x2'] .rounds {
-  grid-area: rounds;
-  align-self: center;
-}
-
-html[data-size='3x2'] .noise-row {
-  grid-area: noise;
-  align-self: center;
-}
-
-html[data-size='3x2'] .task-line,
-html[data-size='3x2'] .phase-line,
-html[data-size='3x2'] .stats,
-html[data-size='3x2'] .rounds,
-html[data-size='3x2'] .noise-row {
+html[data-size='3x2'] .side {
+  display: flex;
+  width: 100%;
   max-width: 100%;
 }
 
-/* ---------------- 设置按钮 ---------------- */
+html[data-size='3x2'] .task-line {
+  width: 100%;
+  font-size: clamp(13px, 3vmin, 17px);
+}
+
+html[data-size='3x2'] .menu-btn {
+  display: inline-flex;
+}
+
+/* ---------------- 图标按钮 / ⋯ 菜单 ---------------- */
 
 .icon-btn {
   display: inline-flex;
@@ -703,29 +566,102 @@ html[data-size='3x2'] .noise-row {
   display: block;
 }
 
-.settings-btn {
+.menu-btn {
+  display: none;
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+
+.menu-backdrop {
   position: absolute;
-  top: clamp(2px, 1.2vmin, 8px);
-  right: clamp(2px, 1.2vmin, 8px);
-  z-index: 5;
+  inset: 0;
+  z-index: 24;
+}
+
+.menu {
+  position: fixed;
+  z-index: 25;
+  min-width: clamp(160px, 46vw, 220px);
+  max-width: calc(100% - 16px);
+  padding: var(--spacingVerticalXS);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadiusXLarge);
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 96%, transparent);
+  backdrop-filter: blur(var(--wtsl-material-blur));
+  box-shadow: var(--shadow16);
   opacity: 0;
-  transition: opacity var(--durationNormal) var(--curveEasyEase);
+  transform: scale(0.98);
+  transform-origin: top right;
+  transition:
+    opacity var(--durationFast) var(--curveEasyEase),
+    transform var(--durationFast) var(--curveDecelerateMid);
 }
 
-html[data-size='3x2'] .settings-btn {
-  opacity: 0.8;
-}
-
-body.sheet-open .settings-btn,
-.settings-btn:hover,
-.settings-btn:focus-visible {
+.menu.is-open {
   opacity: 1;
+  transform: scale(1);
 }
 
-@media (hover: none) {
-  .settings-btn {
-    opacity: 0.85;
-  }
+.menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--spacingHorizontalS);
+  margin-top: var(--spacingVerticalXS);
+  border: none;
+  border-radius: var(--borderRadiusMedium);
+  background: transparent;
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--durationFaster) var(--curveEasyEase);
+}
+
+.menu-item:hover {
+  background: var(--colorSubtleBackgroundHover);
+}
+
+.menu-item:active {
+  background: var(--colorSubtleBackgroundPressed);
+}
+
+/* ---------------- 详情（统计 / 白噪音 / 次要操作） ---------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacingVerticalXS) var(--spacingHorizontalM);
+}
+
+.detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacingHorizontalS);
+  min-height: 34px;
+  padding: 0 var(--spacingHorizontalXS);
+  min-width: 0;
+}
+
+.detail-label {
+  color: var(--colorNeutralForeground3);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase300);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-row strong {
+  color: var(--colorNeutralForeground1);
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  font-weight: var(--fontWeightSemibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 /* ---------------- 沉浸模式 ---------------- */
@@ -738,7 +674,8 @@ body.sheet-open .settings-btn,
   align-items: center;
   justify-content: center;
   padding: clamp(10px, 4vmin, 24px);
-  background: color-mix(in srgb, var(--colorNeutralBackground2) 96%, transparent);
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 98%, transparent);
+  backdrop-filter: blur(var(--wtsl-material-blur));
   opacity: 0;
   transition: opacity var(--durationNormal) var(--curveEasyEase);
 }

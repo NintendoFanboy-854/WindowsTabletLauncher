@@ -1,4 +1,4 @@
-/** 卡片左上角城市切换菜单。 */
+/** 详情 Drawer 顶部的城市切换菜单（卡片正常模式不出现菜单，保持无 chrome）。 */
 
 import {
   Button,
@@ -18,7 +18,6 @@ import {
   ChevronDown16Regular,
   Location16Regular,
   Settings16Regular,
-  Warning16Filled,
 } from '@fluentui/react-icons';
 import { placeMenuLabel } from '../data/store.js';
 
@@ -27,14 +26,14 @@ const useStyles = makeStyles({
     minWidth: 0,
     maxWidth: '100%',
     justifyContent: 'flex-start',
-    paddingLeft: '6px',
+    paddingLeft: '2px',
     paddingRight: '4px',
-    gap: '4px',
+    gap: '6px',
     color: tokens.colorNeutralForeground1,
     fontWeight: tokens.fontWeightSemibold,
-    fontSize: 'clamp(11px, 2.3vh, 15px)',
+    fontSize: tokens.fontSizeBase400,
     lineHeight: 1,
-    height: 'clamp(26px, 6vh, 40px)',
+    height: 'clamp(28px, 5vh, 36px)',
   },
   cityName: {
     overflow: 'hidden',
@@ -64,8 +63,6 @@ export function CityMenu({
   onManageCities,
   onOpenSettings,
   onRefresh,
-  warningCount = 0,
-  compact = false,
 }) {
   const styles = useStyles();
   const places = settings?.places || [];
@@ -85,7 +82,7 @@ export function CityMenu({
           <span className={mergeClasses(styles.cityName, className)}>
             {places.find((place) => place.isCurrent)?.name || '选择城市'}
           </span>
-          {!compact && <ChevronDown16Regular />}
+          <ChevronDown16Regular />
         </Button>
       </MenuTrigger>
       <MenuPopover>
@@ -109,11 +106,6 @@ export function CityMenu({
           <MenuItem icon={<ArrowClockwise16Regular />} onClick={onRefresh}>
             刷新数据
           </MenuItem>
-          {warningCount > 0 && (
-            <MenuItem icon={<Warning16Filled />} onClick={onRefresh}>
-              有 {warningCount} 条预警（详情里查看）
-            </MenuItem>
-          )}
           <MenuItem icon={<Settings16Regular />} onClick={onManageCities}>
             管理城市…
           </MenuItem>

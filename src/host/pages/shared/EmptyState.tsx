@@ -14,12 +14,12 @@ const useStyles = makeStyles({
     justifyItems: 'center',
     alignContent: 'center',
     gap: tokens.spacingVerticalM,
-    padding: `${tokens.spacingVerticalXXXL} ${tokens.spacingHorizontalXL}`,
+    padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalXL}`,
     textAlign: 'center',
     color: tokens.colorNeutralForeground1,
   },
   description: {
-    maxWidth: '52ch',
+    maxWidth: '46ch',
     color: tokens.colorNeutralForeground3,
   },
 });
@@ -30,7 +30,7 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
     <div className={styles.root}>
       <Title3>{title}</Title3>
       {description && (
-        <Text size={300} className={styles.description}>
+        <Text size={200} className={styles.description}>
           {description}
         </Text>
       )}

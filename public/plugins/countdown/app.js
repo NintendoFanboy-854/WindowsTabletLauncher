@@ -56,13 +56,20 @@ const THEME_ALIASES = {
 
 const $ = (id) => document.getElementById(id);
 const els = {
+  widget: $('widget'),
   single: $('single'),
   list: $('list'),
   empty: $('empty'),
   emptyAdd: $('empty-add'),
   barCount: $('bar-count'),
   addBtn: $('add-btn'),
-  settingsBtn: $('settings-btn'),
+  menuBackdrop: $('menu-backdrop'),
+  contextMenu: $('context-menu'),
+  menuTitle: $('menu-title'),
+  menuMeta: $('menu-meta'),
+  menuEdit: $('menu-edit'),
+  menuSettings: $('menu-settings'),
+  menuDelete: $('menu-delete'),
   scrim: $('scrim'),
   formSheet: $('form-sheet'),
   formTitle: $('form-title'),
@@ -99,6 +106,8 @@ const state = {
   editingId: null,
   deletingId: null,
   suppressClick: false,
+  menuOpen: false,
+  menuItemId: null,
 };
 
 /* ------------------------------------------------------------------ */
@@ -349,17 +358,14 @@ function buildItemNode(entry) {
   if (entry.days === 0) node.classList.add('is-today');
   else if (state.settings.highlightSoon && entry.days > 0 && entry.days < 7) node.classList.add('is-soon');
 
-  const dot = el('span', 'item-dot');
-  dot.setAttribute('aria-hidden', 'true');
-
   const main = el('span', 'item-main');
-  main.append(el('span', 'item-title', entry.item.title), el('span', 'item-sub', entry.sub));
+  main.append(el('span', 'item-title', entry.item.title));
 
   const days = el('span', 'item-days');
   days.append(daysNode(entry, { pillText: '今天' }));
 
   node.setAttribute('aria-label', `${entry.item.title}，${displayText(entry)}`);
-  node.append(dot, main, days);
+  node.append(main, days);
   return node;
 }
 
@@ -370,7 +376,6 @@ function buildSingleNode(entry) {
 
   const info = el('span', 'single-info');
   info.append(el('span', 'single-title', entry.item.title));
-  info.append(el('span', 'single-sub', entry.item.repeatYearly ? entry.sub : entry.targetDate));
 
   const count = el('span', 'single-count');
   count.append(daysNode(entry));
@@ -433,6 +438,7 @@ function focusFirst(sheet) {
 
 function openPanel(name) {
   if (state.panel === name) return;
+  closeContextMenu();
   if (state.panel) {
     const previous = sheets[state.panel];
     previous.classList.remove('is-open');
@@ -573,6 +579,58 @@ function openConfirm(id) {
   openPanel('confirm');
 }
 
+/* ---------------- 长按菜单：日期/重复/编辑/设置/删除 ---------------- */
+
+function positionContextMenu(x, y) {
+  const margin = 8;
+  const menu = els.contextMenu;
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  const rect = menu.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  let left = x + margin;
+  let top = y + margin;
+  if (left + rect.width > viewportWidth - margin) {
+    left = Math.max(margin, x - rect.width - margin);
+  }
+  if (top + rect.height > viewportHeight - margin) {
+    top = Math.max(margin, y - rect.height - margin);
+  }
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function openContextMenu(id, x, y) {
+  const item = state.items.find((candidate) => candidate.id === id);
+  if (!item) return;
+  const entry = decorate(item, new Date());
+  if (!entry) return;
+  state.menuItemId = id;
+  els.menuTitle.textContent = item.title;
+  const repeat = item.repeatYearly ? entry.sub : entry.targetDate;
+  els.menuMeta.textContent = `${repeat} · ${displayText(entry)}`;
+  els.menuBackdrop.hidden = false;
+  els.contextMenu.hidden = false;
+  positionContextMenu(x, y);
+  state.menuOpen = true;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => els.contextMenu.classList.add('is-open'));
+  });
+  els.menuEdit.focus({ preventScroll: true });
+}
+
+function closeContextMenu() {
+  if (!state.menuOpen) return;
+  state.menuOpen = false;
+  state.menuItemId = null;
+  els.contextMenu.classList.remove('is-open');
+  els.menuBackdrop.hidden = true;
+  window.setTimeout(() => {
+    if (!state.menuOpen) els.contextMenu.hidden = true;
+  }, motionMs('--durationFast') + 20);
+}
+
 function confirmDelete() {
   const id = state.deletingId;
   if (!id) return;
@@ -613,12 +671,12 @@ let pressOrigin = null;
 
 function startPress(event) {
   const id = idFromNode(event.target);
-  if (!id) return;
+  if (!id || state.menuOpen) return;
   clearPress();
   pressOrigin = { x: event.clientX, y: event.clientY };
   pressTimer = window.setTimeout(() => {
     state.suppressClick = true;
-    openConfirm(id);
+    openContextMenu(id, pressOrigin.x, pressOrigin.y);
   }, LONG_PRESS_MS);
 }
 
@@ -678,12 +736,14 @@ els.single.addEventListener('click', (event) => {
 });
 
 let singlePressTimer = 0;
+let singlePressOrigin = null;
 els.single.addEventListener('pointerdown', (event) => {
   const id = els.single.dataset.id;
-  if (!id) return;
+  if (!id || state.menuOpen) return;
+  singlePressOrigin = { x: event.clientX, y: event.clientY };
   singlePressTimer = window.setTimeout(() => {
     state.suppressClick = true;
-    openConfirm(id);
+    openContextMenu(id, singlePressOrigin.x, singlePressOrigin.y);
   }, LONG_PRESS_MS);
 });
 for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
@@ -692,10 +752,39 @@ for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
 
 els.addBtn.addEventListener('click', () => openForm(null));
 els.emptyAdd.addEventListener('click', () => openForm(null));
-els.settingsBtn.addEventListener('click', () => {
+
+// 长按菜单操作
+els.menuEdit.addEventListener('click', () => {
+  const id = state.menuItemId;
+  closeContextMenu();
+  if (id) openItem(id);
+});
+els.menuSettings.addEventListener('click', () => {
+  closeContextMenu();
   syncSettingsControls();
   openPanel('settings');
 });
+els.menuDelete.addEventListener('click', () => {
+  const id = state.menuItemId;
+  closeContextMenu();
+  if (id) openConfirm(id);
+});
+els.menuBackdrop.addEventListener('click', closeContextMenu);
+
+// 长按空白处（非事件行）= 打开倒数日设置；正常模式不出现齿轮
+let blankPressTimer = 0;
+els.widget.addEventListener('pointerdown', (event) => {
+  if (state.panel || state.menuOpen) return;
+  if (event.target.closest?.('.item, .single, .btn, .icon-btn')) return;
+  window.clearTimeout(blankPressTimer);
+  blankPressTimer = window.setTimeout(() => {
+    syncSettingsControls();
+    openPanel('settings');
+  }, LONG_PRESS_MS);
+});
+for (const name of ['pointerup', 'pointercancel', 'pointerleave']) {
+  els.widget.addEventListener(name, () => window.clearTimeout(blankPressTimer));
+}
 
 els.formSave.addEventListener('click', saveForm);
 els.formCancel.addEventListener('click', closePanel);
@@ -722,7 +811,10 @@ els.scrim.addEventListener('click', closePanel);
 
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  if (state.panel) {
+  if (state.menuOpen) {
+    event.preventDefault();
+    closeContextMenu();
+  } else if (state.panel) {
     event.preventDefault();
     closePanel();
   } else {
@@ -970,6 +1062,9 @@ if (!plugin.inHost) {
   else if (urlParams.get('settings') === '1') {
     syncSettingsControls();
     openPanel('settings');
+  } else if (urlParams.get('menu') === '1') {
+    const first = sortedEntries()[0];
+    if (first) window.setTimeout(() => openContextMenu(first.item.id, 160, 170), 400);
   }
 } else {
   boot();

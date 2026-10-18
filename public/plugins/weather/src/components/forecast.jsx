@@ -62,44 +62,21 @@ const useStyles = makeStyles({
     padding: 'clamp(2px, 1vh, 8px) 0',
     borderRadius: tokens.borderRadiusMedium,
   },
-  dayMid: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 'clamp(0px, 0.4vh, 3px)',
-    minWidth: 0,
-  },
-  dayText: {
-    fontSize: 'clamp(9px, 1.8vh, 12px)',
-    color: tokens.colorNeutralForeground2,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth: '100%',
-  },
-  dayPop: {
-    fontSize: 'clamp(8px, 1.6vh, 11px)',
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-  },
-  dayTemps: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 'clamp(0px, 0.3vh, 2px)',
-  },
   dayLabel: {
-    fontSize: 'clamp(9px, 1.9vh, 12px)',
+    fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground3,
     whiteSpace: 'nowrap',
   },
   dayHiLo: {
-    fontSize: 'clamp(10px, 2.1vh, 14px)',
+    fontSize: tokens.fontSizeBase300,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
     lineHeight: 1.15,
     textAlign: 'center',
+  },
+  daySingleTemp: {
+    fontSize: tokens.fontSizeBase400,
+    fontWeight: tokens.fontWeightSemibold,
   },
   hi: { color: tokens.colorNeutralForeground1 },
   lo: { color: tokens.colorNeutralForeground3 },
@@ -179,8 +156,8 @@ export function HourlyStrip({ items, nowIso, unit, scheme, sunrise, sunset, coun
   );
 }
 
-/** 卡片用 7 天列：星期、图标、高低温；showText 时多一行天气现象与降水概率 */
-export function DailyColumns({ items, unit, scheme, className, showText = false }) {
+/** 卡片用 7 天列：星期、图标、高温（低温按需弱化/省略） */
+export function DailyColumns({ items, unit, scheme, className, showLow = true }) {
   const styles = useStyles();
   const list = (items || []).slice(0, 7);
   return (
@@ -188,15 +165,13 @@ export function DailyColumns({ items, unit, scheme, className, showText = false 
       {list.map((item, index) => (
         <div key={item.fxDate || index} className={styles.dayColumn}>
           <span className={styles.dayLabel}>{dayLabel(item.fxDate, index)}</span>
-          <div className={styles.dayMid}>
-            <WeatherIcon code={item.icon} scheme={scheme} size="clamp(16px, 4vh, 32px)" title={item.text} />
-            {showText && <span className={styles.dayText}>{item.text}</span>}
-            {showText && item.pop > 0 && <span className={styles.dayPop}>降水 {item.pop}%</span>}
-          </div>
-          <div className={styles.dayTemps}>
-            <span className={mergeClasses(styles.dayHiLo, styles.hi)}>{fmtTemp(item.tempMax, unit)}</span>
+          <WeatherIcon code={item.icon} scheme={scheme} size="clamp(16px, 4vh, 32px)" title={item.text} />
+          <span className={mergeClasses(styles.dayHiLo, styles.hi, !showLow && styles.daySingleTemp)}>
+            {fmtTemp(item.tempMax, unit)}
+          </span>
+          {showLow && (
             <span className={mergeClasses(styles.dayHiLo, styles.lo)}>{fmtTemp(item.tempMin, unit)}</span>
-          </div>
+          )}
         </div>
       ))}
     </div>

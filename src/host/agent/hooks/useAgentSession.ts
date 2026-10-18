@@ -32,6 +32,7 @@ import {
 } from '../storage';
 import { useSettings } from './useSettings';
 import type {
+  AgentErrorAction,
   AgentSettings,
   AgentTransport,
   ChatRequestMessage,
@@ -62,6 +63,8 @@ export interface VoiceInteractionState {
 export interface AgentSessionError {
   message: string;
   retryable: boolean;
+  /** 可选操作入口（如「去 MiMo 控制台开通 Web Search」） */
+  action?: AgentErrorAction;
 }
 
 export interface AgentSeed {
@@ -337,7 +340,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
           bindings,
           now: new Date(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时区',
-          searchConfigured: Boolean(currentSettings().search.apiKey.trim()),
+          webSearchEnabled: currentSettings().search.enabled,
         }),
       });
 
@@ -383,6 +386,16 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
               updateMessage(conversationId, assistantId, (message) => ({
                 ...message,
                 reasoning: (message.reasoning ?? '') + event.text,
+              }));
+            } else if (event.type === 'sources') {
+              updateMessage(conversationId, assistantId, (message) => ({
+                ...message,
+                sources: mergeSources(message.sources, event.sources),
+              }));
+            } else if (event.type === 'usage') {
+              updateMessage(conversationId, assistantId, (message) => ({
+                ...message,
+                webSearchUsage: event.webSearchUsage,
               }));
             } else if (event.type === 'tool_call') {
               pendingCalls.push(event.call);
@@ -438,7 +451,6 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
             if (call.parseError) throw new Error(call.parseError);
             const outcome = await executeTool(binding, call.name, call.args, {
               transport,
-              settings: currentSettings(),
               signal,
             });
             updateMessage(conversationId, assistantId, (message) => ({
@@ -448,7 +460,6 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
                   ? { ...record, status: 'success', result: outcome.result }
                   : record,
               ),
-              sources: mergeSources(message.sources, outcome.sources),
             }));
             resultText = toolResultToText(outcome.result);
           } catch (toolError) {
@@ -510,7 +521,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
         status: 'error',
       }));
       updateStatus('idle');
-      setError({ message, retryable: true });
+      const action = (turnError as { action?: AgentErrorAction }).action;
+      setError({ message, retryable: true, ...(action ? { action } : {}) });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
     }

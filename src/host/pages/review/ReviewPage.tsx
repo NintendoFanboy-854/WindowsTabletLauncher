@@ -1,16 +1,19 @@
 /**
- * 复盘页（B3）：昨日小结 / 本周 / 本月 / 工作量热力图。
+ * 复盘页（B3 + F5 信息密度复核）：昨日小结 / 本周 / 本月 / 工作量热力图。
+ *
+ * 密度约定（docs/DENSITY.md §4/§5）：
+ * - 一屏一个主任务：看复盘；页头只有一个主操作（Agent 复盘），刷新是次要操作；
+ * - 每张卡片只有一个 Primary：主数值用 fontSizeBase500，单位/说明下沉到 base200 + foreground3；
+ * - 分组靠留白，不用边框/分割线；空状态一句话，不写大段说明。
  *
  * 数据来自各插件注册的 `*.stats` Agent 工具（经 A5 桥接层）。没有插件提供
- * 统计工具时显示空状态；单个插件失败只让它自己那一格显示错误，不影响其它插件。
- * 宽屏四栏卡片网格（DESIGN.md §8），窄屏自动降为单栏。
+ * 统计工具时显示空状态；单个插件失败只影响它自己那一块。
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import {
   Badge,
   Button,
-  Divider,
   MessageBar,
   MessageBarBody,
   Spinner,
@@ -46,18 +49,17 @@ const useStyles = makeStyles({
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: tokens.spacingHorizontalL,
+    gap: tokens.spacingHorizontalM,
     alignItems: 'stretch',
   },
   card: {
     display: 'grid',
     alignContent: 'start',
-    gap: tokens.spacingVerticalS,
+    gap: tokens.spacingVerticalM,
     padding: tokens.spacingHorizontalL,
     borderRadius: tokens.borderRadiusLarge,
     backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    minHeight: '160px',
+    minHeight: '140px',
   },
   wideCard: {
     gridColumn: '1 / -1',
@@ -72,17 +74,32 @@ const useStyles = makeStyles({
   cardHint: {
     color: tokens.colorNeutralForeground3,
   },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalS,
+  providers: {
+    display: 'grid',
+    gap: tokens.spacingVerticalM,
   },
-  metricValue: {
+  providerBlock: {
+    display: 'grid',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  providerLabel: {
+    color: tokens.colorNeutralForeground2,
+  },
+  mainRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalXS,
+    flexWrap: 'wrap',
+  },
+  mainValue: {
     color: tokens.colorNeutralForeground1,
     fontVariantNumeric: 'tabular-nums',
   },
-  muted: {
+  mainUnit: {
+    color: tokens.colorNeutralForeground3,
+  },
+  tertiary: {
     color: tokens.colorNeutralForeground3,
   },
   errorText: {
@@ -95,7 +112,7 @@ const useStyles = makeStyles({
   },
   footer: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: tokens.spacingHorizontalS,
@@ -110,51 +127,57 @@ const useStyles = makeStyles({
   },
 });
 
-function Metric({ label, value }: { label: string; value: string }) {
-  const styles = useStyles();
-  return (
-    <span className={styles.row}>
-      <Text size={200} className={styles.muted}>
-        {label}
-      </Text>
-      <Text size={400} weight="semibold" className={styles.metricValue}>
-        {value}
-      </Text>
-    </span>
-  );
+interface Metric {
+  label: string;
+  value: string;
 }
 
-function ProviderRangeRow({ stat }: { stat: ProviderRangeStats }) {
-  const styles = useStyles();
-  const parts: { label: string; value: string }[] = [];
-  if (typeof stat.completed === 'number') {
-    parts.push({ label: '完成', value: `${stat.completed} ${completedUnit(stat.provider)}` });
-  }
-  if (typeof stat.created === 'number') {
-    parts.push({ label: '新建', value: `${stat.created} 项` });
-  }
+function metricsOf(stat: ProviderRangeStats): Metric[] {
+  const metrics: Metric[] = [];
+  if (typeof stat.created === 'number') metrics.push({ label: '新建', value: `${stat.created} 项` });
   if (typeof stat.focusMinutes === 'number') {
-    parts.push({ label: '专注', value: `${stat.focusMinutes} 分钟` });
+    metrics.push({ label: '专注', value: `${stat.focusMinutes} 分钟` });
   }
   if (typeof stat.streakDays === 'number') {
-    parts.push({ label: '连续', value: `${stat.streakDays} 天` });
+    metrics.push({ label: '连续', value: `${stat.streakDays} 天` });
   }
+  return metrics;
+}
+
+/** 一个插件在一个统计区间里的 Primary（主数值）+ 次要说明 */
+function ProviderBlock({ stat }: { stat: ProviderRangeStats }) {
+  const styles = useStyles();
+  const metrics = metricsOf(stat);
+  const hasCompleted = typeof stat.completed === 'number';
 
   return (
-    <div className={styles.row}>
-      <Text weight="semibold">{stat.label}</Text>
-      <Badge appearance="outline" size="small">
-        {stat.tool}
-      </Badge>
-      {!stat.ok && <Text className={styles.errorText}>{stat.error ?? '统计失败'}</Text>}
-      {stat.ok && parts.length === 0 && (
-        <Text className={styles.muted} size={200}>
-          未返回可聚合字段
+    <div className={styles.providerBlock}>
+      <Text size={300} className={styles.providerLabel}>
+        {stat.label}
+      </Text>
+      {!stat.ok ? (
+        <Text size={200} className={styles.errorText}>
+          {stat.error ?? '统计失败'}
         </Text>
+      ) : (
+        <>
+          <div className={styles.mainRow}>
+            <Text size={500} weight="semibold" className={styles.mainValue}>
+              {hasCompleted ? stat.completed : '—'}
+            </Text>
+            {hasCompleted && (
+              <Text size={200} className={styles.mainUnit}>
+                {completedUnit(stat.provider)}
+              </Text>
+            )}
+          </div>
+          {metrics.length > 0 && (
+            <Text size={200} className={styles.tertiary}>
+              {metrics.map((metric) => `${metric.label} ${metric.value}`).join(' · ')}
+            </Text>
+          )}
+        </>
       )}
-      {parts.map((part) => (
-        <Metric key={part.label} label={part.label} value={part.value} />
-      ))}
     </div>
   );
 }
@@ -177,14 +200,15 @@ function RangeCard({
           {hint}
         </Text>
       </div>
-      <Divider />
-      {stats.length === 0 ? (
-        <Text className={styles.muted} size={200}>
-          没有可用的统计工具
-        </Text>
-      ) : (
-        stats.map((stat) => <ProviderRangeRow key={`${stat.range}:${stat.tool}`} stat={stat} />)
-      )}
+      <div className={styles.providers}>
+        {stats.length === 0 ? (
+          <Text size={200} className={styles.tertiary}>
+            没有可用的统计工具
+          </Text>
+        ) : (
+          stats.map((stat) => <ProviderBlock key={`${stat.range}:${stat.tool}`} stat={stat} />)
+        )}
+      </div>
     </section>
   );
 }
@@ -220,19 +244,22 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
 
   const refresh = useCallback(() => setReloadToken((token) => token + 1), []);
 
-  const providerStats = snapshot
+  const providers = snapshot
     ? Array.from(new Set(snapshot.tools)).map((tool) => {
         const provider = tool.split('.')[0] || tool;
         return { provider, label: providerLabel(provider) };
       })
     : [];
 
+  const yesterdayProviders = providers.filter(
+    ({ provider }) => typeof snapshot?.yesterday[provider] === 'number',
+  );
   const hasStatsTools = (snapshot?.tools.length ?? 0) > 0;
 
   return (
     <PageScaffold
       title="复盘"
-      subtitle="昨日小结、本周与本月进度、工作量热力图 —— 数据来自插件自己上报的统计"
+      subtitle="昨日、本周、本月与工作量热力图"
       onBack={onBack}
       actions={
         <div className={styles.toolbar}>
@@ -271,7 +298,7 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
       {!loading && !error && !hasStatsTools && (
         <EmptyState
           title="还没有可复盘的数据"
-          description="复盘页汇总各插件的 `.stats` Agent 工具（例如 todo.stats、pomodoro.stats）。等插件注册统计工具并且挂载到桌面上，这里会自动出现昨日 / 本周 / 本月汇总与工作量热力图。"
+          description="等插件提供 stats 工具并挂载到桌面后，这里会自动汇总。"
           action={
             <Button appearance="secondary" onClick={refresh}>
               重新读取
@@ -290,22 +317,29 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
                   按插件
                 </Text>
               </div>
-              <Divider />
-              {providerStats.map(({ provider, label }) => {
-                const count = snapshot.yesterday[provider];
-                return (
-                  <div key={provider} className={styles.row}>
-                    <Text weight="semibold">{label}</Text>
-                    {typeof count === 'number' ? (
-                      <Metric label="完成" value={`${count} ${completedUnit(provider)}`} />
-                    ) : (
-                      <Text size={200} className={styles.muted}>
-                        该插件未提供按天数据（byDay）
+              <div className={styles.providers}>
+                {yesterdayProviders.length === 0 ? (
+                  <Text size={200} className={styles.tertiary}>
+                    暂无按天数据
+                  </Text>
+                ) : (
+                  yesterdayProviders.map(({ provider, label }) => (
+                    <div key={provider} className={styles.providerBlock}>
+                      <Text size={300} className={styles.providerLabel}>
+                        {label}
                       </Text>
-                    )}
-                  </div>
-                );
-              })}
+                      <div className={styles.mainRow}>
+                        <Text size={500} weight="semibold" className={styles.mainValue}>
+                          {snapshot.yesterday[provider]}
+                        </Text>
+                        <Text size={200} className={styles.mainUnit}>
+                          {completedUnit(provider)}
+                        </Text>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </section>
 
             <RangeCard title="本周" hint="周一到现在" stats={snapshot.ranges.week} />
@@ -318,10 +352,9 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
                   近 16 周 · 共 {snapshot.heatmap.total} 条
                 </Text>
               </div>
-              <Divider />
               {snapshot.daily.length === 0 ? (
-                <Text className={styles.muted} size={200}>
-                  插件没有返回按天数据（byDay），热力图暂不可用。
+                <Text size={200} className={styles.tertiary}>
+                  插件没有返回按天数据（byDay）。
                 </Text>
               ) : (
                 <Heatmap
@@ -334,10 +367,8 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
           </div>
 
           <div className={styles.footer}>
-            <Text size={200}>
-              数据来自插件 stats 工具：{snapshot.tools.join(' · ')} · 更新于 {formatTime(snapshot.fetchedAt)}
-            </Text>
-            <Text size={200}>统计口径由各插件决定，宿主只做汇总</Text>
+            <Text size={200}>来源：{snapshot.tools.join(' · ')}</Text>
+            <Text size={200}>更新于 {formatTime(snapshot.fetchedAt)} · 统计口径由插件决定</Text>
           </div>
         </>
       )}

@@ -1,0 +1,13 @@
+src\host\agent\demo\main.tsx:218  fontSize: tokens.fontSizeHero700
+src\host\agent\ui\MessageBubble.tsx:118  fontSize: tokens.fontSizeBase200
+src\host\agent\ui\MessageContent.tsx:39  fontSize: tokens.fontSizeBase200
+src\host\agent\ui\ToolCallCard.tsx:40  fontSize: tokens.fontSizeBase200
+src\host\agent\ui\ToolCallCard.tsx:45  fontSize: tokens.fontSizeBase100
+src\host\agent\ui\ToolCallCard.tsx:60  fontSize: tokens.fontSizeBase100
+src\host\agent\ui\ToolCallCard.tsx:71  fontSize: tokens.fontSizeBase100
+src\host\agent\ui\ToolCallCard.tsx:77  fontSize: tokens.fontSizeBase200
+src\host\agent\ui\VoiceStage.tsx:77  fontSize: `clamp(${tokens.fontSizeBase500
+src\host\desktop\desktop.styles.ts:192  fontSize: tokens.fontSizeBase200
+src\host\desktop\desktop.styles.ts:226  fontSize: tokens.fontSizeBase200
+src\host\plugins\demo\main.tsx:142  fontSize: tokens.fontSizeBase200
+src\host\plugins\demo\main.tsx:185  fontSize: tokens.fontSizeBase200

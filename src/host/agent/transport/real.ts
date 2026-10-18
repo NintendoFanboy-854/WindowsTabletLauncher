@@ -1,36 +1,39 @@
 /**
  * MiMo V2.6 传输层（OpenAI 兼容 `/chat/completions`）。
  *
- * - 对话：SSE 流式，支持 `tool_calls` 与 `reasoning_content`；开启思考时按 MiMo 文档回传
- *   `thinking: { type: 'enabled' | 'disabled' }`。
+ * - 对话：SSE 流式，支持函数 `tool_calls`、`reasoning_content` 与 MiMo 原生 `web_search`；
+ *   开启思考时按 MiMo 文档回传 `thinking: { type: 'enabled' | 'disabled' }`。
+ * - 联网搜索：请求 `tools` 里附加 `{ type: 'web_search', max_keyword, force_search, limit }`，
+ *   来源从响应 `annotations`（`url_citation`）读取，流式首个数据包就会带来源。
+ * - 未开通 Web Search Plugin 时接口返回 400（`webSearchEnabled is false`），
+ *   这里映射成带控制台入口的可读错误。
  * - 语音识别：同一个 `/chat/completions`，model = `mimo-v2.5-asr`，音频以 data URL 传入。
  * - 语音合成：同一个 endpoint，model = `mimo-v2.5-tts`，`audio.format = pcm16`，SSE 里读
  *   `choices[0].delta.audio.data`（base64，PCM16LE 24kHz）。
- * - 搜索：Tavily（宿主实现，不依赖模型厂商的联网能力）。
  * - 插件工具：走 HostBridge.callTool。
  */
 
 import { getHostBridge } from '../../bridge';
+import { MIMO_PLUGIN_CONSOLE_URL } from '../types';
 import type {
-  AgentSettings,
+  AgentErrorAction,
   AgentToolDecl,
   AgentTransport,
-  ChatRequestMessage,
+  AgentSettings,
   ChatToolCall,
   ChatTurnRequest,
   ModelStreamEvent,
-  OpenAIToolCall,
+  SourceRef,
   ToolRunOptions,
-  WebPage,
-  WebSearchResult,
 } from '../types';
-import { buildSystemPrompt } from './prompt';
-import { fetchPageText, tavilySearch } from '../tools/web';
 import { readErrorBody, readSse } from './sse';
 
 const CHAT_ENDPOINT = '/chat/completions';
 const ASR_MODEL = 'mimo-v2.5-asr';
 const TTS_MODEL = 'mimo-v2.5-tts';
+
+/** 每次 web_search 返回的结果组数：1 组足够回答，需要更多由模型自行再检索 */
+const NATIVE_WEB_SEARCH_LIMIT = 1;
 
 /** SSE 两帧之间的最长等待：深度思考可能长时间无输出，给足余量；超过按网络异常处理 */
 const STREAM_IDLE_TIMEOUT_MS = 120_000;
@@ -48,13 +51,43 @@ interface ChatCompletionChunk {
       content?: string | null;
       reasoning_content?: string | null;
       tool_calls?: DeltaToolCall[];
+      annotations?: unknown[] | null;
     };
+    message?: { annotations?: unknown[] | null };
     finish_reason?: string | null;
   }>;
+  /** 带 stream_options.include_usage 时，末尾会有一个 choices=[] 的 usage 包 */
+  usage?: {
+    web_search_usage?: { tool_usage?: number; page_usage?: number };
+  } | null;
 }
 
 interface ChatCompletionPayload {
   choices?: Array<{ message?: { content?: string | null } }>;
+}
+
+interface MimoErrorPayload {
+  error?: {
+    code?: string;
+    message?: string;
+    param?: string;
+    type?: string;
+  };
+}
+
+/** API Key 没开通 Web Search Plugin 时的可读错误（附控制台入口） */
+export class MimoWebSearchDisabledError extends Error {
+  readonly action: AgentErrorAction = {
+    label: '打开 MiMo 控制台 · 插件管理',
+    url: MIMO_PLUGIN_CONSOLE_URL,
+  };
+
+  constructor() {
+    super(
+      'MiMo 联网搜索未开通：当前 API Key 没有 Web Search Plugin 权限。请到 MiMo 控制台 → 插件管理 开通 Web Search 后重试，或在设置里关闭联网搜索。',
+    );
+    this.name = 'MimoWebSearchDisabledError';
+  }
 }
 
 function headersFor(apiKey: string): Record<string, string> {
@@ -62,6 +95,40 @@ function headersFor(apiKey: string): Record<string, string> {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${apiKey}`,
   };
+}
+
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/**
+ * 解析 `message.annotations` / `delta.annotations`。
+ * MiMo 的 url_citation 形如：
+ * `{ type: 'url_citation', url_citation: { url, title, site_name, summary, publish_time, logo_url } }`，
+ * 也兼容把字段直接平铺在数组项上的写法。
+ */
+export function parseAnnotations(raw: unknown): SourceRef[] {
+  if (!Array.isArray(raw)) return [];
+  const sources: SourceRef[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue;
+    const record = item as Record<string, unknown>;
+    const citation =
+      typeof record.url_citation === 'object' && record.url_citation !== null
+        ? (record.url_citation as Record<string, unknown>)
+        : record;
+    const url = asNonEmptyString(citation.url);
+    if (!url) continue;
+    sources.push({
+      url,
+      title: asNonEmptyString(citation.title) ?? url,
+      siteName: asNonEmptyString(citation.site_name),
+      summary: asNonEmptyString(citation.summary),
+      publishTime: asNonEmptyString(citation.publish_time),
+      logoUrl: asNonEmptyString(citation.logo_url),
+    });
+  }
+  return sources;
 }
 
 function parseToolArguments(raw: string): { args: unknown; parseError?: string } {
@@ -109,6 +176,31 @@ export function stripMarkdownForSpeech(text: string): string {
     .trim();
 }
 
+/** HTTP 错误统一映射；识别「Web Search Plugin 未开通」的 400 */
+async function throwForHttpError(response: Response): Promise<never> {
+  const text = await response.text().catch(() => '');
+  let payload: MimoErrorPayload | null = null;
+  try {
+    payload = JSON.parse(text) as MimoErrorPayload;
+  } catch {
+    payload = null;
+  }
+
+  const flag = [payload?.error?.param, payload?.error?.message, payload?.error?.type, payload?.error?.code]
+    .filter((item): item is string => typeof item === 'string')
+    .join(' ')
+    .toLowerCase();
+  if (flag.includes('websearchenabled') || flag.includes('web search tool')) {
+    throw new MimoWebSearchDisabledError();
+  }
+
+  const detail = payload?.error?.message?.trim() || text.trim().slice(0, 400);
+  const param = payload?.error?.param?.trim();
+  throw new Error(
+    `MiMo 请求失败（HTTP ${response.status}）${detail ? `：${detail}${param ? `（${param}）` : ''}` : ''}`,
+  );
+}
+
 export class MimoTransport implements AgentTransport {
   readonly kind = 'mimo' as const;
 
@@ -139,15 +231,29 @@ export class MimoTransport implements AgentTransport {
     const apiKey = this.apiKey();
     if (!apiKey) throw new Error('未配置 MiMo API Key：请到设置 → 模型 里填写');
 
+    const search = this.settings().search;
+    const tools: unknown[] = request.tools.map((tool) => tool);
+    if (search.enabled) {
+      // MiMo 原生 web_search：与函数工具共存，是否真的检索由模型判断（force_search 默认关）
+      tools.push({
+        type: 'web_search',
+        max_keyword: search.maxKeyword,
+        force_search: search.forceSearch,
+        limit: NATIVE_WEB_SEARCH_LIMIT,
+      });
+    }
+
     const body: Record<string, unknown> = {
       model: request.model,
       messages: request.messages,
       stream: true,
+      // 末尾的 usage 包（含 web_search_usage），用于来源区的小字统计
+      stream_options: { include_usage: true },
       // MiMo 文档：thinking.type 控制深度思考；默认开启，这里显式传
       thinking: { type: request.thinking ? 'enabled' : 'disabled' },
     };
-    if (request.tools.length > 0) {
-      body.tools = request.tools;
+    if (tools.length > 0) {
+      body.tools = tools;
       body.tool_choice = 'auto';
     }
 
@@ -157,15 +263,11 @@ export class MimoTransport implements AgentTransport {
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const detail = await readErrorBody(response);
-      throw new Error(
-        `MiMo 请求失败（HTTP ${response.status}）${detail ? `：${detail}` : ''}`,
-      );
-    }
+    if (!response.ok) await throwForHttpError(response);
     if (!response.body) throw new Error('MiMo 响应没有可读的流');
 
     const pending = new Map<number, { id: string; name: string; rawArguments: string }>();
+    const emittedSourceUrls = new Set<string>();
     let finishReason = 'stop';
 
     for await (const event of readSse(response.body, request.signal, {
@@ -179,6 +281,18 @@ export class MimoTransport implements AgentTransport {
         continue;
       }
       const choice = chunk.choices?.[0];
+
+      const webSearchUsage = chunk.usage?.web_search_usage;
+      if (webSearchUsage) {
+        onEvent({
+          type: 'usage',
+          webSearchUsage: {
+            toolUsage: webSearchUsage.tool_usage ?? 0,
+            pageUsage: webSearchUsage.page_usage ?? 0,
+          },
+        });
+      }
+
       if (!choice) continue;
 
       const reasoning = choice.delta?.reasoning_content;
@@ -188,6 +302,19 @@ export class MimoTransport implements AgentTransport {
       const content = choice.delta?.content;
       if (typeof content === 'string' && content) {
         onEvent({ type: 'content', text: content });
+      }
+
+      // 来源：MiMo 在流式首个数据包就带 annotations
+      const annotations = parseAnnotations(
+        choice.delta?.annotations ?? choice.message?.annotations,
+      );
+      if (annotations.length) {
+        const fresh = annotations.filter((source) => {
+          if (emittedSourceUrls.has(source.url)) return false;
+          emittedSourceUrls.add(source.url);
+          return true;
+        });
+        if (fresh.length) onEvent({ type: 'sources', sources: fresh });
       }
 
       for (const deltaCall of choice.delta?.tool_calls ?? []) {
@@ -338,16 +465,6 @@ export class MimoTransport implements AgentTransport {
     }
   }
 
-  // ---------- 搜索 / 网页 ----------
-
-  searchWeb(query: string, options: ToolRunOptions): Promise<WebSearchResult[]> {
-    return tavilySearch(this.settings().search.apiKey, query, options.signal);
-  }
-
-  fetchPage(url: string, options: ToolRunOptions): Promise<WebPage> {
-    return fetchPageText(url, options.signal);
-  }
-
   // ---------- 插件工具 ----------
 
   listPluginTools(): AgentToolDecl[] {
@@ -358,18 +475,3 @@ export class MimoTransport implements AgentTransport {
     return getHostBridge().callTool(name, args, { signal: options.signal });
   }
 }
-
-/** 给会话层组 system prompt 用 */
-export function buildMimoSystemPrompt(
-  bindings: Parameters<typeof buildSystemPrompt>[0]['bindings'],
-  settings: AgentSettings,
-): string {
-  return buildSystemPrompt({
-    bindings,
-    now: new Date(),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时区',
-    searchConfigured: Boolean(settings.search.apiKey.trim()),
-  });
-}
-
-export type { ChatRequestMessage, OpenAIToolCall };

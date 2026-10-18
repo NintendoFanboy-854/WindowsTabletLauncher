@@ -1,17 +1,17 @@
 /**
- * 设置页（B1）：主题 / 开机自启 / 快捷键 / 插件入口 / Agent 入口 / 退出。
+ * 设置页（B1 + F5 信息密度复核）：主题 / 开机自启 / 快捷键 / 插件入口 / Agent 入口 / 退出。
+ *
+ * 密度约定（docs/DENSITY.md §4）：
+ * - 一屏一个主任务：本页只做「改设置」，页头只有一个主操作；
+ * - 分组靠留白与字号层级，不用卡片边框/分割线（§2 层级表达手段）；
+ * - 每行最多 1 个主标签 + 1 句次要说明（foreground3 / base200）+ 1 个控件。
  *
  * 宽屏两栏（左侧导航 + 右侧内容），窄屏单栏（导航变成横向 Tab）。
- * 所有颜色/间距/圆角走 Fluent token；不自造控件（Switch/TabList/RadioGroup 都是 Fluent）。
  */
 
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import {
-  Badge,
   Button,
-  Divider,
-  MessageBar,
-  MessageBarBody,
   Radio,
   RadioGroup,
   Spinner,
@@ -78,7 +78,7 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
 const useStyles = makeStyles({
   layout: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(180px, 240px) minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(160px, 200px) minmax(0, 1fr)',
     gap: tokens.spacingHorizontalXXL,
     alignItems: 'start',
     paddingTop: tokens.spacingVerticalL,
@@ -93,23 +93,25 @@ const useStyles = makeStyles({
   },
   content: {
     display: 'grid',
+    gap: tokens.spacingVerticalXXL,
+    minWidth: 0,
+    paddingTop: tokens.spacingVerticalXS,
+  },
+  group: {
+    display: 'grid',
     gap: tokens.spacingVerticalL,
     minWidth: 0,
   },
-  section: {
-    display: 'grid',
-    gap: tokens.spacingVerticalM,
-    padding: tokens.spacingHorizontalL,
-    borderRadius: tokens.borderRadiusLarge,
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  sectionHead: {
+  groupHead: {
     display: 'grid',
     gap: tokens.spacingVerticalXXS,
   },
-  sectionHint: {
+  groupHint: {
     color: tokens.colorNeutralForeground3,
+  },
+  groupBody: {
+    display: 'grid',
+    gap: tokens.spacingVerticalL,
   },
   row: {
     display: 'flex',
@@ -123,45 +125,81 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
   },
-  rowDescription: {
-    color: tokens.colorNeutralForeground3,
-  },
   rowControl: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
   },
+  description: {
+    color: tokens.colorNeutralForeground3,
+  },
   shortcutRow: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: tokens.spacingHorizontalS,
   },
-  shortcutKeys: {
+  shortcutMain: {
     display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    flexWrap: 'wrap',
-  },
-  shortcutScope: {
-    color: tokens.colorNeutralForeground3,
-  },
-  dangerRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'baseline',
     flexWrap: 'wrap',
     gap: tokens.spacingHorizontalM,
   },
-  muted: {
+  keys: {
+    color: tokens.colorNeutralForeground2,
+  },
+  scope: {
     color: tokens.colorNeutralForeground3,
   },
-  valueBadge: {
-    fontVariantNumeric: 'tabular-nums',
-  },
 });
+
+interface SettingsGroupProps {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}
+
+function SettingsGroup({ title, hint, children }: SettingsGroupProps) {
+  const styles = useStyles();
+  return (
+    <section className={styles.group} aria-label={title}>
+      <header className={styles.groupHead}>
+        <Title3>{title}</Title3>
+        {hint && (
+          <Text size={200} className={styles.groupHint}>
+            {hint}
+          </Text>
+        )}
+      </header>
+      <div className={styles.groupBody}>{children}</div>
+    </section>
+  );
+}
+
+interface SettingsRowProps {
+  label: string;
+  description?: string;
+  children?: ReactNode;
+}
+
+function SettingsRow({ label, description, children }: SettingsRowProps) {
+  const styles = useStyles();
+  return (
+    <div className={styles.row}>
+      <div className={styles.rowText}>
+        <Text size={400}>{label}</Text>
+        {description && (
+          <Text size={200} className={styles.description}>
+            {description}
+          </Text>
+        )}
+      </div>
+      {children && <div className={styles.rowControl}>{children}</div>}
+    </div>
+  );
+}
 
 export function SettingsPage({
   onBack,
@@ -214,248 +252,136 @@ export function SettingsPage({
   const themeValue = themeMode ?? 'dark';
   const themeEditable = typeof onThemeModeChange === 'function';
 
+  const autostartDescription =
+    autostart === 'unsupported'
+      ? '浏览器演示模式不可用，Tauri 运行时生效'
+      : autostart === 'error'
+        ? '读取失败，可能注册表权限受限'
+        : '写入当前用户的注册表启动项，开机直接进入桌面';
+
   const pluginSummary = useMemo(() => {
     if (pluginsLoading) return '扫描中…';
     if (plugins.length === 0) return '还没有插件';
-    return `${plugins.length} 个插件 · ${plugins.reduce((sum, plugin) => sum + plugin.widgets.length, 0)} 个组件`;
-  }, [plugins, pluginsLoading]);
+    return `${plugins.length} 个插件 · ${plugins.reduce((sum, plugin) => sum + plugin.widgets.length, 0)} 个组件 · ${manager.sourceKind ?? '未知'} 源`;
+  }, [plugins, pluginsLoading, manager]);
 
   const renderGeneral = () => (
     <>
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <Title3>启动</Title3>
-          <Text size={200} className={styles.sectionHint}>
-            启动器是全屏无边框窗口，正常启动即铺满整块屏幕。
-          </Text>
-        </div>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text weight="semibold">开机自启</Text>
-            <Text size={200} className={styles.rowDescription}>
-              写入当前用户的注册表启动项，开机后直接进入桌面。
-            </Text>
-          </div>
-          <div className={styles.rowControl}>
-            {autostart === 'loading' && <Spinner size="tiny" />}
-            <Switch
-              checked={autostart === 'enabled'}
-              disabled={autostart === 'loading' || autostart === 'unsupported' || autostart === 'error' || autostartBusy}
-              onChange={(_event, data) => {
-                void onAutostartChange(data.checked);
-              }}
-              label={autostart === 'enabled' ? '已开启' : '已关闭'}
-            />
-          </div>
-        </div>
-        {autostart === 'unsupported' && (
-          <MessageBar intent="info">
-            <MessageBarBody>浏览器演示模式：开机自启只在 Tauri 运行时可用。</MessageBarBody>
-          </MessageBar>
-        )}
-        {autostart === 'error' && (
-          <MessageBar intent="warning">
-            <MessageBarBody>读取开机自启状态失败，可能是注册表权限受限。</MessageBarBody>
-          </MessageBar>
-        )}
-        <Divider />
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text weight="semibold">启动时全屏</Text>
-            <Text size={200} className={styles.rowDescription}>
-              窗口创建时即全屏，不显示标题栏和边框。
-            </Text>
-          </div>
-          <Badge appearance="tint" color="success">
-            已启用
-          </Badge>
-        </div>
-      </div>
+      <SettingsGroup title="启动" hint="启动器是全屏无边框窗口，正常启动即铺满整屏。">
+        <SettingsRow label="开机自启" description={autostartDescription}>
+          {autostart === 'loading' && <Spinner size="tiny" />}
+          <Switch
+            checked={autostart === 'enabled'}
+            disabled={
+              autostart === 'loading' ||
+              autostart === 'unsupported' ||
+              autostart === 'error' ||
+              autostartBusy
+            }
+            onChange={(_event, data) => {
+              void onAutostartChange(data.checked);
+            }}
+            label={autostart === 'enabled' ? '已开启' : '已关闭'}
+          />
+        </SettingsRow>
+        <SettingsRow label="启动时全屏" description="窗口创建即全屏，不显示标题栏和边框" />
+      </SettingsGroup>
 
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <Title3>退出</Title3>
-          <Text size={200} className={styles.sectionHint}>
-            Esc 不会退出应用；退出只走这里或全局快捷键 Ctrl + Q。
-          </Text>
-        </div>
-        <div className={styles.dangerRow}>
-          <div className={styles.rowText}>
-            <Text weight="semibold">退出启动器</Text>
-            <Text size={200} className={styles.rowDescription}>
-              插件 iframe 会随应用一起关闭，缓存数据由各插件自己保存。
-            </Text>
-          </div>
+      <SettingsGroup title="退出" hint="Esc 只返回桌面，不退出应用；退出走这里或 Ctrl + Q。">
+        <SettingsRow label="退出启动器" description="插件 iframe 随应用关闭，缓存数据由各插件自己保存">
           <Button appearance="secondary" onClick={() => void quitApplication(notify)}>
             退出应用
           </Button>
-        </div>
-      </div>
+        </SettingsRow>
+      </SettingsGroup>
     </>
   );
 
   const renderAppearance = () => (
-    <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <Title3>主题</Title3>
-        <Text size={200} className={styles.sectionHint}>
-          所有组件使用 Fluent 2 的深色 / 亮色主题，颜色取自 token，不写死色值。
-        </Text>
-      </div>
-      <RadioGroup
-        value={themeValue}
-        layout="horizontal"
-        disabled={!themeEditable}
-        onChange={(_event, data) => {
-          if (data.value === 'dark' || data.value === 'light') onThemeModeChange?.(data.value);
-        }}
-      >
-        <Radio value="dark" label="深色（默认）" />
-        <Radio value="light" label="亮色" />
-      </RadioGroup>
-      {!themeEditable && (
-        <MessageBar intent="info">
-          <MessageBarBody>
-            主题由 App 层的 FluentProvider 控制；接线传入 onThemeModeChange 后这里可切换。
-          </MessageBarBody>
-        </MessageBar>
-      )}
-      <Divider />
-      <div className={styles.row}>
-        <div className={styles.rowText}>
-          <Text weight="semibold">卡片材质</Text>
-          <Text size={200} className={styles.rowDescription}>
-            半透明 Fluent 背景色 + 统一模糊（项目 token --wtsl-material-blur）。
-          </Text>
-        </div>
-        <Badge appearance="outline">Fluent 2</Badge>
-      </div>
-    </div>
+    <SettingsGroup
+      title="主题"
+      hint={
+        themeEditable
+          ? 'Fluent 2 深色 / 亮色主题，颜色全部来自 token。'
+          : '主题由 App 层的 FluentProvider 控制，接线传入回调后可切换。'
+      }
+    >
+      <SettingsRow label="配色模式">
+        <RadioGroup
+          value={themeValue}
+          layout="horizontal"
+          disabled={!themeEditable}
+          onChange={(_event, data) => {
+            if (data.value === 'dark' || data.value === 'light') onThemeModeChange?.(data.value);
+          }}
+        >
+          <Radio value="dark" label="深色（默认）" />
+          <Radio value="light" label="亮色" />
+        </RadioGroup>
+      </SettingsRow>
+    </SettingsGroup>
   );
 
   const renderShortcuts = () => (
-    <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <Title3>全局与桌面快捷键</Title3>
-        <Text size={200} className={styles.sectionHint}>
-          全局快捷键在任意页面生效；桌面相关的按键由桌面层在自身状态里处理。
-        </Text>
-      </div>
+    <SettingsGroup title="快捷键" hint="全局快捷键在任意页面生效；桌面相关按键由桌面层处理。">
       {SHORTCUTS.map((shortcut) => (
         <div key={shortcut.keys} className={styles.shortcutRow}>
-          <div className={styles.shortcutKeys}>
-            <Badge appearance="tint" color="informative" className={styles.valueBadge}>
+          <div className={styles.shortcutMain}>
+            <Text size={200} className={styles.keys}>
               {shortcut.keys}
-            </Badge>
+            </Text>
             <Text size={300}>{shortcut.action}</Text>
           </div>
-          <Text size={200} className={styles.shortcutScope}>
+          <Text size={200} className={styles.scope}>
             {shortcut.scope}
           </Text>
         </div>
       ))}
-    </div>
+    </SettingsGroup>
   );
 
   const renderPlugins = () => (
-    <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <Title3>插件</Title3>
-        <Text size={200} className={styles.sectionHint}>
-          插件决定桌面上有什么。安装后自动扫描，无需重启。
-        </Text>
-      </div>
-      <div className={styles.row}>
-        <div className={styles.rowText}>
-          <Text weight="semibold">已安装</Text>
-          <Text size={200} className={styles.rowDescription}>
-            {pluginSummary} · 数据源：{manager.sourceKind ?? '探测中'}
-          </Text>
-        </div>
-        <div className={styles.rowControl}>
-          <Button
-            appearance="secondary"
-            onClick={() => {
-              void reloadPlugins();
-              notify('已重新扫描插件目录');
-            }}
-          >
-            重新扫描
-          </Button>
-          <Button appearance="primary" onClick={() => onNavigate('plugins')}>
-            打开插件管理
-          </Button>
-        </div>
-      </div>
-      <Divider />
-      <div className={styles.row}>
-        <div className={styles.rowText}>
-          <Text weight="semibold">安装插件</Text>
-          <Text size={200} className={styles.rowDescription}>
-            把插件 zip 拖进窗口即可解压安装到 plugins/&lt;id&gt;/（Tauri 运行时）。
-          </Text>
-        </div>
+    <SettingsGroup title="插件" hint="插件决定桌面上有什么；安装后自动扫描，无需重启。">
+      <SettingsRow label="已安装" description={pluginSummary}>
+        <Button
+          appearance="secondary"
+          onClick={() => {
+            void reloadPlugins();
+            notify('已重新扫描插件目录');
+          }}
+        >
+          重新扫描
+        </Button>
+        <Button appearance="primary" onClick={() => onNavigate('plugins')}>
+          插件管理
+        </Button>
+      </SettingsRow>
+      <SettingsRow label="安装插件" description="把插件 zip 拖进窗口即解压到 plugins/<id>/">
         <Button appearance="secondary" onClick={() => onNavigate('plugins')}>
           去安装
         </Button>
-      </div>
-    </div>
+      </SettingsRow>
+    </SettingsGroup>
   );
 
   const renderAgent = () => (
-    <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <Title3>Agent</Title3>
-        <Text size={200} className={styles.sectionHint}>
-          内置 Agent 面板；复盘页可以从这里直接进入 Agent 对话。
-        </Text>
-      </div>
-      <div className={styles.row}>
-        <div className={styles.rowText}>
-          <Text weight="semibold">Agent 面板</Text>
-          <Text size={200} className={styles.rowDescription}>
-            {onOpenAgent ? '打开对话面板（浮层 / 侧栏形态由 Agent 层决定）。' : 'D 阶段接入，接线后这里可打开面板。'}
-          </Text>
-        </div>
+    <SettingsGroup title="Agent" hint="模型、语音与工具调度在 Agent 模块里配置（D 阶段）。">
+      <SettingsRow
+        label="Agent 面板"
+        description={onOpenAgent ? '对话与工具调用入口' : 'D 阶段接入，接线后可从桌面或这里打开'}
+      >
         <Button appearance="primary" disabled={!onOpenAgent} onClick={onOpenAgent}>
           打开 Agent
         </Button>
-      </div>
-      <Divider />
-      <div className={styles.row}>
-        <div className={styles.rowText}>
-          <Text weight="semibold">模型与语音</Text>
-          <Text size={200} className={styles.rowDescription}>
-            MiMo 模型 Key、语音、人脸唤醒在 Agent 模块里配置。
-          </Text>
-        </div>
-        <Badge appearance="outline">D 阶段</Badge>
-      </div>
-    </div>
+      </SettingsRow>
+    </SettingsGroup>
   );
 
   const renderAbout = () => (
-    <div className={styles.section}>
-      <div className={styles.sectionHead}>
-        <Title3>Windows Tablet Launcher</Title3>
-        <Text size={200} className={styles.sectionHint}>
-          给 Windows 平板用的全屏小组件桌面，所有功能来自插件。
-        </Text>
-      </div>
-      <div className={styles.row}>
-        <Text size={200} className={styles.muted}>
-          宿主外壳
-        </Text>
-        <Text size={200}>Fluent 2 · Tauri 2 · React 19</Text>
-      </div>
-      <Divider />
-      <div className={styles.row}>
-        <Text size={200} className={styles.muted}>
-          路由
-        </Text>
-        <Text size={200}>?page=settings / review / plugins</Text>
-      </div>
-    </div>
+    <SettingsGroup title="Windows Tablet Launcher" hint="给 Windows 平板用的全屏小组件桌面，能力全部来自插件。">
+      <SettingsRow label="宿主外壳" description="Fluent 2 · Tauri 2 · React 19" />
+      <SettingsRow label="页面路由" description="?page=settings / review / plugins" />
+    </SettingsGroup>
   );
 
   const sections: Record<SettingsSection, () => ReactElement> = {
@@ -470,14 +396,14 @@ export function SettingsPage({
   return (
     <PageScaffold
       title="设置"
-      subtitle="外观、启动行为、快捷键与插件入口"
+      subtitle="启动行为、外观、快捷键与插件入口"
       onBack={onBack}
       actions={
         <Button appearance="secondary" onClick={() => onNavigate('review')}>
           复盘
         </Button>
       }
-      maxContentWidth="1080px"
+      maxContentWidth="1040px"
     >
       <div className={wide ? styles.layout : mergeClasses(styles.layout, styles.layoutNarrow)}>
         <TabList

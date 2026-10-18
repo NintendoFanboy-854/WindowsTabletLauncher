@@ -2,6 +2,7 @@
  * 单条消息：用户气泡 / Agent 回答卡片（含工具卡片、思考过程、来源、朗读按钮）。
  */
 
+import { useState } from 'react';
 import {
   Accordion,
   AccordionHeader,
@@ -18,6 +19,8 @@ import {
 import {
   AlertRegular,
   BotRegular,
+  ChevronDownRegular,
+  ChevronUpRegular,
   GlobeRegular,
   PersonRegular,
   Speaker2Regular,
@@ -87,12 +90,28 @@ const useStyles = makeStyles({
     paddingTop: tokens.spacingVerticalXS,
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  sourceLink: {
+  sourceChip: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    fontSize: tokens.fontSizeBase200,
     minWidth: 0,
+    paddingInline: tokens.spacingHorizontalS,
+    paddingBlock: tokens.spacingVerticalXXS,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground3,
+    textDecoration: 'none',
+  },
+  sourceTitle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sourceMeta: {
+    color: tokens.colorNeutralForeground3,
+    flexShrink: 0,
+  },
+  sourcesFooter: {
+    color: tokens.colorNeutralForeground3,
+    textAlign: 'end',
   },
   reasoning: {
     color: tokens.colorNeutralForeground2,
@@ -109,6 +128,9 @@ const useStyles = makeStyles({
   },
 });
 
+/** 来源 chips 首屏上限（docs/DENSITY.md · Agent：最多 3 条，其余折叠） */
+const SOURCE_CHIP_LIMIT = 3;
+
 function formatTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -124,6 +146,10 @@ export interface MessageBubbleProps {
 
 export function MessageBubble({ message, session, showReasoning }: MessageBubbleProps) {
   const styles = useStyles();
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const sources = message.sources ?? [];
+  const visibleSources = sourcesExpanded ? sources : sources.slice(0, SOURCE_CHIP_LIMIT);
+  const hiddenSourceCount = sources.length - visibleSources.length;
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const speaking = session.speakingMessageId === message.id;
@@ -183,25 +209,47 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
             </span>
           ) : null}
 
-          {message.sources?.length ? (
+          {sources.length ? (
             <div className={styles.sources}>
               <Text size={200} weight="semibold">
                 来源
               </Text>
-              {message.sources.map((source) => (
+              {visibleSources.map((source) => (
                 <Link
                   key={source.url}
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"
-                  className={styles.sourceLink}
+                  className={styles.sourceChip}
+                  title={source.summary ?? source.url}
                 >
                   <GlobeRegular />
-                  <Text size={200} truncate>
+                  <Text size={200} truncate className={styles.sourceTitle}>
                     {source.title || source.url}
                   </Text>
+                  {source.siteName ? (
+                    <Text size={100} className={styles.sourceMeta}>
+                      {source.siteName}
+                    </Text>
+                  ) : null}
                 </Link>
               ))}
+              {hiddenSourceCount > 0 ? (
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={sourcesExpanded ? <ChevronUpRegular /> : <ChevronDownRegular />}
+                  onClick={() => setSourcesExpanded((previous) => !previous)}
+                >
+                  {sourcesExpanded ? '收起来源' : `还有 ${hiddenSourceCount} 条来源`}
+                </Button>
+              ) : null}
+              {message.webSearchUsage ? (
+                <Text size={100} className={styles.sourcesFooter}>
+                  联网搜索 · {message.webSearchUsage.toolUsage} 次检索 /{' '}
+                  {message.webSearchUsage.pageUsage} 个页面
+                </Text>
+              ) : null}
             </div>
           ) : null}
         </div>

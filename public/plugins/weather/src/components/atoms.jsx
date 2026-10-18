@@ -145,7 +145,7 @@ export function DemoBadge({ className }) {
   return <span className={mergeClasses(styles.demoBadge, className)}>演示</span>;
 }
 
-/** 预警条：卡片顶部；不可单独点击（点击整张卡片会默认打开预警 Tab） */
+/** 预警条：卡片顶部；只有一条核心信息（标题），多条时在详情里展开 */
 export function WarningStrip({ warnings }) {
   const styles = useStyles();
   if (!warnings || warnings.length === 0) return null;
@@ -154,19 +154,17 @@ export function WarningStrip({ warnings }) {
     <div className={styles.warningStrip} style={{ backgroundColor: primary.color, color: contrastTextColor(primary.color) }}>
       <Warning16Filled className={styles.warningIcon} />
       <span className={styles.warningText}>{primary.title}</span>
-      {warnings.length > 1 && <span className={styles.warningCount}>+{warnings.length - 1}</span>}
     </div>
   );
 }
 
-/** 1×1 尺寸下的预警小角标 */
+/** 1×1 尺寸下的预警小角标（有预警才出现） */
 export function WarningBadge({ warnings }) {
   const styles = useStyles();
   if (!warnings || warnings.length === 0) return null;
   return (
     <span className={styles.warningDot} style={{ backgroundColor: warnings[0].color, color: contrastTextColor(warnings[0].color) }}>
       <Warning16Filled />
-      {warnings.length > 1 ? warnings.length : ''}
     </span>
   );
 }

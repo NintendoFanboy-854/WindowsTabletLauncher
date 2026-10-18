@@ -29,7 +29,7 @@ export { useSettings } from './hooks/useSettings';
 export { useViewportWidth } from './hooks/useViewportWidth';
 export { useFaceState } from './hooks/useFaceState';
 
-export { MimoTransport } from './transport/real';
+export { MimoTransport, parseAnnotations, MimoWebSearchDisabledError } from './transport/real';
 export { MockTransport } from './transport/mock';
 
 export {
@@ -58,9 +58,11 @@ export {
   DEFAULT_SETTINGS,
   MIMO_MODELS,
   MIMO_BASE_URL,
+  MIMO_PLUGIN_CONSOLE_URL,
   TTS_VOICES,
 } from './types';
 export type {
+  AgentErrorAction,
   AgentSettings,
   AgentTransport,
   AgentToolDecl,
@@ -70,6 +72,4 @@ export type {
   PanelMode,
   SourceRef,
   ToolCallRecord,
-  WebPage,
-  WebSearchResult,
 } from './types';

@@ -2,7 +2,8 @@
  * Agent 面板演示 / 截图页（vite dev 下访问 `/src/host/agent/demo.html`）。
  *
  * 参数：
- * - `?scenario=overlay`（默认）浮层态，带工具卡片与来源
+ * - `?scenario=overlay`（默认）浮层态，带工具卡片与来源 chips
+ * - `?scenario=search` 空会话自动发起一次搜索（Mock 原生 web_search annotations）
  * - `?scenario=voice` 全屏语音态（Mock 数据，波形在朗读）
  * - `?scenario=sidebar` 常驻侧栏态
  * - `?scenario=fullscreen` 全屏文字对话
@@ -44,13 +45,15 @@ const scenario = new URLSearchParams(window.location.search).get('scenario') ?? 
 localStorage.removeItem(CONVERSATIONS_STORAGE_KEY);
 localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
 updateSettings(
-  scenario === 'voice'
-    ? { mock: true, panelMode: 'fullscreen', tts: { continuous: true } }
-    : scenario === 'sidebar'
-      ? { mock: true, panelMode: 'sidebar', tts: { continuous: false } }
-      : scenario === 'fullscreen'
-        ? { mock: true, panelMode: 'fullscreen', tts: { continuous: false } }
-        : { mock: true, panelMode: 'overlay', tts: { continuous: false } },
+  scenario === 'realsearch'
+    ? { mock: false, panelMode: 'overlay', tts: { continuous: false } }
+    : scenario === 'voice'
+      ? { mock: true, panelMode: 'fullscreen', tts: { continuous: true } }
+      : scenario === 'sidebar'
+        ? { mock: true, panelMode: 'sidebar', tts: { continuous: false } }
+        : scenario === 'fullscreen'
+          ? { mock: true, panelMode: 'fullscreen', tts: { continuous: false } }
+          : { mock: true, panelMode: 'overlay', tts: { continuous: false } },
 );
 
 function message(
@@ -65,35 +68,40 @@ const SEARCH_RESULTS = [
   {
     title: 'MiMo V2.6 系列模型更新：1M 上下文、128K 输出',
     url: 'https://mimo.mi.com/docs/zh-CN/updates/model',
-    content: 'MiMo V2.6 系列支持文本生成、全模态理解、深度思考、流式输出、函数调用、结构化输出和联网搜索。',
   },
   {
     title: 'OpenAI Chat Completions API 兼容',
     url: 'https://mimo.mi.com/docs/zh-CN/api/chat/openai-api',
-    content: '请求地址 https://api.xiaomimimo.com/v1/chat/completions，SSE 流式返回。',
+  },
+  {
+    title: '联网搜索（web_search）使用指南',
+    url: 'https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/text-generation/tool-calling/web-search',
+  },
+  {
+    title: 'MiMo 控制台 · 插件管理',
+    url: 'https://platform.xiaomimimo.com/#/console/plugin',
   },
 ];
 
 const OVERLAY_MESSAGES: Message[] = [
-  message('user', '搜一下 MiMo V2.6 的最新消息，顺便把番茄钟设为 25 分钟。'),
+  message('user', '帮我看看今天的待办，再把番茄钟设为 25 分钟。'),
   message(
     'assistant',
-    'MiMo V2.6 三个型号都支持 **1M 上下文** 和 **128K 输出**，深度思考、函数调用、流式输出、联网搜索都已支持。\n\n番茄钟已设为 25 分钟，结束我会提醒你。\n\n来源：\n1. [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)\n2. [OpenAI Chat Completions API 兼容](https://mimo.mi.com/docs/zh-CN/api/chat/openai-api)',
+    '今天有 2 件待办：给客户回邮件、整理周三评审材料。番茄钟已设为 25 分钟，结束我会提醒你。',
     {
       toolCalls: [
         {
-          id: 'demo-search',
-          name: 'web__search',
-          args: { query: 'MiMo V2.6 最新消息' },
+          id: 'demo-todo',
+          name: 'todo__today',
+          args: {},
           status: 'success',
-          result: { query: 'MiMo V2.6 最新消息', results: SEARCH_RESULTS },
-        },
-        {
-          id: 'demo-fetch',
-          name: 'web__fetch',
-          args: { url: 'https://mimo.mi.com/docs/zh-CN/updates/model' },
-          status: 'error',
-          error: '抓取网页失败：HTTP 403；备用 Reader：连接超时',
+          result: {
+            total: 2,
+            items: [
+              { title: '给客户回邮件', done: false },
+              { title: '整理周三评审材料', done: false },
+            ],
+          },
         },
         {
           id: 'demo-pomodoro',
@@ -103,7 +111,19 @@ const OVERLAY_MESSAGES: Message[] = [
           result: { started: true, minutes: 25 },
         },
       ],
-      sources: SEARCH_RESULTS.map((item) => ({ title: item.title, url: item.url })),
+    },
+  ),
+  message('user', '搜一下 MiMo V2.6 的最新消息'),
+  message(
+    'assistant',
+    'MiMo V2.6 三个型号都支持 **1M 上下文** 和 **128K 输出**，深度思考、函数调用、流式输出、联网搜索都已支持。\n\n来源：\n1. [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)\n2. [OpenAI Chat Completions API 兼容](https://mimo.mi.com/docs/zh-CN/api/chat/openai-api)',
+    {
+      sources: SEARCH_RESULTS.map((item) => ({
+        title: item.title,
+        url: item.url,
+        siteName: new URL(item.url).hostname,
+      })),
+      webSearchUsage: { toolUsage: 1, pageUsage: 4 },
     },
   ),
 ];
@@ -144,10 +164,15 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
   },
   // 空会话，页面加载后自动点一个建议，用来验证“真实发送 → Mock 流式 → 工具卡片”链路
   interact: { mode: 'overlay', open: true, seed: { messages: [] } },
+  // 空会话，自动点一条搜索建议：验证 annotations 来源 chips 流程
+  search: { mode: 'overlay', open: true, seed: { messages: [] } },
+  // 需要 public/secrets.json 里的 MiMo Key：真实请求 + 真实 annotations
+  realsearch: { mode: 'overlay', open: true, seed: { messages: [] } },
 };
 
 const config = SCENARIOS[scenario] ?? SCENARIOS.overlay;
 const mockTransport = new MockTransport();
+const activeTransport = scenario === 'realsearch' ? undefined : mockTransport;
 
 const useStyles = makeStyles({
   desktop: {
@@ -262,7 +287,7 @@ createRoot(document.getElementById('root')!).render(
     <FluentProvider theme={webDarkTheme} style={{ height: '100%' }}>
       <DemoDesktop />
       <AgentSurface
-        transport={mockTransport}
+        transport={activeTransport}
         seed={config.seed}
         open={config.open}
         mode={config.mode}
@@ -282,4 +307,35 @@ if (scenario === 'interact') {
     );
     suggestion?.click();
   }, 800);
+}
+
+// ?scenario=search：自动点第三条建议，验证 MiMo annotations → sources chips（3+1 折叠）
+if (scenario === 'search') {
+  window.setTimeout(() => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const suggestion = buttons.find((button) =>
+      button.textContent?.includes('搜一下 MiMo V2.6'),
+    );
+    suggestion?.click();
+  }, 800);
+}
+
+// ?scenario=realsearch：从 /secrets.json 注入 MiMo Key，再自动发一条真实搜索请求
+if (scenario === 'realsearch') {
+  void fetch('/secrets.json', { cache: 'no-store' })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((secrets: { mimo?: { apiKey?: string; baseUrl?: string } } | null) => {
+      const apiKey = secrets?.mimo?.apiKey ?? '';
+      if (!apiKey) return;
+      updateSettings({
+        mock: false,
+        mimo: { apiKey, ...(secrets?.mimo?.baseUrl ? { baseUrl: secrets.mimo.baseUrl } : {}) },
+      });
+      window.setTimeout(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        buttons
+          .find((button) => button.textContent?.includes('搜一下 MiMo V2.6'))
+          ?.click();
+      }, 1200);
+    });
 }

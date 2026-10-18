@@ -1,8 +1,11 @@
 /**
  * 编辑模式顶部工具栏（Fluent Toolbar）：
  * 增删页、左右移动当前页的顺序、完成退出。
+ *
+ * 常驻 DOM、用 `visible` 切换 opacity/transform 过渡（motionTokens），
+ * 隐藏时 inert + pointer-events:none，不参与布局也不响应点击。
  */
-import { Toolbar, ToolbarButton, ToolbarDivider, Text } from '@fluentui/react-components';
+import { Text, Toolbar, ToolbarButton, ToolbarDivider, mergeClasses } from '@fluentui/react-components';
 import {
   Add20Regular,
   Checkmark20Regular,
@@ -13,6 +16,7 @@ import {
 import { useStyles } from './desktop.styles';
 
 interface EditToolbarProps {
+  visible: boolean;
   pages: number;
   activePage: number;
   onAddPage(): void;
@@ -22,6 +26,7 @@ interface EditToolbarProps {
 }
 
 export function EditToolbar({
+  visible,
   pages,
   activePage,
   onAddPage,
@@ -33,8 +38,10 @@ export function EditToolbar({
 
   return (
     <Toolbar
-      className={styles.toolbar}
+      className={mergeClasses(styles.toolbar, visible && styles.toolbarVisible)}
       aria-label="编辑桌面"
+      aria-hidden={!visible}
+      inert={!visible}
       data-no-desktop-gesture="true"
       size="small"
     >

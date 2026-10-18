@@ -136,6 +136,18 @@ export function Composer({
               />
             }
           >
+            {session.error.action ? (
+              <Button
+                size="small"
+                appearance="primary"
+                onClick={() => {
+                  const url = session.error?.action?.url;
+                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {session.error.action.label}
+              </Button>
+            ) : null}
             {session.error.retryable ? (
               <Button
                 size="small"
