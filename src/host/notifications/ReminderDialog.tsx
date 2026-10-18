@@ -34,12 +34,10 @@ export interface ReminderDialogProps {
 }
 
 const useStyles = makeStyles({
+  // 弹层材质/圆角/阴影全部交给 Fluent Dialog 默认（V-19：不覆写 shadow64、不加边框）
   surface: {
     maxWidth: 'min(560px, 92vw)',
     width: 'min(560px, 92vw)',
-    borderRadius: tokens.borderRadiusXLarge,
-    boxShadow: tokens.shadow64,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   body: {
     display: 'grid',

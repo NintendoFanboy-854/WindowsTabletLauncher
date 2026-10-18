@@ -33,6 +33,7 @@ const useStyles = makeStyles({
   row: {
     display: 'flex',
     alignItems: 'center',
+    minHeight: '40px',
     gap: tokens.spacingHorizontalM,
     flexWrap: 'wrap',
   },
@@ -50,6 +51,9 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
+  },
+  control40: {
+    minHeight: '40px',
   },
 });
 
@@ -111,6 +115,7 @@ export function FaceSetup({
     <div className={styles.root}>
       <div className={styles.row}>
         <Switch
+          className={styles.control40}
           checked={settings.face.enabled}
           onChange={(_, data) => onUpdate({ face: { enabled: data.checked } })}
           label="人脸唤醒"
@@ -130,7 +135,7 @@ export function FaceSetup({
         <div className={styles.spacer} />
         {sampleCount > 0 ? (
           <Button
-            size="small"
+            size="large"
             appearance="subtle"
             icon={<DeleteRegular />}
             onClick={clearSamples}
@@ -156,6 +161,7 @@ export function FaceSetup({
         <video ref={videoRef} className={styles.preview} muted playsInline />
         <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS }}>
           <Button
+            size="large"
             appearance="secondary"
             icon={<CameraRegular />}
             onClick={() => void startPreview()}
@@ -164,6 +170,7 @@ export function FaceSetup({
             打开摄像头预览
           </Button>
           <Button
+            size="large"
             appearance="primary"
             icon={<PersonRegular />}
             onClick={() => void capture()}
@@ -182,6 +189,7 @@ export function FaceSetup({
           匹配阈值
         </Text>
         <Slider
+          className={styles.control40}
           style={{ flex: 1, minWidth: '160px' }}
           min={0.2}
           max={0.8}
@@ -193,8 +201,8 @@ export function FaceSetup({
         <Text size={300}>{settings.face.threshold.toFixed(2)}</Text>
       </div>
       <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-        阈值越小越严格（face-api 的欧氏距离，常用 0.4–0.6）。识别按 2fps 抽帧，连续 2 帧命中才唤醒，
-        唤醒后自动进入全屏语音并开始录音。特征只存在本机，不上传。
+        数值越小越严格（0.4–0.6 之间比较合适）。系统每隔约半秒识别一次，
+        连续确认后才会唤醒；唤醒后自动进入全屏语音并开始录音。特征只保存在本机，不会上传。
       </Text>
     </div>
   );

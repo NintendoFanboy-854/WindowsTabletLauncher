@@ -40,7 +40,7 @@ Tauri（Rust）
 | A0 | 工程基线 | 目录重构（`src/host`）、Bridge 协议类型定义、Fluent 主题与 token、`scripts/shot.ps1` 截图脚本 | — | `src/host/**`、`scripts/**`、`package.json` |
 | A1 | Tauri 系统能力 | Rust command：窗口全屏/退出、开机自启、`getLocation`、`getIdleSeconds`、`setKeepAwake`、插件目录读写、zip 解压 | A0 | `src-tauri/**` |
 | A2 | 插件管理器 | 扫描 `plugins/`、读 manifest（多尺寸）、挂载 iframe、后台 iframe、热重载、zip 拖入安装 | A0 | `src/host/plugins/**` |
-| A3 | 布局引擎 | 自适应列数（8/6/4）、正方形单元格、行数推导、多页、布局持久化、列数变化重排 | A0 | `src/host/layout/**` |
+| A3 | 布局引擎 | 自适应列数（8/6/4/3/2）、正方形单元格、行数推导、多页、布局持久化、列数变化重排 | A0 | `src/host/layout/**` |
 | A4 | 编辑模式与拖拽 | 长按进入、卡片缩放、删除/改尺寸/设置按钮、拖拽吸附、边缘翻页、跨页拖动、键盘操作 | A3 | `src/host/desktop/**` |
 | A5 | 桥接层 | 8 个宿主 API 的 postMessage 实现（请求/响应 id、超时处理）、主题 token 注入、焦点交接协议 | A2、A3 | `src/host/bridge/**` |
 

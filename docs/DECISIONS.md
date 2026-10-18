@@ -10,15 +10,22 @@
 - 以设计规范为准，在项目 token 层固定 12px，**不允许各组件用 calc 再算、也不允许混用 6/8/16/**。
 - 文档修订：`FLUENT2.md §5` 已补"token 值映射注意"。
 
-## D-02 插件控件实现策略（V-03）
+## D-02 插件控件实现策略（V-03）——已由 D-02b 取代
 
-- **决策**：插件运行在 iframe 中，**不强制使用 Fluent UI React**；但必须同时满足：
-  1. 颜色 / 字号 / 间距 / 圆角 / 阴影 / 动效全部走 Fluent token（或等价 CSS 变量）；
-  2. hover / pressed / disabled / focus-visible 四种状态与 Fluent 观感一致；
-  3. 交互目标 ≥ 40×40 CSS px；
-  4. 表单类设置面板推荐使用 Fluent React（weather 已是先例）。
-- 理由：每个插件独立打包 React 会增加约 1MB/插件与首屏成本；token + 状态规范足以保证视觉交互一致。
-- **审计口径**：V-03 由 P1 调整为「豁免（有约束）」；前提是 H3/H4/H5 的 token 化与触控目标达标。
+- ~~**原决策（2026-10-19 早）**：插件运行在 iframe 中，不强制使用 Fluent UI React，只要 token 化 + 四态一致 + 触控 ≥40 即可。~~
+- 原决策作废，见 D-02b。
+
+## D-02b 全部插件必须使用 Fluent UI React（取代 D-02）
+
+- **决策（用户 2026-10-19 明确要求）**：**每一个组件都必须基于 Fluent UI React v9**，最严格地满足 Fluent 2 设计规范与官方组件，"设计风格优先于一切"，不为了包体积牺牲一致性。
+- 具体：
+  1. 六个插件（clock / countdown / pomodoro / sedentary / todo / weather）全部改为 **React + `@fluentui/react-components`** 的 iframe 页面，用 Vite 打包成自包含 ES module（沿用 weather 的 `build.mjs` 模式，产物 `app/app.js` 随 public 进 git）。
+  2. 插件内**不再自绘控件**：按钮、菜单、对话框、抽屉、输入、开关、进度条、徽标、提示、骨架、空态、消息条等一律用 Fluent 组件；布局/层级用 `tokens`（spacing、typography、color）与 `makeStyles`。
+  3. 插件根节点包 `FluentProvider`，主题由宿主 `host:init/theme` 注入（亮/暗）。
+  4. 数据层/业务逻辑（store、api、定时器）可保留为纯 JS 模块，由 React 入口引用。
+  5. 包体积不再是约束（每插件约 1MB，可接受）；不为省体积引入手写 HTML 控件。
+- **审计口径**：V-03 由「豁免」改回 **P1，必须修复**；V-04/V-05/V-19（插件 token 化）由 React 迁移自然消解，复检时按 Fluent 组件使用率与 token 扫描判定。
+
 
 ## D-03 桌面常驻 dock（V-14）
 

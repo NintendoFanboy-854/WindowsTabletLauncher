@@ -26,13 +26,4 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 卡片里可能需要滚动的区域（详情 Drawer 用 Fluent 自带样式，这里只兜底） */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  border-radius: 4px;
-  background: rgba(128, 128, 128, 0.4);
-}
+/* 滚动条交给浏览器按 color-scheme 渲染，不在插件里自绘非 token 圆角/颜色。 */

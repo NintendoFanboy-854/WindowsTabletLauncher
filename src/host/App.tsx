@@ -71,7 +71,7 @@ export default function App() {
   return (
     <FluentProvider
       theme={themeMode === 'light' ? webLightTheme : webDarkTheme}
-      style={{ height: '100%', ['--wtsl-card-radius' as string]: '12px' }}
+      style={{ height: '100%' }}
     >
       {seeded && (
         <NotificationsProvider bridge={bridge}>

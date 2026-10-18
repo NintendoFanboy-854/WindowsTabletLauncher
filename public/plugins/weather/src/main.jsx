@@ -1,58 +1,40 @@
-/** 天气插件入口：读设置/缓存 → 挂载 React 应用；同时兼容脱离宿主的独立开发。 */
+/**
+ * 天气插件入口（D-02b 浮层视图架构）：
+ * - `?view=settings` → 宿主全窗口浮层里的设置视图
+ * - `?view=detail`   → 详情视图
+ * - 无 view          → 桌面卡片视图
+ *
+ * 浮层视图由宿主用整窗 Fluent Dialog 加载同一插件页面并追加 `?view=<name>`，
+ * 这样设置/详情不会被卡片 iframe 的边界裁切（docs/PLUGIN-REACT.md）。
+ */
 
-import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { plugin } from '/plugin-sdk.js';
+import { FluentProvider } from '@fluentui/react-components';
+import { getOverlayView, startHostCapture, useHostTheme } from '../../_shared/host.js';
 import WeatherApp from './WeatherApp.jsx';
-import { normalizeSettings } from './data/store.js';
-import { legacyThemePayload } from './theme.js';
-import { parseSizeParam, sizeKeyOf } from './utils.js';
+import DetailView from './views/DetailView.jsx';
+import SettingsView from './views/SettingsView.jsx';
 
-const params = new URLSearchParams(location.search);
-const query = Object.fromEntries(params.entries());
+// 必须在 React 挂载前注册：host:init 可能早于组件树渲染到达
+startHostCapture();
 
-// 宿主在 iframe onLoad 时就会发 host:init（见 PluginWidgetFrame），可能早于 React 挂载。
-// 这里在模块执行的第一时间注册监听并缓存，bootstrap 时作为初始 size/theme 使用。
-let capturedHostInit = null;
-let capturedLegacyTheme = null;
-plugin.onInit((payload) => {
-  if (!capturedHostInit) capturedHostInit = payload;
-});
-window.addEventListener('message', (event) => {
-  const data = event.data;
-  if (data?.type === 'wtsl:init' && data.theme && !capturedLegacyTheme) capturedLegacyTheme = data.theme;
-});
-
-function withTimeout(promise, ms, fallback) {
-  return Promise.race([
-    Promise.resolve(promise).catch(() => fallback),
-    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
-  ]);
-}
-
-async function bootstrap() {
-  const rootElement = document.getElementById('root');
-  if (!rootElement) return;
-
-  const [rawSettings, rawCache] = await Promise.all([
-    withTimeout(plugin.getConfig('settings'), 1500, null),
-    withTimeout(plugin.getConfig('cache'), 1500, {}),
-  ]);
-
-  let settings = normalizeSettings(rawSettings);
-  if (query.mock === '1') settings = { ...settings, mock: true };
-
-  const cache = rawCache && typeof rawCache === 'object' && !Array.isArray(rawCache) ? rawCache : {};
-  const hostSize = Array.isArray(capturedHostInit?.size) ? capturedHostInit.size : null;
-  const sizeParam = parseSizeParam(query.size);
-  const hostTheme = capturedHostInit?.theme || null;
-  const legacyTheme = capturedLegacyTheme ? legacyThemePayload(capturedLegacyTheme) : null;
-  const themePayload = hostTheme || legacyTheme || { colorScheme: query.theme === 'light' ? 'light' : 'dark' };
-  const sizeKey = hostSize ? sizeKeyOf(hostSize) : sizeParam ? sizeKeyOf(sizeParam) : '3x2';
-
-  createRoot(rootElement).render(
-    <WeatherApp plugin={plugin} initial={{ settings, cache, sizeKey, themePayload, query }} />,
+function Root() {
+  const { theme, scheme } = useHostTheme();
+  const overlayView = getOverlayView();
+  return (
+    <FluentProvider theme={theme} style={{ width: '100%', height: '100%', background: 'transparent' }}>
+      {overlayView === 'settings' ? (
+        <SettingsView />
+      ) : overlayView === 'detail' ? (
+        <DetailView scheme={scheme} />
+      ) : (
+        <WeatherApp scheme={scheme} />
+      )}
+    </FluentProvider>
   );
 }
 
-bootstrap();
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(<Root />);
+}

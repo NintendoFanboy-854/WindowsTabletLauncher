@@ -13,7 +13,6 @@ import { AirRing, DailyColumns, HourlyStrip, isNight } from './forecast.jsx';
 import {
   Condition,
   HiLo,
-  WarningBadge,
   WarningStrip,
   WeatherIcon,
 } from './atoms.jsx';
@@ -29,28 +28,28 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    backgroundColor: tokens.colorNeutralBackground1,
+    // 卡片材质由宿主 WidgetCard 提供，插件根节点保持透明，六张卡片观感一致（D-02b）
+    backgroundColor: 'transparent',
     color: tokens.colorNeutralForeground1,
     fontFamily: tokens.fontFamilyBase,
     userSelect: 'none',
     cursor: 'pointer',
-    gap: 'clamp(2px, 1vh, 8px)',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
-    ':active': { backgroundColor: tokens.colorNeutralBackground1Pressed },
+    gap: tokens.spacingVerticalXS,
+    ':hover': { backgroundColor: tokens.colorSubtleBackgroundHover },
+    ':active': { backgroundColor: tokens.colorSubtleBackgroundPressed },
     ':focus-visible': {
       outline: `2px solid ${tokens.colorStrokeFocus2}`,
       outlineOffset: '-2px',
     },
   },
-  pad1: { padding: '4px' },
-  pad2: { padding: 'clamp(6px, 1.4vmin, 10px) clamp(8px, 2vmin, 16px) clamp(8px, 2vmin, 14px)' },
-  pad22: { padding: 'clamp(6px, 1.6vmin, 12px) clamp(8px, 2vmin, 16px) clamp(6px, 1.6vmin, 12px)' },
-  padLarge: { padding: 'clamp(7px, 1.6vmin, 12px) clamp(10px, 2.2vmin, 18px) clamp(8px, 1.8vmin, 14px)' },
+  pad1: { padding: tokens.spacingVerticalXS },
+  pad2: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}` },
+  pad22: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM} ${tokens.spacingVerticalS}` },
+  padLarge: { padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL} ${tokens.spacingVerticalM}` },
   cityLine: {
     fontSize: tokens.fontSizeBase200,
     lineHeight: tokens.lineHeightBase200,
     color: tokens.colorNeutralForeground3,
-    letterSpacing: '0.02em',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -61,9 +60,9 @@ const useStyles = makeStyles({
     position: 'absolute',
     top: '9%',
     right: '9%',
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
+    width: tokens.spacingHorizontalS,
+    height: tokens.spacingHorizontalS,
+    borderRadius: tokens.borderRadiusCircular,
     backgroundColor: tokens.colorStatusWarningForeground1,
   },
   body: { flex: 1, minHeight: 0, minWidth: 0, display: 'flex' },
@@ -73,28 +72,28 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'column',
-    gap: '2px',
+    gap: tokens.spacingVerticalXXS,
     position: 'relative',
-    paddingBottom: '2vh',
+    paddingBottom: tokens.spacingVerticalXS,
   },
-  temp1: {
-    fontSize: 'clamp(18px, 16vmin, 52px)',
+  tempBase: {
     lineHeight: 1,
     fontWeight: tokens.fontWeightSemibold,
     fontVariantNumeric: 'tabular-nums',
   },
+  temp1: { fontSize: tokens.fontSizeBase700 },
 
   // 2×1
-  body2: { flexDirection: 'column', justifyContent: 'center', gap: 'clamp(1px, 0.6vh, 5px)' },
-  row2: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 2vmin, 16px)', minWidth: 0 },
-  temp2: { fontSize: 'clamp(28px, 12vmin, 56px)' },
+  body2: { flexDirection: 'column', justifyContent: 'center', gap: tokens.spacingVerticalXXS },
+  row2: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
+  temp2: { fontSize: tokens.fontSizeBase800 },
   condition2: { fontSize: tokens.fontSizeBase300 },
   side2: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    gap: 'clamp(1px, 0.5vh, 3px)',
+    gap: tokens.spacingVerticalXXS,
     marginLeft: 'auto',
     flexShrink: 0,
   },
@@ -107,53 +106,67 @@ const useStyles = makeStyles({
   },
 
   // 2×2
-  body22: { flexDirection: 'column', gap: 'clamp(3px, 1.2vh, 10px)' },
-  currentRow: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.8vmin, 14px)', flexShrink: 0 },
-  temp22: { fontSize: 'clamp(24px, 8.5vmin, 48px)' },
-  conditions: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 },
+  body22: { flexDirection: 'column', gap: tokens.spacingVerticalS },
+  currentRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexShrink: 0 },
+  temp22: { fontSize: tokens.fontSizeBase900 },
+  conditions: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0, flex: 1 },
   conditionText: { fontSize: tokens.fontSizeBase300 },
   fill: { flex: 1, minHeight: 0, minWidth: 0 },
 
   // 3×2 / 4×2
-  body32: { flexDirection: 'column', gap: 'clamp(3px, 1.2vh, 10px)' },
+  body32: { flexDirection: 'column', gap: tokens.spacingVerticalS },
+  heroDailyGroup: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalS,
+  },
   currentHero: {
     display: 'flex',
     alignItems: 'center',
-    gap: 'clamp(8px, 2.4vmin, 18px)',
+    gap: tokens.spacingHorizontalM,
     flexShrink: 0,
     minWidth: 0,
   },
-  tempHero: { fontSize: 'clamp(30px, 10vmin, 64px)' },
+  tempHero: { fontSize: tokens.fontSizeBase900 },
   heroMeta: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 'clamp(1px, 0.5vh, 4px)',
+    gap: tokens.spacingVerticalXXS,
     minWidth: 0,
     flex: 1,
     alignItems: 'flex-start',
   },
-  body42: { flexDirection: 'column', gap: 'clamp(4px, 1.4vh, 12px)' },
-  row42: { display: 'flex', gap: 'clamp(12px, 2.6vmin, 24px)', alignItems: 'stretch', minHeight: 0, flex: 1 },
+  body42: { flexDirection: 'column', gap: tokens.spacingVerticalS },
+  row42Top: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flex: 1,
+    minHeight: 0,
+  },
   col42Current: {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     minWidth: 0,
-    flex: '1.05 1 0',
-    gap: 'clamp(2px, 0.8vh, 6px)',
+    flex: '1 1 0',
+    gap: tokens.spacingVerticalXXS,
   },
-  currentIconRow: { display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.6vmin, 14px)' },
-  temp42: { fontSize: 'clamp(24px, 7.8vmin, 52px)' },
-  col42Daily: { flex: '1.7 1 0', minWidth: 0, display: 'flex', alignItems: 'stretch' },
-  dailyFull: { height: '100%' },
+  currentIconRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS },
+  temp42: { fontSize: tokens.fontSizeBase900 },
   col42Air: {
     flex: '0 0 auto',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 0,
-    width: 'clamp(70px, 20vmin, 140px)',
+    width: 'clamp(90px, 20vmin, 150px)',
   },
+  dailyRow42: { flexShrink: 0 },
 
   // 状态
   stateBody: {
@@ -162,9 +175,9 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 'clamp(4px, 1.4vh, 12px)',
+    gap: tokens.spacingVerticalM,
     textAlign: 'center',
-    padding: 'clamp(6px, 2vmin, 16px)',
+    padding: tokens.spacingVerticalL,
     minHeight: 0,
   },
   stateTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
@@ -174,10 +187,16 @@ const useStyles = makeStyles({
     maxWidth: '46ch',
     lineHeight: tokens.lineHeightBase200,
   },
-  stateButtons: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' },
+  stateButtons: { display: 'flex', gap: tokens.spacingHorizontalS, flexWrap: 'wrap', justifyContent: 'center' },
   keyIcon: { color: tokens.colorNeutralForeground3 },
   tinyHint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
-  loading: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', color: tokens.colorNeutralForeground2 },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalS,
+    color: tokens.colorNeutralForeground2,
+  },
 });
 
 function LoadingState({ compact }) {
@@ -260,7 +279,7 @@ const ICON_1 = 'min(46vmin, 52%)';
 const ICON_2 = 'clamp(34px, 24vmin, 88px)';
 const ICON_22 = 'clamp(32px, 19vmin, 74px)';
 const ICON_HERO = 'clamp(38px, 16vmin, 84px)';
-const ICON_42 = 'clamp(32px, 12.5vmin, 68px)';
+const ICON_42 = 'clamp(34px, 14vmin, 72px)';
 
 export default function Card({
   sizeKey,
@@ -350,7 +369,9 @@ export default function Card({
       role="button"
       tabIndex={0}
       data-weather-card
-      aria-label={`天气卡片${place ? `：${place.name}` : ''}，按回车打开详情，长按打开设置`}
+      aria-label={`天气卡片${place ? `：${place.name}` : ''}${
+        warnings?.length ? `，有 ${warnings.length} 条天气预警` : ''
+      }，按回车打开详情，长按打开设置`}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerUp={clearTimer}
@@ -383,7 +404,7 @@ export default function Card({
                 size={ICON_1}
                 title={current.text}
               />
-              <span className={styles.temp1}>{fmtTemp(current.temp, settings.unit)}</span>
+              <span className={mergeClasses(styles.tempBase, styles.temp1)}>{fmtTemp(current.temp, settings.unit)}</span>
             </div>
           )}
 
@@ -398,7 +419,7 @@ export default function Card({
                   size={ICON_2}
                   title={current.text}
                 />
-                <span className={mergeClasses(styles.temp1, styles.temp2)}>
+                <span className={mergeClasses(styles.tempBase, styles.temp2)}>
                   {fmtTemp(current.temp, settings.unit)}
                 </span>
                 <div className={styles.side2}>
@@ -421,7 +442,7 @@ export default function Card({
                   title={current.text}
                 />
                 <div className={styles.conditions}>
-                  <span className={mergeClasses(styles.temp1, styles.temp22)}>
+                  <span className={mergeClasses(styles.tempBase, styles.temp22)}>
                     {fmtTemp(current.temp, settings.unit)}
                   </span>
                   <Condition code={current.icon} text={current.text} className={styles.conditionText} />
@@ -446,30 +467,32 @@ export default function Card({
           {size === '3x2' && (
             <div className={mergeClasses(styles.body, styles.body32)}>
               <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.currentHero}>
-                <WeatherIcon
-                  code={current.icon}
-                  night={currentNight}
-                  scheme={scheme}
-                  size={ICON_HERO}
-                  title={current.text}
-                />
-                <span className={mergeClasses(styles.temp1, styles.tempHero)}>
-                  {fmtTemp(current.temp, settings.unit)}
-                </span>
-                <div className={styles.heroMeta}>
-                  <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+              <div className={styles.heroDailyGroup}>
+                <div className={styles.currentHero}>
+                  <WeatherIcon
+                    code={current.icon}
+                    night={currentNight}
+                    scheme={scheme}
+                    size={ICON_HERO}
+                    title={current.text}
+                  />
+                  <span className={mergeClasses(styles.tempBase, styles.tempHero)}>
+                    {fmtTemp(current.temp, settings.unit)}
+                  </span>
+                  <div className={styles.heroMeta}>
+                    <Condition code={current.icon} text={current.text} className={styles.conditionText} />
+                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+                  </div>
                 </div>
+                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} showLow={false} />
               </div>
-              <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} className={styles.fill} showLow={false} />
             </div>
           )}
 
           {size === '4x2' && (
             <div className={mergeClasses(styles.body, styles.body42)}>
               <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.row42}>
+              <div className={styles.row42Top}>
                 <div className={styles.col42Current}>
                   <div className={styles.currentIconRow}>
                     <WeatherIcon
@@ -479,33 +502,30 @@ export default function Card({
                       size={ICON_42}
                       title={current.text}
                     />
-                    <span className={mergeClasses(styles.temp1, styles.temp42)}>
+                    <span className={mergeClasses(styles.tempBase, styles.temp42)}>
                       {fmtTemp(current.temp, settings.unit)}
                     </span>
                   </div>
                   <Condition code={current.icon} text={current.text} className={styles.conditionText} />
                   <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
                 </div>
-                <div className={styles.col42Daily}>
-                  <DailyColumns
-                    items={data.daily}
-                    unit={settings.unit}
-                    scheme={scheme}
-                    className={styles.dailyFull}
-                  />
-                </div>
                 {air && (
                   <div className={styles.col42Air}>
-                    <AirRing air={air} size="clamp(64px, 22vmin, 132px)" />
+                    <AirRing air={air} size="clamp(60px, 18vmin, 116px)" />
                   </div>
                 )}
               </div>
+              <DailyColumns
+                items={data.daily}
+                unit={settings.unit}
+                scheme={scheme}
+                className={styles.dailyRow42}
+              />
             </div>
           )}
         </div>
       )}
 
-      {warnings && warnings.length > 0 && size === '1x1' && <WarningBadge warnings={warnings} />}
       {showOfflineDot && <span className={styles.offlineDot} title="离线数据" />}
     </div>
   );

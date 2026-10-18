@@ -103,7 +103,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gap: tokens.spacingVerticalXS,
     padding: tokens.spacingHorizontalL,
-    borderRadius: tokens.borderRadiusLarge,
+    borderRadius: 'var(--wtsl-card-radius)',
     backgroundColor: tokens.colorNeutralBackground2,
   },
   cardHead: {
@@ -117,6 +117,18 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
+  },
+  rowActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
+  statusOn: {
+    color: tokens.colorNeutralForeground2,
+  },
+  statusOff: {
+    color: tokens.colorNeutralForeground3,
   },
   overlay: {
     position: 'fixed',
@@ -144,14 +156,24 @@ function metaSummary(plugin: NormalizedPlugin): string {
   return parts.join(' · ');
 }
 
-function Toggle({ plugin, onChange }: { plugin: NormalizedPlugin; onChange: (enabled: boolean) => void }) {
-  const preferences = usePluginPreferences();
-  const disabled = preferences.disabled.includes(plugin.id);
+/**
+ * 启用/禁用开关（V-21：让它成为“操作”列里的有效动作，而不是和状态文字重复）。
+ * 状态列只显示文字，开关放到操作列；标签由 aria-label 提供，避免表格里出现第二份状态文案。
+ */
+function Toggle({
+  plugin,
+  enabled,
+  onChange,
+}: {
+  plugin: NormalizedPlugin;
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
   return (
     <Switch
-      checked={!disabled}
+      checked={enabled}
       onChange={(_event, data) => onChange(data.checked)}
-      label={disabled ? '已禁用' : '已启用'}
+      aria-label={enabled ? `禁用「${plugin.name}」` : `启用「${plugin.name}」`}
     />
   );
 }
@@ -162,6 +184,9 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
   const { plugins, loading, error, reload } = usePlugins(pluginManager);
   const wide = useMediaQuery(WIDE_PAGE_QUERY);
   const tauri = isTauriRuntime();
+  const preferences = usePluginPreferences();
+  const disabledIds = useMemo(() => new Set(preferences.disabled), [preferences.disabled]);
+  const isEnabled = (plugin: NormalizedPlugin) => !disabledIds.has(plugin.id);
 
   const [confirmTarget, setConfirmTarget] = useState<NormalizedPlugin | null>(null);
   const [zipPath, setZipPath] = useState('');
@@ -239,16 +264,26 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
     );
   };
 
-  const removeButton = (plugin: NormalizedPlugin) => (
-    <Button
-      appearance="subtle"
-      size="small"
-      onClick={() => setConfirmTarget(plugin)}
-      disabled={!tauri || busy === plugin.id}
-      title={tauri ? '删除插件目录' : '浏览器演示模式不支持删除插件'}
-    >
-      删除
-    </Button>
+  const removeButton = (plugin: NormalizedPlugin) => {
+    // 浏览器演示模式没有可执行的删除动作：整列不渲染禁用按钮（V-21）
+    if (!tauri) return null;
+    return (
+      <Button
+        appearance="subtle"
+        size="small"
+        onClick={() => setConfirmTarget(plugin)}
+        disabled={busy === plugin.id}
+        title="删除插件目录"
+      >
+        删除
+      </Button>
+    );
+  };
+
+  const renderStatus = (plugin: NormalizedPlugin) => (
+    <Text size={200} className={isEnabled(plugin) ? styles.statusOn : styles.statusOff}>
+      {isEnabled(plugin) ? '已启用' : '已禁用'}
+    </Text>
   );
 
   return (
@@ -327,10 +362,17 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                             </Text>
                           </div>
                         </TableCell>
+                        <TableCell>{renderStatus(plugin)}</TableCell>
                         <TableCell>
-                          <Toggle plugin={plugin} onChange={(enabled) => toggleEnabled(plugin, enabled)} />
+                          <div className={styles.rowActions}>
+                            <Toggle
+                              plugin={plugin}
+                              enabled={isEnabled(plugin)}
+                              onChange={(enabled) => toggleEnabled(plugin, enabled)}
+                            />
+                            {removeButton(plugin)}
+                          </div>
                         </TableCell>
-                        <TableCell>{removeButton(plugin)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -342,14 +384,19 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                   <article key={plugin.id} className={styles.pluginCard}>
                     <div className={styles.cardHead}>
                       <Text size={400}>{plugin.name}</Text>
-                      <div className={styles.cardActions}>
-                        <Toggle plugin={plugin} onChange={(enabled) => toggleEnabled(plugin, enabled)} />
-                        {removeButton(plugin)}
-                      </div>
+                      {renderStatus(plugin)}
                     </div>
                     <Text size={200} className={styles.tertiary}>
                       {metaSummary(plugin)}
                     </Text>
+                    <div className={styles.cardActions}>
+                      <Toggle
+                        plugin={plugin}
+                        enabled={isEnabled(plugin)}
+                        onChange={(enabled) => toggleEnabled(plugin, enabled)}
+                      />
+                      {removeButton(plugin)}
+                    </div>
                   </article>
                 ))}
               </div>

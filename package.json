@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:plugin": "node scripts/build-plugin.mjs",
+    "build:plugins": "node scripts/build-plugin.mjs --all",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",
+    "@fluentui/react-icons": "^2.0.245",
     "@tauri-apps/api": "^2.12.4",
     "@vladmandic/face-api": "^1.7.15",
     "react": "^19.3.1",

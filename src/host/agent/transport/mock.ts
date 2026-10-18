@@ -192,7 +192,7 @@ export class MockTransport implements AgentTransport {
       await sleep(260, signal);
       onEvent({ type: 'sources', sources: MOCK_SEARCH_SOURCES });
       onEvent({ type: 'usage', webSearchUsage: { toolUsage: 1, pageUsage: 4 } });
-      const answer = `我联网查了一下「${userText.replace(/\s+/g, ' ').slice(0, 24)}」。MiMo V2.6 三个型号都支持 1M 上下文和 128K 输出，深度思考、函数调用、流式输出、联网搜索都已支持。\n\n来源：\n1. [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)\n2. [OpenAI Chat Completions API 兼容](https://mimo.mi.com/docs/zh-CN/api/chat/openai-api)`;
+      const answer = `我联网查了一下「${userText.replace(/\s+/g, ' ').slice(0, 24)}」。MiMo V2.6 三个型号都支持 1M 上下文和 128K 输出，深度思考、函数调用、流式输出、联网搜索都已支持。详情可以看 [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)。`;
       for (const chunk of chunkText(answer)) {
         await sleep(14, signal);
         onEvent({ type: 'content', text: chunk });

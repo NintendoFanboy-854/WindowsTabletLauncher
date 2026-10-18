@@ -31,10 +31,24 @@ import type { HostBridge } from '../bridge';
 import type { ThemePayload, WidgetInstance, WidgetSize } from '../bridge/types';
 import type { GridMetrics } from '../layout';
 import { CARD_MATERIAL, CARD_RADIUS, useStyles } from './desktop.styles';
-import { LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from './interaction';
+import {
+  EDIT_CARD_SCALE,
+  EDIT_TOUCH_TARGET,
+  LONG_PRESS_MS,
+  LONG_PRESS_MOVE_TOLERANCE,
+} from './interaction';
 import { useLongPress } from './useLongPress';
 import { WidgetFrame } from './WidgetFrame';
 import type { WidgetFrameHandle } from './WidgetFrame';
+
+/**
+ * AUDIT V-06 / DESIGN §1.2：平板触控目标不小于 40×40 CSS px。
+ * 编辑模式卡片有 0.97 缩放，按钮布局尺寸要反算（EDIT_TOUCH_TARGET），屏幕上实测才不会低于 40。
+ */
+const TOUCH_TARGET: CSSProperties = {
+  minWidth: EDIT_TOUCH_TARGET,
+  minHeight: EDIT_TOUCH_TARGET,
+};
 
 export interface WidgetCardProps {
   widget: WidgetInstance;
@@ -109,7 +123,7 @@ export function WidgetCard({
     position: 'absolute',
     top: 0,
     left: 0,
-    transform: `translate(${x}px, ${y}px) scale(${editMode ? 0.97 : 1})`,
+    transform: `translate(${x}px, ${y}px) scale(${editMode ? EDIT_CARD_SCALE : 1})`,
     width,
     height,
     padding: 0,
@@ -163,6 +177,7 @@ export function WidgetCard({
           ref={frameRef}
           bridge={bridge}
           theme={theme}
+          title={widget.title}
           instanceUid={widget.uid}
           pluginId={widget.pluginId}
           widgetId={widget.widgetId}
@@ -184,7 +199,8 @@ export function WidgetCard({
         <ReOrderDotsHorizontal20Regular />
       </div>
 
-      {/* 编辑模式 chrome：标题 + 删除 / 改尺寸 / 设置。常驻 DOM 用 opacity/transform 过渡进出 */}
+      {/* 编辑模式 chrome：顶部渐变压暗遮罩 + 标题 + 删除 / 改尺寸 / 设置。
+          常驻 DOM 用 opacity/transform 过渡进出 */}
       <div
         className={mergeClasses(styles.editOverlay, editMode && styles.editOverlayVisible)}
         data-widget-overlay="true"
@@ -198,6 +214,7 @@ export function WidgetCard({
           onEditPointerDown(event, widget);
         }}
       >
+        <div className={styles.editScrim} data-edit-scrim="true" aria-hidden="true" />
         <Text className={styles.editTitle} size={200} weight="semibold" truncate>
           {widget.title}
         </Text>
@@ -210,6 +227,7 @@ export function WidgetCard({
             <Button
               size="small"
               appearance="subtle"
+              style={TOUCH_TARGET}
               icon={<Delete20Regular />}
               aria-label={`删除 ${widget.title}`}
               onClick={() => onDelete(widget)}
@@ -224,6 +242,7 @@ export function WidgetCard({
               <Button
                 size="small"
                 appearance="subtle"
+                style={TOUCH_TARGET}
                 icon={<Resize20Regular />}
                 aria-label={`改变 ${widget.title} 的尺寸`}
                 title="改尺寸"
@@ -248,6 +267,7 @@ export function WidgetCard({
             <Button
               size="small"
               appearance="subtle"
+              style={TOUCH_TARGET}
               icon={<Settings20Regular />}
               aria-label={`${widget.title} 设置`}
               onClick={() => onOpenSettings(widget)}

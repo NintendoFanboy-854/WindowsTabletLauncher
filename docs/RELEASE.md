@@ -28,6 +28,8 @@
 ## 3. 设计合规（对照 FLUENT2.md / DENSITY.md）
 
 - [ ] `design-auditor` 复检通过：P0 = 0，P1 已修复或明确记录
+- [ ] 六个插件全部是 React + Fluent UI React（`src/main.jsx` + `FluentProvider`），无自绘控件（DECISIONS D-02b）
+- [ ] 插件设置/详情走宿主全窗口浮层（`?view=settings|detail`），卡片 iframe 内无被裁切的 Dialog/Drawer
 - [ ] 三分辨率截图：1440×960 / 1024×768 / 960×1440
 - [ ] 普通模式卡片无 chrome；编辑模式才出现操作
 - [ ] 每个组件每个尺寸的信息预算内（见 DENSITY.md 第 2 节）

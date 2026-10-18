@@ -47,6 +47,10 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground1,
     color: tokens.colorNeutralForeground1,
   },
+  // 全屏：外层用更暗的页面背景，中间对话列用背景 1 区分，不再画左右竖线
+  fullscreenShell: {
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
   fullscreenInner: {
     display: 'flex',
     flexDirection: 'column',
@@ -55,12 +59,6 @@ const useStyles = makeStyles({
     width: '100%',
     maxWidth: '880px',
     marginInline: 'auto',
-    borderLeftWidth: '1px',
-    borderLeftStyle: 'solid',
-    borderLeftColor: tokens.colorNeutralStroke2,
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: tokens.colorNeutralStroke2,
     backgroundColor: tokens.colorNeutralBackground1,
   },
   header: {
@@ -68,9 +66,9 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     paddingInline: tokens.spacingHorizontalM,
-    paddingBlock: tokens.spacingVerticalS,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    minHeight: '48px',
+    paddingBlock: tokens.spacingVerticalM,
+    // DENSITY：标题栏与内容之间用留白分组，不用 1px 分割线
+    minHeight: '56px',
   },
   headerTitle: {
     display: 'flex',
@@ -90,7 +88,7 @@ const useStyles = makeStyles({
 });
 
 function modelLabel(session: AgentSession): string {
-  if (session.isMock) return 'Mock 演示';
+  if (session.isMock) return '演示模式';
   const model = MIMO_MODELS.find((item) => item.value === session.settings.model);
   return model?.label.replace('MiMo V2.6 ', 'V2.6 ') ?? session.settings.model;
 }
@@ -133,6 +131,7 @@ export function ConversationPane({
     <div className={styles.header}>
       {layout === 'fullscreen' ? (
         <Button
+          size="large"
           appearance="subtle"
           icon={<ArrowLeftRegular />}
           onClick={onClose}
@@ -151,6 +150,7 @@ export function ConversationPane({
         <Menu>
           <MenuTrigger disableButtonEnhancement>
             <Button
+              size="large"
               appearance="subtle"
               icon={<HistoryRegular />}
               aria-label="会话历史"
@@ -190,6 +190,7 @@ export function ConversationPane({
         <Menu>
           <MenuTrigger disableButtonEnhancement>
             <Button
+              size="large"
               appearance="subtle"
               icon={mode === 'fullscreen' ? <FullScreenMaximizeRegular /> : <PanelRightRegular />}
               aria-label="切换面板形态"
@@ -214,6 +215,7 @@ export function ConversationPane({
         </Menu>
 
         <ToggleButton
+          size="large"
           appearance="subtle"
           icon={reading ? <SpeakerMuteRegular /> : <Speaker2Regular />}
           checked={reading}
@@ -223,6 +225,7 @@ export function ConversationPane({
         />
 
         <Button
+          size="large"
           appearance="subtle"
           icon={<SettingsRegular />}
           onClick={onOpenSettings}
@@ -231,6 +234,7 @@ export function ConversationPane({
         />
 
         <Button
+          size="large"
           appearance="subtle"
           icon={<DismissRegular />}
           onClick={onClose}
@@ -251,7 +255,7 @@ export function ConversationPane({
 
   if (layout === 'fullscreen') {
     return (
-      <div className={styles.root}>
+      <div className={`${styles.root} ${styles.fullscreenShell}`}>
         <div className={styles.fullscreenInner}>{content}</div>
       </div>
     );

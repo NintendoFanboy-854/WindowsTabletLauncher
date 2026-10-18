@@ -64,3 +64,13 @@ export function isStaleCache(fetchedAt, refreshMin, now = Date.now()) {
   const maxAge = Math.max(2, Number(refreshMin) || 30) * 2 * 60 * 1000;
   return now - fetchedAt > maxAge;
 }
+
+/** 独立开发/截图：`?mock=1` 让当前会话强制使用演示数据 */
+export function urlMockOverride() {
+  return new URLSearchParams(location.search).get('mock') === '1';
+}
+
+/** 独立开发/截图：当前会话的尺寸档位参数（宿主内由 host:init 覆盖） */
+export function urlSizeParam() {
+  return parseSizeParam(new URLSearchParams(location.search).get('size'));
+}

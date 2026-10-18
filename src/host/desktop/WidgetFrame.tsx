@@ -32,6 +32,8 @@ interface WidgetFrameProps {
   bridge?: HostBridge;
   pluginId: string;
   widgetId: string;
+  /** 实例标题（组件标题，用于 iframe/设置浮层标题） */
+  title?: string;
   /** 桌面实例唯一 id（WidgetCard 传 widget.uid）；桥接层用它区分同一插件的多个实例 */
   instanceUid?: string;
   src: string;
@@ -42,7 +44,7 @@ interface WidgetFrameProps {
 }
 
 export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(function WidgetFrame(
-  { bridge: bridgeProp, pluginId, widgetId, instanceUid, src, size, theme, notify },
+  { bridge: bridgeProp, pluginId, widgetId, title, instanceUid, src, size, theme, notify },
   ref,
 ) {
   const styles = useStyles();
@@ -127,7 +129,7 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
       size={size}
       theme={theme}
       config={config}
-      title={`${pluginId} / ${widgetId}`}
+      title={title ?? `${pluginId} / ${widgetId}`}
       onApiCall={handleApiCall}
       onMessage={handleMessage}
     />

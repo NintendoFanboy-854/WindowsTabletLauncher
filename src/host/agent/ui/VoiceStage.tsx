@@ -153,6 +153,7 @@ export function VoiceStage({
     <div className={styles.root}>
       <div className={styles.topBar}>
         <Button
+          size="large"
           appearance="subtle"
           icon={<ArrowLeftRegular />}
           onClick={onExit}
@@ -163,10 +164,11 @@ export function VoiceStage({
         <div className={styles.topBarTitle}>
           <Title2>语音模式</Title2>
           <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-            {session.isMock ? 'Mock 演示：语音为模拟状态' : 'MiMo 流式语音'}
+            {session.isMock ? '演示模式：语音为模拟状态' : 'MiMo 流式语音'}
           </Text>
         </div>
         <ToggleButton
+          size="large"
           appearance="subtle"
           icon={reading ? <SpeakerMuteRegular /> : <Speaker2Regular />}
           checked={reading}
@@ -175,6 +177,7 @@ export function VoiceStage({
           title={reading ? '关闭连续朗读' : '开启连续朗读'}
         />
         <Button
+          size="large"
           appearance="subtle"
           icon={<SettingsRegular />}
           onClick={onOpenSettings}

@@ -1,10 +1,9 @@
 /** 卡片与详情共用的小展示件。 */
 
-import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { Warning16Filled } from '@fluentui/react-icons';
+import { MessageBar, MessageBarBody, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { conditionText, weatherIconUrl } from '../data/icons.js';
 import { fetchedMinutesAgo, fmtTemp, isNightTime } from '../data/format.js';
-import { contrastTextColor, isStaleCache } from '../utils.js';
+import { isStaleCache } from '../utils.js';
 
 const useStyles = makeStyles({
   icon: {
@@ -44,53 +43,23 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusCircular,
-    padding: '0 6px',
-    lineHeight: '16px',
-    fontSize: '10px',
+    padding: `0 ${tokens.spacingHorizontalS}`,
+    lineHeight: tokens.lineHeightBase100,
+    fontSize: tokens.fontSizeBase100,
     flexShrink: 0,
     whiteSpace: 'nowrap',
   },
-  warningStrip: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    minWidth: 0,
-    overflow: 'hidden',
-    borderRadius: tokens.borderRadiusMedium,
-    padding: 'clamp(3px, 1.2vh, 6px) clamp(6px, 2vw, 10px)',
-    fontSize: 'clamp(10px, 2.2vh, 13px)',
-    lineHeight: 1.2,
+  warningBar: {
     flexShrink: 0,
+    minWidth: 0,
   },
-  warningText: {
+  warningBarText: {
+    display: 'block',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    flex: 1,
-  },
-  warningCount: {
-    flexShrink: 0,
-    opacity: 0.85,
-    whiteSpace: 'nowrap',
-  },
-  warningIcon: {
-    flexShrink: 0,
-  },
-  warningDot: {
-    position: 'absolute',
-    top: '8%',
-    right: '8%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '2px',
-    minWidth: '18px',
-    height: '18px',
-    padding: '0 4px',
-    borderRadius: tokens.borderRadiusCircular,
-    fontSize: '11px',
-    fontWeight: tokens.fontWeightSemibold,
-    lineHeight: '18px',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
   },
 });
 
@@ -145,27 +114,19 @@ export function DemoBadge({ className }) {
   return <span className={mergeClasses(styles.demoBadge, className)}>演示</span>;
 }
 
-/** 预警条：卡片顶部；只有一条核心信息（标题），多条时在详情里展开 */
+/** 预警条：Fluent MessageBar（intent warning），只有一条核心信息（标题）；多条在详情里展开 */
 export function WarningStrip({ warnings }) {
   const styles = useStyles();
   if (!warnings || warnings.length === 0) return null;
   const primary = warnings[0];
   return (
-    <div className={styles.warningStrip} style={{ backgroundColor: primary.color, color: contrastTextColor(primary.color) }}>
-      <Warning16Filled className={styles.warningIcon} />
-      <span className={styles.warningText}>{primary.title}</span>
-    </div>
-  );
-}
-
-/** 1×1 尺寸下的预警小角标（有预警才出现） */
-export function WarningBadge({ warnings }) {
-  const styles = useStyles();
-  if (!warnings || warnings.length === 0) return null;
-  return (
-    <span className={styles.warningDot} style={{ backgroundColor: warnings[0].color, color: contrastTextColor(warnings[0].color) }}>
-      <Warning16Filled />
-    </span>
+    <MessageBar
+      intent="warning"
+      className={styles.warningBar}
+      style={{ paddingTop: tokens.spacingVerticalXXS, paddingBottom: tokens.spacingVerticalXXS }}
+    >
+      <MessageBarBody className={styles.warningBarText}>{primary.title}</MessageBarBody>
+    </MessageBar>
   );
 }
 

@@ -4,11 +4,13 @@
  *
  * 材质：Fluent web 端没有 Acrylic token（DESIGN.md §6），卡片用
  * colorNeutralBackground* 的半透明混合 + 项目 token `--wtsl-material-blur`。
+ * 圆角：项目 token `--wtsl-card-radius`（12px，修正 Fluent v9 borderRadiusXLarge=8px
+ * 与 FLUENT2 §5 规范的偏差，见 AUDIT V-01/V-02）。
  */
 import { makeStyles, tokens, motionTokens } from '@fluentui/react-components';
 
-/** 卡片圆角：Fluent 的 borderRadiusXLarge 是 8px，平板卡片取它的 2 倍（16px） */
-export const CARD_RADIUS = `calc(${tokens.borderRadiusXLarge} * 2)`;
+/** 卡片圆角：项目 token（12px），不再用 calc 自造数值 */
+export const CARD_RADIUS = 'var(--wtsl-card-radius)';
 
 const MATERIAL_BACKGROUND = `color-mix(in srgb, ${tokens.colorNeutralBackground2} 72%, transparent)`;
 
@@ -97,12 +99,29 @@ export const useStyles = makeStyles({
     transitionDuration: `${motionTokens.durationNormal}ms`,
     transitionTimingFunction: motionTokens.curveDecelerateMid,
   },
+  /**
+   * AUDIT V-13：编辑 chrome 直接压在插件首行上（todo 工具栏 / 天气城市名）。
+   * 用一层不占布局的顶部渐变压暗遮罩给标题和按钮当底，高度 =
+   * 40px 触控目标 + 上下 spacingS，下方渐隐到透明，不遮插件主体。
+   */
+  editScrim: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    right: '0',
+    zIndex: 1,
+    height: `calc(${tokens.spacingHorizontalXXL} * 2 + ${tokens.spacingHorizontalS})`,
+    background: `linear-gradient(to bottom, color-mix(in srgb, ${tokens.colorNeutralBackground1} 84%, transparent) 0%, color-mix(in srgb, ${tokens.colorNeutralBackground1} 52%, transparent) 62%, transparent 100%)`,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    pointerEvents: 'none',
+  },
   editTitle: {
     position: 'absolute',
     top: tokens.spacingHorizontalXS,
     left: tokens.spacingHorizontalXS,
     zIndex: 3,
-    maxWidth: `max(0px, calc(100% - ${tokens.spacingHorizontalXXXL} * 3.4))`,
+    // 3 个 40px 触控按钮 + 间距，留出标题空间（小卡片上由 truncate 省略）
+    maxWidth: `max(0px, calc(100% - ${tokens.spacingHorizontalXXXL} * 4.5))`,
     paddingTop: tokens.spacingHorizontalXXS,
     paddingBottom: tokens.spacingHorizontalXXS,
     paddingLeft: tokens.spacingHorizontalS,
@@ -131,6 +150,7 @@ export const useStyles = makeStyles({
     backdropFilter: 'blur(var(--wtsl-material-blur))',
     boxShadow: tokens.shadow4,
   },
+  /** AUDIT V-06：编辑模式图标按钮的触控目标 ≥40×40（DESIGN §1.2，按钮上用内联 min 尺寸保证不被 Fluent 类覆盖） */
   /** 正常模式的拖拽提示：只在悬停时出现，overlay 不占布局 */
   dragHint: {
     position: 'absolute',

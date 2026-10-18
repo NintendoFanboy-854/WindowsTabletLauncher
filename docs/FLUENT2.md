@@ -166,10 +166,11 @@
 | 2 | 卡片阴影 `0 18px 40px` 自定 | shadow4/8 + stroke | 同上 |
 | 3 | 每张卡片常驻标题栏/齿轮 | chrome on demand | task-15 处理 |
 | 4 | 待办列表元信息过密 | 渐进披露 | task-12 处理 |
-| 5 | 插件内字号未统一走 type ramp | 字阶表 | 各插件密度返工时校准 |
+| 5 | 插件内字号未统一走 type ramp | 字阶表 | 插件迁移 Fluent UI React 后由组件默认字阶保证 |
 | 6 | 桌面网格 gap 14px | 间距 ramp | 改为 12 或 16 |
 | 7 | 天气图标非 Fluent | 仅内容图形例外 | 已记录，保持 |
 | 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |
+| 9 | 插件自绘控件（clock/countdown/pomodoro/sedentary/todo） | 一律用 Fluent UI React 组件 | **已定案：全部迁移到 Fluent UI React + FluentProvider（DECISIONS D-02b），按严格规范执行** |
 
 ## 15. 检查清单（每个组件/页面上线前）
 

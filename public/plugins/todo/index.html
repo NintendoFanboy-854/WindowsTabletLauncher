@@ -2,37 +2,14 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>待办</title>
-    <link rel="stylesheet" href="./fluent-tokens.css" />
-    <link rel="stylesheet" href="./app.css" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./base.css" />
   </head>
   <body>
-    <div id="app" data-size="3x3" aria-label="待办小组件"></div>
-    <div id="overlay"></div>
-    <div id="toast" role="status" aria-live="polite"></div>
-    <script>
-      // 错误态按 DESIGN §1.2 用 Fluent MessageBar 的排版呈现，避免整页空白。
-      window.addEventListener('error', (event) => {
-        // ResizeObserver 的 “loop completed with undelivered notifications” 是浏览器噪音，不是渲染失败
-        if (String(event.message || '').includes('ResizeObserver')) {
-          event.preventDefault?.();
-          return;
-        }
-        const host = document.getElementById('app');
-        if (!host) return;
-        host.innerHTML = '';
-        const box = document.createElement('div');
-        box.setAttribute('role', 'alert');
-        box.style.cssText =
-          'margin:12px;padding:10px 12px;border-radius:4px;border:1px solid var(--colorPaletteRedBorder2,#d13438);' +
-          'background:var(--colorPaletteRedBackground1,#3f1011);color:var(--colorNeutralForeground1,#fff);font:12px/1.5 var(--fontFamilyBase,sans-serif);' +
-          'white-space:pre-wrap;overflow:auto;max-height:100%;';
-        box.textContent = `待办加载出错：${event.message || event.error || '未知错误'}\n${(event.filename || '').split('/').pop()}:${event.lineno || ''}`;
-        host.append(box);
-      });
-    </script>
-    <script type="module" src="./js/app.js"></script>
+    <!-- 卡片视图 / 设置浮层 / 任务详情浮层都由 React 渲染（DECISIONS D-02b） -->
+    <div id="root"></div>
+    <script type="module" src="./app/app.js"></script>
   </body>
 </html>

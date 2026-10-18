@@ -65,30 +65,30 @@ function authHeaders(settings) {
 }
 
 const LEGACY_CODE_MESSAGE = {
-  204: '请求成功，但该地区没有数据',
-  400: '请求参数错误',
-  401: '身份认证失败，请检查 API Key',
-  402: '超过每日请求限额，请稍后再试',
-  403: '没有访问权限或帐号额度不足',
-  404: '请求的资源不存在',
-  429: '请求过于频繁（429），请稍后重试',
-  500: '和风天气服务暂时不可用',
+  204: '该地区没有天气数据',
+  400: '请求有误，请稍后再试',
+  401: '天气服务认证失败，请检查 API Key',
+  402: '今日请求次数已用完，请稍后再试',
+  403: '天气服务暂时不可用，请检查帐号状态',
+  404: '没有找到天气数据',
+  429: '请求过于频繁，请稍后再试',
+  500: '天气服务暂时不可用，请稍后再试',
 };
 
 function messageForStatus(status, detail) {
   switch (status) {
     case 400:
-      return detail ? `请求参数错误：${detail}` : '请求参数错误';
+      return detail ? `请求有误：${detail}` : '请求有误，请稍后再试';
     case 401:
-      return '身份认证失败，请检查 API Key / JWT 与 API Host';
+      return '天气服务认证失败，请检查 API Key';
     case 403:
-      return '没有访问权限：请检查 API Host、凭据限制或帐号额度';
+      return '天气服务暂时不可用，请检查数据地址与帐号状态';
     case 404:
-      return '接口不存在：请确认 API Host 与接口路径匹配';
+      return '没有找到天气数据，请确认数据地址';
     case 429:
-      return '请求过于频繁（429），将使用缓存数据';
+      return '请求过于频繁，暂时显示已缓存的数据';
     default:
-      return status >= 500 ? '和风天气服务暂时不可用' : `请求失败（HTTP ${status}）`;
+      return status >= 500 ? '天气服务暂时不可用，请稍后再试' : `请求失败（${status}），请稍后再试`;
   }
 }
 
@@ -104,10 +104,10 @@ function buildUrl(base, path, query) {
 async function request(settings, base, path, query) {
   const headers = authHeaders(settings);
   if (!resolveHost(settings).configured) {
-    throw new WeatherApiError(
-      '未配置和风天气 API Host：请在设置里填写控制台 → 设置中的专属 API Host（形如 abcd1234.qweatherapi.com）',
-      { status: 401, code: 'NO_HOST' },
-    );
+    throw new WeatherApiError('还没有设置天气数据地址：请在天气设置里填写和风天气控制台提供的 API Host', {
+      status: 401,
+      code: 'NO_HOST',
+    });
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -121,8 +121,8 @@ async function request(settings, base, path, query) {
     });
   } catch (error) {
     clearTimeout(timer);
-    if (error?.name === 'AbortError') throw new WeatherApiError('请求超时，将使用缓存数据', { status: 0, code: 'TIMEOUT' });
-    throw new WeatherApiError('网络请求失败（无网络或被 CORS 拦截），将使用缓存数据', { status: 0, code: 'NETWORK' });
+    if (error?.name === 'AbortError') throw new WeatherApiError('请求超时，暂时显示已缓存的数据', { status: 0, code: 'TIMEOUT' });
+    throw new WeatherApiError('网络连接失败，暂时显示已缓存的数据', { status: 0, code: 'NETWORK' });
   }
   clearTimeout(timer);
 
@@ -139,11 +139,11 @@ async function request(settings, base, path, query) {
     const detail = body?.error?.detail || body?.error?.title || '';
     let message = messageForStatus(response.status, detail);
     if (type.includes('invalid-host')) {
-      message = 'API Host 无效：请在设置里填写和风控制台 → 设置中的专属 API Host（公共域名已停用）';
+      message = '天气数据地址无效：请在天气设置里检查 API Host';
     } else if (type.includes('unauthorized')) {
-      message = '身份认证失败，请检查 API Key / JWT 是否正确';
+      message = '天气服务认证失败，请检查 API Key';
     } else if (type.includes('no-credit') || type.includes('overdue')) {
-      message = '和风帐号额度不足或账单逾期，请在控制台检查';
+      message = '天气帐号额度不足，请在和风天气控制台检查';
     }
     throw new WeatherApiError(message, { status: response.status, code: type || String(response.status) });
   }

@@ -380,7 +380,7 @@ export function SettingsPage({
   const renderAbout = () => (
     <SettingsGroup title="Windows Tablet Launcher" hint="给 Windows 平板用的全屏小组件桌面，能力全部来自插件。">
       <SettingsRow label="宿主外壳" description="Fluent 2 · Tauri 2 · React 19" />
-      <SettingsRow label="页面路由" description="?page=settings / review / plugins" />
+      <SettingsRow label="数据保存" description="配置与统计都保存在本机，不上传第三方。" />
     </SettingsGroup>
   );
 
@@ -408,6 +408,7 @@ export function SettingsPage({
       <div className={wide ? styles.layout : mergeClasses(styles.layout, styles.layoutNarrow)}>
         <TabList
           vertical={wide}
+          size="large"
           selectedValue={section}
           className={wide ? styles.nav : undefined}
           onTabSelect={(_event, data) => {

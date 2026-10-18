@@ -128,10 +128,16 @@ export function stripSourceSection(text: string): string {
       /^(\d+[.)]|[-*+])\s+/.test(item.trim()) ||
       /^\[[^\]]+\]\(.+\)$/.test(item.trim()) ||
       /^https?:\/\//.test(item.trim());
-    const tailLooksLikeList = headerTail.length > 0 ? listLike(`${headerTail}`) || /^\d+[.)]/.test(headerTail) : true;
+    const headerTailStartsList = /^(\d+[.)]|[-*+])\s+/.test(headerTail);
+    const tailLooksLikeList =
+      headerTail.length > 0 ? listLike(headerTail) || headerTailStartsList : true;
     const restLooksLikeList = afterHeader.every(listLike);
+    // 只有“确实有一段来源清单”才裁：单行「参考资料：[链接]」属于正文引用，保留
+    const shouldStrip =
+      (afterHeader.length > 0 && tailLooksLikeList && restLooksLikeList) ||
+      (headerTailStartsList && restLooksLikeList);
 
-    if (tailLooksLikeList && restLooksLikeList) {
+    if (shouldStrip) {
       return lines.slice(0, index).join('\n').replace(/\s+$/, '');
     }
   }

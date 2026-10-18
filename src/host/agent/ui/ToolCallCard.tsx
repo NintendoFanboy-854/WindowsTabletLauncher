@@ -20,8 +20,8 @@ import { summarizeToolArgs, summarizeToolResult } from '../tools/registry';
 
 const useStyles = makeStyles({
   card: {
+    // DENSITY：用背景层级区分，不画 1px 边框
     backgroundColor: tokens.colorNeutralBackground3,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusMedium,
     overflow: 'hidden',
   },
@@ -104,7 +104,7 @@ export function ToolCallCard({ record }: { record: ToolCallRecord }) {
   return (
     <Accordion collapsible className={styles.card}>
       <AccordionItem value="call">
-        <AccordionHeader size="small" className={styles.header}>
+        <AccordionHeader size="large" className={styles.header}>
           <span className={styles.head}>
             <WrenchRegular />
             <Text className={styles.name} weight="semibold">

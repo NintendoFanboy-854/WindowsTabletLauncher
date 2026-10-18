@@ -57,7 +57,7 @@ const useStyles = makeStyles({
     alignContent: 'start',
     gap: tokens.spacingVerticalM,
     padding: tokens.spacingHorizontalL,
-    borderRadius: tokens.borderRadiusLarge,
+    borderRadius: 'var(--wtsl-card-radius)',
     backgroundColor: tokens.colorNeutralBackground2,
     minHeight: '140px',
   },
@@ -255,6 +255,8 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
     ({ provider }) => typeof snapshot?.yesterday[provider] === 'number',
   );
   const hasStatsTools = (snapshot?.tools.length ?? 0) > 0;
+  // V-21：空态只保留空态里的「重新读取」一个入口，页头刷新在空态时隐藏
+  const emptyState = !loading && !error && !hasStatsTools;
 
   return (
     <PageScaffold
@@ -268,9 +270,11 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
               {sourceLabel}
             </Badge>
           )}
-          <Button appearance="secondary" onClick={refresh} disabled={loading}>
-            刷新
-          </Button>
+          {!emptyState && (
+            <Button appearance="secondary" onClick={refresh} disabled={loading}>
+              刷新
+            </Button>
+          )}
           <Button appearance="primary" onClick={onOpenAgent} disabled={!onOpenAgent}>
             Agent 复盘
           </Button>
@@ -295,10 +299,10 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
         </MessageBar>
       )}
 
-      {!loading && !error && !hasStatsTools && (
+      {emptyState && (
         <EmptyState
           title="还没有可复盘的数据"
-          description="等插件提供 stats 工具并挂载到桌面后，这里会自动汇总。"
+          description="插件提供 stats 工具后，这里会自动汇总。"
           action={
             <Button appearance="secondary" onClick={refresh}>
               重新读取

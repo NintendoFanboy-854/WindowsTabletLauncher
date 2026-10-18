@@ -50,7 +50,6 @@ const useStyles = makeStyles({
     gridAutoRows: '1fr',
     gap: 'clamp(2px, 0.8vw, 6px)',
     minHeight: 0,
-    height: '100%',
   },
   dayColumn: {
     display: 'flex',
@@ -61,6 +60,10 @@ const useStyles = makeStyles({
     minWidth: 0,
     padding: 'clamp(2px, 1vh, 8px) 0',
     borderRadius: tokens.borderRadiusMedium,
+  },
+  dayColumnSpread: {
+    justifyContent: 'space-between',
+    padding: 'clamp(4px, 1.6vh, 14px) 0',
   },
   dayLabel: {
     fontSize: tokens.fontSizeBase200,
@@ -156,14 +159,14 @@ export function HourlyStrip({ items, nowIso, unit, scheme, sunrise, sunset, coun
   );
 }
 
-/** 卡片用 7 天列：星期、图标、高温（低温按需弱化/省略） */
-export function DailyColumns({ items, unit, scheme, className, showLow = true }) {
+/** 卡片用 7 天列：星期、图标、高温（低温按需弱化/省略）；spread 让列在竖向铺满 */
+export function DailyColumns({ items, unit, scheme, className, showLow = true, spread = false }) {
   const styles = useStyles();
   const list = (items || []).slice(0, 7);
   return (
     <div className={mergeClasses(styles.dailyColumns, className)}>
       {list.map((item, index) => (
-        <div key={item.fxDate || index} className={styles.dayColumn}>
+        <div key={item.fxDate || index} className={mergeClasses(styles.dayColumn, spread && styles.dayColumnSpread)}>
           <span className={styles.dayLabel}>{dayLabel(item.fxDate, index)}</span>
           <WeatherIcon code={item.icon} scheme={scheme} size="clamp(16px, 4vh, 32px)" title={item.text} />
           <span className={mergeClasses(styles.dayHiLo, styles.hi, !showLow && styles.daySingleTemp)}>

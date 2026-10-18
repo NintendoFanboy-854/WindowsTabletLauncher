@@ -1,0 +1,21 @@
+/*
+ * 待办插件页面外壳（iframe 视口重置，不含视觉样式）。
+ * 视觉全部由 Fluent UI React 在 #root 里用 makeStyles + tokens 渲染（DECISIONS D-02b）。
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  overflow: hidden;
+  background: transparent;
+  color-scheme: normal;
+}

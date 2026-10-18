@@ -1,16 +1,17 @@
 /**
  * 轻量 Markdown 渲染：段落、无序/有序列表、标题、粗体、行内代码、链接。
- * 只负责排版，交互组件（Link）仍用 Fluent 组件。
+ * 行内解析（含括号 URL）与「来源」清单裁剪在 ./markdown.ts，只负责排版。
  */
 
 import { Fragment, useMemo, type ReactNode } from 'react';
 import { Link, makeStyles, Text, tokens } from '@fluentui/react-components';
+import { tokenizeInline } from './markdown';
 
 const useStyles = makeStyles({
   root: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
+    gap: tokens.spacingVerticalS,
     minWidth: 0,
     overflowWrap: 'anywhere',
   },
@@ -102,54 +103,36 @@ function parseBlocks(text: string): Block[] {
   return blocks;
 }
 
-const INLINE_PATTERN =
-  /\[([^\]]+)]\((https?:\/\/[^)\s]+)\)|\*\*([^*]+)\*\*|`([^`]+)`|(https?:\/\/[^\s)<>]+)/g;
-
 function renderInline(
   text: string,
   codeClassName: string,
   keyPrefix: string,
 ): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-  let matchIndex = 0;
-  let match: RegExpExecArray | null;
-
-  INLINE_PATTERN.lastIndex = 0;
-  while ((match = INLINE_PATTERN.exec(text)) !== null) {
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-    const key = `${keyPrefix}-${matchIndex}`;
-    matchIndex += 1;
-
-    if (match[1] && match[2]) {
-      nodes.push(
-        <Link key={key} href={match[2]} target="_blank" rel="noreferrer">
-          {match[1]}
-        </Link>,
-      );
-    } else if (match[3]) {
-      nodes.push(
-        <Text key={key} weight="semibold">
-          {match[3]}
-        </Text>,
-      );
-    } else if (match[4]) {
-      nodes.push(
-        <Text key={key} className={codeClassName} font="monospace">
-          {match[4]}
-        </Text>,
-      );
-    } else if (match[5]) {
-      nodes.push(
-        <Link key={key} href={match[5]} target="_blank" rel="noreferrer">
-          {match[5]}
-        </Link>,
-      );
+  return tokenizeInline(text).map((token, index) => {
+    const key = `${keyPrefix}-${index}`;
+    switch (token.type) {
+      case 'link':
+        return (
+          <Link key={key} href={token.url} target="_blank" rel="noreferrer">
+            {token.label}
+          </Link>
+        );
+      case 'bold':
+        return (
+          <Text key={key} weight="semibold">
+            {token.text}
+          </Text>
+        );
+      case 'code':
+        return (
+          <Text key={key} className={codeClassName} font="monospace">
+            {token.text}
+          </Text>
+        );
+      default:
+        return <Fragment key={key}>{token.text}</Fragment>;
     }
-    lastIndex = INLINE_PATTERN.lastIndex;
-  }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
+  });
 }
 
 export function MessageContent({ text }: { text: string }): ReactNode {

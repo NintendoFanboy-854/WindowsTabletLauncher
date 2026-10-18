@@ -4,82 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>时钟</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./base.css" />
   </head>
   <body>
-    <!-- 正常模式只有时间/日期本身：无齿轮、无标题栏；设置走长按（或宿主编辑模式） -->
-    <main class="clock" id="clock" role="button" tabindex="0" aria-label="时钟：点击切换 12 / 24 小时制，长按打开设置">
-      <div class="time-row">
-        <span class="time-main" id="time-main">--:--</span>
-        <span class="time-sec" id="time-sec" aria-hidden="true"></span>
-        <span class="time-meridiem" id="time-meridiem" aria-hidden="true"></span>
-      </div>
-      <div class="meta">
-        <span class="date" id="date"></span>
-        <span class="meta-dot" aria-hidden="true">·</span>
-        <span class="weekday" id="weekday"></span>
-      </div>
-    </main>
-
-    <div class="scrim" id="scrim" hidden></div>
-    <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
-      <header class="sheet-head">
-        <h2 class="sheet-title" id="sheet-title">时钟设置</h2>
-        <button class="icon-btn" id="close-settings" type="button" title="关闭" aria-label="关闭设置">
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="m4.09 4.22.06-.07a.5.5 0 0 1 .63-.06l.07.06L10 9.29l5.15-5.14a.5.5 0 0 1 .63-.06l.07.06c.18.17.2.44.06.63l-.06.07L10.71 10l5.14 5.15c.18.17.2.44.06.63l-.06.07a.5.5 0 0 1-.63.06l-.07-.06L10 10.71l-5.15 5.14a.5.5 0 0 1-.63.06l-.07-.06a.5.5 0 0 1-.06-.63l.06-.07L9.29 10 4.15 4.85a.5.5 0 0 1-.06-.63l.06-.07z"
-            />
-          </svg>
-        </button>
-      </header>
-      <div class="sheet-body">
-        <label class="row" for="set-24h">
-          <span class="row-text">
-            <span class="row-title">24 小时制</span>
-            <span class="row-desc">关闭后显示为 12 小时制（AM / PM）</span>
-          </span>
-          <span class="switch">
-            <input type="checkbox" id="set-24h" role="switch" aria-label="24 小时制" />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </span>
-        </label>
-        <div class="divider"></div>
-        <label class="row" for="set-seconds">
-          <span class="row-text">
-            <span class="row-title">显示秒</span>
-            <span class="row-desc">1×1 档位空间不足，按规格不显示秒</span>
-          </span>
-          <span class="switch">
-            <input type="checkbox" id="set-seconds" role="switch" aria-label="显示秒" />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </span>
-        </label>
-        <div class="divider"></div>
-        <fieldset class="field-group">
-          <legend>日期格式</legend>
-          <label class="radio">
-            <input type="radio" name="date-format" value="zh" />
-            <span class="radio-mark" aria-hidden="true"></span>
-            <span class="radio-label">10月18日 星期日</span>
-          </label>
-          <label class="radio">
-            <input type="radio" name="date-format" value="iso" />
-            <span class="radio-mark" aria-hidden="true"></span>
-            <span class="radio-label">2026-10-18</span>
-          </label>
-          <label class="radio">
-            <input type="radio" name="date-format" value="en" />
-            <span class="radio-mark" aria-hidden="true"></span>
-            <span class="radio-label">10/18 Sun</span>
-          </label>
-        </fieldset>
-      </div>
-    </section>
-
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-    <script type="module" src="app.js"></script>
+    <!-- 卡片视图 / 设置视图都由 React 渲染（DECISIONS D-02b）；正常模式没有操作 chrome -->
+    <div id="root"></div>
+    <script type="module" src="./app/app.js"></script>
   </body>
 </html>

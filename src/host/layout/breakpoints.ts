@@ -1,10 +1,13 @@
 /**
  * 自适应网格几何：窗口尺寸 → 列数 / 单元格 / 行数。
  *
- * 规则来自 docs/DESIGN.md §1.1：
- * - 列数：宽 ≥1280 → 8，900–1279 → 6，<900 → 4
+ * 规则来自 docs/DESIGN.md §1.1（并按 AUDIT V-22 补窄屏降列）：
+ * - 列数：宽 ≥1280 → 8，900–1279 → 6，480–899 → 4，360–479 → 3，<360 → 2
  * - 单元格是正方形，96px ≤ cell ≤ 220px
  * - 行数 = floor(可用高度 / 单元格)，最少 4 行；页内不滚动
+ *
+ * 窄屏（<480）必须降列：320px 宽时 4 列 × 96px + 3 × 12px = 420px 必然横向溢出，
+ * 降到 2 列后 2 × 96px + 12px = 204px < 280px 可用宽，网格能完整放进屏幕。
  *
  * 间距和留白取 Fluent 间距 token 的数值（token 在运行时是 CSS 变量，这里用其定义值，
  * 见 node_modules/@fluentui/tokens 的 spacings 定义），避免拍脑袋的魔法数字。
@@ -26,7 +29,9 @@ export const MIN_ROWS = 4;
 export const COLUMN_BREAKPOINTS: readonly { minWidth: number; columns: number }[] = [
   { minWidth: 1280, columns: 8 },
   { minWidth: 900, columns: 6 },
-  { minWidth: 0, columns: 4 },
+  { minWidth: 480, columns: 4 },
+  { minWidth: 360, columns: 3 },
+  { minWidth: 0, columns: 2 },
 ];
 
 /** 窗口宽度（CSS px）→ 列数 */

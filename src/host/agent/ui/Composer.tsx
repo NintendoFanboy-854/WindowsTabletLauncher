@@ -44,6 +44,7 @@ const useStyles = makeStyles({
   textareaInner: {
     resize: 'none',
     maxHeight: '120px',
+    minHeight: '40px',
   },
   actions: {
     display: 'flex',
@@ -98,8 +99,8 @@ export function Composer({
       {showSetupBanner ? (
         <MessageBar intent="warning" className={styles.banner}>
           <MessageBarBody>
-            <MessageBarTitle>还没配置 MiMo API Key</MessageBarTitle>
-            Agent 现在只能看不能答。去设置里填 Key，或者先开 Mock 演示模式看完整流程。
+            <MessageBarTitle>还没有填写 MiMo API Key</MessageBarTitle>
+            现在还不能回答问题。可以去设置里填好 Key，或者先打开演示模式体验完整流程。
           </MessageBarBody>
           <MessageBarActions
             containerAction={
@@ -113,7 +114,7 @@ export function Composer({
               appearance="outline"
               onClick={() => session.updateSettings({ mock: true })}
             >
-              开启 Mock 演示
+              开启演示模式
             </Button>
           </MessageBarActions>
         </MessageBar>
@@ -184,7 +185,7 @@ export function Composer({
           className={styles.textarea}
           textarea={{ className: styles.textareaInner }}
           value={draft}
-          placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"
+          placeholder="问点什么…"
           resize="none"
           rows={1}
           onChange={(_, data) => setDraft(data.value)}
@@ -193,6 +194,7 @@ export function Composer({
         />
         <div className={styles.actions}>
           <ToggleButton
+            size="large"
             appearance="subtle"
             icon={recording ? <StopRegular /> : <MicRegular />}
             checked={recording}
@@ -203,6 +205,7 @@ export function Composer({
           />
           {busy ? (
             <Button
+              size="large"
               appearance="primary"
               icon={<StopRegular />}
               aria-label="停止生成"
@@ -211,6 +214,7 @@ export function Composer({
             />
           ) : (
             <Button
+              size="large"
               appearance="primary"
               icon={<SendRegular />}
               disabled={!draft.trim()}

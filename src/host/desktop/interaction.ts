@@ -33,3 +33,15 @@ export const WHEEL_PAGE_RATIO = 1;
 export const WHEEL_RESET_MS = 500;
 
 /** 拖动到屏幕边缘的触发带宽度 = 一个单元格（由布局引擎的 cell 决定，见 Desktop.tsx） */
+
+/**
+ * 编辑模式卡片缩放（DESIGN.md §2「卡片轻微缩放」）。
+ * 编辑 chrome 的触控目标要按这个缩放反算，保证屏幕上实际命中区仍 ≥40×40（AUDIT V-06）。
+ */
+export const EDIT_CARD_SCALE = 0.97;
+
+/** 触控目标基准：DESIGN.md §1.2 规定不小于 40×40 CSS px */
+export const TOUCH_TARGET_SIZE = 40;
+
+/** 编辑模式下按钮的布局尺寸（反算缩放后屏幕实测仍 ≥40） */
+export const EDIT_TOUCH_TARGET = Math.ceil(TOUCH_TARGET_SIZE / EDIT_CARD_SCALE);

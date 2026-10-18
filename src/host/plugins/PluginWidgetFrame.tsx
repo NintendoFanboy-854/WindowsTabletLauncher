@@ -15,10 +15,22 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from 'react';
+
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  makeStyles,
+} from '@fluentui/react-components';
+import { Dismiss24Regular } from '@fluentui/react-icons';
 
 import { PROTOCOL_VERSION } from '../bridge/types';
 import type {
@@ -58,6 +70,8 @@ export interface PluginWidgetFrameProps {
   onMessage?: (message: PluginToHostMessage) => void;
   /** 插件调用宿主 API；最后一个参数是把结果写回去的 reply */
   onApiCall?: (message: PluginCallMessage, reply: HostApiReply) => void;
+  /** 浮层视图 iframe 里按 Esc 时回调（由外层实例关闭浮层）；卡片实例不传 */
+  onOverlayClose?: () => void;
   /** 不可见的常驻 iframe（后台插件用） */
   hidden?: boolean;
 }
@@ -75,6 +89,8 @@ export interface PluginWidgetFrameHandle {
   focusPlugin(): void;
   /** 宿主替 Agent 调插件工具 */
   toolCall(id: string, name: string, args: unknown): void;
+  /** 打开本插件的设置浮层（全窗口 Fluent Dialog，用 ?settings=1 加载同一插件页面） */
+  openSettings(): void;
   /** 回插件请求（桥接层用） */
   reply(id: string, ok: boolean, result?: unknown, error?: string): void;
   /** 重载 iframe（热重载 / 崩溃兜底） */
@@ -101,6 +117,36 @@ const VISIBLE_FRAME_STYLE: CSSProperties = {
   background: 'transparent',
 };
 
+/**
+ * 插件浮层视图：插件设置/详情是独立视图，宿主用 `?view=<name>` 把同一插件页面
+ * 装进全窗口 Fluent Dialog。这样浮层不会被小卡片的 iframe 边界裁切
+ * （DECISIONS.md D-02b；docs/PLUGIN-REACT.md「浮层视图」）。
+ */
+const useSettingsStyles = makeStyles({
+  surface: {
+    width: 'min(880px, 92vw)',
+    maxWidth: '92vw',
+    height: 'min(72vh, 680px)',
+  },
+  body: {
+    height: '100%',
+    minHeight: 0,
+  },
+  content: {
+    height: '100%',
+    minHeight: 0,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  frame: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    border: 0,
+    background: 'transparent',
+  },
+});
+
 function sameSize(a: WidgetSize, b: WidgetSize): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
@@ -120,6 +166,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       style,
       onMessage,
       onApiCall,
+      onOverlayClose,
       hidden = false,
     } = props;
 
@@ -127,11 +174,29 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     const frameUid =
       instanceUid?.trim() || (widgetId ? `${pluginId}:${widgetId}` : `${pluginId}:background`);
 
+    const settingsStyles = useSettingsStyles();
     const frameRef = useRef<HTMLIFrameElement>(null);
     const [loadedAt, setLoadedAt] = useState(0);
+    /** 插件请求的全窗口浮层视图：{ view: 'settings' | 'detail' | ..., title } */
+    const [overlay, setOverlay] = useState(null as null | { view: string; title: string });
     const readyRef = useRef(false);
     const lastSize = useRef<WidgetSize | null>(null);
     const lastTheme = useRef<ThemePayload | undefined>(theme);
+
+    const openOverlay = useCallback((view?: unknown, overlayTitle?: unknown) => {
+      const viewName = typeof view === 'string' && view.trim() ? view.trim() : 'settings';
+      setOverlay({
+        view: viewName,
+        title: typeof overlayTitle === 'string' && overlayTitle.trim() ? overlayTitle.trim() : '设置',
+      });
+    }, []);
+
+    // 浮层视图的地址：同一插件页面加 `?view=<view>`（D-02b）
+    const overlaySrc = useMemo(() => {
+      if (!overlay) return null;
+      const separator = src.includes('?') ? '&' : '?';
+      return `${src}${separator}view=${encodeURIComponent(overlay.view)}`;
+    }, [overlay, src]);
 
     // init 要拿“加载那一刻”的最新 props，用 ref 避免把 init 绑死到首次渲染
     const latest = useRef({ pluginId, widgetId, size, theme, config });
@@ -184,6 +249,24 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         if (event.source !== frameRef.current?.contentWindow) return;
         const data = event.data as PluginToHostMessage | null | undefined;
         if (!data || typeof data !== 'object' || typeof data.type !== 'string') return;
+        const rawType = (data as { type: string }).type;
+
+        // 浮层视图 iframe 里按 Esc：交回外层实例关闭浮层（焦点在 iframe 内时宿主收不到 Esc）
+        if (rawType === 'plugin:request-overlay-close') {
+          onOverlayClose?.();
+          return;
+        }
+        // 插件请求全窗口浮层视图（D-02b：设置/详情是独立视图，宿主用 ?view=... 加载）
+        if (rawType === 'plugin:request-overlay') {
+          const payload = (data as unknown as { payload?: { view?: unknown; title?: unknown } }).payload;
+          openOverlay(payload?.view, payload?.title);
+          return;
+        }
+        // 兼容旧协议：只请求设置浮层
+        if (rawType === 'plugin:request-settings') {
+          openOverlay('settings', '设置');
+          return;
+        }
 
         if (data.type === 'plugin:ready') readyRef.current = true;
         onMessage?.(data);
@@ -204,7 +287,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       };
       window.addEventListener('message', onWindowMessage);
       return () => window.removeEventListener('message', onWindowMessage);
-    }, [onMessage, onApiCall, post]);
+    }, [onMessage, onApiCall, onOverlayClose, openOverlay, post]);
 
     useImperativeHandle(
       ref,
@@ -216,6 +299,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         updateTheme: (nextTheme) => post({ type: 'host:theme', payload: { theme: nextTheme } }),
         focusPlugin: () => post({ type: 'host:focus' }),
         toolCall: (id, name, args) => post({ type: 'host:tool-call', id, name, args }),
+        openSettings: () => openOverlay('settings', '设置'),
         reply: (id, ok, result, error) => post({ type: 'host:reply', id, ok, result, error }),
         reload: () => {
           const frame = frameRef.current;
@@ -225,25 +309,79 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           return frameRef.current?.contentWindow ?? null;
         },
       }),
-      [post, frameUid],
+      [post, frameUid, openOverlay],
     );
 
     return (
-      <iframe
-        ref={frameRef}
-        src={src}
-        title={title ?? `${pluginId}/${widgetId}`}
-        className={className}
-        style={{ ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE), ...style }}
-        allow="autoplay; clipboard-write; fullscreen"
-        tabIndex={hidden ? -1 : undefined}
-        aria-hidden={hidden || undefined}
-        onLoad={() => {
-          lastSize.current = null;
-          readyRef.current = false;
-          setLoadedAt((value) => value + 1);
-        }}
-      />
+      <>
+        <iframe
+          ref={frameRef}
+          src={src}
+          title={title ?? `${pluginId}/${widgetId}`}
+          className={className}
+          style={{ ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE), ...style }}
+          allow="autoplay; clipboard-write; fullscreen"
+          tabIndex={hidden ? -1 : undefined}
+          aria-hidden={hidden || undefined}
+          onLoad={() => {
+            lastSize.current = null;
+            readyRef.current = false;
+            setLoadedAt((value) => value + 1);
+          }}
+        />
+        {overlay && overlaySrc && (
+          <Dialog
+            key={overlay.view}
+            open
+            modalType="modal"
+            onOpenChange={(_, detail) => {
+              if (!detail.open) setOverlay(null);
+            }}
+          >
+            <DialogSurface
+              className={settingsStyles.surface}
+              aria-label={`${title ?? pluginId} ${overlay.title}`}
+            >
+              <DialogBody className={settingsStyles.body}>
+                <DialogTitle
+                  action={
+                    <Button
+                      appearance="subtle"
+                      size="large"
+                      icon={<Dismiss24Regular />}
+                      aria-label="关闭浮层"
+                      onClick={() => setOverlay(null)}
+                    />
+                  }
+                >
+                  {title ? `${title} · ${overlay.title}` : overlay.title}
+                </DialogTitle>
+                <DialogContent className={settingsStyles.content}>
+                  <PluginWidgetFrameRecursive
+                    src={overlaySrc}
+                    pluginId={pluginId}
+                    widgetId={widgetId}
+                    instanceUid={`${frameUid}:overlay:${overlay.view}`}
+                    size={size}
+                    theme={theme}
+                    config={config}
+                    title={`${title ?? pluginId} ${overlay.title}`}
+                    className={settingsStyles.frame}
+                    onApiCall={onApiCall}
+                    onOverlayClose={() => setOverlay(null)}
+                  />
+                </DialogContent>
+              </DialogBody>
+            </DialogSurface>
+          </Dialog>
+        )}
+      </>
     );
   },
 );
+
+/**
+ * 自引用别名：浮层视图里要再渲染一个本组件（?view=... 的同一插件页面）。
+ * 放在组件定义之后，运行时已初始化，避免循环引用问题。
+ */
+const PluginWidgetFrameRecursive = PluginWidgetFrame;

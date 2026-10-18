@@ -84,7 +84,7 @@ export class MimoWebSearchDisabledError extends Error {
 
   constructor() {
     super(
-      'MiMo 联网搜索未开通：当前 API Key 没有 Web Search Plugin 权限。请到 MiMo 控制台 → 插件管理 开通 Web Search 后重试，或在设置里关闭联网搜索。',
+      'MiMo 联网搜索未开通：这个 API Key 还没有开通联网搜索功能。请到 MiMo 控制台 → 插件管理开通后重试，或在设置里关闭联网搜索。',
     );
     this.name = 'MimoWebSearchDisabledError';
   }

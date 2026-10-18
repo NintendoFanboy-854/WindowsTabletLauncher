@@ -28,6 +28,7 @@ import {
 } from '@fluentui/react-icons';
 import type { AgentSession } from '../hooks/useAgentSession';
 import type { Message } from '../types';
+import { stripSourceSection } from './markdown';
 import { MessageContent } from './MessageContent';
 import { ToolCallCard } from './ToolCallCard';
 
@@ -64,8 +65,8 @@ const useStyles = makeStyles({
     borderStartEndRadius: tokens.borderRadiusSmall,
   },
   assistantBubble: {
+    // DENSITY：分组靠留白/背景层级，不用 1px 分割线
     backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderStartStartRadius: tokens.borderRadiusSmall,
     display: 'flex',
     flexDirection: 'column',
@@ -87,8 +88,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalXXS,
-    paddingTop: tokens.spacingVerticalXS,
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    marginTop: tokens.spacingVerticalS,
   },
   sourceChip: {
     display: 'flex',
@@ -150,6 +150,8 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
   const sources = message.sources ?? [];
   const visibleSources = sourcesExpanded ? sources : sources.slice(0, SOURCE_CHIP_LIMIT);
   const hiddenSourceCount = sources.length - visibleSources.length;
+  // 来源只保留 chips：有 annotations 时去掉正文末尾的“来源：”清单
+  const displayContent = sources.length ? stripSourceSection(message.content) : message.content;
   const isUser = message.role === 'user';
   const isStreaming = message.status === 'streaming';
   const speaking = session.speakingMessageId === message.id;
@@ -192,7 +194,7 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
             </Accordion>
           ) : null}
 
-          {message.content ? <MessageContent text={message.content} /> : null}
+          {displayContent ? <MessageContent text={displayContent} /> : null}
 
           {isStreaming ? (
             <span
@@ -236,7 +238,7 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
               ))}
               {hiddenSourceCount > 0 ? (
                 <Button
-                  size="small"
+                  size="large"
                   appearance="subtle"
                   icon={sourcesExpanded ? <ChevronUpRegular /> : <ChevronDownRegular />}
                   onClick={() => setSourcesExpanded((previous) => !previous)}
@@ -265,7 +267,7 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
           ) : null}
           {canSpeak ? (
             <Button
-              size="small"
+              size="large"
               appearance="subtle"
               icon={speaking ? <SpeakerMuteRegular /> : <Speaker2Regular />}
               aria-label={speaking ? '停止朗读这条回答' : '朗读这条回答'}

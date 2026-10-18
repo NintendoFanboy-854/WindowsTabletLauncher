@@ -4,7 +4,7 @@
  * 参数：
  * - `?scenario=overlay`（默认）浮层态，带工具卡片与来源 chips
  * - `?scenario=search` 空会话自动发起一次搜索（Mock 原生 web_search annotations）
- * - `?scenario=voice` 全屏语音态（Mock 数据，波形在朗读）
+ * - `?scenario=voice` 全屏语音态（演示数据，波形在朗读）
  * - `?scenario=sidebar` 常驻侧栏态
  * - `?scenario=fullscreen` 全屏文字对话
  * - `?scenario=settings` 浮层 + 设置对话框（人脸不可用时显示原因）
@@ -116,7 +116,7 @@ const OVERLAY_MESSAGES: Message[] = [
   message('user', '搜一下 MiMo V2.6 的最新消息'),
   message(
     'assistant',
-    'MiMo V2.6 三个型号都支持 **1M 上下文** 和 **128K 输出**，深度思考、函数调用、流式输出、联网搜索都已支持。\n\n来源：\n1. [MiMo V2.6 系列模型更新](https://mimo.mi.com/docs/zh-CN/updates/model)\n2. [OpenAI Chat Completions API 兼容](https://mimo.mi.com/docs/zh-CN/api/chat/openai-api)',
+    'MiMo V2.6 三个型号都支持 **1M 上下文** 和 **128K 输出**，深度思考、函数调用、流式输出、联网搜索都已支持。想看官方说明可以点 [MiMo 模型更新（含版本对比）](https://example.com/docs/MiMo_(v2.6))。',
     {
       sources: SEARCH_RESULTS.map((item) => ({
         title: item.title,
@@ -234,7 +234,7 @@ function DemoDesktop() {
       <div className={styles.header}>
         <Title2>Windows 平板桌面</Title2>
         <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
-          Agent 模块演示（Mock 数据） · scenario={scenario}
+          Agent 模块演示（演示数据） · scenario={scenario}
         </Text>
       </div>
       <div className={styles.grid}>

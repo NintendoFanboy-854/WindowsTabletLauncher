@@ -1,3 +1,20 @@
+:root {
+  /*
+   * 项目 token 声明（DESIGN §6 允许的唯一非 Fluent 来源：Acrylic / 壁纸）。
+   * - 壁纸：Fluent web 没有 Acrylic 背景，桌面壁纸是产品决定，颜色在此集中声明，
+   *   页面内不散落 hex。
+   * - 卡片圆角：FLUENT2 §5 的卡片圆角为 12px；Fluent v9 的 borderRadiusXLarge
+   *   实际是 8px，这里用项目 token 统一页面卡片圆角（V-02）。
+   */
+  --wtsl-card-radius: 12px;
+  --wtsl-desktop-backdrop:
+    radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%),
+    radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%),
+    #0e0f13;
+  --wtsl-desktop-foreground: #f3f3f3;
+  --wtsl-desktop-font: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -11,99 +28,11 @@ body,
 
 body {
   overflow: hidden;
-  background:
-    radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%),
-    radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%),
-    #0e0f13;
-  color: #f3f3f3;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  background: var(--wtsl-desktop-backdrop);
+  color: var(--wtsl-desktop-foreground);
+  font-family: var(--wtsl-desktop-font);
   -webkit-font-smoothing: antialiased;
   user-select: none;
-}
-
-.desktop {
-  position: relative;
-  height: 100%;
-  padding: 24px;
-}
-
-.desktop-grid {
-  display: grid;
-  gap: 14px;
-  height: 100%;
-}
-
-.widget {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(24px);
-}
-
-.widget-head {
-  display: flex;
-  align-items: center;
-  flex: 0 0 26px;
-  padding: 0 12px;
-  cursor: grab;
-  touch-action: none;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-}
-
-.widget-head:active {
-  cursor: grabbing;
-}
-
-.widget-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.widget-frame {
-  display: block;
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  border: 0;
-  background: transparent;
-  color-scheme: dark;
-}
-
-.desktop-hint {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 14px;
-  pointer-events: none;
-}
-
-.reset-layout {
-  position: fixed;
-  right: 18px;
-  bottom: 16px;
-  padding: 6px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.reset-layout:hover {
-  background: rgba(255, 255, 255, 0.14);
 }
 
 /* ---------- 宿主容器与桌面入口 ---------- */
@@ -112,30 +41,30 @@ body {
   height: 100%;
 }
 
+/*
+ * 桌面右下入口：位置/间距/圆角/阴影全部走 Fluent token（V-20）。
+ * 背景/描边不再自造 rgba fallback，主题 token 由 FluentProvider 提供。
+ */
 .desktop-dock {
   position: fixed;
-  right: 18px;
-  bottom: 16px;
+  right: var(--spacingHorizontalL);
+  bottom: var(--spacingVerticalL);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
-  border-radius: 12px;
-  background: var(--colorNeutralBackground1, rgba(255, 255, 255, 0.06));
-  box-shadow: var(--shadow8, 0 4px 16px rgba(0, 0, 0, 0.3));
-  border: 1px solid var(--colorNeutralStroke2, rgba(255, 255, 255, 0.08));
+  gap: var(--spacingHorizontalXS);
+  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
+  border-radius: var(--borderRadiusXLarge);
+  background-color: var(--colorNeutralBackground1);
+  box-shadow: var(--shadow8);
   z-index: 10;
 }
-
 
 /* ---------- Agent 侧栏让宽（AgentSurface 在 documentElement 上写变量与标记） ---------- */
 
 html[data-agent-panel='sidebar'] .host-root {
   padding-right: var(--wtsl-agent-panel-width, 0px);
-  transition: padding-right var(--durationNormal, 200ms) var(--curveEasyEase, ease);
 }
 
 html[data-agent-panel='sidebar'] .desktop-dock {
-  right: calc(18px + var(--wtsl-agent-panel-width, 0px));
-  transition: right var(--durationNormal, 200ms) var(--curveEasyEase, ease);
+  right: calc(var(--spacingHorizontalL) + var(--wtsl-agent-panel-width, 0px));
 }
