@@ -81,3 +81,7 @@ dist/
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
+
+# 截图回归输出
+shots/
+

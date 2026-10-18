@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WidgetInstance } from './types';
-import { createInstances, loadPlugins } from './pluginLoader';
+import { createInstances, loadPlugins } from '../plugins/loader';
 import WidgetFrame from './WidgetFrame';
 
 const COLS = 8;

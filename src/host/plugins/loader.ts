@@ -1,4 +1,4 @@
-import type { PluginManifest, WidgetInstance } from './types';
+import type { PluginManifest, WidgetInstance } from '../desktop/types';
 
 const BASE = '/plugins/';
 
