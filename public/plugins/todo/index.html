@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Todo</title>
+    <style>
+      :root {
+        --fg: #f3f3f3;
+        --muted: rgba(243, 243, 243, 0.55);
+        --line: rgba(255, 255, 255, 0.12);
+        --accent: #7cb3ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #1b1c22;
+        color: var(--fg);
+        font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+        font-size: 13px;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        padding: 10px 12px 12px;
+        gap: 8px;
+      }
+
+      form {
+        display: flex;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+
+      input {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--fg);
+        font: inherit;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: var(--accent);
+      }
+
+      button {
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      ul {
+        flex: 1 1 auto;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        overflow: auto;
+        scrollbar-width: thin;
+      }
+
+      li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      li.done span {
+        color: var(--muted);
+        text-decoration: line-through;
+      }
+
+      li span {
+        flex: 1;
+        overflow-wrap: anywhere;
+      }
+
+      li button {
+        padding: 2px 8px;
+        font-size: 11px;
+        opacity: 0;
+      }
+
+      li:hover button {
+        opacity: 1;
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 8px 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="add">
+      <input id="text" placeholder="加个待办，回车即可" autocomplete="off" />
+      <button type="submit">加</button>
+    </form>
+    <ul id="list"></ul>
+
+    <script>
+      const KEY = 'todo.items.v1';
+      const form = document.getElementById('add');
+      const input = document.getElementById('text');
+      const list = document.getElementById('list');
+
+      /** @type {{id:string, text:string, done:boolean}[]} */
+      let items = JSON.parse(localStorage.getItem(KEY) ?? '[]');
+
+      const save = () => localStorage.setItem(KEY, JSON.stringify(items));
+
+      function render() {
+        list.innerHTML = '';
+        if (items.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = '还没有待办';
+          list.append(empty);
+          return;
+        }
+        for (const item of items) {
+          const li = document.createElement('li');
+          if (item.done) li.classList.add('done');
+
+          const box = document.createElement('input');
+          box.type = 'checkbox';
+          box.checked = item.done;
+          box.addEventListener('change', () => {
+            item.done = box.checked;
+            save();
+            render();
+          });
+
+          const span = document.createElement('span');
+          span.textContent = item.text;
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.textContent = '删';
+          del.addEventListener('click', () => {
+            items = items.filter((x) => x.id !== item.id);
+            save();
+            render();
+          });
+
+          li.append(box, span, del);
+          list.append(li);
+        }
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        items.push({ id: crypto.randomUUID(), text, done: false });
+        input.value = '';
+        save();
+        render();
+        parent.postMessage({ type: 'wtsl:notify', text: `已添加：${text}` }, '*');
+      });
+
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || data.type !== 'wtsl:init') return;
+        if (data.theme) {
+          const root = document.documentElement;
+          if (data.theme.foreground) root.style.setProperty('--fg', data.theme.foreground);
+          if (data.theme.muted) root.style.setProperty('--muted', data.theme.muted);
+          if (data.theme.accent) root.style.setProperty('--accent', data.theme.accent);
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>
+

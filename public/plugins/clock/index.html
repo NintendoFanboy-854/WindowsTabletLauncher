@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clock</title>
+    <style>
+      :root {
+        --fg: #f3f3f3;
+        --muted: rgba(243, 243, 243, 0.6);
+        --accent: #7cb3ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #1b1c22;
+        color: var(--fg);
+        font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      body {
+        display: grid;
+        place-content: center;
+        gap: 4px;
+        padding: 16px 20px;
+        cursor: pointer;
+      }
+
+      .time {
+        font-size: clamp(28px, 18vh, 88px);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .date {
+        font-size: clamp(11px, 2.2vh, 15px);
+        color: var(--muted);
+        letter-spacing: 0.06em;
+      }
+
+      .hint {
+        font-size: 10px;
+        color: var(--muted);
+        opacity: 0.5;
+      }
+
+      body:hover .hint {
+        opacity: 1;
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="time" id="time">--:--</div>
+    <div class="date" id="date"></div>
+    <div class="hint" id="hint">点击切换 12 / 24 小时制</div>
+
+    <script>
+      const timeEl = document.getElementById('time');
+      const dateEl = document.getElementById('date');
+      const hintEl = document.getElementById('hint');
+
+      let hour12 = JSON.parse(localStorage.getItem('clock.hour12') ?? 'false');
+      const pad = (n) => String(n).padStart(2, '0');
+
+      function render() {
+        const now = new Date();
+        let h = now.getHours();
+        let suffix = '';
+        if (hour12) {
+          suffix = h >= 12 ? ' PM' : ' AM';
+          h = h % 12 || 12;
+          timeEl.textContent = `${h}:${pad(now.getMinutes())}${suffix}`;
+        } else {
+          timeEl.textContent = `${pad(h)}:${pad(now.getMinutes())}`;
+        }
+        timeEl.style.fontSize = hour12 ? 'clamp(24px, 14vh, 72px)' : '';
+        dateEl.textContent = now.toLocaleDateString('zh-CN', {
+          month: 'long',
+          day: 'numeric',
+          weekday: 'long',
+        });
+        hintEl.textContent = hour12 ? '点击切换 12 / 24 小时制（当前 12 小时）' : '点击切换 12 / 24 小时制（当前 24 小时）';
+      }
+
+      document.body.addEventListener('click', () => {
+        hour12 = !hour12;
+        localStorage.setItem('clock.hour12', JSON.stringify(hour12));
+        render();
+        parent.postMessage(
+          { type: 'wtsl:notify', text: hour12 ? '已切换到 12 小时制' : '已切换到 24 小时制' },
+          '*',
+        );
+      });
+
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || data.type !== 'wtsl:init') return;
+        if (data.theme) {
+          const root = document.documentElement;
+          if (data.theme.foreground) root.style.setProperty('--fg', data.theme.foreground);
+          if (data.theme.muted) root.style.setProperty('--muted', data.theme.muted);
+          if (data.theme.accent) root.style.setProperty('--accent', data.theme.accent);
+        }
+      });
+
+      render();
+      setInterval(render, 1000);
+    </script>
+  </body>
+</html>
+

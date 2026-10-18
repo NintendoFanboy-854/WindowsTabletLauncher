@@ -1,0 +1,13 @@
+{
+  "id": "todo",
+  "name": "待办",
+  "version": "0.1.0",
+  "widgets": [
+    {
+      "id": "todo-list",
+      "title": "待办",
+      "size": [3, 3],
+      "cell": [5, 0]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "clock",
+  "name": "时钟",
+  "version": "0.1.0",
+  "widgets": [
+    {
+      "id": "clock-card",
+      "title": "时钟",
+      "size": [2, 1],
+      "cell": [0, 0]
+    },
+    {
+      "id": "clock-large",
+      "title": "日期时钟",
+      "size": [3, 2],
+      "cell": [2, 0]
+    }
+  ]
+}
