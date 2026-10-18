@@ -4,36 +4,41 @@
 > **审计基线**：`ad7ea0a`（2026-10-18 23:37:05 +08:00），审计时工作区 clean
 > **审计时间**：2026-10-18 22:56 – 2026-10-19 00:1x（+08:00）
 > **G2 复检**：修复后提交 `e6e57b7`（2026-10-19 01:59:53），复检时间 2026-10-19 02:00–03:00；判定口径见 `docs/DECISIONS.md`（D-01~D-05 / D-02b）、`docs/PLUGIN-REACT.md`。基线结论与 §1~§7 原文保留不篡改，复检结果见 §0、§8、§9。
-> **G2b 增量复验（本次更新）**：收口提交 `2b79fb9`（2026-10-19 02:58:06，声称工作区 clean），复验时间 2026-10-19 03:0x–03:4x；目标「P1=0」判定，结果见 §0、§8 新增行、§9.8。**注：复验期间工作区出现 3 项未提交变更（pomodoro N-02/tauri 最小窗口），判定按 03:2x 工作区快照，详见 §9.8.5。**
+> **G2b 增量复验**：收口提交 `2b79fb9`（2026-10-19 02:58:06），复验时间 03:0x–03:4x；结果见 §0（历史）、§8、§9.8。
+> **G2c 最终确认（本次更新）**：收口提交 `85c3962`（2026-10-19 03:30:44，工作区除 1 个未跟踪 `docs/RELEASE-REPORT.md` 外干净），复验时间 2026-10-19 03:3x–03:5x；最终判定见 §0、§8、§9.9。
 > **审计工具**：PowerShell 7 + Edge 155.0.4283.62 headless（CDP 截图/DOM 测量）+ ripgrep 静态扫描
 > **截图目录**：`shots/audit/`（本报告引用的截图均在此目录）
 > **扫描原始输出**：`docs/audit/_scan-*.txt`、`docs/audit/_shots-*.log`、`docs/audit/_baseline-manifest.txt`
 > **审计者立场**：只对照规范与产物；不接受"整体良好"结论；每条违规均带截图或 `文件:行` 证据。
 
-## 0. 结论摘要（G2b 收口后，2026-10-19）
+## 0. 结论摘要（G2c 最终确认，2026-10-19）
 
 > **基线（`ad7ea0a`）**：P0=0 / P1=8 / P2=15 / P3=3（§1~§7 为基线原文，保留）。
-> **G2（`e6e57b7`）**：P0=0 / P1=1 / P2=5 / P3=9（见 §8、§9）。
-> **G2b（`2b79fb9`，本次）**：P0=0 / **P1=0** / P2=4 / P3=14（见下表与 §9.8）。
+> **G2（`e6e57b7`）**：P0=0 / P1=1 / P2=5 / P3=9（§8、§9）。
+> **G2b（`2b79fb9`）**：P0=0 / P1=0 / P2=4 / P3=14（§8、§9.8）。
+> **G2c（`85c3962`，本次最终确认）**：P0=0 / **P1=0 / P2=0** / P3=14（§8、§9.9）。
 
-| 严重度 | 基线 | G2 | **G2b 收口** | 说明 |
-|---|---|---|---|---|
-| **P0（阻断）** | 0 | 0 | **0** | 未发现阻断级缺陷 |
-| **P1（应修）** | 8 | 1 | **0** | V-01/02/03/04/05/06/07/08 全部关闭：V-04/05 确认天气 token 化；V-06 复测原记录证据项全部 ≥40（编辑工具条 40×5、卡片编辑 41、设置 Tab 40、Agent 建议 3×40、dock 40、页面按钮无 <40） |
-| **P2（可优化）** | 15 | 5 | **4** | 本轮关闭 N-01（⋯ 菜单）、N-02（1×1 进度条）、V-04/V-05；残留：V-17 部分（2 处未生效/未改）、N-03 Fluent 表单控件默认密度、N-04 插件空/错误态 CTA 24px、N-05 插件构建产物不同步（见 §9.8） |
-| **P3（备注）** | 3 | 9 | **14** | 见 §9.4 与 §9.8.2 末尾 P3 清单（累计备注项，含 G2b 新增 5 项） |
+| 严重度 | 基线 | G2 | G2b | **G2c 最终** | 说明 |
+|---|---|---|---|---|---|
+| **P0（阻断）** | 0 | 0 | 0 | **0** | 未发现阻断级缺陷 |
+| **P1（应修）** | 8 | 1 | 0 | **0** | V-01~V-08 全部关闭（G2/G2b 完成） |
+| **P2（可优化）** | 15 | 5 | 4 | **0** | G2c 关闭 V-17（最后 1 处文案）、N-02（1×1 进度条，已提交）、N-03（Fluent 内建控件 min-height 40）、N-04（插件空/错误态 CTA 40）、N-05（全部插件产物重建并核对） |
+| **P3（备注）** | 3 | 9 | 14 | **14** | 均为产品决策/已记录例外/内容图形常量，不阻断发布（清单见 §9.9.4） |
 
-**G2b 最严重 3 条（均为残留/流程项，非 P1）**
+**最终判定：可发布（设计维度：P0=0 / P1=0 / P2=0）。** 无设计阻断项；14 项 P3 为备注与已记录例外，不需要在发布前处理。
 
-1. **N-05 构建产物与源码不同步（发布前必须处理）**：`2b79fb9` 只重建了 `countdown`/`weather` 的 `app/app.js`；`todo`（src 已改）与 `pomodoro`（src 已改）的产物未随 commit 重建。实测 `todo` 的 `?view=settings` 浮层仍显示旧文案「按 Fluent type ramp 切档，不做连续缩放」（`g2b2-overlay-todo-settings-1440x960.png`；`todo/app/app.js` grep 命中），即 V-17 的 todo 修复运行时未生效。**发布前必须 `node scripts/build-plugin.mjs --all` 并复核产物与 src 一致**。
-2. **V-17 仍有 1 处用户可见工程术语**：`PomodoroSettings.jsx:174`「通过宿主 setKeepAwake 实现」（已打进 pomodoro bundle，`g2b-overlay-pomodoro-settings-1440x960.png` 可见）。
-3. **N-03/N-04 触控密度残差**：宿主与浮层的 Fluent 内建表单控件默认高度 <40（Switch 行 36px、weather 设置浮层 Input 38px、Checkbox 内部 32px，见 `_g2b2-scenarios.log`/`_g2b3-scenarios.log`）；插件空/错误态 CTA 仅 24px（weather「去设置填 Key」「使用演示数据」，`g2b2-weather-nokey.png`）。建议在 DECISIONS 记录「Fluent 内建控件按官方默认密度」例外，或空/错误态 CTA 统一 `size="large"`。
+**G2c 收口证据（摘要）**
 
-**可发布性：可发布（设计维度和 P1=0）。** 前提是发布前执行 N-05（重建全部插件产物并核对运行时文案），该项属发布流程必须项而非设计规范阻断；其余 P2 三项（V-17 1 处文案、N-03、N-04）不阻断发布，可排入下一迭代。G2b 复测证据：`docs/audit/_g2b-*.log`、`_g2b2-*.log`、`_g2b3-*.log`；截图 `shots/audit/g2b-*.png`、`g2b2-*.png`。
+- **N-03（触控）**：`?page=settings` Switch **40**、纵向 Tab 40、below40=0；`?page=plugins` 6 个 Switch 全 **40**、below40=0；weather 设置浮层 13 个 Fluent 控件根元素全 **40**、below40=0；Agent 设置对话框 14 个控件根元素全 **40**、below40=0。内部 `fui-Input__input` 38 / `fui-Dropdown__button` 38 / `fui-Slider__input` 20 属 Fluent 内部几何（命中区根元素 40），记 P3。
+- **N-04（空/错误态 CTA）**：weather NoKey「去设置填 Key」129×**40**、「使用演示数据」130×**40**；todo 空态「新建任务」98×**40**；below40=0（`g2c-weather-nokey.png`、`g2c-todo-empty-2x2.png`）。
+- **N-05（产物同步）**：六个插件 `app.js` 均于 03:23 重建；`todo/app.js` 旧文案「按 Fluent type ramp 切档」**0 命中**、新文案命中；`pomodoro/app.js` 旧「通过宿主 setKeepAwake 实现」**0 命中**、新文案命中；运行时 `?view=settings` 已确认新文案（`g2c-todo-overlay-settings-1440x960.png`、`g2c-pomodoro-overlay-settings-1440x960.png`）。
+- **N-02 / V-17**：pomodoro 1×1 实测 `role=progressbar` 1 个；源码扫描 0 处工程术语，全部文案已用户语言。
+- **回归**：桌面 6 卡片 / 0 alert / 圆角 12px；weather 3×2 字号仅 12/14/16px、无溢出；G2c 全部场景无 console 报错（0 error / 0 warning）。
+- **复扫（`_g2c-scan-*.txt`）**：非 token 字号 5、gap 5、padding 7、margin 12（均为配置值/0/auto/内容图形常量）、圆角 3（项目 token）、阴影 0、hex 7（4 weather 算法常量 + 2 项目 token 声明 + 1 演示页，组件样式 0）、自定义动效 0。
 
-**G2b 关键通过项**：V-04/V-05 天气 forecast 字号/间距全部 `fontSizeBase*`/`spacing*` token（3×2 实测字号仅 12/14/16px、4×2 10/12/14/16px）；V-06 全部记录证据项 ≥40；N-01 countdown 3×2 只剩「倒数日 5 项 + ⋯」，菜单含「新增倒数日/设置」；N-02 pomodoro 1×1 出现 `role=progressbar`（1 个）；宿主控制台 0 error/0 warning（脚本复测 0 条 console 错误）。
+**P3（14，摘要）**：V-14 dock 常驻（D-03 产品决策）、Composer 顶部分隔线、weather 对比度算法 hex、插件独立页无宿主主题白底、Fluent 内部 input/trigger 38/20px（根命中区 40）、todo Tag dismiss 20px（Fluent Pattern）、天气图表 2px gap（内容图形）、Dialog 默认 8px 圆角（D-01 已记录例外）、Keyborg 仅演示页、单次瞬态 React #520（未复现）、320 窄屏（tauri `minWidth:960` 已限制）、sedentary 3×2 组件措辞冲突、pomodoro 3×2 视觉重心、时钟秒角标偏好。详见 §9.9.4。
 
-**G2 复检通过的关键项（摘要）**：六插件全部 React + `FluentProvider` + Fluent 组件（V-03 已修，D-02b 达标）；插件设置/详情全部走宿主 `?view=settings|detail` 全窗口 Fluent Dialog，无 iframe 内裁切（截图 §9.2）；卡片圆角统一 12px 项目 token（V-01/02 已修，实测 6 张卡片 radius=12px）；页面切换零 `react-motion` 报错（V-07 已修）；信息密度按 D-04 落地（todo 2×2=4 / 3×2=6 / 3×3=10 行，weather 2×2 逐时 ≤6；V-08/09 已修）。
+**发布说明建议（对应 P3）**：① 平板触控增强——宿主与插件对 Fluent 内建表单控件统一 `min-height:40px`，视觉密度略高于 Fluent 桌面默认；② 窗口最小尺寸 960×640；③ 天气图标为和风 SVG（Fluent 覆盖不全，内容图形例外）；④ CSS 近似 Acrylic/Mica（Win10 无系统材质）；⑤ 桌面右下 dock 常驻为产品决策（D-03）。
 
 ---
 
@@ -307,7 +312,7 @@
 
 ---
 
-## 8. 复检记录表（G2 + G2b 已填）
+## 8. 复检记录表（G2 / G2b / G2c 已填）
 
 > 复检基线：`ad7ea0a` → G2 `e6e57b7`（2026-10-19 01:59:53）→ G2b `2b79fb9`（2026-10-19 02:58:06，工作区 clean）。G2 复检时间 02:00–03:00，G2b 复检时间 03:0x–03:4x。状态：`已修 / 部分修 / 豁免（需方书面）/ 未修`。证据文件中 `final-*` 为 G2 截图，`g2b-*`/`g2b2-*` 为 G2b 截图（`shots/audit/`），`_g2-*`/`_g2b*` 为对应日志/扫描。
 
@@ -329,7 +334,7 @@
 | V-14 | P2 | **豁免（产品决策）** | `docs/DECISIONS.md` D-03：保留常驻 dock，按钮 ≥40px（实测 40px 达标）；审计按 P3 记录 | 同上 | design-auditor |
 | V-15 | P2 | **已修** | `ConversationPane` 头部/`MessageBubble` 气泡/来源区/全屏左右竖线已移除（`grep border*` 仅剩 `Composer.tsx:32` 输入区顶线与 `FaceSetup` 头像卡边界，见 §9.4 P3） | 同上 | design-auditor |
 | V-16 | P2 | **已修** | 新增 `markdown.ts`：支持带括号 URL、`stripSourceSection` 去重；`MessageBubble.tsx:154` 有 sources 时裁掉正文"来源："清单；placeholder 改为"问点什么…"（`Composer.tsx:188`）；截图 `final-agent-search-1440x960.png`（无原始 markdown、无重复来源） | 同上 | design-auditor |
-| V-17 | P2 | **部分修（P2 残留）** | 已生效：weather/plugins/desktop/pomodoro 多数文案改用户语言（`final-plugins-1440x960.png`、`g2b-plugins-1440x960.png`、`g2b2-overlay-pomodoro-settings-1440x960.png`：WebAudio→由系统合成、Session→每次专注都会被记录、isPluginEnabled/index.json/manifest 已改）。残留 2 点：① `PomodoroSettings.jsx:174`「通过宿主 setKeepAwake 实现」仍在（且已打进 pomodoro bundle）；② **todo 产物未重建**，运行时 `?view=settings` 仍显示「按 Fluent type ramp 切档」（`g2b2-overlay-todo-settings-1440x960.png`，`todo/app/app.js` grep 命中）→ 见 N-05 | 同上 | design-auditor |
+| V-17 | P2 | **已修（G2c 关闭）** | `85c3962`：pomodoro 最后 1 处「通过宿主 setKeepAwake 实现」→「专注期间不锁屏，结束后自动恢复」；六插件产物全部重建，运行时确认 todo/pomodoro 设置浮层新文案、旧文案 0 命中（`_g2c-scenarios.log`、`_g2c2-scenarios.log`、`g2c-todo-overlay-settings-1440x960.png`、`g2c-pomodoro-overlay-settings-1440x960.png`）；源码复扫 0 处工程术语 | 2026-10-19 03:4x | design-auditor |
 | V-18 | P2 | **已修** | 插件 CSS 140 条 hex 兜底全部删除（`base.css` 仅视口重置，`_g2-scan-hex.txt` 7 处：4 处天气对比度算法常量、2 处宿主项目 token 声明、1 处演示页）；宿主壁纸改为 `--wtsl-desktop-backdrop` token（`src/styles.css:10-14`） | 同上 | design-auditor |
 | V-19 | P2 | **已修** | 非 token 圆角 0（唯一 `CARD_RADIUS` 为项目 token）、非 token 阴影 0（`_g2-scan-radius/shadow.txt`）；`ReminderDialog` 不再覆写 `shadow64`/加边框（`ReminderDialog.tsx:37` 注释）；插件状态光晕/inset 阴影已移除 | 同上 | design-auditor |
 | V-20 | P2 | **已修** | `src/styles.css` 壁纸/前景/字体集中为项目 token（`:root`），dock 间距/圆角/阴影/背景全部 `var(--spacing*/--borderRadius*/--shadow*/--color*)`，无 rgba fallback | 同上 | design-auditor |
@@ -337,10 +342,10 @@
 | V-22 | P2 | **已修** | `breakpoints.ts` 新增 480/360 断点（8/6/4/3/2 列）；320×640 实测 `scrollWidth=clientWidth=320`，2 列布局无横向溢出；截图 `final-desktop-320x640.png`（竖向仍为"一屏不滚动"，320 宽下部分组件在视口外，属产品最小窗口定义，见 §9.4 P3） | 同上 | design-auditor |
 | V-23 | P2 | **已修** | 宿主页面（桌面/编辑/三页面/Agent 三形态）G2 日志 0 条 Keyborg 报错（`_g2-shots-plain.log`、`_g2-shots-remaining.log` 中 Keyborg 仅出现在 `src/host/agent/demo.html` 演示页，见 §9.4 P3） | 同上 | design-auditor |
 | N-01 | G2 新增 P2 | **已修（G2b）** | countdown 3×2 改为单个「⋯」Menu（`CountdownApp.jsx:424-452`），aria-label=倒数日操作，菜单项「新增倒数日/设置」；实测 header 仅 1 个按钮（`_g2b-scenarios.log`），截图 `g2b-countdown-3x2.png`、`g2b-countdown-3x2-menu.png` | 2026-10-19 03:3x | design-auditor |
-| N-02 | G2 新增 P2 | **已修（G2b）** | pomodoro 1×1 出现进度指示：实测 `role=progressbar` 1 个（`_g2b-scenarios.log`），截图 `g2b-pomodoro-1x1.png`（短休 05:00 + 顶部进度条） | 同上 | design-auditor |
-| N-03 | G2b 新增 P2 | **未修（残留）** | Fluent 内建表单控件默认高度 <40：宿主设置页/插件管理页 Switch 行 36px（`_g2b3-scenarios.log`）、weather 设置浮层 Input 38px（`_g2b2-scenarios.log`）、Agent 设置 Switches 默认（Fluent 自带密度）；建议 DECISIONS 记录「Fluent 内建控件按官方默认密度」例外，或统一 `size="large"` | 同上 | design-auditor |
-| N-04 | G2b 新增 P2 | **未修（残留）** | 插件空/错误态 CTA 24px：weather NoKey「去设置填 Key」「使用演示数据」（实测 88×24 / 90×24，`g2b2-weather-nokey.png`）、ErrorState「重试」同 small；todo 3×3 添加按钮实测 38px（`_g2b2` walker）、todo Tag 删除按钮约 20px（Fluent Tag 内部，P3 例外）。建议空/错误态主 CTA 改 `size="large"` | 同上 | design-auditor |
-| N-05 | G2b 新增 P2 | **未修（发布前必须处理）** | 插件构建产物与 src 不同步：`2b79fb9` 仅重建 countdown/weather 的 `app.js`，todo/pomodoro 的 src 改动未重建；实测 todo `?view=settings` 仍显示旧文案「按 Fluent type ramp 切档」（`g2b2-overlay-todo-settings-1440x960.png`；`todo/app/app.js` grep 命中「Fluent type ramp」）。发布前必须 `node scripts/build-plugin.mjs --all` 并核对产物与 src 一致（建议纳入 RELEASE 检查清单） | 同上 | design-auditor |
+| N-02 | G2 新增 P2 | **已修（G2c 提交确认）** | pomodoro 1×1 进度指示：`role=progressbar` 1 个；`85c3962` 提交 `PomodoroApp.jsx` progressBar + 重建产物（787KB）；截图 `g2c-pomodoro-1x1.png`（专注 12:57 + 顶部进度条） | 2026-10-19 03:4x | design-auditor |
+| N-03 | G2b 新增 P2 | **已修（G2c 关闭）** | `src/styles.css` + 六插件 `base.css`/`weather.css` 追加 `.fui-Input/Switch/Checkbox/Radio/Slider/Dropdown { min-height:40px }`；G2c 实测：设置页 Switch **40**/Tab 40、插件页 6 Switch 全 **40**、below40=0；weather 设置浮层 13 个控件根元素全 **40**、below40=0；Agent 设置对话框 14 个控件全 **40**、below40=0（`_g2c-scenarios.log`、`_g2c2-scenarios.log`）。Fluent 内部 input/trigger 38/20px 属内部几何（根命中区 40），记 P3 | 2026-10-19 03:4x | design-auditor |
+| N-04 | G2b 新增 P2 | **已修（G2c 关闭）** | `85c3962`：weather NoKey/ErrorState CTA 与 todo 空态 CTA 改 `size="large"`；G2c 实测 weather NoKey「去设置填 Key」129×**40**、「使用演示数据」130×**40**；todo 空态「新建任务」98×**40**；below40=0（`g2c-weather-nokey.png`、`g2c-todo-empty-2x2.png`）。todo Tag 删除按钮约 20px 属 Fluent Tag Pattern 内部，记 P3 | 2026-10-19 03:4x | design-auditor |
+| N-05 | G2b 新增 P2 | **已修（G2c 关闭）** | `85c3962`：`node scripts/build-plugin.mjs --all` 重建六插件产物（`app.js` 均 03:23 更新）；`todo/app.js` 旧文案「按 Fluent type ramp 切档」0 命中、新文案命中；`pomodoro/app.js` 旧「通过宿主 setKeepAwake 实现」0 命中、新文案命中；运行时 `?view=settings` 新文案已确认（`g2c-todo-overlay-settings-1440x960.png`、`g2c-pomodoro-overlay-settings-1440x960.png`）；`RELEASE.md` §1 已加产物重建核对项 | 2026-10-19 03:4x | design-auditor |
 
 ---
 
@@ -518,6 +523,68 @@ G2b 复验开始时（02:58）lead 声称工作区 clean（`2b79fb9`）；复验
   3. 发布后 `git status` 干净。
   N-03/N-04/V-17 1 处文案不阻断发布，可在下一迭代处理，或由需求方在 `DECISIONS.md` 记录「Fluent 内建控件按官方默认密度」等例外。
 
+### 9.9 G2c 最终确认（`85c3962`，2026-10-19 03:3x–03:5x）
+
+**对象**：`85c3962`（2026-10-19 03:30:44；工作区仅 1 个未跟踪文件 `docs/RELEASE-REPORT.md`，为 Lead 的发布报告，非本次审计写入）。G2b §9.8.5 记录的 3 项未提交变更（pomodoro progressBar、其产物、tauri minWidth/minHeight）均已包含在本提交中。
+
+**复验方式**：CDP 场景 `_g2c-scenarios.log`（12 个）+ `_g2c2-scenarios.log`（3 个定向复测）；静态复扫 `_g2c-scan-*.txt`；截图 `shots/audit/g2c-*.png`。
+
+#### 9.9.1 收口验证
+
+| 项 | 状态 | 实测/证据 |
+|---|---|---|
+| N-02 番茄 1×1 进度 | **已修（关闭）** | `PomodoroApp.jsx` 1×1 分支 `{progressBar}` + 产物重建；实测 `role=progressbar`=1；截图 `g2c-pomodoro-1x1.png` |
+| N-03 Fluent 控件触控 | **已修（关闭）** | 宿主与六插件 CSS 追加 `.fui-Input/Switch/Checkbox/Radio/Slider/Dropdown{min-height:40px}`；实测：设置页 Switch **40**、Tab 40、below40=0；插件页 6 个 Switch 全 **40**、below40=0；weather 设置浮层 13 个控件根元素全 **40**、below40=0；Agent 设置对话框 14 个控件全 **40**、below40=0。内部 `.fui-Input__input` 38 / `.fui-Dropdown__button` 38 / `.fui-Slider__input` 20 为 Fluent 内部几何（根命中区 40），记 P3 |
+| N-04 空/错误态 CTA | **已修（关闭）** | weather NoKey「去设置填 Key」129×**40**、「使用演示数据」130×**40**（`g2c-weather-nokey.png`）；todo 空态「新建任务」98×**40**（`g2c-todo-empty-2x2.png`）；below40=0 |
+| N-05 产物同步 | **已修（关闭）** | 六插件 `app.js` 均于 03:23 重建；`todo/app.js` 旧文案「按 Fluent type ramp 切档」0 命中、新文案命中；`pomodoro/app.js` 旧「通过宿主 setKeepAwake 实现」0 命中、新文案命中；运行时 todo/pomodoro `?view=settings` 均显示新文案（`g2c-todo-overlay-settings-1440x960.png`、`g2c-pomodoro-overlay-settings-1440x960.png`）；`RELEASE.md` §1 已加「插件产物必须重建核对」检查项 |
+| V-17 工程文案 | **已修（关闭）** | 最后 1 处 `setKeepAwake` →「专注期间不锁屏，结束后自动恢复」；源码复扫 0 处工程术语；运行时文案已确认 |
+
+#### 9.9.2 回归与视觉检查
+
+- 宿主桌面 `g2c-desktop-1440x960.png`：6 卡片、0 alert、卡片圆角 12px、无 console 报错；dock 40px。
+- 设置页 `g2c-settings-1440x960.png`：Switch 行因触控规则略增高（40），布局无破版；纵向 Tab 40。
+- 插件管理页 `g2c-plugins-1440x960.png`：6 个 Switch 全 40，表格布局正常。
+- weather 设置浮层 `g2c-weather-overlay-settings-1440x960.png`：Input/Switch/Radio 根元素 40，内容可滚动，无裁切破版。
+- Agent 设置对话框 `g2c-agent-settings-1440x960.png`：14 个控件根元素 40，对话框 720×814 在视口内，布局正常。
+- weather 3×2 `g2c-weather-3x2.png`：字号仅 12/14/16px（ramp），无溢出；todo 空态 `g2c-todo-empty-2x2.png` CTA 40。
+- G2c 全部场景无 console error/warning 输出。
+
+#### 9.9.3 复扫统计（G2c）
+
+| 项 | G2b | G2c | 说明 |
+|---|---|---|---|
+| 非 token 字号 / gap / padding / margin | 5 / 5 / 7 / 12 | **5 / 5 / 7 / 12** | 全部为配置值、`0`/`auto` 或内容图形常量，无样式违规 |
+| 非 token 圆角 / 阴影 | 3 / 0 | **3 / 0** | 圆角 3 处均为 `CARD_RADIUS = var(--wtsl-card-radius)`（项目 token） |
+| 手写 hex | 7 | **7** | 4 天气对比度算法常量 + 2 项目 token 声明 + 1 演示页；组件样式 0 |
+| 自定义动效时长/曲线 | 0 | **0** | 全部 `motionTokens` |
+| clamp 字号/间距（插件样式） | 0 | **0** | 仅内容图形尺寸保留 clamp（图标/AQI 环等，FLUENT2 §14 item5 例外） |
+
+扫描文件：`docs/audit/_g2c-scan-*.txt`。
+
+#### 9.9.4 P3 备注清单（14，不阻断发布）
+
+1. V-14 桌面 dock 保留常驻（D-03 产品决策，按钮 40px 达标）。
+2. `Composer.tsx:32` 输入区顶部 1px 分隔线（结构边界，非内容分组）。
+3. `weather/src/utils.js:29-50` 4 处 hex 为对比度算法常量（非样式 token）。
+4. 插件独立页无宿主 `host:init` 时主题回退为浅色（产品内始终由宿主注入主题）。
+5. Fluent 内部元素尺寸：`fui-Input__input` 38、`fui-Dropdown__button` 38、`fui-Slider__input` 20（外层命中区 40）。
+6. todo Tag 删除按钮约 20px（Fluent Tag Pattern 内部 dismiss）。
+7. 天气分钟级降水图表 `panels.jsx:98 gap:'2px'`（值在 spacing ramp，内容图形）。
+8. 弹层 Dialog 沿用 Fluent 默认 8px 圆角（D-01 已记录例外）。
+9. Keyborg disposal 告警仅出现在 `src/host/agent/demo.html` 演示页（产品页面 0 条）。
+10. G2b 期间出现 1 次瞬态 `Minified React error #520`（插件页），后续多轮未复现。
+11. 320px 窄屏下桌面按"一屏不滚动"仅显示部分组件（`tauri.conf.json` 已设 minWidth 960/minHeight 640，窗口层已限制）。
+12. sedentary 3×2 统计项与 DENSITY §4 组件措辞存在冲突，但符合 §2 预算表与组件文档（建议后续修订措辞）。
+13. pomodoro 3×2 视觉重心略偏下（progress 条 + 大时间），不影响层级。
+14. 时钟秒角标位置（`p-clock-2x1`）为风格偏好。
+
+#### 9.9.5 最终判定与发布建议
+
+- **P0 = 0 / P1 = 0 / P2 = 0 / P3 = 14**。
+- **结论：可发布（设计维度）。** 无设计阻断项；G2b 的 4 项 P2 全部关闭；G2c 未引入新违规。
+- 发布前剩余事项（非本审计职责，属 `RELEASE.md` 流程）：`npm run typecheck` / `npm run build`（Lead 已报 exit 0）、Tauri 真窗口冒烟（六插件加载/Agent/通知/编辑模式）、提交未跟踪的 `docs/RELEASE-REPORT.md`、最终 `git status` 干净后打 tag/push。
+- 发布说明建议见 §0 末尾（触控增强规则、最小窗口 960×640、天气图标例外、CSS 近似材质、dock 常驻决策）。
+
 ---
 
 ## 附录 A：截图索引（`shots/audit/`）
@@ -567,6 +634,12 @@ G2b 复验开始时（02:58）lead 声称工作区 clean（`2b79fb9`）；复验
 - 插件：`g2b-countdown-3x2.png`、`g2b-countdown-3x2-menu.png`（N-01 证据）、`g2b-weather-3x2.png`、`g2b-weather-4x2.png`、`g2b-pomodoro-1x1.png`（N-02 证据）、`g2b2-weather-nokey.png`（N-04 证据）
 - 浮层/文案：`g2b-overlay-weather-settings-1440x960.png`、`g2b-overlay-pomodoro-settings-1440x960.png`、`g2b-overlay-todo-settings-1440x960.png`、`g2b2-overlay-pomodoro-settings-1440x960.png`、`g2b2-overlay-todo-settings-1440x960.png`（N-05 证据：todo 旧文案）
 
+**G2c 截图（`g2c-*.png`，2026-10-19 03:4x；`85c3962` 最终状态）**
+
+- 宿主：`g2c-desktop-1440x960.png`、`g2c-settings-1440x960.png`、`g2c-plugins-1440x960.png`
+- Agent：`g2c-agent-settings-1440x960.png`（14 控件 40px）
+- 插件/浮层：`g2c-weather-overlay-settings-1440x960.png`（13 控件 40px）、`g2c-weather-nokey.png`（CTA 40px）、`g2c-todo-empty-2x2.png`（CTA 40px）、`g2c-todo-overlay-settings-1440x960.png`（新文案）、`g2c-pomodoro-overlay-settings-1440x960.png`（新文案）、`g2c-pomodoro-1x1.png`（progressbar）、`g2c-weather-3x2.png`
+
 ## 附录 D：G2 证据文件
 
 | 文件 | 内容 |
@@ -578,3 +651,7 @@ G2b 复验开始时（02:58）lead 声称工作区 clean（`2b79fb9`）；复验
 | `docs/audit/_g2-overlays.log`、`_g2-overlay-todo-retry.log` | 插件全窗口浮层截图日志（Dialog 尺寸/关闭按钮 40×40） |
 | `docs/audit/_g2b-scan-*.txt` | **G2b 复扫**（hex/字号/圆角/阴影/gap/padding/margin） |
 | `docs/audit/_g2b-scenarios.log`、`_g2b2-scenarios.log`、`_g2b3-scenarios.log` | **G2b DOM 实测/截图日志**（V-06 高度、N-01/N-02 验证、N-03/N-04 高度、N-05 产物核对） |
+| `docs/audit/_g2c-scan-*.txt` | **G2c 复扫**（与 G2b 一致） |
+| `docs/audit/_g2c-scenarios.log`、`_g2c2-scenarios.log` | **G2c DOM 实测/截图日志**（控件根元素 40、CTA 40、产物文案核对、progressbar） |
+
+> 说明：`_g2b*-scenarios.log` / `_g2c*-scenarios.log` 命中仓库 `.gitignore` 的 `*.log` 规则，仅本地留存；其关键数值已定量写入 §9.8/§9.9，扫描结果（`_g2b-scan-*`、`_g2c-scan-*`）与截图目录另行保存。复现命令与场景 JSON 脚本位于本机 `%TEMP%\wtsl-g2.mjs`、`g2b*-scenarios.json`、`g2c*-scenarios.json`（临时文件，如需归档可在发布前复制进 `docs/audit/`）。
