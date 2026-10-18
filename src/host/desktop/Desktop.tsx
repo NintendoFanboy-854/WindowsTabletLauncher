@@ -42,7 +42,6 @@ import { BackgroundFrames } from './BackgroundFrames';
 import { EditToolbar } from './EditToolbar';
 import { PageIndicator } from './PageIndicator';
 import { WidgetCard } from './WidgetCard';
-import { WidgetSettingsDialog } from './WidgetSettingsDialog';
 import { useViewportMetrics } from './useViewportMetrics';
 import {
   DRAG_START_DISTANCE,
@@ -256,7 +255,6 @@ export default function Desktop({
   const [layout, setLayout] = useState<LayoutState | null>(null);
   const [editMode, setEditMode] = useState(readInitialEditMode);
   const [focusedUid, setFocusedUid] = useState<string | null>(null);
-  const [settingsWidget, setSettingsWidget] = useState<WidgetInstance | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<number | null>(null);
   const [dragView, setDragView] = useState<DragView | null>(null);
 
@@ -426,7 +424,6 @@ export default function Desktop({
 
   const exitEditMode = useCallback(() => {
     setEditMode(false);
-    setSettingsWidget(null);
     setDragView(null);
   }, []);
 
@@ -455,7 +452,6 @@ export default function Desktop({
   const deleteWidget = useCallback(
     (widget: WidgetInstance) => {
       setLayout((previous) => (previous ? removeWidgetFromLayout(previous, widget.uid) : previous));
-      setSettingsWidget((current) => (current?.uid === widget.uid ? null : current));
       notify(`已删除「${widget.title}」`);
     },
     [notify],
@@ -481,16 +477,18 @@ export default function Desktop({
     [notify],
   );
 
-  const openSettings = useCallback((widget: WidgetInstance) => {
+  /**
+   * 编辑模式的「设置」/ Enter：不弹宿主占位 Dialog，直接把 host:open-settings 转发给插件，
+   * 由插件打开它自己的设置面板（clock 抽屉 / pomodoro 对话框等）。
+   */
+  const openPluginSettings = useCallback((widget: WidgetInstance) => {
     setFocusedUid(widget.uid);
-    setSettingsWidget(widget);
+    const handle = frameHandlesRef.current.get(widget.uid);
+    if (!handle) return;
+    handle.openSettings();
+    // 焦点交给插件，让设置面板里的键盘操作（含插件自己的 Esc 关闭）生效
+    handle.focusPlugin();
   }, []);
-
-  const closeSettings = useCallback(() => {
-    const widget = settingsWidget;
-    setSettingsWidget(null);
-    if (widget) focusCardNode(widget.uid);
-  }, [settingsWidget, focusCardNode]);
 
   // ---------- 焦点移动 ----------
 
@@ -729,7 +727,6 @@ export default function Desktop({
     ) {
       return;
     }
-    if (settingsWidget) return;
     const session: SwipeSession = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -798,7 +795,7 @@ export default function Desktop({
 
   // 触控板双指 / 鼠标滚轮翻页：累计一个单元格的滚动距离算一次翻页
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    if (editModeRef.current || settingsWidget) return;
+    if (editModeRef.current) return;
     const target = event.target;
     if (
       target instanceof Element &&
@@ -823,7 +820,6 @@ export default function Desktop({
   // ---------- 键盘：Tab/方向键 roving focus，Enter 进组件/设置，Delete 删除，Esc 退出 ----------
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (settingsWidget) return;
     const state = layoutRef.current;
     if (!state) return;
     const ordered = [...state.widgets].sort(compareReadingOrder);
@@ -853,7 +849,7 @@ export default function Desktop({
       case 'Enter':
         if (!focusedWidget) break;
         event.preventDefault();
-        if (editModeRef.current) openSettings(focusedWidget);
+        if (editModeRef.current) openPluginSettings(focusedWidget);
         else focusWidgetFrame(focusedWidget);
         break;
       case 'Delete':
@@ -956,7 +952,7 @@ export default function Desktop({
                       onTap={handleCardTap}
                       onFocus={handleCardFocus}
                       onDelete={deleteWidget}
-                      onOpenSettings={openSettings}
+                      onOpenSettings={openPluginSettings}
                       onChangeSize={changeWidgetSize}
                       onEditPointerDown={beginEditDrag}
                       registerFrameHandle={registerFrameHandle}
@@ -1038,13 +1034,6 @@ export default function Desktop({
           </div>
         </div>
       )}
-
-      <WidgetSettingsDialog
-        widget={settingsWidget}
-        metrics={metrics}
-        onChangeSize={changeWidgetSize}
-        onClose={closeSettings}
-      />
     </div>
   );
 }

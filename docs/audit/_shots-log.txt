@@ -73,3 +73,19 @@ Motion factories require a single child element to be passed. That element eleme
   console: ERR @fluentui/react-motion: Invalid child element.
 Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
 OK host-plugins-960x1440.png 960x1440 18.3s {"text":473,"scrollH":1440}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-agent-overlay-1440x960.png 1440x960 20.5s {"text":485,"scrollH":960}
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+  console: ERR @fluentui/react-motion: Invalid child element.
+Motion factories require a single child element to be passed. That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef().
+OK host-agent-overlay-1024x768.png 1024x768 24.8s {"text":485,"scrollH":768}
+Warning: Detected unsettled top-level await at file:///C:/Users/HuanChen/AppData/Local/Temp/wtsl-audit-shot3.mjs:100
+        r = await capture(cdp, s);
+            ^
+
+
+

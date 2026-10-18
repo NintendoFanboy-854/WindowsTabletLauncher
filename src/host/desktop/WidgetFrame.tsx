@@ -3,14 +3,20 @@
  * - 内部直接用插件管理器提供的 `PluginWidgetFrame`（协议收发、init/resize/theme 都在那里）；
  * - 把它接到宿主桥接层 `HostBridge`：注册 iframe 句柄（reply / focusPlugin / toolCall），
  *   插件 API 调用走 `bridge.handleApiCall`，`host:init` 的 config 用 `bridge.configSnapshot`；
- * - 对外只暴露桌面层需要的 `focusPlugin()`（宿主按 Enter 进入组件时用）。
+ * - 对外暴露桌面层需要的能力：focusPlugin()（Enter 进组件）、openSettings()（编辑模式「设置」转发）。
  *
  * 旧原型插件的 `wtsl:notify` 也在这里兜住（老插件升级前仍能弹通知）。
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { getHostBridge } from '../bridge';
 import type { HostBridge, PluginFrameHandle } from '../bridge';
-import type { PluginCallMessage, PluginToHostMessage, ThemePayload, WidgetSize } from '../bridge/types';
+import type {
+  HostToPluginMessage,
+  PluginCallMessage,
+  PluginToHostMessage,
+  ThemePayload,
+  WidgetSize,
+} from '../bridge/types';
 import { PluginWidgetFrame } from '../plugins';
 import type { PluginWidgetFrameHandle } from '../plugins';
 import { useStyles } from './desktop.styles';
@@ -18,6 +24,8 @@ import { useStyles } from './desktop.styles';
 export interface WidgetFrameHandle {
   /** 把键盘焦点交给插件（含 iframe 的 DOM 焦点） */
   focusPlugin(): void;
+  /** 让插件打开自己的设置面板（编辑模式「设置」按钮 / Enter 转发 host:open-settings） */
+  openSettings(): void;
 }
 
 interface WidgetFrameProps {
@@ -99,6 +107,11 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
         if (!frame) return;
         frame.contentWindow?.focus();
         frame.focusPlugin();
+      },
+      openSettings() {
+        // 插件协议里没有 host:open-settings 类型（types.ts 不扩），插件侧按原始 message 监听
+        const message = { type: 'host:open-settings' } as unknown as HostToPluginMessage;
+        frameRef.current?.send(message);
       },
     }),
     [],
