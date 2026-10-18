@@ -15,8 +15,8 @@ public\plugins\countdown\styles.css:931  0
 public\plugins\countdown\styles.css:951  var(--spacingVerticalXS)
 public\plugins\countdown\styles.css:974  0
 public\plugins\pomodoro\styles.css:115  0
-public\plugins\pomodoro\styles.css:384  -6px
-public\plugins\pomodoro\styles.css:611  var(--spacingVerticalXS)
+public\plugins\pomodoro\styles.css:393  -6px
+public\plugins\pomodoro\styles.css:610  var(--spacingVerticalXS)
 public\plugins\pomodoro\styles.css:832  var(--spacingVerticalS)
 public\plugins\pomodoro\styles.css:836  0
 public\plugins\pomodoro\styles.css:920  var(--spacingVerticalXS) 0

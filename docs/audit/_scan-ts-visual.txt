@@ -1,0 +1,8 @@
+src\host\desktop\desktop.styles.ts:45  transitionDuration: '0ms'
+src\host\desktop\desktop.styles.ts:60  gap: '0'
+src\host\desktop\desktop.styles.ts:235  borderRadius: CARD_RADIUS
+src\host\desktop\desktop.styles.ts:252  borderRadius: CARD_RADIUS
+src\host\desktop\WidgetCard.tsx:116  gap: 0
+src\host\desktop\WidgetCard.tsx:117  borderRadius: CARD_RADIUS
+src\host\layout\types.ts:34  gap: number;
+src\host\pages\review\Heatmap.tsx:33  gap: CELL_GAP

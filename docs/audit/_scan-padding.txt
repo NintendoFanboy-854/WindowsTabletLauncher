@@ -22,13 +22,13 @@ public\plugins\countdown\styles.css:905  0
 public\plugins\countdown\styles.css:960  var(--spacingVerticalS) var(--spacingHorizontalM)
 public\plugins\pomodoro\styles.css:163  clamp(8px, 3vmin, 18px)
 public\plugins\pomodoro\styles.css:279  0.16em 0.6em
-public\plugins\pomodoro\styles.css:314  0 var(--spacingHorizontalL)
-public\plugins\pomodoro\styles.css:404  clamp(4px, 2.4vmin, 10px)
-public\plugins\pomodoro\styles.css:543  0
-public\plugins\pomodoro\styles.css:586  var(--spacingVerticalXS)
-public\plugins\pomodoro\styles.css:610  0 var(--spacingHorizontalS)
-public\plugins\pomodoro\styles.css:645  0 var(--spacingHorizontalXS)
-public\plugins\pomodoro\styles.css:677  clamp(10px, 4vmin, 24px)
+public\plugins\pomodoro\styles.css:323  0 var(--spacingHorizontalL)
+public\plugins\pomodoro\styles.css:413  clamp(4px, 2.4vmin, 10px)
+public\plugins\pomodoro\styles.css:542  0
+public\plugins\pomodoro\styles.css:585  var(--spacingVerticalXS)
+public\plugins\pomodoro\styles.css:609  0 var(--spacingHorizontalS)
+public\plugins\pomodoro\styles.css:644  0 var(--spacingHorizontalXS)
+public\plugins\pomodoro\styles.css:676  clamp(10px, 4vmin, 24px)
 public\plugins\pomodoro\styles.css:759  0 var(--spacingHorizontalL)
 public\plugins\pomodoro\styles.css:811  var(--spacingVerticalM) var(--spacingHorizontalL) var(--spacingVerticalL)
 public\plugins\pomodoro\styles.css:869  0 var(--spacingHorizontalM)

@@ -69,7 +69,10 @@ export default function App() {
   }, []);
 
   return (
-    <FluentProvider theme={themeMode === 'light' ? webLightTheme : webDarkTheme} style={{ height: '100%' }}>
+    <FluentProvider
+      theme={themeMode === 'light' ? webLightTheme : webDarkTheme}
+      style={{ height: '100%', ['--wtsl-card-radius' as string]: '12px' }}
+    >
       {seeded && (
         <NotificationsProvider bridge={bridge}>
           <HostShell bridge={bridge} themeMode={themeMode} onThemeModeChange={changeTheme} />
@@ -161,3 +164,5 @@ function DesktopDock({ navigate, onOpenAgent }: DesktopDockProps) {
     </div>
   );
 }
+
+

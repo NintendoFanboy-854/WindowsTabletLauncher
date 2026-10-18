@@ -45,19 +45,19 @@ public\plugins\countdown\styles.css:965  var(--fontSizeBase200)
 public\plugins\countdown\styles.css:975  var(--fontSizeBase300)
 public\plugins\pomodoro\styles.css:250  clamp(9px, 2.8vmin, 13px)
 public\plugins\pomodoro\styles.css:283  clamp(10px, 3vmin, 13px)
-public\plugins\pomodoro\styles.css:320  var(--fontSizeBase300)
-public\plugins\pomodoro\styles.css:356  clamp(12px, 3.2vmin, 16px)
-public\plugins\pomodoro\styles.css:415  min(15vw, 15vh)
-public\plugins\pomodoro\styles.css:419  clamp(8px, 4vw, 10px)
-public\plugins\pomodoro\styles.css:444  min(20vw, 42vh)
-public\plugins\pomodoro\styles.css:448  clamp(10px, 3vmin, 13px)
-public\plugins\pomodoro\styles.css:469  min(9vw, 9vh)
-public\plugins\pomodoro\styles.css:478  clamp(12px, 2.8vw, 15px)
-public\plugins\pomodoro\styles.css:511  min(6vw, 11vh)
-public\plugins\pomodoro\styles.css:522  clamp(13px, 3vmin, 17px)
-public\plugins\pomodoro\styles.css:617  var(--fontSizeBase300)
-public\plugins\pomodoro\styles.css:651  var(--fontSizeBase200)
-public\plugins\pomodoro\styles.css:660  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:329  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:365  clamp(12px, 3.2vmin, 16px)
+public\plugins\pomodoro\styles.css:424  min(15vw, 15vh)
+public\plugins\pomodoro\styles.css:428  clamp(8px, 4vw, 10px)
+public\plugins\pomodoro\styles.css:452  min(20vw, 42vh)
+public\plugins\pomodoro\styles.css:456  clamp(10px, 3vmin, 13px)
+public\plugins\pomodoro\styles.css:476  min(9vw, 9vh)
+public\plugins\pomodoro\styles.css:490  clamp(12px, 2.8vw, 15px)
+public\plugins\pomodoro\styles.css:512  min(6vw, 11vh)
+public\plugins\pomodoro\styles.css:527  clamp(13px, 3vmin, 17px)
+public\plugins\pomodoro\styles.css:616  var(--fontSizeBase300)
+public\plugins\pomodoro\styles.css:650  var(--fontSizeBase200)
+public\plugins\pomodoro\styles.css:659  var(--fontSizeBase300)
 public\plugins\pomodoro\styles.css:716  clamp(12px, 3.4vmin, 18px)
 public\plugins\pomodoro\styles.css:727  min(19vw, 34vh)
 public\plugins\pomodoro\styles.css:736  clamp(12px, 3.6vmin, 18px)
@@ -121,30 +121,33 @@ public\plugins\todo\app.css:1007  0.72rem
 public\plugins\todo\app.css:1017  0.72rem
 public\plugins\todo\app.css:1084  0.7rem
 public\plugins\todo\app.css:1106  0.78rem
-public\plugins\todo\app.css:1172  0.78rem
-public\plugins\todo\app.css:1189  0.72rem
-public\plugins\todo\app.css:1251  0.9em
-public\plugins\todo\app.css:1270  0.78rem
-public\plugins\todo\app.css:1303  0.92rem
-public\plugins\todo\app.css:1323  0.68rem
-public\plugins\todo\app.css:1365  0.82rem
-public\plugins\todo\app.css:1460  0.68rem
-public\plugins\todo\app.css:1465  0.92rem
-public\plugins\todo\app.css:1492  0.68rem
-public\plugins\todo\app.css:1569  0.76rem
-public\plugins\todo\app.css:1602  0.64rem
-public\plugins\todo\app.css:1629  0.64rem
-public\plugins\todo\app.css:1673  0.84rem
-public\plugins\todo\app.css:1726  0.82em
-public\plugins\todo\app.css:1839  1.05rem
-public\plugins\todo\app.css:1846  0.75rem
-public\plugins\todo\app.css:1872  0.9rem
-public\plugins\todo\app.css:1897  0.76rem
-public\plugins\todo\app.css:1903  0.7rem
-public\plugins\todo\app.css:1975  0.8rem
-public\plugins\todo\app.css:1999  0.85rem
-public\plugins\todo\app.css:2043  0.78rem
-public\plugins\todo\app.css:2057  0.84rem
-public\plugins\todo\app.css:2092  0.88rem
-public\plugins\todo\app.css:2132  0.74rem
-public\plugins\todo\app.css:2153  0.8rem
+public\plugins\todo\app.css:1171  0.78rem
+public\plugins\todo\app.css:1188  0.72rem
+public\plugins\todo\app.css:1250  0.9em
+public\plugins\todo\app.css:1269  0.78rem
+public\plugins\todo\app.css:1302  0.92rem
+public\plugins\todo\app.css:1322  0.68rem
+public\plugins\todo\app.css:1364  0.82rem
+public\plugins\todo\app.css:1459  0.68rem
+public\plugins\todo\app.css:1464  0.92rem
+public\plugins\todo\app.css:1491  0.68rem
+public\plugins\todo\app.css:1568  0.76rem
+public\plugins\todo\app.css:1601  0.64rem
+public\plugins\todo\app.css:1628  0.64rem
+public\plugins\todo\app.css:1672  0.84rem
+public\plugins\todo\app.css:1725  0.82em
+public\plugins\todo\app.css:1838  1.05rem
+public\plugins\todo\app.css:1845  0.75rem
+public\plugins\todo\app.css:1871  0.9rem
+public\plugins\todo\app.css:1896  0.76rem
+public\plugins\todo\app.css:1902  0.7rem
+public\plugins\todo\app.css:1974  0.8rem
+public\plugins\todo\app.css:1998  0.85rem
+public\plugins\todo\app.css:2042  0.78rem
+public\plugins\todo\app.css:2056  0.84rem
+public\plugins\todo\app.css:2091  0.88rem
+public\plugins\todo\app.css:2131  0.74rem
+public\plugins\todo\app.css:2152  0.8rem
+src\styles.css:57  12px
+src\styles.css:87  14px
+src\styles.css:101  12px

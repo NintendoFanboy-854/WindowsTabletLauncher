@@ -21,6 +21,8 @@
 | `3×3` | 1 个主区域 | 列表/图表 | 1 个入口（菜单/详情） | ≤1 |
 | `4×2` | 1 个主区域 | 分栏辅助 | 1 个入口 | ≤1 |
 
+> **内容列表例外**：组件声明的内容列表（todo 任务行、weather 逐时/7 天、日历格）按「行」计为 1 个 Secondary 区块，不逐项累加；行数上限见 D-04：todo 2×2≤4、3×2≤6、3×3≤10；weather 2×2 逐时≤6。
+
 **层级表达手段（只用 Fluent token）**
 
 - 字号：Primary 用 `fontSizeBase500/600`（或组件自定的 Display 级），Secondary 用 `fontSizeBase300`，Tertiary 用 `fontSizeBase200`；不靠加粗堆层级。

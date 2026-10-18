@@ -73,7 +73,9 @@
 
 **本项目落地**：
 
-- 卡片：**X-Large 12px**（当前 CSS 写了 20px，超规格，随密度返工改）。
+> **token 值映射注意**：Fluent 2 设计规范的圆角表（Medium 4 / Large 8 / X-Large 12）与 Fluent UI React v9 的 `borderRadius*` token 实际值不完全一致（v9：Medium 4 / Large 6 / X-Large 8）。本项目以设计规范为准，在项目层定义 `--wtsl-card-radius: 12px` 供卡片使用；组件内的小元素直接用 v9 token。
+
+- 卡片：**12px**（项目 token `--wtsl-card-radius`，不允许 calc 自造或混用 6/8/16）。
 - 按钮/输入框：Medium 4px；小徽章：Small 2px；圆形状态点：Circle。
 - 不允许出现规范之外的圆角数值。
 

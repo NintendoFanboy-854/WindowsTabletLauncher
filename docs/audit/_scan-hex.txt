@@ -146,4 +146,6 @@ public\plugins\todo\app.css:50  #0e0f13  | #0e0f13;
 public\plugins\todo\index.html:29  #d13438  | 'margin:12px;padding:10px 12px;border-radius:4px;border:1px solid var(--colorPaletteRedBorder2,#d13438);' +
 public\plugins\todo\index.html:30  #3f1011  | 'background:var(--colorPaletteRedBackground1,#3f1011);color:var(--colorNeutralForeground1,#fff);font:12px/1.5 var(--fontFamilyBase,sans-serif);' +
 public\plugins\todo\index.html:30  #fff  | 'background:var(--colorPaletteRedBackground1,#3f1011);color:var(--colorNeutralForeground1,#fff);font:12px/1.5 var(--fontFamilyBase,sans-serif);' +
-src\host\agent\demo\main.tsx:190  #0e0f13  | 'radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%), radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%), #0e0f13',
+src\host\agent\demo\main.tsx:185  #0e0f13  | 'radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%), radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%), #0e0f13',
+src\styles.css:17  #0e0f13  | #0e0f13;
+src\styles.css:18  #f3f3f3  | color: #f3f3f3;
