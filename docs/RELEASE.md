@@ -8,6 +8,7 @@
 - [ ] `npm run build` 通过（tsc + vite）
 - [ ] `src-tauri` 目录 `cargo check` 通过
 - [ ] `npx tauri build --debug --no-bundle` 通过（真窗口可运行）
+- [ ] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建并通过 `git status` 确认 `app/app.js` 已提交（N-05）
 
 ## 2. 运行时冒烟（Tauri 真窗口）
 

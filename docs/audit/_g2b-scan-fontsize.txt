@@ -1,0 +1,5 @@
+public\plugins\todo\src\config.js:11  fontSize: 'default'
+public\plugins\todo\src\config.js:34  fontSize: source.fontSize === 'large' ? 'large' : 'default'
+public\plugins\todo\src\settings.jsx:185  fontSize: data.value
+public\plugins\todo\src\todoData.js:59  fontSize: config.fontSize
+public\plugins\weather\src\components\atoms.jsx:82  fontSize: size

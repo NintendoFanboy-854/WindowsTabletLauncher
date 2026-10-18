@@ -231,7 +231,7 @@ function NoKeyState({ compact, onOpenSettings, onUseMock }) {
       <span className={styles.stateButtons}>
         <Button
           appearance="primary"
-          size="small"
+          size="large"
           onClick={(event) => {
             event.stopPropagation();
             onOpenSettings();
@@ -241,7 +241,7 @@ function NoKeyState({ compact, onOpenSettings, onUseMock }) {
         </Button>
         <Button
           appearance="secondary"
-          size="small"
+          size="large"
           onClick={(event) => {
             event.stopPropagation();
             onUseMock();
@@ -262,7 +262,7 @@ function ErrorState({ error, onRetry }) {
       <span className={styles.stateText}>{error || '请检查网络、API Key 与 API Host。'}</span>
       <Button
         appearance="primary"
-        size="small"
+        size="large"
         icon={<ArrowClockwise20Regular />}
         onClick={(event) => {
           event.stopPropagation();

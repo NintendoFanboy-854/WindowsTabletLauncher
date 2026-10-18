@@ -28488,6 +28488,7 @@ function Kw({ title: e, actionLabel: t, onAction: n, size: r = 400 }) {
 			}),
 			t && n ? /* @__PURE__ */ (0, F.jsx)(X, {
 				appearance: "primary",
+				size: "large",
 				className: i.emptyAction,
 				onClick: n,
 				children: t
@@ -30086,7 +30087,7 @@ function dT() {
 							}), /* @__PURE__ */ (0, F.jsx)(Z, {
 								size: 200,
 								className: e.subtle,
-								children: "按 Fluent type ramp 切档，不做连续缩放"
+								children: "字号只按档位切换，不连续缩放"
 							})]
 						}), /* @__PURE__ */ (0, F.jsx)($y, {
 							layout: "horizontal",

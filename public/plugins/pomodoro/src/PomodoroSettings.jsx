@@ -171,7 +171,7 @@ export default function PomodoroSettings() {
           <div className={styles.rowText}>
             <Text size={300}>专注时阻止息屏</Text>
             <Text className={styles.subtle} size={200}>
-              通过宿主 setKeepAwake 实现
+              专注期间不锁屏，结束后自动恢复
             </Text>
           </div>
           <Switch

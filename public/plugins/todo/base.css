@@ -19,3 +19,14 @@ body {
   background: transparent;
   color-scheme: normal;
 }
+
+/* 平板触控：Fluent 内建表单控件的命中区统一 >=40（DESIGN 1.2 / AUDIT N-03） */
+.fui-Input,
+.fui-Switch,
+.fui-Checkbox,
+.fui-Radio,
+.fui-Slider,
+.fui-Dropdown {
+  min-height: 40px;
+}
+

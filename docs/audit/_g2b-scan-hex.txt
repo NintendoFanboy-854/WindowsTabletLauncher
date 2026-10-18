@@ -1,0 +1,7 @@
+public\plugins\weather\src\utils.js:29  #ffffff  | if (!color || typeof color !== 'string') return '#ffffff';
+public\plugins\weather\src\utils.js:46  #ffffff  | return '#ffffff';
+public\plugins\weather\src\utils.js:50  #1a1a1a  | return luminance > 0.62 ? '#1a1a1a' : '#ffffff';
+public\plugins\weather\src\utils.js:50  #ffffff  | return luminance > 0.62 ? '#1a1a1a' : '#ffffff';
+src\host\agent\demo\main.tsx:185  #0e0f13  | 'radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%), radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%), #0e0f13',
+src\styles.css:13  #0e0f13  | #0e0f13;
+src\styles.css:14  #f3f3f3  | --wtsl-desktop-foreground: #f3f3f3;

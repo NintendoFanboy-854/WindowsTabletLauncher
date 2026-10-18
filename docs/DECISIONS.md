@@ -45,7 +45,7 @@
 
 | 项 | 处置 |
 |---|---|
-| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 ≥40×40；G2 后宿主页面按钮、编辑工具条、Agent 建议按钮已统一 large，实测 0 项 <40 |
+| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 ≥40×40；G2 后宿主页面按钮、编辑工具条、Agent 建议按钮已统一 large；G2b 后 Fluent 内建表单控件（Switch/Input/Radio/Checkbox/Slider/Dropdown）在宿主与插件 iframe 里统一 `min-height: 40px`（CSS 命中区规则）。按钮类实测 0 项 <40，内建控件命中区 40（Checkbox 内部图形尺寸除外） |
 | V-10 预警组件 | plugin-weather 改 Fluent MessageBar/Badge |
 | V-11 空态死胡同 | countdown / pomodoro / todo 按任务卡补主操作 |
 | V-12 久坐重复值 | plugin-pack 改阈值/激励提示 |

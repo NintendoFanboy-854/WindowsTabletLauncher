@@ -324,7 +324,7 @@ export function EmptyState({ title, actionLabel, onAction, size = 400 }) {
         {title}
       </Text>
       {actionLabel && onAction ? (
-        <Button appearance="primary" className={styles.emptyAction} onClick={onAction}>
+        <Button appearance="primary" size="large" className={styles.emptyAction} onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}

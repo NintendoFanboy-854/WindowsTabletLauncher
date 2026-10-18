@@ -24986,14 +24986,14 @@ function iS({ compact: e, onOpenSettings: t, onUseMock: n }) {
 				className: r.stateButtons,
 				children: [/* @__PURE__ */ (0, P.jsx)(Yh, {
 					appearance: "primary",
-					size: "small",
+					size: "large",
 					onClick: (e) => {
 						e.stopPropagation(), t();
 					},
 					children: "去设置填 Key"
 				}), /* @__PURE__ */ (0, P.jsx)(Yh, {
 					appearance: "secondary",
-					size: "small",
+					size: "large",
 					onClick: (e) => {
 						e.stopPropagation(), n();
 					},
@@ -25018,7 +25018,7 @@ function aS({ error: e, onRetry: t }) {
 			}),
 			/* @__PURE__ */ (0, P.jsx)(Yh, {
 				appearance: "primary",
-				size: "small",
+				size: "large",
 				icon: /* @__PURE__ */ (0, P.jsx)(Vu, {}),
 				onClick: (e) => {
 					e.stopPropagation(), t();

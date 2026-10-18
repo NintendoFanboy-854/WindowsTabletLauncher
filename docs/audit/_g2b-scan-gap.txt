@@ -1,0 +1,5 @@
+public\plugins\weather\src\views\panels.jsx:98  gap: '2px'
+src\host\desktop\desktop.styles.ts:62  gap: '0'
+src\host\desktop\WidgetCard.tsx:130  gap: 0
+src\host\layout\types.ts:34  gap: number;
+src\host\pages\review\Heatmap.tsx:33  gap: CELL_GAP

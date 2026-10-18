@@ -513,6 +513,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
           openSettings();
         }}
       >
+        {progressBar}
         {phaseBadge}
         <Text className={styles.time} size={900} weight="semibold">
           {snapshot.remainingText}

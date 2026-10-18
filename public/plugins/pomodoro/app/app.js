@@ -23267,6 +23267,7 @@ function Ky({ fallbackSizeKey: e }) {
 			e.preventDefault(), m();
 		},
 		children: [
+			x,
 			y,
 			/* @__PURE__ */ (0, P.jsx)(wv, {
 				className: t.time,
@@ -23405,7 +23406,7 @@ function Jy() {
 			/* @__PURE__ */ (0, P.jsx)(wv, {
 				className: e.hint,
 				size: 200,
-				children: "计时、跳过、重置与沉浸模式都在卡片上的 ⋯ 菜单里；统计会写入 Session 记录并汇总到复盘。"
+				children: "计时、跳过、重置与沉浸模式都在卡片上的 ⋯ 菜单里；每次专注都会被记录，并汇总到复盘。"
 			})
 		]
 	});
@@ -23566,7 +23567,7 @@ function Xy() {
 							}), /* @__PURE__ */ (0, P.jsx)(wv, {
 								className: e.subtle,
 								size: 200,
-								children: "WebAudio 合成，不联网"
+								children: "由系统合成，不占用网络"
 							})]
 						}), /* @__PURE__ */ (0, P.jsx)(vv, {
 							checked: t.sound,
@@ -23585,7 +23586,7 @@ function Xy() {
 							}), /* @__PURE__ */ (0, P.jsx)(wv, {
 								className: e.subtle,
 								size: 200,
-								children: "通过宿主 setKeepAwake 实现"
+								children: "专注期间不锁屏，结束后自动恢复"
 							})]
 						}), /* @__PURE__ */ (0, P.jsx)(vv, {
 							checked: t.keepAwake,
