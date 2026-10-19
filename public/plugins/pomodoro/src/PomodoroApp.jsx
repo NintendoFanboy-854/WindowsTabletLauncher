@@ -1,14 +1,18 @@
 /**
- * 番茄钟卡片视图。
+ * 番茄钟卡片视图（UI 重写 v2，docs/UI-REWRITE-SPEC.md §3.3）。
  *
- * 正常模式：大号剩余时间（Primary）+ 阶段 + 当前任务（1 行）+ 主按钮（开始/暂停）；
- * 跳过 / 重置 / 沉浸 / 详情 / 设置在 ⋯ Menu 或详情/设置浮层里（D-02b / DENSITY）。
- * 1×1、2×1 也有可用的主操作：1×1 点击卡片切换，2×1 额外给 40px 主按钮。
+ * 字号层级（数字主信息走 _shared/typography.js 的 displayXl()）：
+ * - 1×1：时间 XL-48 + 阶段 14 品牌色 + 2px 进度
+ * - 2×1：时间 68（Hero1000）+ 阶段 14 + 40px 主按钮
+ * - 2×2：时间 68 + 阶段 14 + 任务 16 S + 今日统计 16 + 40px 按钮
+ * - 3×2：时间 XL-96 + 阶段/任务 16 + 两条今日统计 16 + 轮次 12 + 40px 按钮 + 顶部 4px 进度
+ * - 沉浸层：时间 XL-112 + 阶段/任务 16 + 40px 按钮
+ *
+ * 删除 lineHeight:1；间距按尺寸档（1×1=8，2×1=8/12，2×2=12，3×2=12/16）。
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
-  Badge,
   Button,
   Menu,
   MenuItem,
@@ -40,6 +44,7 @@ import {
   useSettingsRequest,
   useStoredConfig,
 } from '../../_shared/host.js';
+import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
@@ -50,11 +55,14 @@ import {
 } from './data/timer.js';
 
 const LONG_PRESS_MS = 500;
+const XL_48 = displayXl(48);
+const XL_96 = displayXl(96);
+const XL_112 = displayXl(112);
 
 const PHASE_COLOR = {
   focus: tokens.colorBrandForeground1,
   shortBreak: tokens.colorStatusSuccessForeground1,
-  longBreak: tokens.colorStatusInfoForeground1,
+  longBreak: tokens.colorBrandForeground2,
 };
 
 const useStyles = makeStyles({
@@ -66,42 +74,59 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    padding: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground1,
     overflow: 'hidden',
     userSelect: 'none',
   },
-  rootCompact: {
+  root1: {
     alignItems: 'center',
-    padding: tokens.spacingHorizontalS,
-    gap: tokens.spacingVerticalXXS,
+    justifyContent: 'space-evenly',
+    gap: tokens.spacingVerticalXS,
+    padding: tokens.spacingVerticalS,
     cursor: 'pointer',
   },
-  rootRow: {
+  root21: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: tokens.spacingHorizontalM,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
   },
-  rootWide: {
-    padding: tokens.spacingHorizontalL,
+  root22: {
     gap: tokens.spacingVerticalS,
+    padding: tokens.spacingVerticalM,
+  },
+  root32: {
+    gap: tokens.spacingVerticalS,
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+  },
+  /* ---- 数字主信息（D-07 Display XL / Fluent Hero1000） ---- */
+  time48: {
+    ...XL_48,
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  time96: {
+    ...XL_96,
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  time112: {
+    ...XL_112,
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
   },
   time: {
-    fontVariantNumeric: 'tabular-nums',
-    lineHeight: 1,
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
     whiteSpace: 'nowrap',
   },
-  timeRow: {
+  /* ---- 阶段 / 任务 / 统计 ---- */
+  phaseRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
+    gap: tokens.spacingHorizontalXS,
     minWidth: 0,
-  },
-  phase: {
-    display: 'inline-flex',
-    alignItems: 'center',
   },
   task: {
     color: tokens.colorNeutralForeground2,
@@ -109,6 +134,36 @@ const useStyles = makeStyles({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     maxWidth: '100%',
+  },
+  stats: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    color: tokens.colorNeutralForeground2,
+    minWidth: 0,
+  },
+  statsLine: {
+    color: tokens.colorNeutralForeground2,
+    whiteSpace: 'nowrap',
+  },
+  round: {
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+  },
+  /* ---- 布局 ---- */
+  primaryColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  rowMain: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
   },
   actions: {
     display: 'flex',
@@ -118,28 +173,37 @@ const useStyles = makeStyles({
   },
   wide: {
     display: 'grid',
-    gridTemplateColumns: 'auto minmax(0, 1fr)',
-    alignItems: 'center',
+    gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
+    alignItems: 'stretch',
     columnGap: tokens.spacingHorizontalXL,
     rowGap: tokens.spacingVerticalS,
+    minHeight: 0,
+    flex: '1 1 auto',
   },
   wideMain: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
+    justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     minWidth: 0,
   },
   wideSide: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: tokens.spacingVerticalS,
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingVerticalXS,
     minWidth: 0,
   },
-  progress: {
+  progressTop: {
     width: '100%',
+    flex: '0 0 auto',
   },
+  progressBottom: {
+    width: '72%',
+  },
+  /* ---- 沉浸层 ---- */
   immersive: {
     position: 'absolute',
     inset: 0,
@@ -152,10 +216,6 @@ const useStyles = makeStyles({
     padding: tokens.spacingHorizontalL,
     backgroundColor: tokens.colorNeutralBackground1,
     textAlign: 'center',
-  },
-  immersiveTime: {
-    fontVariantNumeric: 'tabular-nums',
-    lineHeight: 1,
   },
   immersiveActions: {
     display: 'flex',
@@ -172,7 +232,7 @@ const useStyles = makeStyles({
 });
 
 function useLongPress(onLongPress) {
-  const ref = useRef({ timer: 0, origin: null });
+  const ref = useRef({ timer: 0, origin: null, suppressClick: false });
   const clear = useCallback(() => {
     window.clearTimeout(ref.current.timer);
     ref.current.timer = 0;
@@ -182,10 +242,14 @@ function useLongPress(onLongPress) {
   const onPointerDown = useCallback(
     (event) => {
       if (event.button !== 0) return;
+      clear();
       ref.current.origin = { x: event.clientX, y: event.clientY };
-      ref.current.timer = window.setTimeout(() => onLongPress(), LONG_PRESS_MS);
+      ref.current.timer = window.setTimeout(() => {
+        ref.current.suppressClick = true;
+        onLongPress();
+      }, LONG_PRESS_MS);
     },
-    [onLongPress],
+    [clear, onLongPress],
   );
   const onPointerMove = useCallback(
     (event) => {
@@ -195,7 +259,19 @@ function useLongPress(onLongPress) {
     },
     [clear],
   );
-  return { onPointerDown, onPointerMove, onPointerUp: clear, onPointerCancel: clear, onPointerLeave: clear };
+  const consumeSuppressedClick = useCallback(() => {
+    if (!ref.current.suppressClick) return false;
+    ref.current.suppressClick = false;
+    return true;
+  }, []);
+  return {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: clear,
+    onPointerCancel: clear,
+    onPointerLeave: clear,
+    consumeSuppressedClick,
+  };
 }
 
 export default function PomodoroApp({ fallbackSizeKey }) {
@@ -299,7 +375,8 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     },
   );
 
-  const toggleLabel = snapshot.running ? '暂停' : snapshot.phase !== 'focus' || snapshot.progress > 0 ? '继续' : '开始';
+  const toggleLabel =
+    snapshot.running ? '暂停' : snapshot.phase !== 'focus' || snapshot.progress > 0 ? '继续' : '开始';
 
   const toggleButton = (withLabel) => (
     <Tooltip content={snapshot.running ? '暂停' : '开始 / 继续'} relationship="label">
@@ -345,14 +422,11 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     </Menu>
   );
 
-  const phaseBadge = (
-    <Badge
-      appearance="tint"
-      size="large"
-      style={{ color: PHASE_COLOR[snapshot.phase] }}
-    >
+  /* 阶段：1×1/2×1/2×2 14，3×2 16；颜色只表达阶段语义 */
+  const phaseText = (size = 300) => (
+    <Text size={size} weight="semibold" style={{ color: PHASE_COLOR[snapshot.phase] }}>
       {snapshot.phaseLabel}
-    </Badge>
+    </Text>
   );
 
   const immersiveLayer = immersive && (
@@ -365,14 +439,10 @@ export default function PomodoroApp({ fallbackSizeKey }) {
         aria-label="退出沉浸模式"
         onClick={() => setImmersive(false)}
       />
-      <Text size={400} style={{ color: PHASE_COLOR[snapshot.phase] }} weight="semibold">
-        {snapshot.phaseLabel}
-      </Text>
-      <Text className={styles.immersiveTime} size={1000} weight="semibold">
-        {snapshot.remainingText}
-      </Text>
+      {phaseText(400)}
+      <Text className={styles.time112}>{snapshot.remainingText}</Text>
       {snapshot.taskTitle && (
-        <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
+        <Text size={400} className={styles.task}>
           {snapshot.taskTitle}
         </Text>
       )}
@@ -396,50 +466,102 @@ export default function PomodoroApp({ fallbackSizeKey }) {
           结束本轮
         </Button>
       </div>
-      <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+      <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
         今日 {snapshot.today.completed} 个 · {snapshot.today.focusMinutes} 分钟
       </Text>
     </div>
   );
 
-  const progressBar = (
-    <ProgressBar
-      className={styles.progress}
-      value={snapshot.progress}
-      max={1}
-      thickness="medium"
-      aria-label="本轮进度"
-    />
-  );
+  const rootPressProps = {
+    onPointerDown: press.onPointerDown,
+    onPointerMove: press.onPointerMove,
+    onPointerUp: press.onPointerUp,
+    onPointerCancel: press.onPointerCancel,
+    onPointerLeave: press.onPointerLeave,
+    onContextMenu: (event) => {
+      event.preventDefault();
+      openSettings();
+    },
+  };
 
-  if (wide) {
+  /* ---- 1×1：时间 48 + 阶段 14 + 2px 进度，居中 ---- */
+  if (compact) {
     return (
       <div
-        className={mergeClasses(styles.root, styles.rootWide)}
-        onPointerDown={press.onPointerDown}
-        onPointerMove={press.onPointerMove}
-        onPointerUp={press.onPointerUp}
-        onPointerCancel={press.onPointerCancel}
-        onPointerLeave={press.onPointerLeave}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          openSettings();
+        className={mergeClasses(styles.root, styles.root1)}
+        role="button"
+        tabIndex={0}
+        aria-label={`${snapshot.phaseLabel} ${snapshot.remainingText}，点击开始或暂停`}
+        onClick={() => {
+          if (press.consumeSuppressedClick()) return;
+          toggle();
         }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggle();
+          }
+        }}
+        {...rootPressProps}
       >
-        {progressBar}
+        <Text className={styles.time48}>{snapshot.remainingText}</Text>
+        {phaseText(300)}
+        <ProgressBar className={styles.progressBottom} value={snapshot.progress} max={1} aria-label="本轮进度" />
+        {immersiveLayer}
+      </div>
+    );
+  }
+
+  /* ---- 2×1：左时间 68 + 阶段 14，右 40px 主按钮 ---- */
+  if (row) {
+    return (
+      <div
+        className={mergeClasses(styles.root, styles.root21)}
+        {...rootPressProps}
+      >
+        <div className={styles.rowMain}>
+          {phaseText(300)}
+          <Text className={styles.time} size={1000} weight="semibold">
+            {snapshot.remainingText}
+          </Text>
+        </div>
+        <div className={styles.actions}>{toggleButton(true)}</div>
+        {immersiveLayer}
+      </div>
+    );
+  }
+
+  /* ---- 3×2：顶部 4px 进度；左时间 96 + 阶段 16；右任务/两条统计/轮次/按钮/菜单 ---- */
+  if (wide) {
+    return (
+      <div className={mergeClasses(styles.root, styles.root32)} {...rootPressProps}>
+        <ProgressBar
+          className={styles.progressTop}
+          value={snapshot.progress}
+          max={1}
+          thickness="large"
+          aria-label="本轮进度"
+        />
         <div className={styles.wide}>
           <div className={styles.wideMain}>
-            <div className={styles.timeRow}>
-              {phaseBadge}
-              <Text className={styles.time} size={1000} weight="semibold">
-                {snapshot.remainingText}
-              </Text>
-            </div>
+            {phaseText(400)}
+            <Text className={styles.time96}>{snapshot.remainingText}</Text>
           </div>
           <div className={styles.wideSide}>
-            <Text className={styles.task} size={300}>
+            <Text size={400} className={styles.task}>
               {snapshot.taskTitle ?? '未关联任务'}
             </Text>
+            <div className={styles.stats}>
+              <Text size={400} className={styles.statsLine}>
+                今日完成 {snapshot.today.completed} 个
+              </Text>
+              <Text size={400} className={styles.statsLine}>
+                专注 {snapshot.today.focusMinutes} 分钟
+              </Text>
+              <Text size={200} className={styles.round}>
+                第 {Math.min(snapshot.roundsBeforeLongBreak, snapshot.focusRound + 1)} / {snapshot.roundsBeforeLongBreak} 轮
+              </Text>
+            </div>
             <div className={styles.actions}>
               {toggleButton(true)}
               {menu}
@@ -451,100 +573,18 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     );
   }
 
-  if (row) {
-    return (
-      <div
-        className={mergeClasses(styles.root, styles.rootRow)}
-        role="button"
-        tabIndex={0}
-        aria-label={`${snapshot.phaseLabel} ${snapshot.remainingText}，点击开始或暂停`}
-        onClick={toggle}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggle();
-          }
-        }}
-        onPointerDown={press.onPointerDown}
-        onPointerMove={press.onPointerMove}
-        onPointerUp={press.onPointerUp}
-        onPointerCancel={press.onPointerCancel}
-        onPointerLeave={press.onPointerLeave}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          openSettings();
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: tokens.spacingVerticalXXS, minWidth: 0 }}>
-          {phaseBadge}
-          <Text className={styles.time} size={1000} weight="semibold">
-            {snapshot.remainingText}
-          </Text>
-        </div>
-        <div className={styles.actions} onClick={(event) => event.stopPropagation()}>
-          {toggleButton(false)}
-        </div>
-        {immersiveLayer}
-      </div>
-    );
-  }
-
-  if (compact) {
-    return (
-      <div
-        className={mergeClasses(styles.root, styles.rootCompact)}
-        role="button"
-        tabIndex={0}
-        aria-label={`${snapshot.phaseLabel} ${snapshot.remainingText}，点击开始或暂停`}
-        onClick={toggle}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggle();
-          }
-        }}
-        onPointerDown={press.onPointerDown}
-        onPointerMove={press.onPointerMove}
-        onPointerUp={press.onPointerUp}
-        onPointerCancel={press.onPointerCancel}
-        onPointerLeave={press.onPointerLeave}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          openSettings();
-        }}
-      >
-        {progressBar}
-        {phaseBadge}
-        <Text className={styles.time} size={900} weight="semibold">
-          {snapshot.remainingText}
-        </Text>
-        {immersiveLayer}
-      </div>
-    );
-  }
-
+  /* ---- 2×2：时间 68 → 阶段 14 → 任务 16 → 今日统计 16 → 按钮 40 ---- */
   return (
-    <div
-      className={styles.root}
-      onPointerDown={press.onPointerDown}
-      onPointerMove={press.onPointerMove}
-      onPointerUp={press.onPointerUp}
-      onPointerCancel={press.onPointerCancel}
-      onPointerLeave={press.onPointerLeave}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        openSettings();
-      }}
-    >
-      {progressBar}
-      <div className={styles.timeRow}>
-        {phaseBadge}
-        <Text className={styles.time} size={1000} weight="semibold">
-          {snapshot.remainingText}
-        </Text>
-      </div>
-      <Text className={styles.task} size={300}>
+    <div className={mergeClasses(styles.root, styles.root22)} {...rootPressProps}>
+      <Text className={styles.time} size={1000} weight="semibold">
+        {snapshot.remainingText}
+      </Text>
+      {phaseText(300)}
+      <Text size={400} className={styles.task}>
         {snapshot.taskTitle ?? '未关联任务'}
+      </Text>
+      <Text size={400} className={styles.statsLine}>
+        今日 {snapshot.today.completed} 个 · 专注 {snapshot.today.focusMinutes} 分钟
       </Text>
       <div className={styles.actions}>{toggleButton(true)}</div>
       {immersiveLayer}

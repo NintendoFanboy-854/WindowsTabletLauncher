@@ -37,7 +37,7 @@
 ## D-04 内容列表与密度预算（V-09）
 
 - **决策**：组件声明的「内容列表」按**行**计为 1 个 Secondary 区块，不逐项累加；但必须遵守行数上限：
-  - todo：`2×2` ≤ 4 行、`3×2` ≤ 6 行、`3×3` ≤ 10 行；超出显示「查看全部」。
+  - todo：`2×2` ≤ 4 行、`3×2` ≤ 5 行、`3×3` ≤ 8 行、`4×2` 每栏 ≤ 5 行；行高 44 + 行距 4，行数按实际可用高度动态取 `min(cap, floor((avail + 4) / 48))`；超出显示「查看全部」或滚动渐隐。3×2 从 6 行改为 5 行是算术约束：328px 卡高 − padding 24 − composer 40 − 组间距 16 = 248px，6 行需要 284px；5 行 236px 可放下（计数由工具条/composer 占位承担，不再单占 28px 头）。3×3 同理，1024×768 下动态 6–7 行、1440 下 7–8 行。
   - weather：`2×2` 逐时 ≤ 6；`3×2/4×2` 的 7 天每行=1 天，不计入 Secondary。
 - 文档修订：`DENSITY.md §2` 已补内容列表例外说明。
 
@@ -64,3 +64,23 @@
 - 插件侧：`public/plugins/_shared/host.js` 的 `useHostTheme()` 在宿主内完全跟随宿主主题；独立打开（开发/截图）时跟随系统 `prefers-color-scheme` 并监听变化。
 - 旧值兼容：`dark` / `light` 照旧生效；未设置时按 `system`。
 - 插件 SDK：`public/plugin-sdk.js` 记忆最近一次 `host:init/theme/resize` 并在监听注册时补发，避免插件挂载晚于主题消息而停在回退主题（实测出现过亮色系统里部分插件仍深色）。
+
+## D-07 Display XL：数字型主信息的项目字阶例外（新增，2026-10-19）
+
+- **背景**：Fluent 2 官方字阶（`references/fluentui-design/typography.md`）与 Fluent UI React v9 token
+  （`node_modules/@fluentui/tokens/lib/global/fonts.js`）的最大角色都是 **Display 68px / 92px**
+  （`fontSizeHero1000`）。本项目平板常驻桌面、当作台面电子设备使用（0.5–2m 观看），
+  墙钟/计时/温度等**纯数字主信息**在 1–1.5m 外需要更大的字，官方 ramp 不提供。
+- **决策（用户拍板，选项 B）**：定义项目级 `Display XL` 字阶，**只允许用于数字型主信息**：
+
+  | 档位 | 字号 | 行高 | 典型用途 |
+  |---|---|---|---|
+  | XL-48 | 48px | 56px | 1×1 / 2×1 单值卡主数字（时钟、计时、久坐、计数、天数） |
+  | XL-80 | 80px | 88px | 2×2 单值卡主数字（如久坐分钟数） |
+  | XL-96 | 96px | 104px | 3×2 数字主信息（久坐分钟、番茄计时） |
+  | XL-112 | 112px | 124px | 3×2 墙钟级 hero（时钟时间） |
+
+- **限制**：不得用于标题、正文、标签、按钮文字；实现统一走 `public/plugins/_shared/typography.js`
+  的 `displayXl(size)` / `DISPLAY_XL`，不在组件里裸写数字；行高用该表值，不做 `lineHeight: 1`。
+- **文档口径**：`FLUENT2.md §14` 记录为项目偏离项；`DENSITY.md §2.1` 的量化门禁按此执行；
+  审计中"超过 68px 即非严格 Fluent 字阶"的结论仍然成立——这是**明确的项目例外**，不是 Fluent 合规范畴。

@@ -1,103 +1,83 @@
-/** 卡片内的逐时 / 7 天 / AQI 可视件。 */
+/**
+ * 卡片内的逐时 / 7 天 / AQI 可视件。
+ *
+ * 字号全部走 Fluent 字阶（Text size / token），不再手写 fontSize/clamp/lineHeight；
+ * 尺寸/间距按 UI-REWRITE-SPEC §3.6：逐时 标签14/图标28/温度16；7 天 标签14/图标24/
+ * 高温20/低温14；AQI 环 88、值24、标签12、类别14。
+ */
 
-import { makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { WeatherIcon, HiLo } from './atoms.jsx';
+import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { WeatherIcon } from './atoms.jsx';
 import { dayLabel, fmtTemp, hourLabel } from '../data/format.js';
-import { aqiCategoryZh } from '../data/format.js';
 
 const useStyles = makeStyles({
   hourly: {
     display: 'grid',
     gridAutoFlow: 'column',
     gridAutoColumns: 'minmax(0, 1fr)',
-    gridAutoRows: '1fr',
-    gap: tokens.spacingHorizontalXS,
-    minHeight: 0,
     height: '100%',
     alignItems: 'stretch',
+    gap: tokens.spacingHorizontalXS,
   },
   hourItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
+    justifyContent: 'space-between',
+    gap: tokens.spacingVerticalXS,
+    padding: `${tokens.spacingVerticalS} 0`,
     minWidth: 0,
-    borderRadius: tokens.borderRadiusMedium,
-    paddingBlock: tokens.spacingVerticalXS,
   },
-  hourLabel: {
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorNeutralForeground3,
-    fontVariantNumeric: 'tabular-nums',
-    whiteSpace: 'nowrap',
-  },
-  hourTemp: {
-    fontSize: tokens.fontSizeBase300,
-    color: tokens.colorNeutralForeground1,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-  },
-  hoursIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  hourLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  hourTemp: { color: tokens.colorNeutralForeground1, whiteSpace: 'nowrap' },
+
   dailyColumns: {
     display: 'grid',
     gridAutoFlow: 'column',
     gridAutoColumns: 'minmax(0, 1fr)',
-    gridAutoRows: '1fr',
-    gap: tokens.spacingHorizontalXXS,
+    height: '100%',
     minHeight: 0,
   },
   dayColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
     minWidth: 0,
-    paddingBlock: tokens.spacingVerticalXS,
-    borderRadius: tokens.borderRadiusMedium,
   },
-  dayColumnSpread: {
+  dayColumnPanel: {
     justifyContent: 'space-between',
-    paddingBlock: tokens.spacingVerticalS,
+    padding: `${tokens.spacingVerticalM} 0`,
   },
-  dayLabel: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
+  dayColumnRow: {
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
   },
-  dayHiLo: {
-    fontSize: tokens.fontSizeBase300,
+  dayLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  dayHigh: {
+    color: tokens.colorNeutralForeground1,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
-    lineHeight: 1.15,
-    textAlign: 'center',
   },
-  daySingleTemp: {
-    fontSize: tokens.fontSizeBase400,
-    fontWeight: tokens.fontWeightSemibold,
+  dayLow: {
+    color: tokens.colorNeutralForeground3,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
   },
-  hi: { color: tokens.colorNeutralForeground1 },
-  lo: { color: tokens.colorNeutralForeground3 },
+
   ring: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
+    gap: tokens.spacingVerticalS,
     height: '100%',
+    minWidth: 0,
   },
   ringGraphic: {
     position: 'relative',
     display: 'grid',
     placeItems: 'center',
-    aspectRatio: '1 / 1',
-    maxHeight: '100%',
+    flexShrink: 0,
   },
   ringSvg: {
     position: 'absolute',
@@ -112,68 +92,68 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    lineHeight: 1.05,
   },
   aqiValue: {
-    fontSize: tokens.fontSizeBase400,
-    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
     fontVariantNumeric: 'tabular-nums',
   },
-  aqiLabel: {
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-  },
-  aqiCategory: {
-    fontSize: tokens.fontSizeBase200,
-    whiteSpace: 'nowrap',
-    fontWeight: tokens.fontWeightSemibold,
-  },
+  aqiLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  aqiCategory: { fontWeight: tokens.fontWeightSemibold, whiteSpace: 'nowrap' },
 });
 
 /** 卡片用逐时条：现在 + 随后 N 小时 */
-export function HourlyStrip({ items, nowIso, unit, scheme, sunrise, sunset, count = 6, className }) {
+export function HourlyStrip({ items, unit, scheme, sunrise, sunset, count = 6 }) {
   const styles = useStyles();
   const list = (items || []).slice(0, count);
   return (
-    <div className={mergeClasses(styles.hourly, className)}>
-      {list.map((item, index) => {
-        const night = isNight(item.fxTime, sunrise, sunset);
-        return (
-          <div key={item.fxTime || index} className={styles.hourItem}>
-            <span className={styles.hourLabel}>{index === 0 ? '现在' : hourLabel(item.fxTime)}</span>
-            <span className={styles.hoursIcon}>
-              <WeatherIcon
-                code={item.icon}
-                night={night}
-                scheme={scheme}
-                size="clamp(20px, 5vh, 38px)"
-                title={item.text}
-              />
-            </span>
-            <span className={styles.hourTemp}>{fmtTemp(item.temp, unit)}</span>
-          </div>
-        );
-      })}
+    <div className={styles.hourly}>
+      {list.map((item, index) => (
+        <div key={item.fxTime || index} className={styles.hourItem}>
+          <Text size={300} className={styles.hourLabel}>
+            {index === 0 ? '现在' : hourLabel(item.fxTime)}
+          </Text>
+          <WeatherIcon
+            code={item.icon}
+            night={isNight(item.fxTime, sunrise, sunset)}
+            scheme={scheme}
+            size={28}
+            title={item.text}
+          />
+          <Text size={400} weight="semibold" className={styles.hourTemp}>
+            {fmtTemp(item.temp, unit)}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }
 
-/** 卡片用 7 天列：星期、图标、高温（低温按需弱化/省略）；spread 让列在竖向铺满 */
-export function DailyColumns({ items, unit, scheme, className, showLow = true, spread = false }) {
+/**
+ * 卡片用 7 天列：星期、图标、高温（低温按需）。
+ * variant="panel"（3×2 右栏）上下 space-between；variant="row"（4×2 底栏 96px）紧凑居中。
+ */
+export function DailyColumns({ items, unit, scheme, showLow = true, variant = 'panel' }) {
   const styles = useStyles();
   const list = (items || []).slice(0, 7);
+  const isRow = variant === 'row';
   return (
-    <div className={mergeClasses(styles.dailyColumns, className)}>
+    <div className={styles.dailyColumns}>
       {list.map((item, index) => (
-        <div key={item.fxDate || index} className={mergeClasses(styles.dayColumn, spread && styles.dayColumnSpread)}>
-          <span className={styles.dayLabel}>{dayLabel(item.fxDate, index)}</span>
-          <WeatherIcon code={item.icon} scheme={scheme} size="clamp(16px, 4vh, 32px)" title={item.text} />
-          <span className={mergeClasses(styles.dayHiLo, styles.hi, !showLow && styles.daySingleTemp)}>
+        <div
+          key={item.fxDate || index}
+          className={mergeClasses(styles.dayColumn, isRow ? styles.dayColumnRow : styles.dayColumnPanel)}
+        >
+          <Text size={300} className={styles.dayLabel}>
+            {dayLabel(item.fxDate, index)}
+          </Text>
+          <WeatherIcon code={item.icon} scheme={scheme} size={isRow ? 20 : 24} title={item.text} />
+          <Text size={500} weight="semibold" className={styles.dayHigh}>
             {fmtTemp(item.tempMax, unit)}
-          </span>
+          </Text>
           {showLow && (
-            <span className={mergeClasses(styles.dayHiLo, styles.lo)}>{fmtTemp(item.tempMin, unit)}</span>
+            <Text size={300} className={styles.dayLow}>
+              {fmtTemp(item.tempMin, unit)}
+            </Text>
           )}
         </div>
       ))}
@@ -181,8 +161,8 @@ export function DailyColumns({ items, unit, scheme, className, showLow = true, s
   );
 }
 
-/** AQI 环。value 为 null 时不渲染。 */
-export function AirRing({ air, size = 'clamp(64px, 22vh, 132px)', className }) {
+/** AQI 环：4×2 固定 88px；值 24 / 标签 12 / 类别 14（UI-REWRITE-SPEC §3.6） */
+export function AirRing({ air, size = 88, className }) {
   const styles = useStyles();
   if (!air || air.aqi == null) return null;
   const aqi = Number(air.aqi);
@@ -193,9 +173,9 @@ export function AirRing({ air, size = 'clamp(64px, 22vh, 132px)', className }) {
   const color = air.color || 'currentColor';
   return (
     <div className={mergeClasses(styles.ring, className)}>
-      <div className={styles.ringGraphic} style={{ width: size, height: size }}>
+      <div className={styles.ringGraphic} style={{ width: `${size}px`, height: `${size}px` }}>
         <svg className={styles.ringSvg} viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(128,128,128,0.25)" strokeWidth="8" />
+          <circle cx="50" cy="50" r={radius} fill="none" stroke={tokens.colorNeutralStroke2} strokeWidth="8" />
           <circle
             cx="50"
             cy="50"
@@ -208,13 +188,17 @@ export function AirRing({ air, size = 'clamp(64px, 22vh, 132px)', className }) {
           />
         </svg>
         <div className={styles.ringCenter}>
-          <span className={styles.aqiValue}>{air.aqiDisplay || aqi}</span>
-          <span className={styles.aqiLabel}>AQI</span>
+          <Text size={600} weight="semibold" className={styles.aqiValue}>
+            {air.aqiDisplay || aqi}
+          </Text>
+          <Text size={200} className={styles.aqiLabel}>
+            AQI
+          </Text>
         </div>
       </div>
-      <span className={styles.aqiCategory} style={{ color }}>
-        {air.category || aqiCategoryZh(null, air.level)}
-      </span>
+      <Text size={300} weight="semibold" className={styles.aqiCategory} style={{ color }}>
+        {air.category || '—'}
+      </Text>
     </div>
   );
 }

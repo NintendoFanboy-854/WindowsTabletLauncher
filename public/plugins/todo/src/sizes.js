@@ -33,9 +33,9 @@ export function rowBudget(kind) {
     case 'mini':
       return 4;
     case 'medium':
-      return 6;
+      return 5;
     case 'full':
-      return 10;
+      return 8;
     default:
       return null;
   }

@@ -9,6 +9,8 @@
 - [ ] `src-tauri` 目录 `cargo check` 通过
 - [ ] `npx tauri build --debug --no-bundle` 通过（真窗口可运行）
 - [ ] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建并通过 `git status` 确认 `app/app.js` 已提交（N-05）
+- [ ] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1 的 8 类断言，25/25 通过）
+- [ ] 亮暗两套主题的宿主整屏 + 插件代表尺寸截图（亮色跟随系统）
 
 ## 2. 运行时冒烟（Tauri 真窗口）
 

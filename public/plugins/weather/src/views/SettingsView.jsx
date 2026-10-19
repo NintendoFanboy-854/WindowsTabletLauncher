@@ -102,7 +102,7 @@ const useStyles = makeStyles({
     minWidth: 0,
     ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover },
   },
-  resultMeta: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase100, whiteSpace: 'nowrap' },
+  resultMeta: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap' },
   radioGroup: { display: 'flex', alignItems: 'center', minHeight: '40px' },
   radio40: { minHeight: '40px' },
   control40: { minHeight: '40px' },
@@ -415,3 +415,4 @@ export default function SettingsView() {
     </div>
   );
 }
+

@@ -1,14 +1,14 @@
 /**
- * 倒数日卡片视图（正常模式：每行只留 天数 + 标题；无常驻 chrome）。
+ * 倒数日卡片视图（UI 重写 v2，docs/UI-REWRITE-SPEC.md §3.2）。
  *
- * 尺寸信息预算（docs/DENSITY.md）：
- * - 1×1：最近一条的天数（Primary）+ 标题（Secondary）
- * - 2×1：最近一条的标题 + 天数；空态直接给「添加倒数日」
- * - 2×2：列表最多 4 行
- * - 3×2：列表最多 5 行 + 新增按钮 + 设置入口（唯一 Tertiary）
+ * 字号层级（1440×960 iframe 实测尺寸）：
+ * - 1×1：最近事件天数/「今天」XL-48（数字 fg1；事件色只做 4px 圆点）；标题 14 S；单位 16 T
+ * - 2×1：天数 68（Hero1000）；标题 16 S + 重复/日期 14 T；左右结构
+ * - 2×2：hero 天数 XL-48；下面 3 行（标题 14 + 天数 16，行高 44）
+ * - 3×2：header 计数 12 + ⋯ 菜单；hero 天数 XL-48；4 行（标题 16 + 天数 20，行高 44）
  *
- * 操作走长按 / 右键 / 浮层视图：长按事件行 → 编辑浮层（内含删除）；
- * 长按空白 / 右键 / 设置按钮 → requestSettings()（宿主全窗口 Fluent Dialog）。
+ * 数字主信息走 _shared/typography.js 的 displayXl()；文本只走 Fluent Text size。
+ * 操作仍走长按 / ⋯ 菜单 / ?view=edit|settings 全窗口浮层（D-02b）。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -39,6 +39,7 @@ import {
   useSettingsRequest,
   useStoredConfig,
 } from '../../_shared/host.js';
+import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
@@ -57,6 +58,8 @@ import {
 
 const LONG_PRESS_MS = 500; // 交互阈值（不是动效时长，DESIGN.md）
 const LONG_PRESS_MOVE_TOLERANCE = 8;
+
+const XL_48 = displayXl(48);
 
 function useLongPress(onLongPress) {
   const ref = useRef({ timer: 0, origin: null, suppressClick: false });
@@ -110,6 +113,18 @@ function daysText(entry) {
   return `还有 ${entry.days} 天`;
 }
 
+/** 数字型主信息：今天显示「今天」，其余显示天数绝对值 */
+function primaryTextOf(entry) {
+  if (entry.status === 'today') return '今天';
+  return String(Math.abs(entry.days));
+}
+
+/** 主信息单位：今天无单位；过去用「天前」，未来用「天」 */
+function unitOf(entry) {
+  if (entry.status === 'today') return '';
+  return entry.status === 'past' ? '天前' : '天';
+}
+
 const useStyles = makeStyles({
   root: {
     boxSizing: 'border-box',
@@ -118,22 +133,111 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    padding: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground1,
     overflow: 'hidden',
     userSelect: 'none',
     outline: 'none',
   },
-  rootCompact: {
-    padding: tokens.spacingHorizontalS,
-    gap: tokens.spacingVerticalNone,
+  root1: {
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    padding: tokens.spacingVerticalS,
+    gap: tokens.spacingVerticalXS,
   },
-  rootLarge: {
-    justifyContent: 'flex-start',
+  root21: {
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    gap: tokens.spacingVerticalXS,
+  },
+  root22: {
+    padding: tokens.spacingVerticalM,
     gap: tokens.spacingVerticalS,
-    padding: tokens.spacingHorizontalL,
+    justifyContent: 'space-evenly',
   },
+  root32: {
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    gap: tokens.spacingVerticalS,
+    justifyContent: 'flex-start',
+  },
+  /* ---- 数字主信息（D-07 Display XL） ---- */
+  primary48: {
+    ...XL_48,
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  primary68: {
+    ...TABULAR_NUMS,
+    fontWeight: tokens.fontWeightSemibold,
+    whiteSpace: 'nowrap',
+  },
+  primaryRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  unit: {
+    color: tokens.colorNeutralForeground3,
+  },
+  /* ---- 1×1 ---- */
+  single: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
+    minHeight: 0,
+    textAlign: 'center',
+  },
+  titleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingHorizontalS,
+    maxWidth: '100%',
+    minWidth: 0,
+  },
+  dot: {
+    width: tokens.spacingHorizontalXS,
+    height: tokens.spacingHorizontalXS,
+    borderRadius: tokens.borderRadiusCircular,
+    flex: '0 0 auto',
+  },
+  singleTitle: {
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground2,
+  },
+  /* ---- 2×1 ---- */
+  rowLayout: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  titleBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+    flex: '1 1 auto',
+  },
+  title16: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground2,
+  },
+  sub14: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground3,
+  },
+  /* ---- 列表（2×2 / 3×2） ---- */
   header: {
     display: 'flex',
     alignItems: 'center',
@@ -152,26 +256,36 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     whiteSpace: 'nowrap',
   },
-  actions: {
+  heroRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
     flex: '0 0 auto',
+  },
+  heroTitleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+    overflow: 'hidden',
   },
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalNone,
+    gap: tokens.spacingVerticalXS,
     minHeight: 0,
     overflow: 'hidden',
+    flex: '0 0 auto',
   },
   row: {
-    minHeight: '40px',
+    minHeight: '44px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS} !important`,
+    padding: `0 ${tokens.spacingHorizontalS} !important`,
     borderRadius: tokens.borderRadiusMedium,
     textAlign: 'left',
   },
@@ -184,38 +298,15 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground2,
   },
   rowDays: {
     flex: '0 0 auto',
     whiteSpace: 'nowrap',
     fontVariantNumeric: 'tabular-nums',
+    color: tokens.colorNeutralForeground1,
   },
-  single: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
-    textAlign: 'center',
-    minHeight: 0,
-  },
-  singleLabel: {
-    color: tokens.colorNeutralForeground3,
-  },
-  singleDays: {
-    fontVariantNumeric: 'tabular-nums',
-    lineHeight: 1,
-  },
-  singleUnit: {
-    color: tokens.colorNeutralForeground3,
-  },
-  singleTitle: {
-    maxWidth: '100%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    color: tokens.colorNeutralForeground2,
-  },
+  /* ---- 空态 ---- */
   empty: {
     display: 'flex',
     flexDirection: 'column',
@@ -232,6 +323,7 @@ const useStyles = makeStyles({
   },
 });
 
+/** 列表行（2×2 / 3×2）：点击/长按都进编辑浮层 */
 function EntryRow({ entry, sizeKey, onOpen }) {
   const styles = useStyles();
   const press = useLongPress(() => onOpen(entry.item.id));
@@ -260,12 +352,7 @@ function EntryRow({ entry, sizeKey, onOpen }) {
       <Text className={styles.rowTitle} size={wide ? 400 : 300}>
         {entry.item.title}
       </Text>
-      <Text
-        className={styles.rowDays}
-        size={wide ? 500 : 400}
-        weight="semibold"
-        style={{ color: tokens[colorTokenOf(entry.item.color)] }}
-      >
+      <Text className={styles.rowDays} size={wide ? 500 : 400} weight="semibold">
         {daysText(entry)}
       </Text>
     </Button>
@@ -282,9 +369,10 @@ export default function CountdownApp({ fallbackSizeKey }) {
   itemsRef.current = items;
 
   const compact = sizeKey === '1x1';
+  const row = sizeKey === '2x1';
+  const list = sizeKey === '2x2' || sizeKey === '3x2';
   const wide = sizeKey === '3x2';
-  const list = sizeKey === '2x2' || wide;
-  const rowLimit = wide ? 5 : 4;
+  const heroLimit = wide ? 5 : 4; // hero + 4 行（3×2）/ hero + 3 行（2×2）
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000);
@@ -295,7 +383,7 @@ export default function CountdownApp({ fallbackSizeKey }) {
     if (!itemsLoaded) return [];
     return visibleEntries(items, settings, now);
   }, [items, itemsLoaded, now, settings]);
-  const entries = allEntries.slice(0, list ? rowLimit : 1);
+  const entries = allEntries.slice(0, list ? heroLimit : 1);
 
   const openEditor = useCallback((id) => {
     setEditingTarget(id ?? null);
@@ -371,16 +459,24 @@ export default function CountdownApp({ fallbackSizeKey }) {
   /* 长按空白 = 设置（事件行有自己的长按 → 编辑浮层） */
   const rootPress = useLongPress(() => requestSettings('倒数日设置'));
 
+  const dotOf = (entry) => (
+    <span
+      className={styles.dot}
+      style={{ backgroundColor: tokens[colorTokenOf(entry.item.color)] }}
+      aria-hidden="true"
+    />
+  );
+
   if (!itemsLoaded) {
     return <div className={styles.root} />;
   }
 
   if (!allEntries.length) {
     return (
-      <div className={styles.root} role="group" aria-label="倒数日">
+      <div className={mergeClasses(styles.root, compact ? styles.root1 : row ? styles.root21 : wide ? styles.root32 : styles.root22)} role="group" aria-label="倒数日">
         <div className={styles.empty}>
           {!compact && <CalendarLtr20Regular className={styles.emptyIcon} aria-hidden="true" />}
-          <Text size={compact ? 200 : 300}>还没有倒数日</Text>
+          <Text size={300}>还没有倒数日</Text>
           <Button
             appearance="primary"
             size="large"
@@ -396,9 +492,105 @@ export default function CountdownApp({ fallbackSizeKey }) {
 
   const near = entries[0];
 
+  /* ---- 1×1：天数/今天 XL-48 + 标题 14 + 单位 16 ---- */
+  if (compact) {
+    return (
+      <div
+        className={mergeClasses(styles.root, styles.root1)}
+        role="button"
+        tabIndex={0}
+        aria-label={`${near.item.title}，${displayText(near)}`}
+        onClick={() => {
+          if (rootPress.consumeSuppressedClick()) return;
+          openEditor(near.item.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openEditor(near.item.id);
+          }
+        }}
+        onPointerDown={rootPress.onPointerDown}
+        onPointerMove={rootPress.onPointerMove}
+        onPointerUp={rootPress.onPointerUp}
+        onPointerCancel={rootPress.onPointerCancel}
+        onPointerLeave={rootPress.onPointerLeave}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          requestSettings('倒数日设置');
+        }}
+      >
+        <div className={styles.primaryRow}>
+          <Text className={styles.primary48}>{primaryTextOf(near)}</Text>
+          {unitOf(near) && <Text size={400} className={styles.unit}>{unitOf(near)}</Text>}
+        </div>
+        <div className={styles.titleRow}>
+          {dotOf(near)}
+          <Text className={styles.singleTitle} size={300}>
+            {near.item.title}
+          </Text>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- 2×1：左标题/日期，右天数 68 ---- */
+  if (row) {
+    return (
+      <div
+        className={mergeClasses(styles.root, styles.root21)}
+        role="button"
+        tabIndex={0}
+        aria-label={`${near.item.title}，${displayText(near)}`}
+        onClick={() => {
+          if (rootPress.consumeSuppressedClick()) return;
+          openEditor(near.item.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openEditor(near.item.id);
+          }
+        }}
+        onPointerDown={rootPress.onPointerDown}
+        onPointerMove={rootPress.onPointerMove}
+        onPointerUp={rootPress.onPointerUp}
+        onPointerCancel={rootPress.onPointerCancel}
+        onPointerLeave={rootPress.onPointerLeave}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          requestSettings('倒数日设置');
+        }}
+      >
+        <div className={styles.rowLayout}>
+          <div className={styles.titleBlock}>
+            <div className={styles.titleRow}>
+              {dotOf(near)}
+              <Text className={styles.title16} size={400} weight="semibold">
+                {near.item.title}
+              </Text>
+            </div>
+            <Text className={styles.sub14} size={300}>
+              {near.sub}
+            </Text>
+          </div>
+          <div className={styles.primaryRow}>
+            <Text className={styles.primary68} size={1000} weight="semibold">
+              {primaryTextOf(near)}
+            </Text>
+            {unitOf(near) && <Text size={400} className={styles.unit}>{unitOf(near)}</Text>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- 2×2 / 3×2：hero + 列表 ---- */
+  const listEntries = entries.slice(1);
+
   return (
     <div
-      className={mergeClasses(styles.root, compact && styles.rootCompact, wide && styles.rootLarge)}
+      className={mergeClasses(styles.root, wide ? styles.root32 : styles.root22)}
       role="group"
       aria-label="倒数日"
       onPointerDown={(event) => {
@@ -416,95 +608,54 @@ export default function CountdownApp({ fallbackSizeKey }) {
       {wide && (
         <div className={styles.header}>
           <div className={styles.headerTitle}>
-            <Text size={500} weight="semibold">
+            <Text size={400} weight="semibold" className={styles.title16}>
               倒数日
             </Text>
             <Text size={200} className={styles.count}>
               {allEntries.length} 项
             </Text>
           </div>
-          <div className={styles.actions}>
-            {/* chrome on demand（DENSITY 规则 3 / AUDIT N-01）：3×2 正常模式只留一个 ⋯ 菜单，
-                新增与设置都收进菜单，不再常驻齿轮按钮 */}
-            <Menu>
-              <MenuTrigger disableButtonEnhancement>
-                <Button
-                  appearance="subtle"
-                  size="large"
-                  icon={<MoreHorizontal20Regular />}
-                  aria-label="倒数日操作"
-                />
-              </MenuTrigger>
-              <MenuPopover>
-                <MenuList>
-                  <MenuItem icon={<Add20Regular />} onClick={() => openEditor(null)}>
-                    新增倒数日
-                  </MenuItem>
-                  <MenuItem icon={<Settings20Regular />} onClick={() => requestSettings('倒数日设置')}>
-                    设置
-                  </MenuItem>
-                </MenuList>
-              </MenuPopover>
-            </Menu>
-          </div>
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <Button
+                appearance="subtle"
+                size="large"
+                icon={<MoreHorizontal20Regular />}
+                aria-label="倒数日操作"
+              />
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<Add20Regular />} onClick={() => openEditor(null)}>
+                  新增倒数日
+                </MenuItem>
+                <MenuItem icon={<Settings20Regular />} onClick={() => requestSettings('倒数日设置')}>
+                  设置
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
         </div>
       )}
 
-      {list ? (
-        <div className={styles.list} role="list">
-          {entries.map((entry) => (
-            <EntryRow key={entry.item.id} entry={entry} sizeKey={sizeKey} onOpen={openEditor} />
-          ))}
-        </div>
-      ) : compact ? (
-        <div className={styles.single} role="button" tabIndex={0} aria-label={`${near.item.title}，${displayText(near)}`}>
-          <Text className={styles.singleLabel} size={200}>
-            {near.status === 'today' ? '就是今天' : near.status === 'past' ? '已过' : '还有'}
-          </Text>
-          {near.status !== 'today' && (
-            <Text
-              className={styles.singleDays}
-              size={900}
-              weight="semibold"
-              style={{ color: tokens[colorTokenOf(near.item.color)] }}
-            >
-              {Math.abs(near.days)}
-            </Text>
-          )}
-          {near.status !== 'today' && (
-            <Text className={styles.singleUnit} size={200}>
-              天
-            </Text>
-          )}
-          <Text className={styles.singleTitle} size={200}>
+      <div className={styles.heroRow}>
+        <div className={styles.heroTitleRow}>
+          {dotOf(near)}
+          <Text className={styles.title16} size={wide ? 400 : 400} weight={wide ? 'semibold' : 'regular'}>
             {near.item.title}
           </Text>
         </div>
-      ) : (
-        <Button
-          appearance="subtle"
-          size="large"
-          className={mergeClasses(styles.row, near.status === 'today' && styles.rowToday)}
-          onClick={() => openEditor(near.item.id)}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            openEditor(near.item.id);
-          }}
-          aria-label={`${near.item.title}，${displayText(near)}，点击编辑`}
-        >
-          <Text className={styles.rowTitle} size={400}>
-            {near.item.title}
-          </Text>
-          <Text
-            className={styles.rowDays}
-            size={800}
-            weight="semibold"
-            style={{ color: tokens[colorTokenOf(near.item.color)] }}
-          >
-            {daysText(near)}
-          </Text>
-        </Button>
-      )}
+        <div className={styles.primaryRow}>
+          <Text className={styles.primary48}>{primaryTextOf(near)}</Text>
+          {unitOf(near) && <Text size={400} className={styles.unit}>{unitOf(near)}</Text>}
+        </div>
+      </div>
+
+      <div className={styles.list} role="list">
+        {listEntries.map((entry) => (
+          <EntryRow key={entry.item.id} entry={entry} sizeKey={sizeKey} onOpen={openEditor} />
+        ))}
+      </div>
     </div>
   );
 }

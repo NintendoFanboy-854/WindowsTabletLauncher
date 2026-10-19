@@ -57,7 +57,7 @@ const useStyles = makeStyles({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  rowSub: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  rowSub: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   rowRight: {
     display: 'flex',
     flexDirection: 'column',
@@ -87,7 +87,7 @@ const useStyles = makeStyles({
   dailyTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: tokens.spacingHorizontalXS },
   dailyDay: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   dailyText: {
-    fontSize: tokens.fontSizeBase100,
+    fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground3,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -104,7 +104,11 @@ const useStyles = makeStyles({
     minHeight: '2px',
   },
   airHero: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalL, padding: `${tokens.spacingVerticalXS} 0` },
-  airValue: { fontSize: tokens.fontSizeHero800, fontWeight: tokens.fontWeightSemibold, lineHeight: 1 },
+  airValue: {
+    fontSize: tokens.fontSizeHero800,
+    lineHeight: tokens.lineHeightHero800,
+    fontWeight: tokens.fontWeightSemibold,
+  },
   airMeta: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
   airCategory: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
   pollutantGrid: {
@@ -113,7 +117,7 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalL,
   },
   pollutant: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS },
-  pollutantName: { fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3 },
+  pollutantName: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   pollutantValue: {
     fontSize: tokens.fontSizeBase400,
     fontWeight: tokens.fontWeightSemibold,
@@ -129,7 +133,7 @@ const useStyles = makeStyles({
   adviceLabel: {
     display: 'block',
     color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase100,
+    fontSize: tokens.fontSizeBase200,
     marginBottom: tokens.spacingVerticalXXS,
   },
   indexGrid: {
@@ -142,7 +146,7 @@ const useStyles = makeStyles({
   indexName: { fontSize: tokens.fontSizeBase300, color: tokens.colorNeutralForeground1 },
   indexCategory: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   indexText: {
-    fontSize: tokens.fontSizeBase100,
+    fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground3,
     lineHeight: tokens.lineHeightBase200,
   },
@@ -460,3 +464,4 @@ export function WarningPanel({ data, loading, error, requestSection }) {
     </div>
   );
 }
+

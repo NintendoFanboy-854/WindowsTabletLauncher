@@ -36,7 +36,7 @@
 ### 1.2 小组件内部
 
 - 小组件是 iframe，**iframe 的视口就是卡片本身**：内部直接用 `vw / vh / % / clamp()`，不要写死像素。
-- 字阶、间距用 Fluent token 做基准，再用 `clamp()` 按视口缩放；极端小尺寸下**优先保信息、砍装饰**。
+- 字阶、间距用 Fluent token 做基准；文本字号只用 `Text size` / `fontSizeBase*` / `fontSizeHero*`。数字型主信息可按 DECISIONS D-07 使用项目 `Display XL`（48/80/96/112），不得用于标题/正文/标签，不做 `lineHeight: 1`。间距按 DENSITY §2.1 的尺寸档映射，不再用任意 `clamp()`。
 - 触控目标不小于 **40×40 CSS px**（Fluent 的触控尺寸）。
 - 每个组件文档里必须写清楚：各档位显示什么、**太小的时候砍掉什么**。
 - 加载态用 Fluent `Skeleton` / `Spinner`，错误态用 `MessageBar`，空状态用 Fluent 的空状态排版。

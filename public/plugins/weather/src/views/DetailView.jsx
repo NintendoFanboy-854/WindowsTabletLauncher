@@ -88,13 +88,17 @@ const useStyles = makeStyles({
   },
   headlineTemp: {
     fontSize: tokens.fontSizeHero700,
+    lineHeight: tokens.lineHeightHero700,
     fontWeight: tokens.fontWeightSemibold,
-    lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
   },
   headlineMeta: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
   headlineCondition: { fontSize: tokens.fontSizeBase400, color: tokens.colorNeutralForeground1 },
-  headlineSub: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  headlineSub: {
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    color: tokens.colorNeutralForeground3,
+  },
   tabs: { flexShrink: 0 },
   content: {
     flex: 1,
@@ -381,7 +385,7 @@ export default function DetailView({ scheme }) {
               code={current.icon}
               night={isNight(current.obsTime || new Date().toISOString(), today?.sunrise, today?.sunset)}
               scheme={scheme}
-              size="clamp(40px, 7vmin, 64px)"
+              size="56px"
               title={current.text}
             />
             <span className={styles.headlineTemp}>{fmtTemp(current.temp, settings.unit)}</span>

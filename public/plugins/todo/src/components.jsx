@@ -1,6 +1,6 @@
 /** 待办卡片 / 视图共用的 Fluent 组件（任务行、空态、月历格、热力图）。 */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -33,6 +33,9 @@ import {
 import { store } from '../js/store.js';
 
 const LONG_PRESS_MS = 500; // 交互阈值（DESIGN.md §1.2），不是动效时长
+export const ROW_HEIGHT = 44;
+export const ROW_GAP = 4;
+export const ROW_PITCH = ROW_HEIGHT + ROW_GAP;
 
 export const useTodoStyles = makeStyles({
   fill: {
@@ -62,13 +65,36 @@ export const useTodoStyles = makeStyles({
   },
   search: { flex: 1 },
   content: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+  },
+  scrollViewport: {
     flex: 1,
     minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  scrollInner: {
+    height: '100%',
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    paddingTop: tokens.spacingVerticalXS,
+    gap: tokens.spacingVerticalXS,
+  },
+  scrollFade: {
+    position: 'absolute',
+    left: tokens.spacingHorizontalNone,
+    right: tokens.spacingHorizontalNone,
+    bottom: tokens.spacingVerticalNone,
+    height: '32px',
+    pointerEvents: 'none',
+    backgroundImage: `linear-gradient(to bottom, transparent, ${tokens.colorNeutralBackground1})`,
+  },
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
   },
   groupHead: {
     display: 'flex',
@@ -95,7 +121,7 @@ export const useTodoStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '40px',
+    minHeight: '44px',
     paddingInline: tokens.spacingHorizontalXS,
     borderRadius: tokens.borderRadiusMedium,
     color: tokens.colorNeutralForeground1,
@@ -109,7 +135,7 @@ export const useTodoStyles = makeStyles({
       outlineOffset: `-${tokens.strokeWidthThick}`,
     },
   },
-  rowDone: { color: tokens.colorNeutralForegroundDisabled },
+  rowDone: { color: tokens.colorNeutralForeground3 },
   rowDragging: { opacity: 0.5, backgroundColor: tokens.colorNeutralBackground3 },
   rowDropTarget: {
     boxShadow: `inset 0 ${tokens.strokeWidthThick} 0 ${tokens.colorBrandBackground}`,
@@ -338,7 +364,7 @@ export function GroupHead({ label, count }) {
   const styles = useTodoStyles();
   return (
     <div className={styles.groupHead}>
-      <Text className={styles.groupLabel} size={200}>
+      <Text className={styles.groupLabel} size={300} weight="semibold">
         {label}
       </Text>
       {typeof count === 'number' ? (
@@ -358,7 +384,7 @@ function RowMeta({ task, now }) {
   const due = toDate(task.dueAt);
   if (due && due < now) {
     return (
-      <Text className={mergeClasses(styles.meta, styles.metaAlert)} size={100}>
+      <Text className={mergeClasses(styles.meta, styles.metaAlert)} size={200}>
         已逾期
       </Text>
     );
@@ -367,7 +393,7 @@ function RowMeta({ task, now }) {
     const hasTime = !(due.getHours() === 23 && due.getMinutes() === 59);
     if (hasTime) {
       return (
-        <Text className={styles.meta} size={100}>
+        <Text className={styles.meta} size={200}>
           {fmtTime(due)}
         </Text>
       );
@@ -491,7 +517,7 @@ export function TaskRows({ tasks, manualSort = false, onToggle, onOpenDetail, on
   );
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className={styles.rows}>
       {tasks.map((task, index) => {
         const dragging = drag?.id === task.id;
         const dropTarget = drag && drag.over === index && drag.id !== task.id;
@@ -551,7 +577,7 @@ export function TaskRows({ tasks, manualSort = false, onToggle, onOpenDetail, on
             />
             <Text
               className={mergeClasses(styles.title, task.done && styles.titleDone)}
-              size={300}
+              size={400}
               truncate
               title={task.title}
             >
@@ -585,7 +611,7 @@ export function MonthGrid({ monthCursor, selectedDay, tasksByDay, weekStart, onS
     <>
       <div className={styles.calGrid} role="grid" aria-label="月历">
         {labels.map((label) => (
-          <Text key={label} className={styles.calWeekday} size={100}>
+          <Text key={label} className={styles.calWeekday} size={200}>
             {label}
           </Text>
         ))}
@@ -603,7 +629,7 @@ export function MonthGrid({ monthCursor, selectedDay, tasksByDay, weekStart, onS
               onClick={() => onSelectDay(key)}
               onDoubleClick={() => onAddDay(key)}
             >
-              <Text size={200}>{date.getDate()}</Text>
+              <Text size={300}>{date.getDate()}</Text>
               {tasks.length > 0 && !compact ? (
                 <span className={styles.calDots} aria-hidden="true">
                   {tasks.slice(0, 3).map((task) => (
@@ -673,3 +699,57 @@ export function Heatmap({ weighted, onToggleWeight, onOpenSettings }) {
 }
 
 export { Add20Regular, Checkmark20Regular };
+
+/** 列表可视行数 = min(maxRows, floor(可用高度 / 行距))（DENSITY §2.1 / §6.4-8） */
+export function useFitRows(ref, maxRows = 10) {
+  const [rows, setRows] = useState(() => Math.max(1, maxRows));
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+    const measure = () => {
+      const height = element.clientHeight;
+      if (!height) return;
+      const fit = Math.floor((height + ROW_GAP) / ROW_PITCH);
+      setRows(Math.max(1, Math.min(maxRows, fit)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, maxRows]);
+  return rows;
+}
+
+/** 内容是否溢出（用于滚动渐隐提示，禁止静默裁切） */
+export function useOverflow(ref) {
+  const [overflow, setOverflow] = useState(false);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+    const update = () => setOverflow(element.scrollHeight > element.clientHeight + 1);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    element.addEventListener('scroll', update, { passive: true });
+    return () => {
+      observer.disconnect();
+      element.removeEventListener('scroll', update);
+    };
+  }, [ref]);
+  return overflow;
+}
+
+/** 滚动容器 + 底部渐隐提示（列表超出可视高度时） */
+export function ScrollArea({ children }) {
+  const styles = useTodoStyles();
+  const ref = useRef(null);
+  const overflow = useOverflow(ref);
+  return (
+    <div className={styles.scrollViewport}>
+      <div className={styles.scrollInner} ref={ref}>
+        {children}
+      </div>
+      {overflow ? <div className={styles.scrollFade} aria-hidden="true" /> : null}
+    </div>
+  );
+}

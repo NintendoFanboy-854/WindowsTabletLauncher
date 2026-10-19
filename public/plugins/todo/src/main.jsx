@@ -124,6 +124,9 @@ function Root() {
   const querySize = parseSizeParam(params.get('size'));
   const defaultSizeKey = querySize ? sizeKeyOf(querySize) : '3x3';
   const standalone = !plugin.inHost;
+  // ?raw=1：跳过独立预览外壳，走宿主同款满视口布局（供机器测量/按 iframe 尺寸截图）
+  // verify-widgets.mjs 以 ?plugin=&widget=&size= 加载 standalone 页：按宿主 iframe 满视口渲染
+  const raw = params.get('raw') === '1' || (params.has('plugin') && params.has('widget'));
 
   let content = <TodoApp defaultSizeKey={defaultSizeKey} />;
   if (overlayView === 'settings') content = <TodoSettings />;
@@ -136,7 +139,7 @@ function Root() {
       style={{ width: '100%', height: '100%', background: 'transparent', colorScheme: 'normal' }}
     >
       <ErrorBoundary>
-        {standalone ? (
+        {standalone && !raw ? (
           <PreviewShell overlayView={overlayView} defaultSizeKey={defaultSizeKey}>
             {content}
           </PreviewShell>

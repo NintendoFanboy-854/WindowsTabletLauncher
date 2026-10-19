@@ -171,6 +171,7 @@
 | 7 | 天气图标非 Fluent | 仅内容图形例外 | 已记录，保持 |
 | 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |
 | 9 | 插件自绘控件（clock/countdown/pomodoro/sedentary/todo） | 一律用 Fluent UI React 组件 | **已定案：全部迁移到 Fluent UI React + FluentProvider（DECISIONS D-02b），按严格规范执行** |
+| 10 | 数字型主信息使用 48–112px（超出 Fluent Display 68px 上限） | 官方字阶最大 Display 68/92 | **已定案：项目级 Display XL 例外（DECISIONS D-07），只用于数字主信息，48/80/96/112，走 `_shared/typography.js`；文本/标签不得使用** |
 
 ## 15. 检查清单（每个组件/页面上线前）
 

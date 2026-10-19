@@ -1,21 +1,17 @@
 /**
- * 天气卡片：一眼看懂的五档尺寸。
+ * 天气卡片：五档尺寸，按 UI-REWRITE-SPEC §3.6 重排。
  *
- * 信息密度规则（docs/DENSITY.md）：每张卡片只有一个 Primary（当前温度），
- * 正常模式不带任何 chrome（无刷新按钮/更新时间/齿轮），预警条只在有预警时出现。
- * 城市、现象、今日高低温是仅有的 Secondary；更细的信息全部进详情 Drawer。
+ * 字号只走 Fluent 字阶：温度用 D-07 Display XL（1×1/2×1/2×2 = 48）或
+ * fontSizeHero1000（3×2/4×2 = 68）；文本全部 `<Text size>`；无 clamp、无 lineHeight 覆盖。
+ * 正常模式无 chrome；预警 MessageBar 只在有预警时出现；AQI 环 88px 不裁切。
  */
 
 import { useCallback, useRef } from 'react';
-import { Button, Spinner, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Button, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { ArrowClockwise20Regular, Key20Regular } from '@fluentui/react-icons';
+import { displayXl } from '../../../_shared/typography.js';
 import { AirRing, DailyColumns, HourlyStrip, isNight } from './forecast.jsx';
-import {
-  Condition,
-  HiLo,
-  WarningStrip,
-  WeatherIcon,
-} from './atoms.jsx';
+import { Condition, HiLo, WarningStrip, WeatherIcon } from './atoms.jsx';
 import { fmtTemp } from '../data/format.js';
 
 const useStyles = makeStyles({
@@ -28,13 +24,12 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    // 卡片材质由宿主 WidgetCard 提供，插件根节点保持透明，六张卡片观感一致（D-02b）
+    // 卡片材质由宿主 WidgetCard 提供，插件根节点保持透明（D-02b）
     backgroundColor: 'transparent',
     color: tokens.colorNeutralForeground1,
     fontFamily: tokens.fontFamilyBase,
     userSelect: 'none',
     cursor: 'pointer',
-    gap: tokens.spacingVerticalXS,
     ':hover': { backgroundColor: tokens.colorSubtleBackgroundHover },
     ':active': { backgroundColor: tokens.colorSubtleBackgroundPressed },
     ':focus-visible': {
@@ -42,131 +37,145 @@ const useStyles = makeStyles({
       outlineOffset: '-2px',
     },
   },
-  pad1: { padding: tokens.spacingVerticalXS },
+  gapXS: { gap: tokens.spacingVerticalXS },
+  gapS: { gap: tokens.spacingVerticalS },
+
+  // 间距按 UI-REWRITE-SPEC §2：1×1=8；2×1=8v/12h；2×2=12；3×2/4×2=12v/16h
+  pad1: { padding: tokens.spacingHorizontalS },
   pad2: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}` },
-  pad22: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM} ${tokens.spacingVerticalS}` },
-  padLarge: { padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL} ${tokens.spacingVerticalM}` },
-  cityLine: {
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    flexShrink: 0,
-    maxWidth: '100%',
-  },
+  pad22: { padding: tokens.spacingVerticalM },
+  padLarge: { padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}` },
+
   offlineDot: {
     position: 'absolute',
-    top: '9%',
-    right: '9%',
+    top: tokens.spacingVerticalS,
+    right: tokens.spacingHorizontalS,
     width: tokens.spacingHorizontalS,
     height: tokens.spacingHorizontalS,
     borderRadius: tokens.borderRadiusCircular,
     backgroundColor: tokens.colorStatusWarningForeground1,
   },
   body: { flex: 1, minHeight: 0, minWidth: 0, display: 'flex' },
+  city: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
 
-  // 1×1
+  // 数字主信息：1×1/2×1/2×2 = XL-48；3×2/4×2 = Display 68（Hero1000）
+  temp48: {
+    ...displayXl(48),
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+  temp68: {
+    fontSize: tokens.fontSizeHero1000,
+    lineHeight: tokens.lineHeightHero1000,
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+
+  // 1×1：图标 + 温度水平居中，padding 8，gap 8
   body1: {
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    position: 'relative',
-    paddingBottom: tokens.spacingVerticalXS,
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
   },
-  tempBase: {
-    lineHeight: 1,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-  },
-  temp1: { fontSize: tokens.fontSizeBase700 },
 
-  // 2×1
-  body2: { flexDirection: 'column', justifyContent: 'center', gap: tokens.spacingVerticalXXS },
-  row2: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
-  temp2: { fontSize: tokens.fontSizeBase800 },
-  condition2: { fontSize: tokens.fontSizeBase300 },
-  side2: {
+  // 2×1：左图标+温度，右现象+高低温；删城市
+  body2: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+  },
+  left2: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
+  right2: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
-    marginLeft: 'auto',
+    gap: tokens.spacingVerticalXS,
+    minWidth: 0,
     flexShrink: 0,
   },
-  subMeta: {
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-    fontVariantNumeric: 'tabular-nums',
+
+  // 2×2：上块 0–55%（当前），下块 55–100%（6 列逐时）
+  body22: { flexDirection: 'column', gap: tokens.spacingVerticalS, minHeight: 0 },
+  top22: {
+    flexBasis: '55%',
+    flexGrow: 0,
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    minHeight: 0,
+    minWidth: 0,
   },
-
-  // 2×2
-  body22: { flexDirection: 'column', gap: tokens.spacingVerticalS },
-  currentRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, flexShrink: 0 },
-  temp22: { fontSize: tokens.fontSizeBase900 },
-  conditions: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0, flex: 1 },
-  conditionText: { fontSize: tokens.fontSizeBase300 },
-  fill: { flex: 1, minHeight: 0, minWidth: 0 },
-
-  // 3×2 / 4×2
-  body32: { flexDirection: 'column', gap: tokens.spacingVerticalS },
-  heroDailyGroup: {
+  top22Row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
     flex: 1,
     minHeight: 0,
+  },
+  meta22: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+    flex: 1,
+  },
+  hourly22: { flexBasis: '45%', flexGrow: 1, flexShrink: 1, minHeight: 0 },
+
+  // 3×2：左 42% 当前 / 右 58% 7 天；列间距 16；padding 12v/16h
+  body32: { flexDirection: 'row', gap: tokens.spacingHorizontalL, minHeight: 0 },
+  current32: {
+    flex: '42 1 0',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     gap: tokens.spacingVerticalS,
-  },
-  currentHero: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalM,
-    flexShrink: 0,
     minWidth: 0,
   },
-  tempHero: { fontSize: tokens.fontSizeBase900 },
-  heroMeta: {
+  currentRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
+  meta32: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
+  daily32: { flex: '58 1 0', minWidth: 0, minHeight: 0 },
+
+  // 4×2：左 55% 当前 / 中 30% AQI / 底 96px 7 天通栏；padding 12v/16h
+  body42: { flexDirection: 'column', gap: tokens.spacingVerticalS, minHeight: 0 },
+  top42: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: tokens.spacingHorizontalL,
+    minHeight: 0,
+    minWidth: 0,
+  },
+  current42: {
+    flexBasis: '55%',
+    flexGrow: 0,
+    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
     minWidth: 0,
-    flex: 1,
-    alignItems: 'flex-start',
   },
-  body42: { flexDirection: 'column', gap: tokens.spacingVerticalS },
-  row42Top: {
+  aqi42: {
+    flexBasis: '30%',
+    flexGrow: 0,
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalL,
-    flex: 1,
+    justifyContent: 'center',
+    minWidth: 0,
     minHeight: 0,
   },
-  col42Current: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    minWidth: 0,
-    flex: '1 1 0',
-    gap: tokens.spacingVerticalXXS,
-  },
-  currentIconRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS },
-  temp42: { fontSize: tokens.fontSizeBase900 },
-  col42Air: {
-    flex: '0 0 auto',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 0,
-    width: 'clamp(90px, 20vmin, 150px)',
-  },
-  dailyRow42: { flexShrink: 0 },
+  daily42: { flex: '0 0 96px', minHeight: 0 },
 
   // 状态
   stateBody: {
@@ -180,16 +189,9 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalL,
     minHeight: 0,
   },
-  stateTitle: { fontSize: tokens.fontSizeBase400, fontWeight: tokens.fontWeightSemibold },
-  stateText: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground2,
-    maxWidth: '46ch',
-    lineHeight: tokens.lineHeightBase200,
-  },
+  stateText: { color: tokens.colorNeutralForeground2, maxWidth: '46ch' },
   stateButtons: { display: 'flex', gap: tokens.spacingHorizontalS, flexWrap: 'wrap', justifyContent: 'center' },
   keyIcon: { color: tokens.colorNeutralForeground3 },
-  tinyHint: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2 },
   loading: {
     display: 'flex',
     flexDirection: 'column',
@@ -205,7 +207,11 @@ function LoadingState({ compact }) {
     <div className={styles.stateBody}>
       <div className={styles.loading}>
         <Spinner size={compact ? 'tiny' : 'medium'} />
-        {!compact && <span className={styles.stateText}>正在获取天气…</span>}
+        {!compact && (
+          <Text size={300} className={styles.stateText}>
+            正在获取天气…
+          </Text>
+        )}
       </div>
     </div>
   );
@@ -217,17 +223,21 @@ function NoKeyState({ compact, onOpenSettings, onUseMock }) {
     return (
       <div className={styles.stateBody}>
         <Key20Regular className={styles.keyIcon} />
-        <span className={styles.tinyHint}>配置 Key</span>
+        <Text size={300} className={styles.stateText}>
+          配置 Key
+        </Text>
       </div>
     );
   }
   return (
     <div className={styles.stateBody}>
       <Key20Regular className={styles.keyIcon} />
-      <span className={styles.stateTitle}>未配置和风天气 API Key</span>
-      <span className={styles.stateText}>
-        在设置里填入 API Key 与 API Host 后即可显示实时天气。没有 Key 时也可以先用内置演示数据预览。
-      </span>
+      <Text size={400} weight="semibold">
+        未配置和风天气 API Key
+      </Text>
+      <Text size={300} className={styles.stateText}>
+        在设置里填入 API Key 与数据地址后即可显示实时天气。没有 Key 时也可以先用内置演示数据预览。
+      </Text>
       <span className={styles.stateButtons}>
         <Button
           appearance="primary"
@@ -258,8 +268,12 @@ function ErrorState({ error, onRetry }) {
   const styles = useStyles();
   return (
     <div className={styles.stateBody}>
-      <span className={styles.stateTitle}>天气数据加载失败</span>
-      <span className={styles.stateText}>{error || '请检查网络、API Key 与 API Host。'}</span>
+      <Text size={400} weight="semibold">
+        天气数据加载失败
+      </Text>
+      <Text size={300} className={styles.stateText}>
+        {error || '请检查网络、API Key 与数据地址。'}
+      </Text>
       <Button
         appearance="primary"
         size="large"
@@ -274,12 +288,6 @@ function ErrorState({ error, onRetry }) {
     </div>
   );
 }
-
-const ICON_1 = 'min(46vmin, 52%)';
-const ICON_2 = 'clamp(34px, 24vmin, 88px)';
-const ICON_22 = 'clamp(32px, 19vmin, 74px)';
-const ICON_HERO = 'clamp(38px, 16vmin, 84px)';
-const ICON_42 = 'clamp(34px, 14vmin, 72px)';
 
 export default function Card({
   sizeKey,
@@ -361,10 +369,10 @@ export default function Card({
     <div
       className={mergeClasses(
         styles.card,
-        size === '1x1' && styles.pad1,
-        size === '2x1' && styles.pad2,
-        size === '2x2' && styles.pad22,
-        (size === '3x2' || size === '4x2') && styles.padLarge,
+        size === '1x1' && mergeClasses(styles.pad1, styles.gapXS),
+        size === '2x1' && mergeClasses(styles.pad2, styles.gapXS),
+        size === '2x2' && mergeClasses(styles.pad22, styles.gapS),
+        (size === '3x2' || size === '4x2') && mergeClasses(styles.padLarge, styles.gapS),
       )}
       role="button"
       tabIndex={0}
@@ -401,57 +409,54 @@ export default function Card({
                 code={current.icon}
                 night={currentNight}
                 scheme={scheme}
-                size={ICON_1}
+                size={44}
                 title={current.text}
               />
-              <span className={mergeClasses(styles.tempBase, styles.temp1)}>{fmtTemp(current.temp, settings.unit)}</span>
+              <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
             </div>
           )}
 
           {size === '2x1' && (
             <div className={mergeClasses(styles.body, styles.body2)}>
-              <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.row2}>
+              <div className={styles.left2}>
                 <WeatherIcon
                   code={current.icon}
                   night={currentNight}
                   scheme={scheme}
-                  size={ICON_2}
+                  size={48}
                   title={current.text}
                 />
-                <span className={mergeClasses(styles.tempBase, styles.temp2)}>
-                  {fmtTemp(current.temp, settings.unit)}
-                </span>
-                <div className={styles.side2}>
-                  <Condition code={current.icon} text={current.text} className={styles.condition2} />
-                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                </div>
+                <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
+              </div>
+              <div className={styles.right2}>
+                <Condition code={current.icon} text={current.text} />
+                <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
               </div>
             </div>
           )}
 
           {size === '2x2' && (
             <div className={mergeClasses(styles.body, styles.body22)}>
-              <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.currentRow}>
-                <WeatherIcon
-                  code={current.icon}
-                  night={currentNight}
-                  scheme={scheme}
-                  size={ICON_22}
-                  title={current.text}
-                />
-                <div className={styles.conditions}>
-                  <span className={mergeClasses(styles.tempBase, styles.temp22)}>
-                    {fmtTemp(current.temp, settings.unit)}
-                  </span>
-                  <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-                </div>
-                <div className={styles.side2}>
-                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+              <div className={styles.top22}>
+                <Text size={200} className={styles.city}>
+                  {place?.name}
+                </Text>
+                <div className={styles.top22Row}>
+                  <WeatherIcon
+                    code={current.icon}
+                    night={currentNight}
+                    scheme={scheme}
+                    size={56}
+                    title={current.text}
+                  />
+                  <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
+                  <div className={styles.meta22}>
+                    <Condition code={current.icon} text={current.text} />
+                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+                  </div>
                 </div>
               </div>
-              <div className={styles.fill}>
+              <div className={styles.hourly22}>
                 <HourlyStrip
                   items={data.hourly}
                   unit={settings.unit}
@@ -466,61 +471,62 @@ export default function Card({
 
           {size === '3x2' && (
             <div className={mergeClasses(styles.body, styles.body32)}>
-              <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.heroDailyGroup}>
-                <div className={styles.currentHero}>
+              <div className={styles.current32}>
+                <Text size={300} className={styles.city}>
+                  {place?.name}
+                </Text>
+                <div className={styles.currentRow}>
                   <WeatherIcon
                     code={current.icon}
                     night={currentNight}
                     scheme={scheme}
-                    size={ICON_HERO}
+                    size={64}
                     title={current.text}
                   />
-                  <span className={mergeClasses(styles.tempBase, styles.tempHero)}>
-                    {fmtTemp(current.temp, settings.unit)}
-                  </span>
-                  <div className={styles.heroMeta}>
-                    <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
-                  </div>
+                  <span className={styles.temp68}>{fmtTemp(current.temp, settings.unit)}</span>
                 </div>
-                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} showLow={false} />
+                <div className={styles.meta32}>
+                  <Condition code={current.icon} text={current.text} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={400} />
+                </div>
+              </div>
+              <div className={styles.daily32}>
+                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} variant="panel" />
               </div>
             </div>
           )}
 
           {size === '4x2' && (
             <div className={mergeClasses(styles.body, styles.body42)}>
-              <span className={styles.cityLine}>{place?.name}</span>
-              <div className={styles.row42Top}>
-                <div className={styles.col42Current}>
-                  <div className={styles.currentIconRow}>
+              <div className={styles.top42}>
+                <div className={styles.current42}>
+                  <Text size={300} className={styles.city}>
+                    {place?.name}
+                  </Text>
+                  <div className={styles.currentRow}>
                     <WeatherIcon
                       code={current.icon}
                       night={currentNight}
                       scheme={scheme}
-                      size={ICON_42}
+                      size={72}
                       title={current.text}
                     />
-                    <span className={mergeClasses(styles.tempBase, styles.temp42)}>
-                      {fmtTemp(current.temp, settings.unit)}
-                    </span>
+                    <span className={styles.temp68}>{fmtTemp(current.temp, settings.unit)}</span>
                   </div>
-                  <Condition code={current.icon} text={current.text} className={styles.conditionText} />
-                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} className={styles.subMeta} />
+                  <div className={styles.meta32}>
+                    <Condition code={current.icon} text={current.text} />
+                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={400} />
+                  </div>
                 </div>
                 {air && (
-                  <div className={styles.col42Air}>
-                    <AirRing air={air} size="clamp(60px, 18vmin, 116px)" />
+                  <div className={styles.aqi42}>
+                    <AirRing air={air} size={88} />
                   </div>
                 )}
               </div>
-              <DailyColumns
-                items={data.daily}
-                unit={settings.unit}
-                scheme={scheme}
-                className={styles.dailyRow42}
-              />
+              <div className={styles.daily42}>
+                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} variant="row" />
+              </div>
             </div>
           )}
         </div>

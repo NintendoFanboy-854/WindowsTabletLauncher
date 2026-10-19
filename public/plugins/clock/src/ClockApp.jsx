@@ -1,13 +1,13 @@
 /**
  * 时钟卡片视图（正常模式没有任何操作 chrome，DECISIONS D-02b / DENSITY 规则）。
  *
- * - 1×1：只显示 HH:MM（规格明确砍掉秒与日期）
- * - 2×1：时间 + 秒 + 日期
- * - 3×2：超大时间 + 日期 + 星期
+ * - 1×1：只显示 HH:MM，Display XL 48（D-07），秒/日期按规格砍掉
+ * - 2×1：时间 Fluent Display 68 + 秒 16 + 日期 16
+ * - 3×2：墙钟 hero：时间 Display XL 112 + 秒 16 + 日期/星期 20
  * - 点击卡片切换 12 / 24 小时制；长按 / 右键菜单打开设置（宿主全窗口浮层）
  *
- * 字号一律用 Fluent `Text` 组件的 size / weight 档位（type ramp），
- * 不用 CSS 覆写 font-size（审计 V-04）。
+ * 文本字号用 Fluent Text 的 size/weight；数字主信息用项目 Display XL（D-07，
+ * `_shared/typography.js`），不在组件里裸写任意 px。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import {
   useSettingsRequest,
   useStoredConfig,
 } from '../../_shared/host.js';
+import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
 import { sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
@@ -55,20 +56,48 @@ const useStyles = makeStyles({
       outlineOffset: `-${tokens.strokeWidthThick}`,
     },
   },
+  /** 1×1：padding 8（DENSITY §2.1 尺寸档） */
   rootCompact: {
     padding: tokens.spacingHorizontalS,
+    gap: tokens.spacingVerticalXXS,
   },
+  /** 2×1：8 纵 / 12 横 */
+  rootRow: {
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    gap: tokens.spacingVerticalXS,
+  },
+  /** 3×2：12 纵 / 16 横，时间与日期之间 12 */
   rootLarge: {
     gap: tokens.spacingVerticalM,
-    padding: tokens.spacingHorizontalL,
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
   },
   timeRow: {
     display: 'flex',
     alignItems: 'baseline',
     gap: tokens.spacingHorizontalXXS,
+    lineHeight: 0,
   },
   numeric: {
-    fontVariantNumeric: 'tabular-nums',
+    ...TABULAR_NUMS,
+  },
+  /** 1×1 数字主信息：Display XL 48（D-07） */
+  timeXl48: {
+    ...displayXl(48),
+    fontWeight: 600,
+    color: tokens.colorNeutralForeground1,
+  },
+  /** 3×2 数字主信息：Display XL 112（D-07） */
+  timeXl112: {
+    ...displayXl(112),
+    fontWeight: 600,
+    color: tokens.colorNeutralForeground1,
+  },
+  /** 2×1 用 Fluent Display 68，行高用 token（不再 lineHeight:1） */
+  time68: {
+    fontSize: tokens.fontSizeHero1000,
+    lineHeight: tokens.lineHeightHero1000,
+    fontWeight: 600,
+    color: tokens.colorNeutralForeground1,
   },
   seconds: {
     color: tokens.colorNeutralForeground3,
@@ -187,7 +216,12 @@ export default function ClockApp() {
   return (
     <div
       ref={rootRef}
-      className={mergeClasses(styles.root, compact && styles.rootCompact, large && styles.rootLarge)}
+      className={mergeClasses(
+        styles.root,
+        compact && styles.rootCompact,
+        sizeKey === '2x1' && styles.rootRow,
+        large && styles.rootLarge,
+      )}
       role="button"
       tabIndex={0}
       aria-label={ariaLabel}
@@ -204,22 +238,26 @@ export default function ClockApp() {
       }}
     >
       <div className={styles.timeRow}>
-        <Text className={styles.numeric} size={large ? 1000 : 900} weight="semibold">
-          {time.main}
-        </Text>
+        {compact && (
+          <span className={mergeClasses(styles.numeric, styles.timeXl48)}>{time.main}</span>
+        )}
+        {large && (
+          <span className={mergeClasses(styles.numeric, styles.timeXl112)}>{time.main}</span>
+        )}
+        {!compact && !large && <span className={mergeClasses(styles.numeric, styles.time68)}>{time.main}</span>}
         {showSeconds && (
-          <Text className={mergeClasses(styles.numeric, styles.seconds)} size={large ? 400 : 300}>
+          <Text className={mergeClasses(styles.numeric, styles.seconds)} size={400}>
             {time.seconds}
           </Text>
         )}
         {settings.hour12 && (
-          <Text className={styles.meridiem} size={large ? 400 : 300}>
+          <Text className={styles.meridiem} size={400}>
             {time.meridiem}
           </Text>
         )}
       </div>
       {!compact && (
-        <Text className={styles.meta} size={large ? 400 : 300}>
+        <Text className={styles.meta} size={large ? 500 : 400}>
           {large ? `${date.date} · ${date.weekday}` : date.inline}
         </Text>
       )}

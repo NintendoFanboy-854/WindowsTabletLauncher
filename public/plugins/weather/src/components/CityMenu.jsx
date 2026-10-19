@@ -30,10 +30,6 @@ const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     gap: tokens.spacingHorizontalS,
     color: tokens.colorNeutralForeground1,
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase400,
-    lineHeight: 1,
-    minHeight: '40px',
   },
   cityName: {
     overflow: 'hidden',
@@ -73,7 +69,7 @@ export function CityMenu({
       <MenuTrigger disableButtonEnhancement>
         <Button
           appearance="subtle"
-          size="small"
+          size="large"
           className={mergeClasses(styles.trigger, triggerClassName)}
           icon={<Location16Regular />}
           title="切换城市"

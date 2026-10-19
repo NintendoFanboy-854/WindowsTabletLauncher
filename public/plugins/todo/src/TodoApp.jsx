@@ -1,28 +1,25 @@
 /**
- * 待办卡片视图（DECISIONS D-02b）。
+ * 待办卡片视图（R3 / docs/UI-REWRITE-SPEC.md §3.5）。
  *
- * 尺寸档位（DENSITY / D-04）：
- * - 1×1  计数 + 首条任务
- * - 2×2  当前清单列表（≤4 行）+「查看全部」，无输入框
- * - 3×2  清单名 + 列表（≤6 行）+ 常驻输入框
- * - 3×3  工具条（今日 / 最近 + 搜索 + ⋯）+ 视图 + 输入框
- * - 4×2  左未完成 / 右已完成两栏（各自内部滚动 + 计数）
+ * 字号层级（Fluent type ramp，数字主信息按 D-07 Display XL）：
+ * - 1×1：未完成计数 XL-48（48/56）+ 标签 14；删掉首条任务
+ * - 2×2：计数 Hero700（28/36）+ 4 行（标题 Base400 16 / 元信息 Base200 12，行高 44）
+ * - 3×2：计数 28 + 行预算 ≤6 + 输入/添加 40
+ * - 3×3：计数 28 + 行数 = min(10, floor(可用高度/44))，超出滚动 + 底部渐隐
+ * - 4×2：两栏列头计数 Base600（24）+ 行 16/12
  *
- * 五视图保留：今日 / 最近 / 分类清单 / 日历+任务 / 周视图·月视图；常驻只留今日/最近，其余在 ⋯ 菜单。
- * 所有可点目标 ≥40×40；长按任务行打开宿主全窗口详情浮层。
+ * 间距按尺寸档：1×1=8；2×2=12；3×2/4×2=12 纵/16 横；3×3=16；列表行距 4（spacingVerticalXS）。
+ * 所有可点目标 ≥40×40；设置/详情/全部任务走宿主 ?view= 浮层。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
-  Checkbox,
   Input,
   Menu,
   MenuGroup,
   MenuGroupHeader,
   MenuItem,
-  MenuItemRadio,
   MenuList,
   MenuPopover,
   MenuTrigger,
@@ -38,10 +35,8 @@ import {
 } from '@fluentui/react-components';
 import {
   Add20Regular,
-  ArrowSort20Regular,
   CalendarLtr20Regular,
   Checkmark20Regular,
-  ChevronDown20Regular,
   Clock20Regular,
   DataHistogram20Regular,
   Dismiss20Regular,
@@ -49,7 +44,6 @@ import {
   MoreHorizontal20Regular,
   Search20Regular,
   Settings20Regular,
-  TaskListLtr20Regular,
 } from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
 import {
@@ -60,8 +54,8 @@ import {
   useStoredConfig,
 } from '../../_shared/host.js';
 import { store as todoStore } from '../js/store.js';
-import { addDays, addMonths, dayKey, fmtDate, isSameDay, startOfMonth, startOfWeek, toDate } from '../js/date.js';
-import { CONFIG_KEY, DEFAULT_CONFIG, normalizeConfig, SORT_OPTIONS, textSizeFor } from './config.js';
+import { addDays, dayKey, fmtDate, isSameDay, startOfMonth, startOfWeek } from '../js/date.js';
+import { CONFIG_KEY, DEFAULT_CONFIG, normalizeConfig, SORT_OPTIONS } from './config.js';
 import { layoutKind, rowBudget, sizeKeyOf } from './sizes.js';
 import {
   buildToolHandlers,
@@ -73,7 +67,18 @@ import {
   useApplyConfig,
   useTodoStore,
 } from './todoData.js';
-import { EmptyState, GroupHead, TaskRows, useTodoStyles } from './components.jsx';
+import {
+  DISPLAY_WEIGHT,
+  TABULAR_NUMS,
+  displayXl,
+} from '../../_shared/typography.js';
+import {
+  EmptyState,
+  ScrollArea,
+  TaskRows,
+  useFitRows,
+  useTodoStyles,
+} from './components.jsx';
 import { CalendarView, CategoryView, DayTodoView, RecentView, WeekMonthView } from './views.jsx';
 
 const TOASTER_ID = 'todo-toast';
@@ -86,59 +91,78 @@ const useStyles = makeStyles({
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    padding: tokens.spacingVerticalS,
-    gap: tokens.spacingVerticalXXS,
     color: tokens.colorNeutralForeground1,
     overflow: 'hidden',
     outline: 'none',
   },
-  rootSummary: { justifyContent: 'center', padding: tokens.spacingVerticalM },
-  rootMini: { justifyContent: 'center' },
-  menuItem: { minHeight: '40px' },
-  summaryMain: { display: 'flex', alignItems: 'baseline', gap: tokens.spacingHorizontalS },
-  summaryLabel: { color: tokens.colorNeutralForeground3 },
-  summaryFirst: {
+  /* 间距按尺寸档（UI-REWRITE-SPEC §2 / §3.5） */
+  padSummary: { padding: tokens.spacingVerticalS, gap: tokens.spacingVerticalXS },
+  padMini: { padding: tokens.spacingVerticalM, gap: tokens.spacingVerticalS },
+  padMedium: {
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    gap: tokens.spacingVerticalS,
+  },
+  padFull: { padding: tokens.spacingVerticalL, gap: tokens.spacingVerticalXS },
+  padWide: {
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    gap: tokens.spacingVerticalS,
+  },
+  summaryMain: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    minWidth: 0,
-    marginTop: tokens.spacingVerticalM,
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
   },
-  summaryTitle: {
-    flex: 1,
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    color: tokens.colorNeutralForeground2,
+  summaryCount: {
+    ...displayXl(48),
+    fontWeight: DISPLAY_WEIGHT,
+    ...TABULAR_NUMS,
+    color: tokens.colorNeutralForeground1,
   },
-  listHead: {
+  summaryLabel: { color: tokens.colorNeutralForeground2 },
+  tabular: { fontVariantNumeric: 'tabular-nums', lineHeight: tokens.lineHeightHero700 },
+  header: {
     display: 'flex',
     alignItems: 'baseline',
     gap: tokens.spacingHorizontalS,
     flexShrink: 0,
-    minHeight: '24px',
   },
-  listName: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  listCount: { color: tokens.colorNeutralForeground4, fontVariantNumeric: 'tabular-nums' },
-  listScroll: {
+  headerName: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  toolbarRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
+    minHeight: '40px',
+  },
+  countGroup: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalXS,
+    flexShrink: 0,
+  },
+  spacer: { flex: 1, minWidth: 0 },
+  listViewport: {
     flex: 1,
     minHeight: 0,
-    overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
   },
-  completeHint: { color: tokens.colorNeutralForeground4, paddingBlock: tokens.spacingVerticalS },
   composer: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
-    paddingTop: tokens.spacingVerticalXS,
   },
   composerInput: { flex: 1 },
-  dueBadge: { flexShrink: 0 },
+  inputLarge: { fontSize: tokens.fontSizeBase400 },
+  buttonLarge: { minHeight: '40px', fontSize: tokens.fontSizeBase400 },
+  moreRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   wideCols: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -150,30 +174,75 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    padding: tokens.spacingVerticalXS,
-    borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground2,
+    gap: tokens.spacingVerticalXS,
   },
   wideColHead: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: tokens.spacingHorizontalS,
     flexShrink: 0,
-    minHeight: '24px',
   },
-  wideColBody: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-  },
+  completeHint: { color: tokens.colorNeutralForeground3 },
+  menuItem: { minHeight: '40px' },
 });
 
-function scopeTasks(store, listScope) {
-  if (!listScope || listScope === 'all') return store.state.tasks;
-  return store.state.tasks.filter((task) => task.listId === listScope);
+/** 计数主层（列表卡 header ≥28px：DENSITY §2.1 断言 1） */
+function CountHeader({ count, name, size = 700 }) {
+  const styles = useStyles();
+  return (
+    <div className={styles.header}>
+      <Text className={styles.tabular} size={size} weight="semibold">
+        {count}
+      </Text>
+      <Text size={200} className={styles.headerName}>
+        {name}
+      </Text>
+    </div>
+  );
+}
+
+/**
+ * 列表：可视行数 = min(budget, floor(可用高度/行距))；
+ * 放不下的行进入滚动区，底部有渐隐提示；超出预算时给「查看全部」入口，禁止静默裁切。
+ */
+function FitList({ tasks, maxRows, budget, manualSort, onToggle, onOpenDetail, onReorder, onMore }) {
+  const styles = useStyles();
+  const viewportRef = useRef(null);
+  const rows = useFitRows(viewportRef, maxRows);
+  const hardBudget = budget ?? tasks.length;
+  const visibleCount = Math.max(1, Math.min(rows, hardBudget));
+  const visible = tasks.slice(0, visibleCount);
+  const rest = tasks.slice(visibleCount, hardBudget);
+  const beyondBudget = tasks.length - hardBudget;
+  return (
+    <div className={styles.listViewport} ref={viewportRef} data-visible-rows={visibleCount}>
+      <ScrollArea>
+        <TaskRows
+          tasks={visible}
+          manualSort={manualSort}
+          onToggle={onToggle}
+          onOpenDetail={onOpenDetail}
+          onReorder={onReorder}
+        />
+        {rest.length > 0 ? (
+          <TaskRows
+            tasks={rest}
+            manualSort={manualSort}
+            onToggle={onToggle}
+            onOpenDetail={onOpenDetail}
+            onReorder={onReorder}
+          />
+        ) : null}
+        {beyondBudget > 0 ? (
+          <div className={styles.moreRow}>
+            <Button appearance="subtle" size="large" onClick={onMore}>
+              查看全部（{tasks.length}）
+            </Button>
+          </div>
+        ) : null}
+      </ScrollArea>
+    </div>
+  );
 }
 
 export default function TodoApp({ defaultSizeKey = '3x3' }) {
@@ -197,18 +266,25 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
   const ui = useUiState(kind, config, configLoaded, store);
   const rootRef = useRef(null);
   const composerRef = useRef(null);
+  const fullViewportRef = useRef(null);
   const [composerFocusAt, setComposerFocusAt] = useState(0);
+  const fullRowsFit = useFitRows(fullViewportRef, 8);
 
   useEffect(() => {
     if (!composerFocusAt) return;
     composerRef.current?.focus();
   }, [composerFocusAt]);
 
-  useEffect(() => plugin.onFocus(() => rootRef.current?.querySelector('button, [role="checkbox"], input')?.focus() ?? rootRef.current?.focus()), []);
+  useEffect(
+    () =>
+      plugin.onFocus(
+        () => rootRef.current?.querySelector('button, [role="checkbox"], input')?.focus() ?? rootRef.current?.focus(),
+      ),
+    [],
+  );
 
   useSettingsRequest(() => openSettingsView());
 
-  /* Esc：先收搜索，再把焦点交还宿主（浮层由宿主 Dialog 处理 Esc） */
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return;
@@ -227,14 +303,16 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
   const currentListId = store.settings.defaultListId || store.lists[0]?.id;
   const currentList = store.listById(currentListId) || store.lists[0];
 
-  const actions = useMemo(() => {
-    const focusComposer = () => {
-      ui.setComposerOpen(true);
-      setComposerFocusAt((value) => value + 1);
-    };
-    return {
-      rowBudget: budget,
-      emptyAction: kind === 'mini' ? '新建任务' : '添加任务',
+  const focusComposer = useCallback(() => {
+    ui.setComposerOpen(true);
+    setComposerFocusAt((value) => value + 1);
+  }, [ui]);
+
+  const actions = useMemo(
+    () => ({
+      /* 3×3 动态行预算：min(10, floor(可用高度/44))，由视图消费 */
+      rowBudget: Math.min(8, Math.max(1, fullRowsFit)),
+      emptyAction: kind === 'mini' || kind === 'summary' ? '新建任务' : '添加任务',
       onEmptyAction: () => {
         if (kind === 'mini' || kind === 'summary') openNewTask(currentListId);
         else focusComposer();
@@ -266,16 +344,12 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
       onSetCalMode: (mode) => ui.setCalMode(mode),
       onToggleHeatWeight: () => ui.setHeatWeighted((value) => !value),
       onOpenSettings: openSettingsView,
-    };
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, kind, currentListId, store, config.weekStart, ui.calCursor, ui.weekCursor, ui.setCalCursor, ui.setWeekCursor, ui.setSelectedDay, ui.setComposerDue, ui.setComposerOpen, ui.setCompletedOpen, ui.setHeatWeighted]);
+    [kind, currentListId, fullRowsFit, config.weekStart, ui.calCursor, ui.weekCursor, focusComposer],
+  );
 
   useAgentTools(TOOL_DECLS, useMemo(() => buildToolHandlers(), []));
-
-  const focusComposer = useCallback(() => {
-    ui.setComposerOpen(true);
-    setComposerFocusAt((value) => value + 1);
-  }, [ui]);
 
   const submitComposer = useCallback(
     (event) => {
@@ -299,7 +373,8 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
   );
 
   const heatmapToggle = (
-    <MenuItem className={styles.menuItem}
+    <MenuItem
+      className={styles.menuItem}
       icon={ui.heatmapOpen ? <Checkmark20Regular /> : <DataHistogram20Regular />}
       onClick={() => ui.setHeatmapOpen((value) => !value)}
     >
@@ -328,8 +403,9 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
               { id: 'calendar', label: '日历 + 任务', icon: <CalendarLtr20Regular /> },
               { id: 'weekmonth', label: '周视图 / 月视图', icon: <Clock20Regular /> },
             ].map((item) => (
-              <MenuItem className={styles.menuItem}
+              <MenuItem
                 key={item.id}
+                className={styles.menuItem}
                 icon={item.icon}
                 onClick={() => ui.setView(item.id)}
                 secondaryContent={ui.view === item.id ? <Checkmark20Regular /> : null}
@@ -340,15 +416,17 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
           </MenuGroup>
           <MenuGroup>
             <MenuGroupHeader>清单</MenuGroupHeader>
-            <MenuItem className={styles.menuItem}
+            <MenuItem
+              className={styles.menuItem}
               onClick={() => ui.setListScope('all')}
               secondaryContent={ui.listScope === 'all' ? <Checkmark20Regular /> : null}
             >
               全部清单
             </MenuItem>
             {store.lists.map((list) => (
-              <MenuItem className={styles.menuItem}
+              <MenuItem
                 key={list.id}
+                className={styles.menuItem}
                 onClick={() => ui.setListScope(list.id)}
                 secondaryContent={ui.listScope === list.id ? <Checkmark20Regular /> : null}
               >
@@ -362,8 +440,9 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
           <MenuGroup>
             <MenuGroupHeader>排序</MenuGroupHeader>
             {SORT_OPTIONS.map((option) => (
-              <MenuItem className={styles.menuItem}
+              <MenuItem
                 key={option.value}
+                className={styles.menuItem}
                 onClick={() => ui.setSort(option.value)}
                 secondaryContent={ui.sort === option.value ? <Checkmark20Regular /> : null}
               >
@@ -398,11 +477,12 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
     actions,
   };
 
-  const composer = (
+  const renderComposer = (leading) => (
     <form className={styles.composer} onSubmit={submitComposer}>
+      {leading}
       <Input
         ref={composerRef}
-        className={styles.composerInput}
+        className={mergeClasses(styles.composerInput, styles.inputLarge)}
         appearance="outline"
         size="large"
         placeholder={ui.composerDue ? `添加到 ${fmtDate(new Date(`${ui.composerDue}T00:00:00`))}…` : '添加任务，回车提交'}
@@ -412,6 +492,8 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
         <Tooltip content="清除日期" relationship="label">
           <Button
             appearance="subtle"
+            size="large"
+            className={styles.buttonLarge}
             icon={<Dismiss20Regular />}
             onClick={() => ui.setComposerDue(null)}
           >
@@ -419,23 +501,34 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
           </Button>
         </Tooltip>
       ) : null}
-      <Button appearance="primary" type="submit" size="medium" className={todoStyles.emptyAction}>
+      <Button appearance="primary" type="submit" size="large" className={styles.buttonLarge}>
         添加
       </Button>
     </form>
   );
+  const composer = renderComposer(null);
 
-  /* ---------------------------------------------------------------- 1×1 */
+  const rootProps = (contentKind) => ({
+    ref: rootRef,
+    role: 'group',
+    tabIndex: -1,
+    'data-size-key': sizeKey,
+    'data-kind': contentKind,
+    'data-row-height': 44,
+    'data-row-gap': 4,
+    'data-max-font': contentKind === 'summary' ? 48 : contentKind === 'wide' ? 24 : 28,
+    'data-visible-rows': contentKind === 'full' ? Math.min(8, fullRowsFit) : undefined,
+  });
+
+  /* ---------------------------------------------------------------- 1×1：计数 XL-48 + 标签 14（无首条任务） */
   if (kind === 'summary') {
     const undone = store.state.tasks.filter((task) => task.listId === currentListId && !task.done);
-    const first = store.sortTasks(undone, 'due')[0];
     const today = new Date();
     const dueToday = undone.filter((task) => task.dueAt && isSameDay(task.dueAt, today));
     return (
       <div
-        className={mergeClasses(styles.root, styles.rootSummary)}
-        ref={rootRef}
-        tabIndex={-1}
+        {...rootProps('summary')}
+        className={mergeClasses(styles.root, styles.padSummary, styles.summaryMain)}
         onContextMenu={(event) => {
           event.preventDefault();
           openSettingsView();
@@ -443,149 +536,124 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
         aria-label={`${currentList?.name || '待办'}：${undone.length} 项未完成，${dueToday.length} 项今日到期`}
       >
         <Toaster toasterId={TOASTER_ID} position="bottom-end" />
-        <div className={styles.summaryMain}>
-          <Text size={textSizeFor(config, 800)} weight="semibold" style={{ lineHeight: 1 }}>
-            {undone.length}
-          </Text>
-          <Text size={200} className={styles.summaryLabel}>
-            未完成 · 今日 {dueToday.length}
-          </Text>
-        </div>
-        <div className={styles.summaryFirst}>
-          <TaskListLtr20Regular aria-hidden="true" style={{ color: tokens.colorNeutralForeground4 }} />
-          <Text size={200} className={styles.summaryTitle} title={first?.title || '没有待办'}>
-            {first ? first.title : '没有待办'}
-          </Text>
-        </div>
+        <span className={styles.summaryCount}>{undone.length}</span>
+        <Text size={300} className={styles.summaryLabel}>
+          未完成 · 今日 {dueToday.length}
+        </Text>
       </div>
     );
   }
 
-  /* ---------------------------------------------------------------- 2×2 / 3×2 */
+  /* ---------------------------------------------------------------- 2×2 / 3×2：计数 28 + 行预算 4/6 + 输入（3×2） */
   if (kind === 'mini' || kind === 'medium') {
     const list = currentList;
     const tasks = store.sortTasks(store.state.tasks.filter((task) => task.listId === list.id && !task.done), ui.sort);
-    const visible = tasks.slice(0, budget);
-    const hidden = tasks.length - visible.length;
     return (
-      <div className={mergeClasses(styles.root, kind === 'mini' && styles.rootMini)} ref={rootRef} tabIndex={-1} aria-label={`${list.name}：${tasks.length} 项未完成`}>
+      <div
+        {...rootProps(kind)}
+        className={mergeClasses(styles.root, kind === 'mini' ? styles.padMini : styles.padMedium)}
+        aria-label={`${list.name}：${tasks.length} 项未完成`}
+      >
         <Toaster toasterId={TOASTER_ID} position="bottom-end" />
-        <div className={styles.listHead}>
-          <Text size={200} className={styles.listName}>
-            {list.name}
-          </Text>
-          <Text size={200} className={styles.listCount}>
-            {tasks.length}
-          </Text>
-        </div>
-        <div className={styles.listScroll}>
-          {tasks.length === 0 ? (
-            <EmptyState
-              title="没有待办"
-              actionLabel={kind === 'medium' ? '添加任务' : '新建任务'}
-              onAction={actions.onEmptyAction}
-            />
-          ) : (
-            <TaskRows
-              tasks={visible}
-              manualSort={ui.sort === 'manual'}
-              onToggle={actions.onToggle}
-              onOpenDetail={actions.onOpenDetail}
-              onReorder={actions.onReorder}
-            />
-          )}
-          {hidden > 0 ? (
-            <Button
-              appearance="subtle"
-              className={todoStyles.more}
-              onClick={() => openAllTasks({ listId: list.id })}
-            >
-              查看全部（{tasks.length}）
-            </Button>
-          ) : null}
-        </div>
-        {kind === 'medium' ? composer : null}
+        {kind === 'mini' ? <CountHeader count={tasks.length} name={list.name} /> : null}
+        {tasks.length === 0 ? (
+          <EmptyState title="没有待办" actionLabel={actions.emptyAction} onAction={actions.onEmptyAction} />
+        ) : (
+          <FitList
+            tasks={tasks}
+            maxRows={budget || 4}
+            budget={budget}
+            manualSort={ui.sort === 'manual'}
+            onToggle={actions.onToggle}
+            onOpenDetail={actions.onOpenDetail}
+            onReorder={actions.onReorder}
+            onMore={() => openAllTasks({ listId: list.id })}
+          />
+        )}
+        {kind === 'medium'
+          ? renderComposer(
+              <div className={styles.countGroup} aria-label={`${tasks.length} 项未完成`}>
+                <Text className={styles.tabular} size={700} weight="semibold">
+                  {tasks.length}
+                </Text>
+                <Text size={200} className={styles.headerName}>
+                  未完成
+                </Text>
+              </div>,
+            )
+          : null}
       </div>
     );
   }
 
-  /* ---------------------------------------------------------------- 4×2 */
+  /* ---------------------------------------------------------------- 4×2：两栏列头计数 24 + 行 16/12 */
   if (kind === 'wide') {
     const list = currentList;
     const undone = store.sortTasks(store.state.tasks.filter((task) => task.listId === list.id && !task.done), ui.sort);
     const done = store.sortTasks(store.state.tasks.filter((task) => task.listId === list.id && task.done), 'created').reverse();
     return (
-      <div className={styles.root} ref={rootRef} tabIndex={-1} aria-label={`${list.name}：${undone.length} 项未完成`}>
+      <div {...rootProps('wide')} className={mergeClasses(styles.root, styles.padWide)} aria-label={`${list.name}：${undone.length} 项未完成`}>
         <Toaster toasterId={TOASTER_ID} position="bottom-end" />
-        <div className={styles.listHead}>
-          <Text size={200} className={styles.listName}>
-            {list.name}
-          </Text>
-          <Text size={200} className={styles.listCount}>
-            {undone.length}
-          </Text>
-          <span className={todoStyles.spacer} />
-          {ui.composerOpen ? null : (
-            <Tooltip content="添加任务" relationship="label">
-              <Button
-                appearance="subtle"
-                className={todoStyles.iconButton}
-                icon={<Add20Regular />}
-                aria-label="添加任务"
-                onClick={() => focusComposer()}
-              />
-            </Tooltip>
-          )}
-        </div>
         <div className={styles.wideCols}>
           <section className={styles.wideCol} aria-label="未完成">
             <div className={styles.wideColHead}>
-              <Text size={200} className={styles.listName}>
-                未完成
-              </Text>
-              <Text size={200} className={styles.listCount}>
+              <Text className={styles.tabular} size={700} weight="semibold">
                 {undone.length}
               </Text>
-            </div>
-            <div className={styles.wideColBody}>
-              {undone.length === 0 ? (
-                <Text size={200} className={styles.completeHint}>
-                  全部做完了
-                </Text>
-              ) : (
-                <TaskRows
-                  tasks={undone}
-                  manualSort={ui.sort === 'manual'}
-                  onToggle={actions.onToggle}
-                  onOpenDetail={actions.onOpenDetail}
-                  onReorder={actions.onReorder}
+              <Text size={200} className={styles.headerName}>
+                未完成
+              </Text>
+              <span className={styles.spacer} />
+              <Tooltip content="添加任务" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="large"
+                  className={todoStyles.iconButton}
+                  icon={<Add20Regular />}
+                  aria-label="添加任务"
+                  onClick={() => focusComposer()}
                 />
-              )}
+              </Tooltip>
             </div>
+            {undone.length === 0 ? (
+              <Text size={200} className={styles.completeHint}>
+                全部做完了
+              </Text>
+            ) : (
+              <FitList
+                tasks={undone}
+                maxRows={30}
+                manualSort={ui.sort === 'manual'}
+                onToggle={actions.onToggle}
+                onOpenDetail={actions.onOpenDetail}
+                onReorder={actions.onReorder}
+                onMore={() => openAllTasks({ listId: list.id })}
+              />
+            )}
           </section>
           <section className={styles.wideCol} aria-label="已完成">
             <div className={styles.wideColHead}>
-              <Text size={200} className={styles.listName}>
-                已完成
-              </Text>
-              <Text size={200} className={styles.listCount}>
+              <Text className={styles.tabular} size={700} weight="semibold">
                 {done.length}
               </Text>
+              <Text size={200} className={styles.headerName}>
+                已完成
+              </Text>
             </div>
-            <div className={styles.wideColBody}>
-              {done.length === 0 ? (
-                <Text size={200} className={styles.completeHint}>
-                  暂无已完成
-                </Text>
-              ) : (
-                <TaskRows
-                  tasks={done}
-                  onToggle={actions.onToggle}
-                  onOpenDetail={actions.onOpenDetail}
-                  onReorder={actions.onReorder}
-                />
-              )}
-            </div>
+            {done.length === 0 ? (
+              <Text size={200} className={styles.completeHint}>
+                暂无已完成
+              </Text>
+            ) : (
+              <FitList
+                tasks={done}
+                maxRows={30}
+                onToggle={actions.onToggle}
+                onOpenDetail={actions.onOpenDetail}
+                onReorder={actions.onReorder}
+                onMore={() => openAllTasks({ done: true })}
+              />
+            )}
           </section>
         </div>
         {ui.composerOpen ? composer : null}
@@ -593,49 +661,59 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
     );
   }
 
-  /* ---------------------------------------------------------------- 3×3 */
-  const view = ui.view;
+  /* ---------------------------------------------------------------- 3×3：工具栏（计数 28 + 今日/最近 + 搜索 + ⋯）+ 动态行 + 输入 */
+  const scopeTasks = ui.listScope === 'all' ? store.state.tasks : store.state.tasks.filter((task) => task.listId === ui.listScope);
+  const scopeUndone = scopeTasks.filter((task) => !task.done).length;
+  const isPrimaryView = ui.view === 'daytodo' || ui.view === 'recent';
   let viewContent = null;
   if (ui.query.trim()) {
-    const hits = store.searchTasks(ui.query).filter(
-      (task) => ui.listScope === 'all' || task.listId === ui.listScope,
-    );
+    const hits = store.searchTasks(ui.query).filter((task) => ui.listScope === 'all' || task.listId === ui.listScope);
     viewContent = (
-      <div className={todoStyles.content}>
-        <GroupHead label={`搜索结果 · “${ui.query}”`} count={hits.length} />
+      <>
+        <Text size={300} weight="semibold" className={styles.headerName}>
+          搜索结果 · “{ui.query}”（{hits.length}）
+        </Text>
         {hits.length === 0 ? (
           <EmptyState title="没有匹配" />
         ) : (
           <TaskRows
-            tasks={hits.slice(0, 10)}
+            tasks={hits.slice(0, Math.max(1, Math.min(8, fullRowsFit)))}
             onToggle={actions.onToggle}
             onOpenDetail={actions.onOpenDetail}
             onReorder={actions.onReorder}
           />
         )}
-      </div>
+      </>
     );
-  } else if (view === 'daytodo') {
-    viewContent = <div className={todoStyles.content}><DayTodoView ctx={ctx} /></div>;
-  } else if (view === 'recent') {
-    viewContent = <div className={todoStyles.content}><RecentView ctx={ctx} /></div>;
-  } else if (view === 'category') {
-    viewContent = <div className={todoStyles.content}><CategoryView ctx={ctx} /></div>;
-  } else if (view === 'calendar') {
-    viewContent = <div className={todoStyles.content}><CalendarView ctx={ctx} /></div>;
+  } else if (ui.view === 'daytodo') {
+    viewContent = <DayTodoView ctx={ctx} />;
+  } else if (ui.view === 'recent') {
+    viewContent = <RecentView ctx={ctx} />;
+  } else if (ui.view === 'category') {
+    viewContent = <CategoryView ctx={ctx} />;
+  } else if (ui.view === 'calendar') {
+    viewContent = <CalendarView ctx={ctx} />;
   } else {
-    viewContent = <div className={todoStyles.content}><WeekMonthView ctx={ctx} /></div>;
+    viewContent = <WeekMonthView ctx={ctx} />;
   }
-
-  const isPrimaryView = view === 'daytodo' || view === 'recent';
+  const calendarLike = !ui.query.trim() && (ui.view === 'calendar' || ui.view === 'weekmonth');
 
   return (
-    <div className={styles.root} ref={rootRef} tabIndex={-1} aria-label="待办清单">
+    <div {...rootProps('full')} className={mergeClasses(styles.root, styles.padFull)} aria-label="待办清单">
       <Toaster toasterId={TOASTER_ID} position="bottom-end" />
-      <div className={todoStyles.toolbar}>
+      <div className={styles.toolbarRow}>
+        <div className={styles.countGroup}>
+          <Text className={styles.tabular} size={700} weight="semibold">
+            {scopeUndone}
+          </Text>
+          <Text size={200} className={styles.headerName}>
+            未完成
+          </Text>
+        </div>
+        <span className={styles.spacer} />
         <TabList
           className={todoStyles.tabs}
-          selectedValue={isPrimaryView ? view : undefined}
+          selectedValue={isPrimaryView ? ui.view : undefined}
           onTabSelect={(_, data) => ui.setView(data.value)}
           aria-label="主视图"
         >
@@ -660,7 +738,7 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
       {ui.searchOpen ? (
         <div className={todoStyles.searchRow}>
           <Input
-            className={todoStyles.search}
+            className={mergeClasses(todoStyles.search, styles.inputLarge)}
             appearance="outline"
             size="large"
             contentBefore={<Search20Regular />}
@@ -684,7 +762,15 @@ export default function TodoApp({ defaultSizeKey = '3x3' }) {
           </Tooltip>
         </div>
       ) : null}
-      {viewContent}
+      <div className={styles.listViewport} ref={fullViewportRef}>
+        {calendarLike ? (
+          viewContent
+        ) : (
+          <ScrollArea>
+            <div className={todoStyles.content}>{viewContent}</div>
+          </ScrollArea>
+        )}
+      </div>
       {composer}
     </div>
   );

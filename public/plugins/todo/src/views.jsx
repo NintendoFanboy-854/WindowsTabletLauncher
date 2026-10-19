@@ -114,7 +114,7 @@ const useStyles = makeStyles({
     minHeight: '28px',
     justifyContent: 'flex-start',
     overflow: 'hidden',
-    fontSize: tokens.fontSizeBase100,
+    fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground2,
   },
   numeric: { fontVariantNumeric: 'tabular-nums' },
@@ -499,7 +499,7 @@ export function WeekMonthView({ ctx }) {
                 className={mergeClasses(local.weekCol, isSameDay(date, today) && local.weekColToday)}
               >
                 <Button appearance="subtle" className={local.weekHeadCell} onClick={() => ctx.actions.onAddDay(key)}>
-                  <Text size={100}>{labels[index]}</Text>
+                  <Text size={200}>{labels[index]}</Text>
                   <Text size={200} weight="semibold" className={local.weekDate}>
                     {date.getDate()}
                   </Text>
@@ -526,7 +526,7 @@ export function WeekMonthView({ ctx }) {
       ) : (
         <div className={local.monthGrid}>
           {labels.map((label) => (
-            <Text key={label} className={local.monthWeekday} size={100}>
+            <Text key={label} className={local.monthWeekday} size={200}>
               {label}
             </Text>
           ))}
@@ -555,7 +555,7 @@ export function WeekMonthView({ ctx }) {
                 {tasks.slice(0, 3).map((task) => (
                   <Text
                     key={task.id}
-                    size={100}
+                    size={200}
                     truncate
                     title={task.title}
                     className={local.monthTask}
@@ -565,7 +565,7 @@ export function WeekMonthView({ ctx }) {
                   </Text>
                 ))}
                 {tasks.length > 3 ? (
-                  <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
+                  <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>
                     +{tasks.length - 3}
                   </Text>
                 ) : null}
