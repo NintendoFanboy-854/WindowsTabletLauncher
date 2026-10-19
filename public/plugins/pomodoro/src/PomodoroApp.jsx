@@ -1,24 +1,18 @@
 /**
- * 番茄钟卡片视图（UI 重写 v2，docs/UI-REWRITE-SPEC.md §3.3）。
+ * 番茄钟卡片（L0）。
  *
- * 字号层级（数字主信息走 _shared/typography.js 的 displayXl()）：
- * - 1×1：时间 XL-48 + 阶段 14 品牌色 + 2px 进度
- * - 2×1：时间 68（Hero1000）+ 阶段 14 + 40px 主按钮
- * - 2×2：时间 68 + 阶段 14 + 任务 16 S + 今日统计 16 + 40px 按钮
- * - 3×2：时间 XL-96 + 阶段/任务 16 + 两条今日统计 16 + 轮次 12 + 40px 按钮 + 顶部 4px 进度
- * - 沉浸层：时间 XL-112 + 阶段/任务 16 + 40px 按钮
+ * 信息预算（docs/components/pomodoro.md）：
+ * - 1×1：剩余时间 48 + 阶段 14 + 2px 进度；不放按钮，点卡体进详情
+ * - 2×1：时间 68 + 阶段 +「开始/暂停」40 +「重置」40
+ * - 2×2：时间 80 + 阶段 + 当前任务 + 今日统计一行 + 两个 40 按钮
+ * - 3×2：时间 96 + 进度 + 阶段 + 任务 + 两条今日统计 + 轮次 + 两个 40 按钮
  *
- * 删除 lineHeight:1；间距按尺寸档（1×1=8，2×1=8/12，2×2=12，3×2=12/16）。
+ * 卡片主体点击 = 打开 L1；快捷按钮 stopPropagation，不打开详情。
+ * 长按/右键/hover 全部交给 CardRoot（useHostCardGesture），这里不处理。
  */
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
-  Button,
-  Menu,
-  MenuItem,
-  MenuList,
-  MenuPopover,
-  MenuTrigger,
   ProgressBar,
   Text,
   Tooltip,
@@ -27,149 +21,61 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import {
-  ArrowNext20Regular,
   ArrowReset20Regular,
-  Dismiss20Regular,
-  FullScreenMaximize20Regular,
-  MoreHorizontal20Regular,
   Pause20Filled,
   Play20Filled,
-  Stop20Filled,
 } from '@fluentui/react-icons';
-import {
-  requestOverlay,
-  requestSettings,
-  useAgentTools,
-  useHostSize,
-  useSettingsRequest,
-  useStoredConfig,
-} from '../../_shared/host.js';
-import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
+import { requestOverlay, useAgentTools, useHostSize, useStoredConfig } from '../../_shared/host.js';
+import { useMotionTransition } from '../../_shared/motion.js';
+import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
+import { CardRoot, TouchButton } from '../../_shared/ui.jsx';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
-  PHASES,
   SETTINGS_KEY,
+  TOOL_DECLS,
+  buildToolHandlers,
   getEngine,
   normalizeSettings,
 } from './data/timer.js';
 
-const LONG_PRESS_MS = 500;
-const XL_48 = displayXl(48);
-const XL_96 = displayXl(96);
-const XL_112 = displayXl(112);
-
-const PHASE_COLOR = {
-  focus: tokens.colorBrandForeground1,
-  shortBreak: tokens.colorStatusSuccessForeground1,
-  longBreak: tokens.colorBrandForeground2,
-};
-
 const useStyles = makeStyles({
   root: {
-    position: 'relative',
-    boxSizing: 'border-box',
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    color: tokens.colorNeutralForeground1,
-    overflow: 'hidden',
     userSelect: 'none',
+    cursor: 'pointer',
   },
   root1: {
     alignItems: 'center',
-    justifyContent: 'space-evenly',
+    justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     padding: tokens.spacingVerticalS,
-    cursor: 'pointer',
   },
   root21: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: tokens.spacingHorizontalM,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    paddingBlock: tokens.spacingVerticalS,
+    paddingInline: tokens.spacingHorizontalM,
   },
   root22: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: tokens.spacingVerticalS,
     padding: tokens.spacingVerticalM,
+    textAlign: 'center',
   },
   root32: {
     gap: tokens.spacingVerticalS,
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    paddingBlock: tokens.spacingVerticalM,
+    paddingInline: tokens.spacingHorizontalL,
   },
-  /* ---- 数字主信息（D-07 Display XL / Fluent Hero1000） ---- */
-  time48: {
-    ...XL_48,
-    ...TABULAR_NUMS,
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  time96: {
-    ...XL_96,
-    ...TABULAR_NUMS,
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  time112: {
-    ...XL_112,
-    ...TABULAR_NUMS,
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  time: {
-    ...TABULAR_NUMS,
-    fontWeight: tokens.fontWeightSemibold,
-    whiteSpace: 'nowrap',
-  },
-  /* ---- 阶段 / 任务 / 统计 ---- */
-  phaseRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    minWidth: 0,
-  },
-  task: {
-    color: tokens.colorNeutralForeground2,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '100%',
-  },
-  stats: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    color: tokens.colorNeutralForeground2,
-    minWidth: 0,
-  },
-  statsLine: {
-    color: tokens.colorNeutralForeground2,
-    whiteSpace: 'nowrap',
-  },
-  round: {
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-  },
-  /* ---- 布局 ---- */
-  primaryColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
-  },
-  rowMain: {
+  mainColumn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
-  },
-  actions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    flex: '0 0 auto',
   },
   wide: {
     display: 'grid',
@@ -177,8 +83,8 @@ const useStyles = makeStyles({
     alignItems: 'stretch',
     columnGap: tokens.spacingHorizontalXL,
     rowGap: tokens.spacingVerticalS,
-    minHeight: 0,
     flex: '1 1 auto',
+    minHeight: 0,
   },
   wideMain: {
     display: 'flex',
@@ -196,6 +102,54 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXS,
     minWidth: 0,
   },
+  stats: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: tokens.spacingVerticalXS,
+    minWidth: 0,
+  },
+  time: {
+    ...TABULAR_NUMS,
+    fontWeight: DISPLAY_WEIGHT,
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+  time48: displayXl(48),
+  time68: {
+    fontSize: tokens.fontSizeHero1000,
+    lineHeight: tokens.lineHeightHero1000,
+  },
+  time80: displayXl(80),
+  time96: displayXl(96),
+  phase: {
+    minWidth: 0,
+  },
+  task: {
+    maxWidth: '100%',
+    minWidth: 0,
+    color: tokens.colorNeutralForeground2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  statLine: {
+    color: tokens.colorNeutralForeground2,
+    whiteSpace: 'nowrap',
+  },
+  round: {
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+  },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flex: '0 0 auto',
+  },
+  actionsCenter: {
+    justifyContent: 'center',
+  },
   progressTop: {
     width: '100%',
     flex: '0 0 auto',
@@ -203,75 +157,41 @@ const useStyles = makeStyles({
   progressBottom: {
     width: '72%',
   },
-  /* ---- 沉浸层 ---- */
-  immersive: {
-    position: 'absolute',
-    inset: 0,
-    zIndex: 2,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalM,
-    padding: tokens.spacingHorizontalL,
-    backgroundColor: tokens.colorNeutralBackground1,
-    textAlign: 'center',
-  },
-  immersiveActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalM,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  immersiveClose: {
-    position: 'absolute',
-    top: tokens.spacingVerticalS,
-    right: tokens.spacingHorizontalS,
-  },
 });
 
-function useLongPress(onLongPress) {
-  const ref = useRef({ timer: 0, origin: null, suppressClick: false });
-  const clear = useCallback(() => {
-    window.clearTimeout(ref.current.timer);
-    ref.current.timer = 0;
-    ref.current.origin = null;
-  }, []);
-  useEffect(() => clear, [clear]);
-  const onPointerDown = useCallback(
-    (event) => {
-      if (event.button !== 0) return;
-      clear();
-      ref.current.origin = { x: event.clientX, y: event.clientY };
-      ref.current.timer = window.setTimeout(() => {
-        ref.current.suppressClick = true;
-        onLongPress();
-      }, LONG_PRESS_MS);
-    },
-    [clear, onLongPress],
+function phaseColor(phase) {
+  return phase === 'focus' ? tokens.colorBrandForeground1 : tokens.colorNeutralForeground2;
+}
+
+function toggleTextOf(snapshot) {
+  if (snapshot.running) return '暂停';
+  if (snapshot.progress > 0) return '继续';
+  return '开始';
+}
+
+function CardActions({ styles, snapshot, onToggle, onReset, centered = false }) {
+  const toggleText = toggleTextOf(snapshot);
+  return (
+    <div className={mergeClasses(styles.actions, centered && styles.actionsCenter)}>
+      <Tooltip content={toggleText} relationship="label">
+        <TouchButton
+          appearance="primary"
+          icon={snapshot.running ? <Pause20Filled /> : <Play20Filled />}
+          aria-label={toggleText}
+          data-pomodoro-action="toggle"
+          onClick={onToggle}
+        />
+      </Tooltip>
+      <Tooltip content="重置本轮" relationship="label">
+        <TouchButton
+          icon={<ArrowReset20Regular />}
+          aria-label="重置本轮"
+          data-pomodoro-action="reset"
+          onClick={onReset}
+        />
+      </Tooltip>
+    </div>
   );
-  const onPointerMove = useCallback(
-    (event) => {
-      const origin = ref.current.origin;
-      if (!origin) return;
-      if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 8) clear();
-    },
-    [clear],
-  );
-  const consumeSuppressedClick = useCallback(() => {
-    if (!ref.current.suppressClick) return false;
-    ref.current.suppressClick = false;
-    return true;
-  }, []);
-  return {
-    onPointerDown,
-    onPointerMove,
-    onPointerUp: clear,
-    onPointerCancel: clear,
-    onPointerLeave: clear,
-    consumeSuppressedClick,
-  };
 }
 
 export default function PomodoroApp({ fallbackSizeKey }) {
@@ -280,14 +200,11 @@ export default function PomodoroApp({ fallbackSizeKey }) {
   const [settings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
   const engine = getEngine();
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
-  const [immersive, setImmersive] = useState(
-    () => new URLSearchParams(location.search).get('immersive') === '1',
-  );
-  const engineRef = useRef(engine);
-  engineRef.current = engine;
+  const phaseTransition = useMotionTransition('exit');
 
   const compact = sizeKey === '1x1';
   const row = sizeKey === '2x1';
+  const medium = sizeKey === '2x2';
   const wide = sizeKey === '3x2';
 
   useEffect(() => {
@@ -299,295 +216,169 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     engine.setSettings(settings);
   }, [engine, settings]);
 
-  useSettingsRequest(() => requestSettings('番茄钟设置'));
+  const handlers = useMemo(() => buildToolHandlers(engine), [engine]);
+  useAgentTools(TOOL_DECLS, handlers);
 
-  const toggle = useCallback(() => engine.toggle(), [engine]);
-  const openDetail = useCallback(() => requestOverlay('detail', '专注详情'), []);
-  const openSettings = useCallback(() => requestSettings('番茄钟设置'), []);
-  const press = useLongPress(openSettings);
-
-  useAgentTools(
-    [
-      {
-        name: 'pomodoro.start',
-        description: '开始或继续一轮专注',
-        parameters: {
-          type: 'object',
-          properties: {
-            minutes: { type: 'number', description: '本轮专注分钟数，省略用设置里的 focusMin' },
-            taskId: { type: 'string', description: '关联的待办任务 id' },
-            taskTitle: { type: 'string', description: '关联任务标题（仅展示用）' },
-          },
-          additionalProperties: false,
-        },
-      },
-      {
-        name: 'pomodoro.pause',
-        description: '暂停当前一轮',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-      {
-        name: 'pomodoro.resume',
-        description: '继续当前一轮',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-      {
-        name: 'pomodoro.stop',
-        description: '停止当前一轮并落库本次记录',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-      {
-        name: 'pomodoro.skip',
-        description: '跳过当前阶段',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-      {
-        name: 'pomodoro.status',
-        description: '读取阶段、剩余秒数、任务与今日统计',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-      {
-        name: 'pomodoro.stats',
-        description: '读取完成数、专注分钟与连续天数',
-        parameters: {
-          type: 'object',
-          properties: {
-            range: { type: 'string', enum: ['today', 'week', 'month'], description: '统计范围，默认 today' },
-          },
-          additionalProperties: false,
-        },
-      },
-    ],
-    {
-      'pomodoro.start': (args) => engineRef.current.start(args),
-      'pomodoro.pause': () => {
-        engineRef.current.pause();
-        return engineRef.current.status();
-      },
-      'pomodoro.resume': () => engineRef.current.start(),
-      'pomodoro.stop': () => ({ session: engineRef.current.stop(), status: engineRef.current.status() }),
-      'pomodoro.skip': () => {
-        engineRef.current.skip();
-        return engineRef.current.status();
-      },
-      'pomodoro.status': () => engineRef.current.status(),
-      'pomodoro.stats': (args) => engineRef.current.stats(args?.range),
+  const toggle = useCallback(
+    (event) => {
+      event.stopPropagation();
+      engine.toggle();
     },
+    [engine],
   );
-
-  const toggleLabel =
-    snapshot.running ? '暂停' : snapshot.phase !== 'focus' || snapshot.progress > 0 ? '继续' : '开始';
-
-  const toggleButton = (withLabel) => (
-    <Tooltip content={snapshot.running ? '暂停' : '开始 / 继续'} relationship="label">
-      <Button
-        appearance="primary"
-        size="large"
-        icon={snapshot.running ? <Pause20Filled /> : <Play20Filled />}
-        onClick={toggle}
-        aria-label={snapshot.running ? '暂停' : '开始'}
-      >
-        {withLabel ? toggleLabel : null}
-      </Button>
-    </Tooltip>
+  const reset = useCallback(
+    (event) => {
+      event.stopPropagation();
+      engine.reset();
+    },
+    [engine],
   );
+  const openDetail = useCallback(() => requestOverlay('detail', '专注详情'), []);
 
-  const menu = (
-    <Menu>
-      <MenuTrigger disableButtonEnhancement>
-        <Tooltip content="更多操作" relationship="label">
-          <Button
-            appearance="subtle"
-            size="large"
-            icon={<MoreHorizontal20Regular />}
-            aria-label="更多操作"
-          />
-        </Tooltip>
-      </MenuTrigger>
-      <MenuPopover>
-        <MenuList>
-          <MenuItem icon={<FullScreenMaximize20Regular />} onClick={() => setImmersive(true)}>
-            沉浸模式
-          </MenuItem>
-          <MenuItem onClick={openDetail}>详情与统计</MenuItem>
-          <MenuItem icon={<ArrowNext20Regular />} onClick={() => engine.skip()}>
-            跳过本轮
-          </MenuItem>
-          <MenuItem icon={<ArrowReset20Regular />} onClick={() => engine.reset()}>
-            重置
-          </MenuItem>
-          <MenuItem onClick={openSettings}>设置</MenuItem>
-        </MenuList>
-      </MenuPopover>
-    </Menu>
-  );
-
-  /* 阶段：1×1/2×1/2×2 14，3×2 16；颜色只表达阶段语义 */
-  const phaseText = (size = 300) => (
-    <Text size={size} weight="semibold" style={{ color: PHASE_COLOR[snapshot.phase] }}>
+  const phaseStyle = {
+    color: phaseColor(snapshot.phase),
+    transitionProperty: 'color',
+    ...phaseTransition,
+  };
+  const phaseText = (
+    <Text
+      size={300}
+      weight="semibold"
+      className={styles.phase}
+      style={phaseStyle}
+      data-pomodoro-phase-label
+    >
       {snapshot.phaseLabel}
     </Text>
   );
+  const taskTitle = snapshot.taskTitle || '未关联任务';
+  const toggleText = toggleTextOf(snapshot);
+  const cardLabel = `${snapshot.phaseLabel} ${snapshot.remainingText}，${
+    snapshot.running ? '计时中' : '已暂停'
+  }；点击卡片打开详情${compact ? '' : `，卡内可${toggleText}或重置`}`;
 
-  const immersiveLayer = immersive && (
-    <div className={styles.immersive} role="dialog" aria-modal="true" aria-label="沉浸模式">
-      <Button
-        className={styles.immersiveClose}
-        appearance="subtle"
-        size="large"
-        icon={<Dismiss20Regular />}
-        aria-label="退出沉浸模式"
-        onClick={() => setImmersive(false)}
-      />
-      {phaseText(400)}
-      <Text className={styles.time112}>{snapshot.remainingText}</Text>
-      {snapshot.taskTitle && (
-        <Text size={400} className={styles.task}>
-          {snapshot.taskTitle}
-        </Text>
-      )}
-      <div className={styles.immersiveActions}>
-        <Button
-          appearance="primary"
-          size="large"
-          icon={snapshot.running ? <Pause20Filled /> : <Play20Filled />}
-          onClick={toggle}
-        >
-          {snapshot.running ? '暂停' : '继续'}
-        </Button>
-        <Button
-          size="large"
-          icon={<Stop20Filled />}
-          onClick={() => {
-            engine.stop();
-            setImmersive(false);
-          }}
-        >
-          结束本轮
-        </Button>
-      </div>
-      <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
-        今日 {snapshot.today.completed} 个 · {snapshot.today.focusMinutes} 分钟
-      </Text>
-    </div>
-  );
+  const actions = <CardActions styles={styles} snapshot={snapshot} onToggle={toggle} onReset={reset} />;
 
-  const rootPressProps = {
-    onPointerDown: press.onPointerDown,
-    onPointerMove: press.onPointerMove,
-    onPointerUp: press.onPointerUp,
-    onPointerCancel: press.onPointerCancel,
-    onPointerLeave: press.onPointerLeave,
-    onContextMenu: (event) => {
-      event.preventDefault();
-      openSettings();
-    },
-  };
-
-  /* ---- 1×1：时间 48 + 阶段 14 + 2px 进度，居中 ---- */
+  /* ---- 1×1：时间 48 + 阶段 + 2px 进度；无按钮 ---- */
   if (compact) {
     return (
-      <div
+      <CardRoot
+        ariaLabel={cardLabel}
+        onActivate={openDetail}
         className={mergeClasses(styles.root, styles.root1)}
-        role="button"
-        tabIndex={0}
-        aria-label={`${snapshot.phaseLabel} ${snapshot.remainingText}，点击开始或暂停`}
-        onClick={() => {
-          if (press.consumeSuppressedClick()) return;
-          toggle();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggle();
-          }
-        }}
-        {...rootPressProps}
+        data-pomodoro-size={sizeKey}
+        data-pomodoro-phase={snapshot.phase}
+        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
       >
-        <Text className={styles.time48}>{snapshot.remainingText}</Text>
-        {phaseText(300)}
-        <ProgressBar className={styles.progressBottom} value={snapshot.progress} max={1} aria-label="本轮进度" />
-        {immersiveLayer}
-      </div>
+        <span className={mergeClasses(styles.time, styles.time48)} data-pomodoro-time>
+          {snapshot.remainingText}
+        </span>
+        {phaseText}
+        <ProgressBar
+          className={styles.progressBottom}
+          value={snapshot.progress}
+          max={1}
+          aria-label="本轮进度"
+        />
+      </CardRoot>
     );
   }
 
-  /* ---- 2×1：左时间 68 + 阶段 14，右 40px 主按钮 ---- */
+  /* ---- 2×1：时间 68 + 阶段 + 两个 40 按钮 ---- */
   if (row) {
     return (
-      <div
+      <CardRoot
+        ariaLabel={cardLabel}
+        onActivate={openDetail}
         className={mergeClasses(styles.root, styles.root21)}
-        {...rootPressProps}
+        data-pomodoro-size={sizeKey}
+        data-pomodoro-phase={snapshot.phase}
+        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
       >
-        <div className={styles.rowMain}>
-          {phaseText(300)}
-          <Text className={styles.time} size={1000} weight="semibold">
+        <div className={styles.mainColumn}>
+          <span className={mergeClasses(styles.time, styles.time68)} data-pomodoro-time>
             {snapshot.remainingText}
-          </Text>
+          </span>
+          {phaseText}
         </div>
-        <div className={styles.actions}>{toggleButton(true)}</div>
-        {immersiveLayer}
-      </div>
+        {actions}
+      </CardRoot>
     );
   }
 
-  /* ---- 3×2：顶部 4px 进度；左时间 96 + 阶段 16；右任务/两条统计/轮次/按钮/菜单 ---- */
+  /* ---- 3×2：进度 + 时间 96 + 阶段 / 任务 + 两条统计 + 轮次 + 按钮 ---- */
   if (wide) {
     return (
-      <div className={mergeClasses(styles.root, styles.root32)} {...rootPressProps}>
+      <CardRoot
+        ariaLabel={cardLabel}
+        onActivate={openDetail}
+        className={mergeClasses(styles.root, styles.root32)}
+        data-pomodoro-size={sizeKey}
+        data-pomodoro-phase={snapshot.phase}
+        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
+      >
         <ProgressBar
           className={styles.progressTop}
           value={snapshot.progress}
           max={1}
-          thickness="large"
           aria-label="本轮进度"
         />
         <div className={styles.wide}>
           <div className={styles.wideMain}>
-            {phaseText(400)}
-            <Text className={styles.time96}>{snapshot.remainingText}</Text>
+            <span className={mergeClasses(styles.time, styles.time96)} data-pomodoro-time>
+              {snapshot.remainingText}
+            </span>
+            {phaseText}
           </div>
           <div className={styles.wideSide}>
-            <Text size={400} className={styles.task}>
-              {snapshot.taskTitle ?? '未关联任务'}
+            <Text size={400} className={styles.task} title={taskTitle}>
+              {taskTitle}
             </Text>
             <div className={styles.stats}>
-              <Text size={400} className={styles.statsLine}>
+              <Text size={300} className={styles.statLine}>
                 今日完成 {snapshot.today.completed} 个
               </Text>
-              <Text size={400} className={styles.statsLine}>
+              <Text size={300} className={styles.statLine}>
                 专注 {snapshot.today.focusMinutes} 分钟
               </Text>
               <Text size={200} className={styles.round}>
-                第 {Math.min(snapshot.roundsBeforeLongBreak, snapshot.focusRound + 1)} / {snapshot.roundsBeforeLongBreak} 轮
+                第 {snapshot.roundInCycle} / {snapshot.roundsBeforeLongBreak} 轮
               </Text>
             </div>
-            <div className={styles.actions}>
-              {toggleButton(true)}
-              {menu}
-            </div>
+            {actions}
           </div>
         </div>
-        {immersiveLayer}
-      </div>
+      </CardRoot>
     );
   }
 
-  /* ---- 2×2：时间 68 → 阶段 14 → 任务 16 → 今日统计 16 → 按钮 40 ---- */
+  /* ---- 2×2：时间 80 + 阶段 + 任务 + 今日统计一行 + 按钮 ---- */
   return (
-    <div className={mergeClasses(styles.root, styles.root22)} {...rootPressProps}>
-      <Text className={styles.time} size={1000} weight="semibold">
+    <CardRoot
+      ariaLabel={cardLabel}
+      onActivate={openDetail}
+      className={mergeClasses(styles.root, styles.root22)}
+      data-pomodoro-size={sizeKey}
+      data-pomodoro-phase={snapshot.phase}
+      data-pomodoro-running={snapshot.running ? 'true' : 'false'}
+    >
+      <span className={mergeClasses(styles.time, styles.time80)} data-pomodoro-time>
         {snapshot.remainingText}
+      </span>
+      {phaseText}
+      <Text size={400} className={styles.task} title={taskTitle}>
+        {taskTitle}
       </Text>
-      {phaseText(300)}
-      <Text size={400} className={styles.task}>
-        {snapshot.taskTitle ?? '未关联任务'}
-      </Text>
-      <Text size={400} className={styles.statsLine}>
+      <Text size={300} className={styles.statLine}>
         今日 {snapshot.today.completed} 个 · 专注 {snapshot.today.focusMinutes} 分钟
       </Text>
-      <div className={styles.actions}>{toggleButton(true)}</div>
-      {immersiveLayer}
-    </div>
+      <CardActions
+        styles={styles}
+        snapshot={snapshot}
+        onToggle={toggle}
+        onReset={reset}
+        centered
+      />
+    </CardRoot>
   );
 }

@@ -1,7 +1,7 @@
 {
   "id": "pomodoro",
   "name": "番茄钟",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "widgets": [
     {
       "id": "pomodoro",
@@ -10,5 +10,112 @@
       "defaultSize": [2, 1],
       "cell": [2, 1]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "durations",
+        "title": "时长与轮数",
+        "hint": "修改后从下一轮开始生效；进行中的一轮按开始时的时长走完",
+        "fields": [
+          {
+            "key": "focusMin",
+            "type": "number",
+            "label": "专注",
+            "description": "一轮专注的时长",
+            "unit": "分钟",
+            "min": 1,
+            "max": 180,
+            "default": 25
+          },
+          {
+            "key": "shortBreakMin",
+            "type": "number",
+            "label": "短休",
+            "description": "普通专注轮次之间的休息",
+            "unit": "分钟",
+            "min": 1,
+            "max": 60,
+            "default": 5
+          },
+          {
+            "key": "longBreakMin",
+            "type": "number",
+            "label": "长休",
+            "description": "完成一轮番茄循环后的长休息",
+            "unit": "分钟",
+            "min": 1,
+            "max": 60,
+            "default": 15
+          },
+          {
+            "key": "roundsBeforeLongBreak",
+            "type": "number",
+            "label": "长休前轮数",
+            "description": "连续完成几轮专注后进入长休",
+            "min": 1,
+            "max": 12,
+            "default": 4
+          }
+        ]
+      },
+      {
+        "id": "behavior",
+        "title": "行为",
+        "fields": [
+          {
+            "key": "autoStartNext",
+            "type": "boolean",
+            "label": "自动开始下一阶段",
+            "description": "专注结束后自动开始休息，休息结束后自动开始专注",
+            "default": false
+          },
+          {
+            "key": "sound",
+            "type": "boolean",
+            "label": "阶段结束提示音",
+            "description": "阶段完成时播放一声提示音",
+            "default": true
+          },
+          {
+            "key": "keepAwake",
+            "type": "boolean",
+            "label": "专注时阻止息屏",
+            "description": "只在专注计时期间阻止系统息屏",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "noise",
+        "title": "白噪音",
+        "hint": "内置合成音频，不联网；只在计时进行中播放",
+        "fields": [
+          {
+            "key": "whiteNoise",
+            "type": "enum",
+            "label": "类型",
+            "default": "none",
+            "options": [
+              { "value": "none", "label": "无" },
+              { "value": "rain", "label": "雨声" },
+              { "value": "cafe", "label": "咖啡厅" },
+              { "value": "fan", "label": "风扇" }
+            ]
+          },
+          {
+            "key": "whiteNoiseVolume",
+            "type": "number",
+            "label": "音量",
+            "unit": "%",
+            "min": 0,
+            "max": 100,
+            "default": 40
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -1,6 +1,7 @@
 /**
- * 番茄钟入口：卡片视图 / 详情视图（?view=detail）/ 设置视图（?view=settings）。
- * 详情与设置都装进宿主全窗口 Fluent Dialog；卡片里不做 Dialog/Drawer（D-02b）。
+ * 番茄钟入口：卡片视图 / 详情视图（?view=detail）。
+ * 设置已迁到宿主设置页（manifest.settings schema），插件内不再有设置视图；
+ * 卡片里也不做 Dialog/Drawer（D-02b / E3）。
  */
 
 import React from 'react';
@@ -15,7 +16,6 @@ import {
 } from '../../_shared/host.js';
 import PomodoroApp from './PomodoroApp.jsx';
 import PomodoroDetail from './PomodoroDetail.jsx';
-import PomodoroSettings from './PomodoroSettings.jsx';
 import { devSizeKey } from './sizes.js';
 import { seedDemoData } from './data/timer.js';
 
@@ -47,9 +47,7 @@ function Root() {
       theme={theme}
       style={{ width: '100%', height: '100%', background, colorScheme: 'normal' }}
     >
-      {overlayView === 'settings' ? (
-        <PomodoroSettings />
-      ) : overlayView === 'detail' ? (
+      {overlayView === 'detail' ? (
         <PomodoroDetail />
       ) : (
         <PomodoroApp fallbackSizeKey={fallbackSizeKey} />
