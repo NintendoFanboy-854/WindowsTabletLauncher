@@ -10,7 +10,7 @@ export const SUPPORTED_SIZES = {
 
 export const DEFAULT_SIZE_KEY = '3x3';
 
-/** 档位分类：决定布局与信息预算 */
+/** 档位分类：决定布局与信息预算（docs/components/todo.md「卡片」） */
 export function layoutKind(sizeKey) {
   switch (sizeKey) {
     case '1x1':
@@ -27,17 +27,19 @@ export function layoutKind(sizeKey) {
   }
 }
 
-/** D-04 / DENSITY：内容列表行数上限 */
-export function rowBudget(kind) {
-  switch (kind) {
-    case 'mini':
+/** 卡片行预算（docs/components/todo.md：2×2=4、3×2=5、3×3=8、4×2=5；1×1 无列表） */
+export function rowBudgetFor(sizeKey) {
+  switch (sizeKey) {
+    case '2x2':
       return 4;
-    case 'medium':
+    case '3x2':
       return 5;
-    case 'full':
+    case '3x3':
       return 8;
+    case '4x2':
+      return 5;
     default:
-      return null;
+      return 0;
   }
 }
 

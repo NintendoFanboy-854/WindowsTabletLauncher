@@ -1,30 +1,13 @@
 /**
- * Agent 工具：文档 docs/components/todo.md「Agent 工具」一节的全部 10 个工具 + todo.stats（复盘数据）。
- * 只依赖 store，不碰 DOM；宿主通过 host:tool-call 调过来，结果用 plugin.toolResult 回传。
+ * Agent 工具：与 docs/components/todo.md「Agent 工具（UI 路径 ↔ 工具）」一一对应。
+ *
+ * 只依赖 store / config，不碰 DOM；宿主通过 host:tool-call 调过来，结果用
+ * plugin.toolResult 回传。所有写操作都与 UI 共用同一数据层（store），
+ * 因此 UI 与工具不会出现两套状态。
  */
+import { readHostSettings, writeHostSettings } from './config.js';
 import { store } from './store.js';
 import { PRIORITIES, RECURRENCES } from './date.js';
-
-const taskSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'string' },
-    listId: { type: 'string' },
-    title: { type: 'string' },
-    note: { type: 'string' },
-    done: { type: 'boolean' },
-    doneAt: { type: 'string' },
-    createdAt: { type: 'string' },
-    updatedAt: { type: 'string' },
-    order: { type: 'number' },
-    priority: { type: 'number', enum: [0, 1, 2, 3] },
-    dueAt: { type: 'string' },
-    remindAt: { type: 'string' },
-    recurrence: { type: 'string', enum: RECURRENCES.map((item) => item.value) },
-    tags: { type: 'array', items: { type: 'string' } },
-    subtasks: { type: 'array' },
-  },
-};
 
 function dateOrNull(value) {
   if (value === undefined) return undefined;
@@ -35,18 +18,45 @@ function dateOrNull(value) {
 function listSummary(list) {
   const tasks = store.state.tasks.filter((task) => task.listId === list.id);
   const done = tasks.filter((task) => task.done).length;
-  return { ...list, total: tasks.length, undone: tasks.length - done, done };
+  return {
+    ...list,
+    isDefault: store.settings.defaultListId === list.id,
+    total: tasks.length,
+    undone: tasks.length - done,
+    done,
+  };
+}
+
+/** 供 UI 用的“任务 + 清单名”视图对象 */
+function enrich(task) {
+  if (!task) return null;
+  const list = store.listById(task.listId);
+  return {
+    ...task,
+    listName: list?.name,
+    listColor: list?.color,
+  };
+}
+
+function resolveSettingsPatch(args = {}) {
+  if (args.patch && typeof args.patch === 'object' && !Array.isArray(args.patch)) return args.patch;
+  const patch = {};
+  for (const key of ['showCompleted', 'defaultSort', 'fontSize', 'weekStart']) {
+    if (Object.prototype.hasOwnProperty.call(args, key)) patch[key] = args[key];
+  }
+  return patch;
 }
 
 export const TOOL_DECLS = [
   {
     name: 'todo.lists',
-    description: '列出所有待办清单（含未完成/已完成数量）',
+    description: '列出所有待办清单（含未完成/已完成数量、哪个是默认清单）',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'todo.list',
-    description: '查询任务；默认只返回未完成任务。可用 listId / done / dueBefore / tag / query 过滤。',
+    description:
+      '查询任务；默认只返回未完成任务。可用 listId / done / dueBefore / tag / query 过滤。',
     parameters: {
       type: 'object',
       properties: {
@@ -60,7 +70,8 @@ export const TOOL_DECLS = [
   },
   {
     name: 'todo.add',
-    description: '新建任务。title 必填；可带 listId / priority(0-3) / dueAt / remindAt / recurrence / tags / subtasks。',
+    description:
+      '新建任务。title 必填；可带 listId / priority(0-3) / dueAt / remindAt / recurrence / tags / subtasks。',
     parameters: {
       type: 'object',
       properties: {
@@ -75,24 +86,6 @@ export const TOOL_DECLS = [
         subtasks: { type: 'array', items: { oneOf: [{ type: 'string' }, { type: 'object' }] } },
       },
       required: ['title'],
-    },
-  },
-  {
-    name: 'todo.addList',
-    description: '新建清单',
-    parameters: {
-      type: 'object',
-      properties: { name: { type: 'string' } },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'todo.complete',
-    description: '勾选 / 取消勾选任务（done 默认 true）。重复任务完成时会自动生成下一次。',
-    parameters: {
-      type: 'object',
-      properties: { id: { type: 'string' }, done: { type: 'boolean' } },
-      required: ['id'],
     },
   },
   {
@@ -124,6 +117,24 @@ export const TOOL_DECLS = [
     },
   },
   {
+    name: 'todo.complete',
+    description: '勾选 / 取消勾选任务（done 默认 true）。重复任务完成时会自动生成下一次。',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string' }, done: { type: 'boolean' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'todo.search',
+    description: '在标题、备注、标签、子任务标题里搜索任务',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    },
+  },
+  {
     name: 'todo.addSubtask',
     description: '给任务加子任务',
     parameters: {
@@ -142,17 +153,62 @@ export const TOOL_DECLS = [
     },
   },
   {
-    name: 'todo.search',
-    description: '在标题、备注、标签、子任务标题里搜索任务',
+    name: 'todo.removeSubtask',
+    description: '删除任务下的一个子任务',
     parameters: {
       type: 'object',
-      properties: { query: { type: 'string' } },
-      required: ['query'],
+      properties: { taskId: { type: 'string' }, subtaskId: { type: 'string' } },
+      required: ['taskId', 'subtaskId'],
+    },
+  },
+  {
+    name: 'todo.addList',
+    description: '新建清单（可选 color：Fluent palette token 名）',
+    parameters: {
+      type: 'object',
+      properties: { name: { type: 'string' }, color: { type: 'string' } },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'todo.renameList',
+    description: '重命名清单',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string' }, name: { type: 'string' } },
+      required: ['id', 'name'],
+    },
+  },
+  {
+    name: 'todo.removeList',
+    description: '删除清单；同时删除其中的任务（至少保留一个清单）',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'todo.setDefaultList',
+    description: '设置默认清单（决定详情页初始筛选，不影响卡片）',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'todo.clearCompleted',
+    description: '清空已完成任务；传 listId 只清某个清单，不传清全部',
+    parameters: {
+      type: 'object',
+      properties: { listId: { type: 'string' } },
     },
   },
   {
     name: 'todo.stats',
-    description: '任务的完成统计（按天/清单/优先级），用于复盘页与热力图；from/to 省略时默认近 30 天。',
+    description:
+      '任务的完成统计（按天/清单/优先级），用于复盘页与热力图；from/to 省略时默认近 30 天。',
     parameters: {
       type: 'object',
       properties: {
@@ -161,18 +217,34 @@ export const TOOL_DECLS = [
       },
     },
   },
+  {
+    name: 'todo.settings.get',
+    description: '读取待办设置（显示已完成 / 默认排序 / 字号 / 一周起始日）',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'todo.settings.set',
+    description:
+      '修改待办设置。patch 可含 showCompleted(boolean) / defaultSort(manual|due|priority|created) / fontSize(default|large) / weekStart(0=周日,1=周一)。',
+    parameters: {
+      type: 'object',
+      properties: {
+        patch: {
+          type: 'object',
+          properties: {
+            showCompleted: { type: 'boolean' },
+            defaultSort: { type: 'string', enum: ['manual', 'due', 'priority', 'created'] },
+            fontSize: { type: 'string', enum: ['default', 'large'] },
+            weekStart: { type: 'number', enum: [0, 1] },
+          },
+        },
+      },
+      required: ['patch'],
+    },
+  },
 ];
 
-/** 供 UI 用的“任务 + 清单名”视图对象 */
-function enrich(task) {
-  return {
-    ...task,
-    listName: store.listById(task.listId)?.name,
-    listColor: store.listById(task.listId)?.color,
-  };
-}
-
-function run(name, args = {}) {
+async function run(name, args = {}) {
   switch (name) {
     case 'todo.lists':
       return store.lists.map(listSummary);
@@ -211,10 +283,6 @@ function run(name, args = {}) {
       });
       return enrich(task);
     }
-    case 'todo.addList':
-      return store.addList(args.name);
-    case 'todo.complete':
-      return enrich(store.setDone(args.id, typeof args.done === 'boolean' ? args.done : true));
     case 'todo.update': {
       const patch = { ...args };
       delete patch.id;
@@ -224,22 +292,52 @@ function run(name, args = {}) {
     }
     case 'todo.remove':
       return store.removeTask(args.id);
+    case 'todo.complete':
+      return enrich(store.setDone(args.id, typeof args.done === 'boolean' ? args.done : true));
+    case 'todo.search':
+      return store.searchTasks(args.query).map(enrich);
     case 'todo.addSubtask':
       return enrich(store.addSubtask(args.taskId, args.title));
     case 'todo.completeSubtask':
-      return enrich(store.completeSubtask(args.taskId, args.subtaskId, typeof args.done === 'boolean' ? args.done : true));
-    case 'todo.search':
-      return store.searchTasks(args.query).map(enrich);
+      return enrich(
+        store.completeSubtask(args.taskId, args.subtaskId, typeof args.done === 'boolean' ? args.done : true),
+      );
+    case 'todo.removeSubtask':
+      return enrich(store.removeSubtask(args.taskId, args.subtaskId));
+    case 'todo.addList':
+      return listSummary(store.addList(args.name, args.color));
+    case 'todo.renameList': {
+      if (!args.name || !String(args.name).trim()) throw new Error('清单名不能为空');
+      return listSummary(store.updateList(args.id, { name: args.name }));
+    }
+    case 'todo.removeList':
+      return store.removeList(args.id);
+    case 'todo.setDefaultList': {
+      const list = store.listById(args.id);
+      if (!list) throw new Error(`找不到清单 ${args.id}`);
+      store.updateSettings({ defaultListId: list.id });
+      return listSummary(list);
+    }
+    case 'todo.clearCompleted':
+      return { removed: store.clearCompleted({ listId: args.listId }) };
     case 'todo.stats':
       return store.statsRange({ from: args.from, to: args.to });
+    case 'todo.settings.get':
+      return readHostSettings();
+    case 'todo.settings.set': {
+      const patch = resolveSettingsPatch(args);
+      if (Object.keys(patch).length === 0) throw new Error('没有要修改的设置项');
+      return writeHostSettings(patch);
+    }
     default:
       throw new Error(`未知工具 ${name}`);
   }
 }
 
-export function runTool(name, args) {
+/** 执行工具，返回 `{ ok, result }` / `{ ok:false, error }`（异步：settings 走宿主桥） */
+export async function runTool(name, args) {
   try {
-    return { ok: true, result: run(name, args || {}) };
+    return { ok: true, result: await run(name, args || {}) };
   } catch (error) {
     return { ok: false, error: error?.message || String(error) };
   }

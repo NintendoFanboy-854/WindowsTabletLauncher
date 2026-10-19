@@ -1,7 +1,7 @@
 {
   "id": "todo",
   "name": "待办",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "background": true,
   "widgets": [
     {
@@ -18,5 +18,60 @@
       "cell": [5, 0],
       "size": [3, 3]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "显示与行为",
+        "hint": "长期偏好；修改后宿主立即保存并生效",
+        "fields": [
+          {
+            "key": "showCompleted",
+            "type": "boolean",
+            "label": "显示已完成",
+            "description": "在列表视图底部折叠显示已完成任务",
+            "default": true
+          },
+          {
+            "key": "defaultSort",
+            "type": "enum",
+            "label": "默认排序",
+            "description": "卡片与详情列表的初始排序方式",
+            "default": "manual",
+            "options": [
+              { "value": "manual", "label": "手动" },
+              { "value": "due", "label": "截止时间" },
+              { "value": "priority", "label": "优先级" },
+              { "value": "created", "label": "创建时间" }
+            ]
+          },
+          {
+            "key": "fontSize",
+            "type": "enum",
+            "label": "字号",
+            "description": "任务标题的字号档位",
+            "default": "default",
+            "options": [
+              { "value": "default", "label": "默认" },
+              { "value": "large", "label": "大" }
+            ]
+          },
+          {
+            "key": "weekStart",
+            "type": "enum",
+            "label": "一周起始日",
+            "description": "影响日历、周视图、月视图与热力图",
+            "default": 1,
+            "options": [
+              { "value": 1, "label": "周一" },
+              { "value": 0, "label": "周日" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -1,8 +1,8 @@
 /**
  * 待办插件入口（DECISIONS D-02b）：
- * - 卡片视图 / 设置浮层（?view=settings）/ 任务详情浮层（?view=detail）/ 全部任务（?view=all）
- *   都由 React + Fluent UI React 渲染；
- * - 后台 iframe（?background=1）不渲染界面，只跑提醒定时器与 Agent 工具；
+ * - 卡片视图由 React + Fluent UI React 渲染；L1 详情由宿主 `?view=detail` 加载；
+ * - 设置没有插件内界面：全部声明在 manifest.settings，由宿主设置页渲染；
+ * - 后台 iframe（`?background=1`）不渲染界面，只跑提醒定时器与 Agent 工具（单写者）；
  * - 独立开发时用 180px 基准单元格模拟卡片（与宿主 iframe 视口一致）。
  */
 
@@ -18,17 +18,10 @@ import {
 } from '@fluentui/react-components';
 import { plugin } from '/plugin-sdk.js';
 import { getOverlayView, startHostCapture, useHostTheme } from '../../_shared/host.js';
-import {
-  buildToolHandlers,
-  openSettingsView,
-  startTodoData,
-  TOOL_DECLS,
-} from './todoData.js';
+import { buildToolHandlers, startTodoData, TOOL_DECLS } from './todoData.js';
 import { buildCardSize, parseSizeParam, sizeKeyOf } from './sizes.js';
-import TodoApp from './TodoApp.jsx';
-import TodoSettings from './settings.jsx';
-import TodoDetail from './detail.jsx';
-import TodoAllTasks from './allTasks.jsx';
+import TodoCard from './TodoCard.jsx';
+import TodoDetail from './TodoDetail.jsx';
 
 startHostCapture();
 
@@ -125,13 +118,10 @@ function Root() {
   const defaultSizeKey = querySize ? sizeKeyOf(querySize) : '3x3';
   const standalone = !plugin.inHost;
   // ?raw=1：跳过独立预览外壳，走宿主同款满视口布局（供机器测量/按 iframe 尺寸截图）
-  // verify-widgets.mjs 以 ?plugin=&widget=&size= 加载 standalone 页：按宿主 iframe 满视口渲染
+  // verify-plugin.mjs 以 ?plugin=&widget=&size= 加载 standalone 页：按宿主 iframe 满视口渲染
   const raw = params.get('raw') === '1' || (params.has('plugin') && params.has('widget'));
 
-  let content = <TodoApp defaultSizeKey={defaultSizeKey} />;
-  if (overlayView === 'settings') content = <TodoSettings />;
-  else if (overlayView === 'detail') content = <TodoDetail />;
-  else if (overlayView === 'all') content = <TodoAllTasks />;
+  const content = overlayView === 'detail' ? <TodoDetail /> : <TodoCard defaultSizeKey={defaultSizeKey} />;
 
   return (
     <FluentProvider
@@ -170,14 +160,9 @@ if (isBackground) {
       plugin.toolResult(message.id, false, error instanceof Error ? error.message : String(error));
     }
   });
-  // 宿主编辑模式点「设置」：后台帧没有界面，交给宿主可用入口
-  window.addEventListener('message', (event) => {
-    if (event.source !== window.parent) return;
-    if (event.data?.type === 'host:open-settings') openSettingsView();
-  });
 } else {
-  // 宿主里的卡片 / 设置 / 详情 / 全部任务视图只读数据，不跑提醒循环
-  // （后台 iframe 负责）；独立打开（无宿主）时由当前实例兜底，提醒照常工作。
+  // 宿主里的卡片 / 详情视图只读数据，不跑提醒循环（后台 iframe 负责）；
+  // 独立打开（无宿主）时由当前实例兜底，提醒照常工作。
   startTodoData({ startReminders: !plugin.inHost });
   const rootElement = document.getElementById('root');
   if (rootElement) createRoot(rootElement).render(<Root />);

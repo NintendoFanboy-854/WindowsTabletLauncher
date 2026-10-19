@@ -106,7 +106,7 @@ interface Task {
 | L2·编辑 | `todo.update` |
 | 删除任务 | `todo.remove` |
 | 子任务 | `todo.addSubtask` / `todo.completeSubtask` / `todo.removeSubtask` |
-| 清单管理 | `todo.lists` / `todo.addList` / `todo.renameList` / `todo.removeList` |
+| 清单管理 | `todo.lists` / `todo.addList` / `todo.renameList` / `todo.removeList` / `todo.setDefaultList` |
 | 已完成组·清空 | `todo.clearCompleted` |
 | 复盘统计 | `todo.stats` |
 | 宿主设置页·待办 | `todo.settings.get` / `todo.settings.set` |

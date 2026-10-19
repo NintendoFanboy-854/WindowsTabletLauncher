@@ -417,7 +417,13 @@ export class TodoStore {
   addTask(input = {}) {
     const title = typeof input.title === 'string' ? input.title.trim() : '';
     if (!title) throw new Error('title 不能为空');
-    const listId = this.state.lists.some((list) => list.id === input.listId) ? input.listId : this.settings.defaultListId || this.state.lists[0].id;
+    if (typeof input.listId !== 'undefined' && input.listId !== null) {
+      // Agent / 表单给了清单就必须存在；静默落到默认清单会让调用方以为写进了目标清单。
+      if (!this.state.lists.some((list) => list.id === input.listId)) {
+        throw new Error(`找不到清单 ${input.listId}`);
+      }
+    }
+    const listId = input.listId || this.settings.defaultListId || this.state.lists[0].id;
     if (typeof input.priority !== 'undefined' && input.priority !== null && !isPriority(input.priority)) {
       throw new Error('priority 必须是 0–3');
     }
@@ -574,12 +580,20 @@ export class TodoStore {
   }
 
   clearCompleted({ listId } = {}) {
-    const before = this.state.tasks.length;
-    this.state.tasks = this.state.tasks.filter((task) => !(task.done && (!listId || task.listId === listId)));
-    const removed = before - this.state.tasks.length;
+    const removedIds = this.state.tasks
+      .filter((task) => task.done && (!listId || task.listId === listId))
+      .map((task) => task.id);
+    if (removedIds.length === 0) return 0;
+    this.state.tasks = this.state.tasks.filter((task) => !removedIds.includes(task.id));
+    // 任务删除后清掉它的提醒标记，避免 todo.settings.reminders 无限堆积；
+    // 合并其他 iframe 的标记，不能把无关任务的已触发状态抹掉。
+    const reminders = { ...readStoredReminders(), ...(this.state.settings.reminders || {}) };
+    for (const id of removedIds) delete reminders[id];
+    this.state.settings.reminders = reminders;
     this.persistTasks();
+    this.persistSettings();
     this.emit();
-    return removed;
+    return removedIds.length;
   }
 
   /** 手动排序：把任务排到目标顺序（ids 是该清单当前可见任务的完整顺序） */
@@ -624,13 +638,23 @@ export class TodoStore {
     if (!list) throw new Error(`找不到清单 ${listId}`);
     if (this.state.lists.length <= 1) throw new Error('至少保留一个清单');
     this.state.lists = this.state.lists.filter((item) => item.id !== listId);
+    const removedTaskIds = this.state.tasks
+      .filter((task) => task.listId === listId)
+      .map((task) => task.id);
     this.state.tasks = this.state.tasks.filter((task) => task.listId !== listId);
+    // 清单连同任务一起删除时，同步清掉这些任务的提醒标记（保留其他 iframe 的标记）
+    const reminders = { ...readStoredReminders(), ...(this.state.settings.reminders || {}) };
+    for (const id of removedTaskIds) delete reminders[id];
+    this.state.settings.reminders = reminders;
     if (this.state.settings.defaultListId === listId) {
       this.state.settings.defaultListId = this.state.lists[0].id;
     }
-    this.persistAll();
+    // 不能走 persistAll：它会按“存储 + 当前”合并提醒标记，把刚删掉的 id 从存储读回来。
+    this.persistLists();
+    this.persistTasks();
+    this.persistSettings();
     this.emit();
-    return { ok: true, id: listId };
+    return { ok: true, id: listId, name: list.name, removedTasks: removedTaskIds.length };
   }
 
   addSubtask(taskId, title) {
