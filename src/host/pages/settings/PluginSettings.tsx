@@ -236,6 +236,15 @@ function PluginSettingsForm({ plugin, schema, bridge, notify }: PluginSettingsFo
     return () => window.removeEventListener('storage', onStorage);
   }, [bridge, plugin.id, schema.key]);
 
+  // 防御性兜底：组件若被复用（例如分区切换但调用方漏了 key），raw 也必须属于当前插件；
+  // 否则 persist({ ...raw, [field]: value }) 会把上一个插件的整份配置写进当前插件。
+  useEffect(() => {
+    setRaw(readStoredSettings(bridge, plugin.id, schema.key));
+    setFieldErrors({});
+    setConfirmReset(false);
+    setFormVersion((version) => version + 1);
+  }, [bridge, plugin.id, schema.key]);
+
   const persist = (next: SettingsValues) => {
     bridge.setConfig(plugin.id, schema.key, next);
     setRaw(next);

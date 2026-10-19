@@ -571,7 +571,9 @@ export function SettingsPage({
         </MessageBar>
       );
     }
-    return <PluginSettings plugin={plugin} bridge={getHostBridge()} notify={notify} />;
+    // key 必须按插件隔离：PluginSettings 内部持有已读配置的 state，
+    // 复用一个实例切换分区会把上个插件的 raw 写进当前插件（B5 数据覆盖）。
+    return <PluginSettings key={plugin.id} plugin={plugin} bridge={getHostBridge()} notify={notify} />;
   };
 
   const sections: Record<SettingsSection, () => ReactElement> = {
