@@ -7,7 +7,7 @@
  * - `?page=` 路由与全局快捷键来自 src/host/shell；
  * - 桌面层自己从全局单例拿 PluginManager / HostBridge。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, FluentProvider, webDarkTheme, webLightTheme } from '@fluentui/react-components';
 
 import { getHostBridge } from './bridge';
@@ -114,10 +114,27 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
   const [agentOpen, setAgentOpen] = useState<boolean>(readAgentParam);
   const openAgent = useCallback(() => setAgentOpen(true), []);
 
-  let content;
+  /**
+   * 桌面层常驻后，切回桌面时用 replayKey 重放 PageTransition 的淡入。
+   * 不能再用 `key={page}`：那会重挂载桌面，插件 iframe（工具调用接收方）跟着
+   * 卸载、重建，iframe 数量也会增长。
+   */
+  const [desktopReplayKey, setDesktopReplayKey] = useState(0);
+  const previousPageRef = useRef<HostPage>(page);
+  // layout effect：在浏览器绘制前递增并触发重放，避免先闪一帧桌面再淡入
+  useLayoutEffect(() => {
+    const previous = previousPageRef.current;
+    previousPageRef.current = page;
+    if (page === 'desktop' && previous !== 'desktop') {
+      setDesktopReplayKey((key) => key + 1);
+    }
+  }, [page]);
+
+  // 非桌面页内容；桌面本体始终挂载在下面的 .host-desktop-layer 里
+  let pageContent = null;
   switch (page) {
     case 'settings':
-      content = (
+      pageContent = (
         <SettingsPage
           onBack={back}
           onNavigate={navigate}
@@ -129,18 +146,34 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
       );
       break;
     case 'review':
-      content = <ReviewPage bridge={bridge} onBack={back} onOpenAgent={openAgent} />;
+      pageContent = <ReviewPage bridge={bridge} onBack={back} onOpenAgent={openAgent} />;
       break;
     case 'plugins':
-      content = <PluginsPage onBack={back} notify={notify} />;
+      pageContent = <PluginsPage onBack={back} notify={notify} />;
       break;
     default:
-      content = <Desktop bridge={bridge} notify={notify} />;
+      break;
   }
 
   return (
     <div className="host-root">
-      <PageTransition key={page}>{content}</PageTransition>
+      {/*
+        桌面层永远挂载：插件 iframe 与 background 运行时是 HostBridge 工具路由的
+        接收方，切到设置/复盘/插件页时整棵卸载会让 todo.stats / pomodoro.stats
+        报“插件当前不在桌面”。非桌面页只隐藏（visibility + inert），不卸载。
+      */}
+      <div
+        className="host-desktop-layer"
+        data-active={page === 'desktop' ? 'true' : 'false'}
+        aria-hidden={page !== 'desktop'}
+        inert={page !== 'desktop'}
+      >
+        <PageTransition replayKey={desktopReplayKey}>
+          <Desktop bridge={bridge} notify={notify} active={page === 'desktop'} />
+        </PageTransition>
+      </div>
+
+      {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
       {page === 'desktop' && <DesktopDock navigate={navigate} onOpenAgent={openAgent} />}
       <AgentSurface open={agentOpen} onOpenChange={setAgentOpen} hideFab />
     </div>

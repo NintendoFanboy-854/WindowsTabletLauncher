@@ -64,6 +64,12 @@ export interface DesktopProps {
   manager?: PluginManager;
   /** 宿主桥接层；不传用全局单例 */
   bridge?: HostBridge;
+  /**
+   * 桌面是否处于前台。App 在非桌面页仍保持桌面挂载（插件 iframe / 后台运行时
+   * 是工具调用接收方），传 false 时结束编辑模式并取消进行中的手势，等价于
+   * 旧行为里的“离开桌面 = 重挂载桌面”。
+   */
+  active?: boolean;
 }
 
 interface SwipeSession {
@@ -227,6 +233,7 @@ export default function Desktop({
   notify: notifyProp,
   manager: managerProp,
   bridge: bridgeProp,
+  active = true,
 }: DesktopProps) {
   const styles = useStyles();
   const manager = managerProp ?? getPluginManager();
@@ -426,6 +433,19 @@ export default function Desktop({
     setEditMode(false);
     setDragView(null);
   }, []);
+
+  // 非桌面页保持挂载但退到后台：结束编辑模式、取消进行中的拖拽/滑动，
+  // 保持旧行为（离开桌面再回来是普通模式），也不让长按/指针计时器残留。
+  useEffect(() => {
+    if (active) return;
+    setEditMode(false);
+    setDragView(null);
+    dragRef.current = null;
+    const swipe = swipeRef.current;
+    if (swipe?.longPressTimer != null) window.clearTimeout(swipe.longPressTimer);
+    swipeRef.current = null;
+    setSwipeOffset(null);
+  }, [active]);
 
   const changePage = useCallback((delta: number) => {
     setLayout((previous) =>
@@ -678,6 +698,8 @@ export default function Desktop({
     (event: ReactPointerEvent<HTMLDivElement>, widget: WidgetInstance) => {
       if (!editModeRef.current) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
+      // 同上：Portal 里的事件不参与卡片拖拽，避免抢指针后吞掉浮层内点击。
+      if (!event.currentTarget.contains(event.target as Node)) return;
       const card = cardNodesRef.current.get(widget.uid);
       const rect = card?.getBoundingClientRect();
       const grabX = rect ? Math.min(Math.max(0, event.clientX - rect.left), rect.width) : 0;
@@ -720,6 +742,9 @@ export default function Desktop({
 
   const handleRootPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // Portal 内容（Fluent Dialog/Menu/Toast）的 pointerdown 会沿 React 树冒泡到桌面根节点，
+    // 但 DOM 上不在根节点内；这里抢指针会把浮层按钮的 click 重定向到桌面，必须放行。
+    if (!event.currentTarget.contains(event.target as Node)) return;
     const target = event.target;
     if (
       target instanceof Element &&

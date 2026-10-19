@@ -244,6 +244,13 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
 
   const refresh = useCallback(() => setReloadToken((token) => token + 1), []);
 
+  // 深链直达复盘页时，插件 iframe 与页面同时挂载、工具声明陆续到达：
+  // 订阅桥接层的变化，晚到的插件也能进入统计，而不是停在空快照。
+  useEffect(() => {
+    if (!bridge.onToolsChange) return undefined;
+    return bridge.onToolsChange(() => setReloadToken((token) => token + 1));
+  }, [bridge]);
+
   const providers = snapshot
     ? Array.from(new Set(snapshot.tools)).map((tool) => {
         const provider = tool.split('.')[0] || tool;

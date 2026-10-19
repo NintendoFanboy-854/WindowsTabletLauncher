@@ -52,6 +52,8 @@
 - **点击** = 小组件默认动作（插件定义，可以什么都不做）。
 - **长按 500ms**（`motionTokens` 之外的手势阈值，属于交互参数）进入编辑模式：卡片轻微缩放、右上角出现「删除 / 改尺寸 / 设置」；点空白或 `Esc` 退出。
 - **拖拽**：编辑模式里拖标题条换格，松手吸附；拖到边缘停 0.6 秒翻页。
+- **桌面手势与 Portal**：长按/滑动在 `pointerdown` 时调 `setPointerCapture`。Fluent Dialog/Menu/Toast 通过 Portal 挂到 `body`，React 合成事件仍沿组件树冒泡到卡片/桌面根节点，但 DOM 上 target 并不在 `currentTarget` 内——若此时抢指针，浮层里按钮的 pointerup/click 会被重定向到桌面，按钮永远点不动（浮层 X 关不掉即此因）。所有抢指针的手势入口统一先判断 `event.currentTarget.contains(event.target)`，不满足直接放行；不要用“排除某类 data 属性”的方式打补丁。
+- **浮层内交互**：保存类操作成功后默认关闭浮层（通过 `plugin:request-overlay-close` 请求宿主），校验失败才留在浮层里显示错误；关闭按钮/Esc/遮罩三条路径都保留。
 - **键盘**：
   - `Tab` 在桌面小组件之间移动焦点（宿主负责 roving focus，焦点环用 Fluent 的 focus indicator）；
   - 焦点进入某个小组件后，宿主通过消息让插件聚焦它内部第一个可聚焦元素；`Esc` 把焦点交还宿主；
@@ -83,7 +85,8 @@
 
 - 加载：宿主读名单 → 读 manifest → 每个小组件挂一个 iframe；当前尺寸由布局决定，通过 `init` 告诉插件。
 - **插件实现**：插件页面**必须是 React + Fluent UI React v9**（`@fluentui/react-components`），入口 `src/main.jsx`，用 Vite 打成自包含 ES module（产物 `app/app.js` 随 `public/` 进 git，运行时不需要构建）。主题用 `FluentProvider` 包裹，从 `host:init/theme` 取亮暗与 token；控件与排版一律用 Fluent 组件/token，不手写原生控件（决策见 `DECISIONS.md` D-02b）。
-- **后台插件**：`"background": true` 时额外挂一个不可见的常驻 iframe（定时、提醒、轮询）。
+- **后台插件**：`"background": true` 时额外挂一个不可见的常驻 iframe（定时、提醒、轮询）。宿主里**提醒只由后台 iframe 调度**（单写者），卡片/浮层实例只读数据；抢锁用 `navigator.locks`，不可用时回退 localStorage 标记。
+- **桌面层常驻**：切到设置/复盘/插件页时，桌面层保持挂载（CSS 隐藏 + `inert` + `aria-hidden`），不卸载。插件 iframe 与 background 运行时是 `HostBridge` 工具调用的接收方，卸载会让复盘页/Agent 报「插件当前不在桌面」。
 - **热加载**：进入编辑模式时重扫插件目录。
 - **安装**：zip 拖进窗口 → 解压到 `plugins/<id>/` → 重扫；手动放文件夹同样生效。
 - **主题注入**：`init(theme)` 传 Fluent token 的颜色；插件把值写到 CSS 变量里用。

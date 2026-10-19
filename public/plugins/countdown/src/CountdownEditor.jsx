@@ -3,7 +3,7 @@
  * 浮层重排 v1（docs/OVERLAY-REWRITE-SPEC.md §1/§3.3）：
  * - 表单 max-width 720 居中；Field 上下布局，控件 40；Field 间距 16
  * - 底部固定操作条：左「删除」（danger）+ 右「取消」「保存」（40）
- * - 保存/删除行为不变；不用 Divider 分组
+ * - 保存成功后请求宿主关闭浮层（失败留在浮层里显示错误）；不用 Divider 分组
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -118,6 +118,11 @@ const useStyles = makeStyles({
   },
 });
 
+/** 请求宿主关闭当前全窗口浮层（保存成功后默认自动关闭，失败时留在浮层里报错） */
+function requestCloseOverlay() {
+  window.parent.postMessage({ type: 'plugin:request-overlay-close' }, '*');
+}
+
 export default function CountdownEditor() {
   const styles = useStyles();
   const [items, setItems, loaded] = useStoredConfig(ITEMS_KEY, [], normalizeItems);
@@ -205,6 +210,9 @@ export default function CountdownEditor() {
       plugin.notify(`已添加「${validation.title}」`);
     }
     setSavedMessage('已保存；关闭此窗口后卡片会同步更新。');
+    // setItems 的 updater 在本次事件结束前把配置 postMessage 给宿主；下一轮任务再请求
+    // 关闭，避免 iframe 先卸载导致 setConfig 没发出去。保存失败会在上面的分支提前 return。
+    window.setTimeout(requestCloseOverlay, 0);
   };
 
   const remove = () => {

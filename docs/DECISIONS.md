@@ -101,3 +101,19 @@
 - 回归入口：`node scripts/verify-overlays.mjs`（12 视图断言）+ `node scripts/shot-host-overlays.mjs`
   （宿主内联调截图）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
 - 后续新增任何插件浮层视图都按此骨架执行；不再逐页另立规格。
+
+## D-12 三个运行时 bug 的修复口径（2026-10-19，已落地）
+
+1. **浮层关不掉**：根因不是 Dialog 写错，而是卡片长按/桌面滑动在 `pointerdown` 抢指针，
+   把 Portal 浮层里按钮的后续事件重定向到桌面。修复口径：所有抢指针的手势入口先做
+   `currentTarget.contains(target)` 守卫，Portal 事件不参与桌面手势；不要用排除 data 属性的补丁。
+2. **保存后自动关闭**：编辑类浮层（countdown edit / todo detail）保存成功后通过
+   `plugin:request-overlay-close` 请求宿主关闭，失败留在浮层显示错误；不做“保存后仍停留 + 提示”。
+3. **通知重复**：检查发现两层原因——todo 详情保存无条件清掉已触发提醒标记（分钟级归一化导致
+   同一条提醒再次触发），以及卡片/浮层/后台多个 iframe 都跑提醒循环。修复口径：提醒只由
+   `background: true` 的后台 iframe 调度（单写者），`navigator.locks` 原子化 claim，标记按
+   “任务 id + 提醒分钟”去重；独立预览（无宿主）由卡片实例兜底。countdown 的按日去重 key
+   改为本地日期（原 UTC 日界会在 Asia/Shanghai 08:00 重复提醒）。
+4. **复盘页「插件当前不在桌面」**：切页时 `Desktop` 被整棵卸载，插件 iframe/后台运行时消失，
+   `HostBridge.callTool` 路由不到。修复口径：桌面层在所有页面保持挂载（隐藏 + `inert`），
+   页面切换只换覆盖层；复盘页对晚到的工具声明用 `onToolsChange` 补刷。

@@ -26413,19 +26413,33 @@ function RC(e, t) {
 	}
 }
 function zC() {
+	let e = LC(MC.settings, null);
+	if (!e || typeof e != "object") return {};
+	let t = e.reminders;
+	return t && typeof t == "object" && !Array.isArray(t) ? { ...t } : {};
+}
+function BC(e) {
+	let t = Q(e);
+	return t ? Math.floor(t.getTime() / 6e4) : null;
+}
+function VC(e, t) {
+	let n = BC(e);
+	return n !== null && n === BC(t);
+}
+function HC() {
 	return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
-function BC() {
+function UC() {
 	return (/* @__PURE__ */ new Date()).toISOString();
 }
-function VC(e) {
+function WC(e) {
 	return Number.isInteger(e) && e >= 0 && e <= 3;
 }
-function HC(e, t) {
+function GC(e, t) {
 	if (!e || typeof e != "object" || typeof e.title != "string") return null;
-	let n = Q(e.createdAt)?.toISOString() || BC();
+	let n = Q(e.createdAt)?.toISOString() || UC();
 	return {
-		id: typeof e.id == "string" && e.id ? e.id : zC(),
+		id: typeof e.id == "string" && e.id ? e.id : HC(),
 		listId: typeof e.listId == "string" && e.listId ? e.listId : t,
 		title: e.title,
 		note: typeof e.note == "string" && e.note ? e.note : void 0,
@@ -26434,13 +26448,13 @@ function HC(e, t) {
 		createdAt: n,
 		updatedAt: Q(e.updatedAt)?.toISOString() || n,
 		order: Number.isFinite(e.order) ? e.order : 0,
-		priority: VC(e.priority) ? e.priority : 0,
+		priority: WC(e.priority) ? e.priority : 0,
 		dueAt: Q(e.dueAt)?.toISOString() || void 0,
 		remindAt: Q(e.remindAt)?.toISOString() || void 0,
 		recurrence: OC.some((t) => t.value === e.recurrence) ? e.recurrence : void 0,
 		tags: Array.isArray(e.tags) ? e.tags.filter((e) => typeof e == "string" && e.trim()).map((e) => e.trim()) : [],
 		subtasks: Array.isArray(e.subtasks) ? e.subtasks.filter((e) => e && typeof e.title == "string").map((e, t) => ({
-			id: typeof e.id == "string" && e.id ? e.id : zC(),
+			id: typeof e.id == "string" && e.id ? e.id : HC(),
 			title: e.title,
 			done: !!e.done,
 			order: Number.isFinite(e.order) ? e.order : t
@@ -26461,18 +26475,18 @@ var $ = new class {
 	}
 	load() {
 		let e = LC(MC.lists, null), t = Array.isArray(e) && e.length ? e.filter((e) => e && typeof e.name == "string").map((e, t) => ({
-			id: typeof e.id == "string" && e.id ? e.id : zC(),
+			id: typeof e.id == "string" && e.id ? e.id : HC(),
 			name: e.name,
 			color: typeof e.color == "string" && e.color ? e.color : NC[t % NC.length],
 			order: Number.isFinite(e.order) ? e.order : t
 		})).sort((e, t) => e.order - t.order) : [];
 		t.length || t.push({
-			id: zC(),
+			id: HC(),
 			name: "我的待办",
 			color: NC[0],
 			order: 0
 		});
-		let n = new Set(t.map((e) => e.id)), r = t[0].id, i = LC(MC.tasks, []), a = (Array.isArray(i) ? i : []).map((e) => HC(e, r)).filter(Boolean).map((e) => n.has(e.listId) ? e : {
+		let n = new Set(t.map((e) => e.id)), r = t[0].id, i = LC(MC.tasks, []), a = (Array.isArray(i) ? i : []).map((e) => GC(e, r)).filter(Boolean).map((e) => n.has(e.listId) ? e : {
 			...e,
 			listId: r
 		}), o = LC(MC.tags, []), s = Array.isArray(o) ? o.filter((e) => typeof e == "string") : [], c = LC(MC.settings, {}), l = {
@@ -26502,7 +26516,10 @@ var $ = new class {
 		}
 	}
 	persistAll() {
-		RC(MC.lists, this.state.lists), RC(MC.tasks, this.state.tasks), RC(MC.tags, this.state.tags), RC(MC.settings, this.state.settings);
+		this.state.settings.reminders = {
+			...zC(),
+			...this.state.settings.reminders || {}
+		}, RC(MC.lists, this.state.lists), RC(MC.tasks, this.state.tasks), RC(MC.tags, this.state.tags), RC(MC.settings, this.state.settings);
 	}
 	persistTasks() {
 		RC(MC.tasks, this.state.tasks);
@@ -26621,17 +26638,17 @@ var $ = new class {
 		};
 	}
 	touch(e) {
-		e.updatedAt = BC();
+		e.updatedAt = UC();
 	}
 	addTask(e = {}) {
 		let t = typeof e.title == "string" ? e.title.trim() : "";
 		if (!t) throw Error("title 不能为空");
 		let n = this.state.lists.some((t) => t.id === e.listId) ? e.listId : this.settings.defaultListId || this.state.lists[0].id;
-		if (e.priority !== void 0 && e.priority !== null && !VC(e.priority)) throw Error("priority 必须是 0–3");
+		if (e.priority !== void 0 && e.priority !== null && !WC(e.priority)) throw Error("priority 必须是 0–3");
 		let r = e.recurrence ?? void 0;
 		if (r && !OC.some((e) => e.value === r)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
-		let i = BC(), a = {
-			id: zC(),
+		let i = UC(), a = {
+			id: HC(),
 			listId: n,
 			title: t,
 			note: typeof e.note == "string" && e.note.trim() ? e.note.trim() : void 0,
@@ -26639,13 +26656,13 @@ var $ = new class {
 			createdAt: i,
 			updatedAt: i,
 			order: this.nextOrder(n),
-			priority: VC(e.priority) ? e.priority : 0,
+			priority: WC(e.priority) ? e.priority : 0,
 			dueAt: DC(e.dueAt) || void 0,
 			remindAt: DC(e.remindAt) || void 0,
 			recurrence: r || void 0,
 			tags: Array.isArray(e.tags) ? e.tags.filter((e) => typeof e == "string" && e.trim()).map((e) => e.trim()) : [],
 			subtasks: Array.isArray(e.subtasks) ? e.subtasks.filter((e) => e && typeof (e.title ?? e) == "string" && String(e.title ?? e).trim()).map((e, t) => ({
-				id: zC(),
+				id: HC(),
 				title: String(e.title ?? e).trim(),
 				done: !!e.done,
 				order: t
@@ -26663,10 +26680,14 @@ var $ = new class {
 			n.title = e;
 		}
 		if (r.note !== void 0 && (n.note = (typeof r.note == "string" ? r.note.trim() : "") || void 0), r.priority !== void 0) {
-			if (!VC(r.priority)) throw Error("priority 必须是 0–3");
+			if (!WC(r.priority)) throw Error("priority 必须是 0–3");
 			n.priority = r.priority;
 		}
-		if (r.dueAt !== void 0 && (n.dueAt = DC(r.dueAt) || void 0), r.remindAt !== void 0 && (n.remindAt = DC(r.remindAt) || void 0, n.remindAt && this.clearFiredReminder(n)), r.recurrence !== void 0) {
+		if (r.dueAt !== void 0 && (n.dueAt = DC(r.dueAt) || void 0), r.remindAt !== void 0) {
+			let e = n.remindAt, t = DC(r.remindAt) || void 0;
+			n.remindAt = t, VC(e, t) || this.clearFiredReminder(n);
+		}
+		if (r.recurrence !== void 0) {
 			if (r.recurrence && !OC.some((e) => e.value === r.recurrence)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
 			n.recurrence = r.recurrence || void 0;
 		}
@@ -26686,15 +26707,15 @@ var $ = new class {
 		return this.setDoneInternal(n, !!t), this.touch(n), this.persistTasks(), this.emit(), n;
 	}
 	setDoneInternal(e, t) {
-		e.done !== t && (e.done = t, e.doneAt = t ? BC() : void 0, t && e.recurrence && this.spawnNextOccurrence(e));
+		e.done !== t && (e.done = t, e.doneAt = t ? UC() : void 0, t && e.recurrence && this.spawnNextOccurrence(e));
 	}
 	spawnNextOccurrence(e) {
 		let t = Q(e.dueAt) || /* @__PURE__ */ new Date(), n = kC(t, e.recurrence);
 		if (!n) return null;
 		let r = /* @__PURE__ */ new Date(), i = 0;
 		for (; n <= r && i < 1e3;) n = kC(n, e.recurrence), i += 1;
-		let a = n.getTime() - t.getTime(), o = BC(), s = {
-			id: zC(),
+		let a = n.getTime() - t.getTime(), o = UC(), s = {
+			id: HC(),
 			listId: e.listId,
 			title: e.title,
 			note: e.note,
@@ -26708,7 +26729,7 @@ var $ = new class {
 			recurrence: e.recurrence,
 			tags: [...e.tags],
 			subtasks: e.subtasks.map((e, t) => ({
-				id: zC(),
+				id: HC(),
 				title: e.title,
 				done: !1,
 				order: t
@@ -26719,8 +26740,11 @@ var $ = new class {
 	removeTask(e) {
 		let t = this.state.tasks.findIndex((t) => t.id === e);
 		if (t < 0) throw Error(`找不到任务 ${e}`);
-		let [n] = this.state.tasks.splice(t, 1);
-		return delete this.state.settings.reminders[e], this.persistTasks(), this.persistSettings(), this.emit(), {
+		let [n] = this.state.tasks.splice(t, 1), r = {
+			...zC(),
+			...this.state.settings.reminders || {}
+		};
+		return delete r[e], this.state.settings.reminders = r, this.persistTasks(), this.persistSettings(), this.emit(), {
 			ok: !0,
 			id: e,
 			removed: n
@@ -26743,7 +26767,7 @@ var $ = new class {
 		let n = String(e ?? "").trim();
 		if (!n) throw Error("清单名不能为空");
 		let r = {
-			id: zC(),
+			id: HC(),
 			name: n,
 			color: t || NC[this.state.lists.length % NC.length],
 			order: this.nextListOrder()
@@ -26770,7 +26794,7 @@ var $ = new class {
 		if (!r) throw Error("子任务标题不能为空");
 		let i = n.subtasks.length ? Math.max(...n.subtasks.map((e) => e.order)) + 1 : 0;
 		return n.subtasks.push({
-			id: zC(),
+			id: HC(),
 			title: r,
 			done: !1,
 			order: i
@@ -26795,34 +26819,47 @@ var $ = new class {
 		t && this.persistTags();
 	}
 	updateSettings(e = {}) {
-		return Object.assign(this.state.settings, e), this.state.lists.some((e) => e.id === this.state.settings.defaultListId) || (this.state.settings.defaultListId = this.state.lists[0]?.id ?? null), this.persistSettings(), this.emit(), this.state.settings;
+		return Object.assign(this.state.settings, e), this.state.settings.reminders = {
+			...zC(),
+			...this.state.settings.reminders || {}
+		}, this.state.lists.some((e) => e.id === this.state.settings.defaultListId) || (this.state.settings.defaultListId = this.state.lists[0]?.id ?? null), this.persistSettings(), this.emit(), this.state.settings;
 	}
 	claimDueReminders(e = /* @__PURE__ */ new Date()) {
-		let t = [], n = LC(MC.settings, null), r = n && typeof n == "object" && n.reminders && typeof n.reminders == "object" ? n.reminders : {};
+		let t = [], n = LC(MC.settings, null), r = n && typeof n == "object" ? n : {}, i = zC();
 		for (let n of this.state.tasks) {
 			if (n.done || !n.remindAt) continue;
-			let i = Q(n.remindAt);
-			!i || i > e || r[n.id] !== n.remindAt && (r[n.id] = n.remindAt, t.push(n));
+			let r = Q(n.remindAt);
+			!r || r > e || i[n.id] !== void 0 && VC(i[n.id], n.remindAt) || (i[n.id] = n.remindAt, t.push(n));
 		}
 		if (t.length) {
-			this.state.settings.reminders = {
-				...this.state.settings.reminders,
-				...r
-			}, this.persistSettings();
 			let e = {
-				...n && typeof n == "object" ? n : {},
-				reminders: r
+				...r,
+				reminders: i
 			};
-			RC(MC.settings, e);
+			RC(MC.settings, e), this.state.settings = {
+				...this.state.settings,
+				...e,
+				reminders: i
+			};
 		}
 		return t;
 	}
 	clearFiredReminder(e) {
-		this.state.settings.reminders[e.id] && (delete this.state.settings.reminders[e.id], this.persistSettings());
+		let t = {
+			...zC(),
+			...this.state.settings.reminders || {}
+		};
+		e.id in t && (delete t[e.id], this.state.settings.reminders = t, this.persistSettings());
 	}
 	snoozeReminder(e, t = 6e5) {
 		let n = this.taskById(e);
-		return n ? (n.remindAt = new Date(Date.now() + t).toISOString(), delete this.state.settings.reminders[n.id], this.persistSettings(), this.persistTasks(), this.emit(), n) : null;
+		if (!n) return null;
+		n.remindAt = new Date(Date.now() + t).toISOString();
+		let r = {
+			...zC(),
+			...this.state.settings.reminders || {}
+		};
+		return delete r[n.id], this.state.settings.reminders = r, this.persistSettings(), this.persistTasks(), this.emit(), n;
 	}
 	statsRange({ from: e, to: t } = {}) {
 		let n = Q(e) || pC(fC(/* @__PURE__ */ new Date()), -30), r = Q(t) || /* @__PURE__ */ new Date(), i = this.state.tasks.filter((e) => {
@@ -26856,7 +26893,7 @@ var $ = new class {
 }();
 //#endregion
 //#region public/plugins/todo/js/demo.js
-function UC(e) {
+function KC(e) {
 	let t = e >>> 0;
 	return () => {
 		t = t + 1831565813 >>> 0;
@@ -26864,15 +26901,15 @@ function UC(e) {
 		return e = Math.imul(e ^ e >>> 15, e | 1), e ^= e + Math.imul(e ^ e >>> 7, e | 61), ((e ^ e >>> 14) >>> 0) / 4294967296;
 	};
 }
-function WC(e, t, n = 0) {
+function qC(e, t, n = 0) {
 	let r = pC(fC(/* @__PURE__ */ new Date()), e);
 	return new Date(r.getFullYear(), r.getMonth(), r.getDate(), t, n, 0, 0).toISOString();
 }
-function GC() {
+function JC() {
 	return new URLSearchParams(location.search).get("demo") === "1" && $.state.tasks.length === 0;
 }
-function KC() {
-	let e = UC(20261018), [t, n, r] = [
+function YC() {
+	let e = KC(20261018), [t, n, r] = [
 		{
 			name: "工作",
 			color: "colorPaletteBlueForeground2"
@@ -26900,7 +26937,7 @@ function KC() {
 		title: "整理产品周报，把本周评审结论同步给设计组",
 		listId: i.工作,
 		priority: 3,
-		dueAt: WC(0, 17, 0),
+		dueAt: qC(0, 17, 0),
 		status: "todo",
 		tags: ["工作", "重要"],
 		subtasks: [
@@ -26911,43 +26948,43 @@ function KC() {
 		note: "周五 17:00 前发出，抄送产品负责人。"
 	});
 	let o = $.state.tasks[$.state.tasks.length - 1];
-	o && ($.completeSubtask(o.id, o.subtasks[0].id, !0), $.updateTask(o.id, { remindAt: WC(1, 9, 30) })), a({
+	o && ($.completeSubtask(o.id, o.subtasks[0].id, !0), $.updateTask(o.id, { remindAt: qC(1, 9, 30) })), a({
 		title: "和设计评审 Fluent 动效 token",
 		listId: i.工作,
 		priority: 2,
-		dueAt: WC(0, 10, 30),
+		dueAt: qC(0, 10, 30),
 		tags: ["工作"],
 		subtasks: ["准备动效示例", "确认 duration 档位"]
 	}), a({
 		title: "提交上周差旅报销单",
 		listId: i.工作,
 		priority: 2,
-		dueAt: WC(-1, 23, 59),
+		dueAt: qC(-1, 23, 59),
 		tags: ["工作"]
 	}), a({
 		title: "买牛奶和面包",
 		listId: i.生活,
 		priority: 1,
-		dueAt: WC(0, 20, 0),
+		dueAt: qC(0, 20, 0),
 		tags: ["生活"]
 	}), a({
 		title: "背单词 20 个（每日）",
 		listId: i.学习,
 		priority: 1,
-		dueAt: WC(0, 22, 0),
+		dueAt: qC(0, 22, 0),
 		recurrence: "daily",
 		tags: ["学习", "健康"]
 	}), a({
 		title: "给妈妈打电话",
 		listId: i.生活,
 		priority: 0,
-		dueAt: WC(0, 19, 30),
+		dueAt: qC(0, 19, 30),
 		tags: ["生活"]
 	}), a({
 		title: "准备下周一的方案初稿",
 		listId: i.工作,
 		priority: 3,
-		dueAt: WC(1, 11, 0),
+		dueAt: qC(1, 11, 0),
 		tags: ["工作", "重要"],
 		subtasks: [
 			"列大纲",
@@ -26958,50 +26995,50 @@ function KC() {
 		title: "健身房练腿",
 		listId: i.生活,
 		priority: 1,
-		dueAt: WC(1, 18, 30),
+		dueAt: qC(1, 18, 30),
 		tags: ["健康"]
 	}), a({
 		title: "读完《设计中的设计》第三章",
 		listId: i.学习,
 		priority: 0,
-		dueAt: WC(1, 21, 0),
+		dueAt: qC(1, 21, 0),
 		tags: ["学习"]
 	}), a({
 		title: "每周复盘（每周）",
 		listId: i.工作,
 		priority: 2,
-		dueAt: WC(1, 20, 0),
+		dueAt: qC(1, 20, 0),
 		recurrence: "weekly",
 		tags: ["工作"]
 	}), a({
 		title: "预约牙医",
 		listId: i.生活,
 		priority: 1,
-		dueAt: WC(3, 9, 0),
+		dueAt: qC(3, 9, 0),
 		tags: ["健康"]
 	}), a({
 		title: "季度目标对齐会",
 		listId: i.工作,
 		priority: 2,
-		dueAt: WC(4, 14, 0),
+		dueAt: qC(4, 14, 0),
 		tags: ["工作"]
 	}), a({
 		title: "整理书桌和文件",
 		listId: i.生活,
 		priority: 0,
-		dueAt: WC(6, 10, 0),
+		dueAt: qC(6, 10, 0),
 		tags: ["生活"]
 	}), a({
 		title: "学习 CSS Container Queries",
 		listId: i.学习,
 		priority: 1,
-		dueAt: WC(8, 20, 0),
+		dueAt: qC(8, 20, 0),
 		tags: ["学习"]
 	}), a({
 		title: "给桌面插件写使用说明",
 		listId: i.工作,
 		priority: 2,
-		dueAt: WC(12, 16, 0),
+		dueAt: qC(12, 16, 0),
 		tags: ["工作"]
 	}), a({
 		title: "整理插件截图，更新 README",
@@ -27048,7 +27085,7 @@ function KC() {
 				listId: i[c],
 				priority: e() > .82 ? 3 : e() > .55 ? 2 : +(e() > .4),
 				tags: l,
-				dueAt: WC(t, 9 + Math.floor(e() * 10), 0)
+				dueAt: qC(t, 9 + Math.floor(e() * 10), 0)
 			});
 			if (u) {
 				let t = 8 + Math.floor(e() * 14), r = Math.floor(e() * 60);
@@ -27070,32 +27107,60 @@ function KC() {
 }
 //#endregion
 //#region public/plugins/todo/js/reminders.js
-var qC = 5e3;
-function JC() {
-	let e = !1, t = async () => {
-		if (e) return;
-		let t = [];
+var XC = 5e3, ZC = "wtsl.todo.reminders.claim", QC = /* @__PURE__ */ new Set();
+function $C(e) {
+	return `${e.id}@${BC(e.remindAt)}`;
+}
+async function ew() {
+	let e = typeof navigator < "u" ? navigator.locks : null;
+	if (!e || typeof e.request != "function") return $.claimDueReminders(/* @__PURE__ */ new Date());
+	try {
+		return await e.request(ZC, { ifAvailable: !0 }, async (e) => e ? $.claimDueReminders(/* @__PURE__ */ new Date()) : null) ?? [];
+	} catch (e) {
+		return console.warn("[todo] 提醒锁不可用，回退到 localStorage 标记", e), $.claimDueReminders(/* @__PURE__ */ new Date());
+	}
+}
+function tw() {
+	let e = !1, t = !1, n = async () => {
+		let e = [];
 		try {
-			t = $.claimDueReminders(/* @__PURE__ */ new Date());
+			e = await ew();
 		} catch (e) {
 			console.error("[todo] 提醒检查失败", e);
 			return;
 		}
-		for (let e of t) try {
-			await YC(e);
-		} catch (e) {
-			console.error("[todo] 提醒弹出失败", e);
+		for (let t of e) {
+			let e = $C(t);
+			if (!QC.has(e)) {
+				QC.add(e);
+				try {
+					await nw(t);
+				} catch (e) {
+					console.error("[todo] 提醒弹出失败", e);
+				} finally {
+					QC.delete(e);
+				}
+			}
 		}
-	}, n = () => {
-		document.hidden || t();
+	}, r = async () => {
+		if (!(e || t)) {
+			t = !0;
+			try {
+				await n();
+			} finally {
+				t = !1;
+			}
+		}
+	}, i = () => {
+		document.hidden || r();
 	};
-	t();
-	let r = setInterval(t, qC);
-	return document.addEventListener("visibilitychange", n), window.addEventListener("focus", n), () => {
-		e = !0, clearInterval(r), document.removeEventListener("visibilitychange", n), window.removeEventListener("focus", n);
+	r();
+	let a = setInterval(r, XC);
+	return document.addEventListener("visibilitychange", i), window.addEventListener("focus", i), () => {
+		e = !0, clearInterval(a), document.removeEventListener("visibilitychange", i), window.removeEventListener("focus", i);
 	};
 }
-async function YC(t) {
+async function nw(t) {
 	let n = $.listById(t.listId), r = n ? `待办提醒 · ${n.name}` : "待办提醒", i = `${t.title}${t.dueAt ? `（${wC(t.dueAt)}）` : ""}`, a = await e.showReminder({
 		title: r,
 		message: i,
@@ -27116,10 +27181,10 @@ async function YC(t) {
 //#endregion
 //#region public/plugins/todo/js/tools.js
 OC.map((e) => e.value);
-function XC(e) {
+function rw(e) {
 	if (e !== void 0) return e === null || e === "" ? null : String(e);
 }
-function ZC(e) {
+function iw(e) {
 	let t = $.state.tasks.filter((t) => t.listId === e.id), n = t.filter((e) => e.done).length;
 	return {
 		...e,
@@ -27128,7 +27193,7 @@ function ZC(e) {
 		done: n
 	};
 }
-var QC = [
+var aw = [
 	{
 		name: "todo.lists",
 		description: "列出所有待办清单（含未完成/已完成数量）",
@@ -27319,16 +27384,16 @@ var QC = [
 		}
 	}
 ];
-function $C(e) {
+function ow(e) {
 	return {
 		...e,
 		listName: $.listById(e.listId)?.name,
 		listColor: $.listById(e.listId)?.color
 	};
 }
-function ew(e, t = {}) {
+function sw(e, t = {}) {
 	switch (e) {
-		case "todo.lists": return $.lists.map(ZC);
+		case "todo.lists": return $.lists.map(iw);
 		case "todo.list": {
 			let e = $.state.tasks;
 			if (t.listId) {
@@ -27341,31 +27406,31 @@ function ew(e, t = {}) {
 				let r = /^\d{4}-\d{2}-\d{2}$/.test(t.dueBefore) ? new Date(n.getFullYear(), n.getMonth(), n.getDate(), 23, 59, 59) : n;
 				e = e.filter((e) => e.dueAt && new Date(e.dueAt) <= r);
 			}
-			return t.tag && (e = e.filter((e) => e.tags.includes(t.tag))), t.query && (e = e.filter((e) => $.matchesQuery(e, t.query))), $.sortTasks(e, "due").map($C);
+			return t.tag && (e = e.filter((e) => e.tags.includes(t.tag))), t.query && (e = e.filter((e) => $.matchesQuery(e, t.query))), $.sortTasks(e, "due").map(ow);
 		}
 		case "todo.add":
 			if (!t.title || !String(t.title).trim()) throw Error("title 不能为空");
-			return $C($.addTask({
+			return ow($.addTask({
 				title: t.title,
 				listId: t.listId,
 				priority: t.priority,
-				dueAt: XC(t.dueAt),
+				dueAt: rw(t.dueAt),
 				note: t.note,
-				remindAt: XC(t.remindAt),
+				remindAt: rw(t.remindAt),
 				recurrence: t.recurrence,
 				tags: t.tags,
 				subtasks: t.subtasks
 			}));
 		case "todo.addList": return $.addList(t.name);
-		case "todo.complete": return $C($.setDone(t.id, typeof t.done != "boolean" || t.done));
+		case "todo.complete": return ow($.setDone(t.id, typeof t.done != "boolean" || t.done));
 		case "todo.update": {
 			let e = { ...t };
-			return delete e.id, "dueAt" in e && (e.dueAt = XC(e.dueAt)), "remindAt" in e && (e.remindAt = XC(e.remindAt)), $C($.updateTask(t.id, e));
+			return delete e.id, "dueAt" in e && (e.dueAt = rw(e.dueAt)), "remindAt" in e && (e.remindAt = rw(e.remindAt)), ow($.updateTask(t.id, e));
 		}
 		case "todo.remove": return $.removeTask(t.id);
-		case "todo.addSubtask": return $C($.addSubtask(t.taskId, t.title));
-		case "todo.completeSubtask": return $C($.completeSubtask(t.taskId, t.subtaskId, typeof t.done != "boolean" || t.done));
-		case "todo.search": return $.searchTasks(t.query).map($C);
+		case "todo.addSubtask": return ow($.addSubtask(t.taskId, t.title));
+		case "todo.completeSubtask": return ow($.completeSubtask(t.taskId, t.subtaskId, typeof t.done != "boolean" || t.done));
+		case "todo.search": return $.searchTasks(t.query).map(ow);
 		case "todo.stats": return $.statsRange({
 			from: t.from,
 			to: t.to
@@ -27373,11 +27438,11 @@ function ew(e, t = {}) {
 		default: throw Error(`未知工具 ${e}`);
 	}
 }
-function tw(e, t) {
+function cw(e, t) {
 	try {
 		return {
 			ok: !0,
-			result: ew(e, t || {})
+			result: sw(e, t || {})
 		};
 	} catch (e) {
 		return {
@@ -27388,25 +27453,25 @@ function tw(e, t) {
 }
 //#endregion
 //#region public/plugins/todo/src/todoData.js
-var nw = !1;
-function rw() {
-	if (nw) return $;
-	nw = !0, $.load();
+var lw = !1;
+function uw({ startReminders: e = !0 } = {}) {
+	if (lw) return $;
+	lw = !0, $.load();
 	try {
-		GC() && KC();
+		JC() && YC();
 	} catch (e) {
 		console.warn("[todo] 演示数据注入失败", e);
 	}
-	return $.bindStorageSync(), JC(), $;
+	return $.bindStorageSync(), e && tw(), $;
 }
-var iw = 0;
+var dw = 0;
 $.subscribe(() => {
-	iw += 1;
+	dw += 1;
 });
-function aw() {
-	return (0, P.useSyncExternalStore)((e) => $.subscribe(e), () => iw, () => iw), $;
+function fw() {
+	return (0, P.useSyncExternalStore)((e) => $.subscribe(e), () => dw, () => dw), $;
 }
-function ow(e, t) {
+function pw(e, t) {
 	let n = JSON.stringify(e);
 	(0, P.useEffect)(() => {
 		t && $.updateSettings({
@@ -27418,47 +27483,47 @@ function ow(e, t) {
 		});
 	}, [t, n]);
 }
-var sw = "todo.overlay";
-function cw(e) {
+var mw = "todo.overlay";
+function hw(e) {
 	try {
-		localStorage.setItem(sw, JSON.stringify(e));
+		localStorage.setItem(mw, JSON.stringify(e));
 	} catch {}
 }
-function lw() {
+function gw() {
 	try {
-		let e = localStorage.getItem(sw);
+		let e = localStorage.getItem(mw);
 		return e ? JSON.parse(e) : null;
 	} catch {
 		return null;
 	}
 }
-function uw(e) {
-	cw({
+function _w(e) {
+	hw({
 		mode: "detail",
 		taskId: e
 	}), iC("detail", "任务详情");
 }
-function dw(e) {
-	cw({
+function vw(e) {
+	hw({
 		mode: "new",
 		listId: e
 	}), iC("detail", "新建任务");
 }
-function fw({ listId: e, done: t = !1, scope: n = null } = {}) {
-	cw({
+function yw({ listId: e, done: t = !1, scope: n = null } = {}) {
+	hw({
 		mode: "all",
 		listId: e,
 		done: t,
 		scope: n
 	}), iC("all", t ? "已完成任务" : "全部任务");
 }
-function pw() {
+function bw() {
 	aC("待办设置");
 }
-function mw() {
+function xw() {
 	let e = {};
-	for (let t of QC) e[t.name] = (e) => {
-		let { ok: n, result: r, error: i } = tw(t.name, e);
+	for (let t of aw) e[t.name] = (e) => {
+		let { ok: n, result: r, error: i } = cw(t.name, e);
 		if (!n) throw Error(i);
 		return r;
 	};
@@ -27466,14 +27531,14 @@ function mw() {
 }
 //#endregion
 //#region public/plugins/todo/src/sizes.js
-var hw = {
+var Sw = {
 	"1x1": [1, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2],
 	"3x3": [3, 3],
 	"4x2": [4, 2]
 };
-function gw(e) {
+function Cw(e) {
 	switch (e) {
 		case "1x1": return "summary";
 		case "2x2": return "mini";
@@ -27482,7 +27547,7 @@ function gw(e) {
 		default: return "full";
 	}
 }
-function _w(e) {
+function ww(e) {
 	switch (e) {
 		case "mini": return 4;
 		case "medium": return 5;
@@ -27490,20 +27555,20 @@ function _w(e) {
 		default: return null;
 	}
 }
-function vw(e) {
+function Tw(e) {
 	if (!e) return null;
 	let t = /^(\d+)\s*[x×,]\s*(\d+)$/i.exec(String(e).trim());
 	return t ? [Number(t[1]), Number(t[2])] : null;
 }
-function yw(e) {
+function Ew(e) {
 	if (!Array.isArray(e) || e.length < 2) return "3x3";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	if (hw[t]) return t;
+	if (Sw[t]) return t;
 	let n = Number(e[0]), r = Number(e[1]);
 	return n <= 1 && r <= 1 ? "1x1" : r >= 3 ? "3x3" : n >= 4 ? "4x2" : n >= 3 ? "3x2" : "2x2";
 }
-function bw(e) {
-	let t = hw[e] || hw["3x3"];
+function Dw(e) {
+	let t = Sw[e] || Sw["3x3"];
 	return {
 		width: t[0] * 180,
 		height: t[1] * 180
@@ -27511,41 +27576,41 @@ function bw(e) {
 }
 //#endregion
 //#region public/plugins/todo/src/config.js
-var xw = "settings", Sw = {
+var Ow = "settings", kw = {
 	defaultListId: null,
 	showCompleted: !0,
 	defaultSort: "manual",
 	fontSize: "default",
 	weekStart: 1
-}, Cw = [{
+}, Aw = [{
 	value: "default",
 	label: "默认"
 }, {
 	value: "large",
 	label: "大"
-}], ww = [{
+}], jw = [{
 	value: 1,
 	label: "周一"
 }, {
 	value: 0,
 	label: "周日"
-}], Tw = PC.map((e) => ({
+}], Mw = PC.map((e) => ({
 	value: e.value,
 	label: e.label
 }));
-function Ew(e) {
+function Nw(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
 		defaultListId: typeof t.defaultListId == "string" && t.defaultListId ? t.defaultListId : null,
-		showCompleted: typeof t.showCompleted == "boolean" ? t.showCompleted : Sw.showCompleted,
-		defaultSort: PC.some((e) => e.value === t.defaultSort) ? t.defaultSort : Sw.defaultSort,
+		showCompleted: typeof t.showCompleted == "boolean" ? t.showCompleted : kw.showCompleted,
+		defaultSort: PC.some((e) => e.value === t.defaultSort) ? t.defaultSort : kw.defaultSort,
 		fontSize: t.fontSize === "large" ? "large" : "default",
 		weekStart: t.weekStart === 0 ? 0 : 1
 	};
 }
 //#endregion
 //#region public/plugins/_shared/typography.js
-var Dw = {
+var Pw = {
 	48: {
 		fontSize: "48px",
 		lineHeight: "56px"
@@ -27563,12 +27628,12 @@ var Dw = {
 		lineHeight: "124px"
 	}
 };
-function Ow(e) {
-	let t = Dw[e];
+function Fw(e) {
+	let t = Pw[e];
 	if (!t) throw Error(`Display XL 只定义了 48/80/96/112，收到 ${String(e)}`);
 	return t;
 }
-var kw = { fontVariantNumeric: "tabular-nums" }, Aw = 500, jw = Kn({
+var Iw = { fontVariantNumeric: "tabular-nums" }, Lw = 500, Rw = Kn({
 	fill: {
 		width: "100%",
 		height: "100%",
@@ -27898,8 +27963,8 @@ var kw = { fontVariantNumeric: "tabular-nums" }, Aw = 500, jw = Kn({
 		borderRadius: W.borderRadiusSmall
 	}
 });
-function Mw({ title: e, actionLabel: t, onAction: n, size: r = 400 }) {
-	let i = jw();
+function zw({ title: e, actionLabel: t, onAction: n, size: r = 400 }) {
+	let i = Rw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: i.empty,
 		children: [
@@ -27923,8 +27988,8 @@ function Mw({ title: e, actionLabel: t, onAction: n, size: r = 400 }) {
 		]
 	});
 }
-function Nw({ label: e, count: t }) {
-	let n = jw();
+function Bw({ label: e, count: t }) {
+	let n = Rw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: n.groupHead,
 		children: [/* @__PURE__ */ (0, F.jsx)(Z, {
@@ -27939,8 +28004,8 @@ function Nw({ label: e, count: t }) {
 		}) : null]
 	});
 }
-function Pw({ task: e, now: t }) {
-	let n = jw();
+function Vw({ task: e, now: t }) {
+	let n = Rw();
 	if (e.done) return null;
 	let r = Q(e.dueAt);
 	if (r && r < t) return /* @__PURE__ */ (0, F.jsx)(Z, {
@@ -27966,8 +28031,8 @@ function Pw({ task: e, now: t }) {
 	}
 	return null;
 }
-function Fw({ tasks: e, manualSort: t = !1, onToggle: n, onOpenDetail: r, onReorder: i }) {
-	let a = jw(), o = (0, P.useRef)(null), s = (0, P.useRef)({
+function Hw({ tasks: e, manualSort: t = !1, onToggle: n, onOpenDetail: r, onReorder: i }) {
+	let a = Rw(), o = (0, P.useRef)(null), s = (0, P.useRef)({
 		timer: 0,
 		suppress: !1,
 		origin: null
@@ -27984,7 +28049,7 @@ function Fw({ tasks: e, manualSort: t = !1, onToggle: n, onOpenDetail: r, onReor
 			id: t.id
 		}, s.current.timer = window.setTimeout(() => {
 			s.current.suppress = !0, r(t.id);
-		}, Aw)));
+		}, Lw)));
 	}, [r]), g = (0, P.useCallback)((e) => {
 		let t = s.current.origin;
 		t && Math.hypot(e.clientX - t.x, e.clientY - t.y) > 8 && m();
@@ -28077,7 +28142,7 @@ function Fw({ tasks: e, manualSort: t = !1, onToggle: n, onOpenDetail: r, onReor
 						title: e.title,
 						children: e.title
 					}),
-					/* @__PURE__ */ (0, F.jsx)(Pw, {
+					/* @__PURE__ */ (0, F.jsx)(Vw, {
 						task: e,
 						now: p
 					})
@@ -28086,8 +28151,8 @@ function Fw({ tasks: e, manualSort: t = !1, onToggle: n, onOpenDetail: r, onReor
 		})
 	});
 }
-function Iw({ monthCursor: e, selectedDay: t, tasksByDay: n, weekStart: r, onSelectDay: i, onAddDay: a, compact: o = !1 }) {
-	let s = jw(), c = EC(r), l = new Date(e.getFullYear(), e.getMonth(), 1), u = (l.getDay() - r + 7) % 7, d = new Date(l);
+function Uw({ monthCursor: e, selectedDay: t, tasksByDay: n, weekStart: r, onSelectDay: i, onAddDay: a, compact: o = !1 }) {
+	let s = Rw(), c = EC(r), l = new Date(e.getFullYear(), e.getMonth(), 1), u = (l.getDay() - r + 7) % 7, d = new Date(l);
 	d.setDate(l.getDate() - u);
 	let f = Array.from({ length: 42 }, (e, t) => {
 		let n = new Date(d);
@@ -28121,8 +28186,8 @@ function Iw({ monthCursor: e, selectedDay: t, tasksByDay: n, weekStart: r, onSel
 		})]
 	}) });
 }
-function Lw({ weighted: e, onToggleWeight: t, onOpenSettings: n }) {
-	let r = jw(), i = $.completionStats(112, { weighted: e }), a = [...i.byDay.values()].map((t) => e ? t.weight : t.count), o = Math.max(1, ...a), s = (e) => e <= 0 ? 0 : Math.min(4, Math.ceil(e / o * 4)), c = [...i.byDay.keys()], l = $.settings.weekStart, u = EC(l), d = ((/* @__PURE__ */ new Date(`${c[0]}T00:00:00`)).getDay() - l + 7) % 7, f = [];
+function Ww({ weighted: e, onToggleWeight: t, onOpenSettings: n }) {
+	let r = Rw(), i = $.completionStats(112, { weighted: e }), a = [...i.byDay.values()].map((t) => e ? t.weight : t.count), o = Math.max(1, ...a), s = (e) => e <= 0 ? 0 : Math.min(4, Math.ceil(e / o * 4)), c = [...i.byDay.keys()], l = $.settings.weekStart, u = EC(l), d = ((/* @__PURE__ */ new Date(`${c[0]}T00:00:00`)).getDay() - l + 7) % 7, f = [];
 	for (let e = 0; e < d; e += 1) f.push(/* @__PURE__ */ (0, F.jsx)("span", { "aria-hidden": "true" }, `pad-${e}`));
 	for (let t of c) {
 		let n = i.byDay.get(t), a = s(e ? n.weight : n.count), o = /* @__PURE__ */ new Date(`${t}T00:00:00`);
@@ -28165,7 +28230,7 @@ function Lw({ weighted: e, onToggleWeight: t, onOpenSettings: n }) {
 		})]
 	});
 }
-function Rw(e, t = 10) {
+function Gw(e, t = 10) {
 	let [n, r] = (0, P.useState)(() => Math.max(1, t));
 	return (0, P.useLayoutEffect)(() => {
 		let n = e.current;
@@ -28181,7 +28246,7 @@ function Rw(e, t = 10) {
 		return a.observe(n), () => a.disconnect();
 	}, [e, t]), n;
 }
-function zw(e) {
+function Kw(e) {
 	let [t, n] = (0, P.useState)(!1);
 	return (0, P.useLayoutEffect)(() => {
 		let t = e.current;
@@ -28194,8 +28259,8 @@ function zw(e) {
 		};
 	}, [e]), t;
 }
-function Bw({ children: e }) {
-	let t = jw(), n = (0, P.useRef)(null), r = zw(n);
+function qw({ children: e }) {
+	let t = Rw(), n = (0, P.useRef)(null), r = Kw(n);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: t.scrollViewport,
 		children: [/* @__PURE__ */ (0, F.jsx)("div", {
@@ -28210,7 +28275,7 @@ function Bw({ children: e }) {
 }
 //#endregion
 //#region public/plugins/todo/src/views.jsx
-var Vw = Kn({
+var Jw = Kn({
 	grow: {
 		flex: 1,
 		minHeight: 0,
@@ -28322,25 +28387,25 @@ var Vw = Kn({
 		marginTop: W.spacingVerticalXS
 	}
 });
-function Hw(e, t) {
+function Yw(e, t) {
 	return !t || t === "all" ? e.state.tasks : e.state.tasks.filter((e) => e.listId === t);
 }
-function Uw(e, t) {
+function Xw(e, t) {
 	return t == null ? e : e.slice(0, Math.max(0, t));
 }
-function Ww({ ctx: e }) {
-	let t = jw(), n = Vw(), { store: r, ui: i } = e, a = /* @__PURE__ */ new Date(), o = fC(a), s = pC(o, 1), c = Hw(r, i.listScope).filter((e) => !e.done), l = c.filter((e) => {
+function Zw({ ctx: e }) {
+	let t = Rw(), n = Jw(), { store: r, ui: i } = e, a = /* @__PURE__ */ new Date(), o = fC(a), s = pC(o, 1), c = Yw(r, i.listScope).filter((e) => !e.done), l = c.filter((e) => {
 		let t = Q(e.dueAt);
 		return t && t < o;
 	}), u = c.filter((e) => e.dueAt && vC(e.dueAt, o)), d = c.filter((e) => e.dueAt && vC(e.dueAt, s)), f = r.sortTasks([...l, ...u], i.sort), p = r.sortTasks(d, i.sort), m = f.length + p.length, h = e.actions.rowBudget;
-	if (m === 0) return /* @__PURE__ */ (0, F.jsx)(Mw, {
+	if (m === 0) return /* @__PURE__ */ (0, F.jsx)(zw, {
 		title: "今天没有到期的任务",
 		actionLabel: e.actions.emptyAction,
 		onAction: e.actions.onEmptyAction
 	});
-	let g = h, _ = Uw(f, g);
+	let g = h, _ = Xw(f, g);
 	g = g === null ? null : g - _.length;
-	let v = Uw(p, g), y = m - _.length - v.length, b = (t) => /* @__PURE__ */ (0, F.jsx)(Fw, {
+	let v = Xw(p, g), y = m - _.length - v.length, b = (t) => /* @__PURE__ */ (0, F.jsx)(Hw, {
 		tasks: t,
 		manualSort: i.sort === "manual",
 		onToggle: e.actions.onToggle,
@@ -28352,14 +28417,14 @@ function Ww({ ctx: e }) {
 		children: [
 			_.length > 0 ? /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: n.section,
-				children: [/* @__PURE__ */ (0, F.jsx)(Nw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(Bw, {
 					label: `今天 · ${a.getMonth() + 1}月${a.getDate()}日`,
 					count: f.length
 				}), b(_)]
 			}) : null,
 			v.length > 0 ? /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: n.section,
-				children: [/* @__PURE__ */ (0, F.jsx)(Nw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(Bw, {
 					label: "明天",
 					count: p.length
 				}), b(v)]
@@ -28377,8 +28442,8 @@ function Ww({ ctx: e }) {
 		]
 	});
 }
-function Gw({ ctx: e }) {
-	let t = jw(), n = Vw(), { store: r, ui: i } = e, a = fC(/* @__PURE__ */ new Date()), o = pC(a, 1), s = r.sortTasks(Hw(r, i.listScope).filter((e) => !e.done), i.sort), c = [
+function Qw({ ctx: e }) {
+	let t = Rw(), n = Jw(), { store: r, ui: i } = e, a = fC(/* @__PURE__ */ new Date()), o = pC(a, 1), s = r.sortTasks(Yw(r, i.listScope).filter((e) => !e.done), i.sort), c = [
 		{
 			key: "today",
 			label: "今天",
@@ -28404,8 +28469,8 @@ function Gw({ ctx: e }) {
 		let t = Q(e.dueAt);
 		t ? dC(t) <= dC(a) ? l.today.tasks.push(e) : vC(t, o) ? l.tomorrow.tasks.push(e) : l.later.tasks.push(e) : l.none.tasks.push(e);
 	}
-	let u = c.filter((e) => e.tasks.length > 0), d = r.sortTasks(Hw(r, i.listScope).filter((e) => e.done), "created").reverse(), f = e.actions.rowBudget, p = u.map((e) => {
-		let t = Uw(e.tasks, f);
+	let u = c.filter((e) => e.tasks.length > 0), d = r.sortTasks(Yw(r, i.listScope).filter((e) => e.done), "created").reverse(), f = e.actions.rowBudget, p = u.map((e) => {
+		let t = Xw(e.tasks, f);
 		return f !== null && (f -= t.length), {
 			...e,
 			visible: t
@@ -28414,16 +28479,16 @@ function Gw({ ctx: e }) {
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: n.grow,
 		children: [
-			u.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Mw, {
+			u.length === 0 ? /* @__PURE__ */ (0, F.jsx)(zw, {
 				title: "还没有待办",
 				actionLabel: e.actions.emptyAction,
 				onAction: e.actions.onEmptyAction
 			}) : p.map((t) => t.visible.length > 0 && /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: n.section,
-				children: [/* @__PURE__ */ (0, F.jsx)(Nw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(Bw, {
 					label: t.label,
 					count: t.tasks.length
-				}), /* @__PURE__ */ (0, F.jsx)(Fw, {
+				}), /* @__PURE__ */ (0, F.jsx)(Hw, {
 					tasks: t.visible,
 					manualSort: i.sort === "manual",
 					onToggle: e.actions.onToggle,
@@ -28458,12 +28523,12 @@ function Gw({ ctx: e }) {
 						children: "查看全部"
 					})
 				]
-			}), i.completedOpen ? /* @__PURE__ */ (0, F.jsx)(Fw, {
+			}), i.completedOpen ? /* @__PURE__ */ (0, F.jsx)(Hw, {
 				tasks: g,
 				onToggle: e.actions.onToggle,
 				onOpenDetail: e.actions.onOpenDetail
 			}) : null] }) : null,
-			i.heatmapOn ? /* @__PURE__ */ (0, F.jsx)(Lw, {
+			i.heatmapOn ? /* @__PURE__ */ (0, F.jsx)(Ww, {
 				weighted: i.heatWeighted,
 				onToggleWeight: e.actions.onToggleHeatWeight,
 				onOpenSettings: e.actions.onOpenSettings
@@ -28471,15 +28536,15 @@ function Gw({ ctx: e }) {
 		]
 	});
 }
-function Kw({ ctx: e }) {
-	let t = Vw(), { store: n, ui: r } = e, i = e.actions.rowBudget;
+function $w({ ctx: e }) {
+	let t = Jw(), { store: n, ui: r } = e, i = e.actions.rowBudget;
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: t.grow,
 		children: n.lists.map((a) => {
-			let o = n.sortTasks(n.state.tasks.filter((e) => e.listId === a.id && !e.done), r.sort), s = Uw(o, i);
+			let o = n.sortTasks(n.state.tasks.filter((e) => e.listId === a.id && !e.done), r.sort), s = Xw(o, i);
 			return i !== null && (i -= s.length), /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: t.section,
-				children: [/* @__PURE__ */ (0, F.jsx)(Nw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(Bw, {
 					label: a.name,
 					count: o.length
 				}), o.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Z, {
@@ -28489,7 +28554,7 @@ function Kw({ ctx: e }) {
 						paddingBlock: W.spacingVerticalXS
 					},
 					children: "这个清单是空的"
-				}) : /* @__PURE__ */ (0, F.jsx)(Fw, {
+				}) : /* @__PURE__ */ (0, F.jsx)(Hw, {
 					tasks: s,
 					manualSort: r.sort === "manual",
 					onToggle: e.actions.onToggle,
@@ -28500,8 +28565,8 @@ function Kw({ ctx: e }) {
 		})
 	});
 }
-function qw({ ctx: e }) {
-	let t = Vw(), n = jw(), { store: r, ui: i } = e, a = i.calCursor, o = /* @__PURE__ */ new Map();
+function eT({ ctx: e }) {
+	let t = Jw(), n = Rw(), { store: r, ui: i } = e, a = i.calCursor, o = /* @__PURE__ */ new Map();
 	for (let e of r.state.tasks) {
 		if (e.done || !e.dueAt || i.listScope !== "all" && e.listId !== i.listScope) continue;
 		let t = dC(e.dueAt);
@@ -28548,7 +28613,7 @@ function qw({ ctx: e }) {
 					})
 				]
 			}),
-			/* @__PURE__ */ (0, F.jsx)(Iw, {
+			/* @__PURE__ */ (0, F.jsx)(Uw, {
 				monthCursor: a,
 				selectedDay: s,
 				tasksByDay: o,
@@ -28580,11 +28645,11 @@ function qw({ ctx: e }) {
 			}),
 			/* @__PURE__ */ (0, F.jsx)("div", {
 				className: t.calPanel,
-				children: l.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Mw, {
+				children: l.length === 0 ? /* @__PURE__ */ (0, F.jsx)(zw, {
 					title: "这天没有安排",
 					actionLabel: "添加任务",
 					onAction: () => e.actions.onAddDay(s)
-				}) : /* @__PURE__ */ (0, F.jsx)(Fw, {
+				}) : /* @__PURE__ */ (0, F.jsx)(Hw, {
 					tasks: [...u, ...d],
 					manualSort: !1,
 					onToggle: e.actions.onToggle,
@@ -28595,8 +28660,8 @@ function qw({ ctx: e }) {
 		]
 	});
 }
-function Jw({ ctx: e }) {
-	let t = Vw(), n = jw(), { store: r, ui: i } = e, a = /* @__PURE__ */ new Map();
+function tT({ ctx: e }) {
+	let t = Jw(), n = Rw(), { store: r, ui: i } = e, a = /* @__PURE__ */ new Map();
 	for (let e of r.state.tasks) {
 		if (e.done || !e.dueAt || i.listScope !== "all" && e.listId !== i.listScope) continue;
 		let t = dC(e.dueAt);
@@ -28727,7 +28792,7 @@ function Jw({ ctx: e }) {
 }
 //#endregion
 //#region public/plugins/todo/src/TodoApp.jsx
-var Yw = "todo-toast", Xw = Kn({
+var nT = "todo-toast", rT = Kn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -28767,9 +28832,9 @@ var Yw = "todo-toast", Xw = Kn({
 		gap: W.spacingVerticalXS
 	},
 	summaryCount: {
-		...Ow(48),
+		...Fw(48),
 		fontWeight: "600",
-		...kw,
+		...Iw,
 		color: W.colorNeutralForeground1
 	},
 	summaryLabel: { color: W.colorNeutralForeground2 },
@@ -28849,8 +28914,8 @@ var Yw = "todo-toast", Xw = Kn({
 	completeHint: { color: W.colorNeutralForeground3 },
 	menuItem: { minHeight: "40px" }
 });
-function Zw({ count: e, name: t, size: n = 700 }) {
-	let r = Xw();
+function iT({ count: e, name: t, size: n = 700 }) {
+	let r = rT();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: r.header,
 		children: [/* @__PURE__ */ (0, F.jsx)(Z, {
@@ -28865,21 +28930,21 @@ function Zw({ count: e, name: t, size: n = 700 }) {
 		})]
 	});
 }
-function Qw({ tasks: e, maxRows: t, budget: n, manualSort: r, onToggle: i, onOpenDetail: a, onReorder: o, onMore: s }) {
-	let c = Xw(), l = (0, P.useRef)(null), u = Rw(l, t), d = n ?? e.length, f = Math.max(1, Math.min(u, d)), p = e.slice(0, f), m = e.slice(f, d), h = e.length - d;
+function aT({ tasks: e, maxRows: t, budget: n, manualSort: r, onToggle: i, onOpenDetail: a, onReorder: o, onMore: s }) {
+	let c = rT(), l = (0, P.useRef)(null), u = Gw(l, t), d = n ?? e.length, f = Math.max(1, Math.min(u, d)), p = e.slice(0, f), m = e.slice(f, d), h = e.length - d;
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: c.listViewport,
 		ref: l,
 		"data-visible-rows": f,
-		children: /* @__PURE__ */ (0, F.jsxs)(Bw, { children: [
-			/* @__PURE__ */ (0, F.jsx)(Fw, {
+		children: /* @__PURE__ */ (0, F.jsxs)(qw, { children: [
+			/* @__PURE__ */ (0, F.jsx)(Hw, {
 				tasks: p,
 				manualSort: r,
 				onToggle: i,
 				onOpenDetail: a,
 				onReorder: o
 			}),
-			m.length > 0 ? /* @__PURE__ */ (0, F.jsx)(Fw, {
+			m.length > 0 ? /* @__PURE__ */ (0, F.jsx)(Hw, {
 				tasks: m,
 				manualSort: r,
 				onToggle: i,
@@ -28902,18 +28967,18 @@ function Qw({ tasks: e, maxRows: t, budget: n, manualSort: r, onToggle: i, onOpe
 		] })
 	});
 }
-function $w({ defaultSizeKey: t = "3x3" }) {
-	let n = Xw(), r = jw(), i = tC(yw, t), a = gw(i), o = _w(a), s = aw(), [c, l, u] = nC(xw, Sw, Ew);
-	ow(c, u);
-	let { dispatchToast: d } = Nx(Yw), f = (0, P.useCallback)((e) => {
+function oT({ defaultSizeKey: t = "3x3" }) {
+	let n = rT(), r = Rw(), i = tC(Ew, t), a = Cw(i), o = ww(a), s = fw(), [c, l, u] = nC(Ow, kw, Nw);
+	pw(c, u);
+	let { dispatchToast: d } = Nx(nT), f = (0, P.useCallback)((e) => {
 		d(/* @__PURE__ */ (0, F.jsx)(Z, {
 			size: 200,
 			children: e
 		}), { timeout: 2200 });
-	}, [d]), p = eT(a, c, u, s), m = (0, P.useRef)(null), h = (0, P.useRef)(null), g = (0, P.useRef)(null), [_, v] = (0, P.useState)(0), y = Rw(g, 8);
+	}, [d]), p = sT(a, c, u, s), m = (0, P.useRef)(null), h = (0, P.useRef)(null), g = (0, P.useRef)(null), [_, v] = (0, P.useState)(0), y = Gw(g, 8);
 	(0, P.useEffect)(() => {
 		_ && h.current?.focus();
-	}, [_]), (0, P.useEffect)(() => e.onFocus(() => m.current?.querySelector("button, [role=\"checkbox\"], input")?.focus() ?? m.current?.focus()), []), oC(() => pw()), (0, P.useEffect)(() => {
+	}, [_]), (0, P.useEffect)(() => e.onFocus(() => m.current?.querySelector("button, [role=\"checkbox\"], input")?.focus() ?? m.current?.focus()), []), oC(() => bw()), (0, P.useEffect)(() => {
 		let e = (e) => {
 			e.key === "Escape" && (p.searchOpen ? (p.setSearchOpen(!1), p.setQuery(""), e.preventDefault()) : cC());
 		};
@@ -28925,15 +28990,15 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		rowBudget: Math.min(8, Math.max(1, y)),
 		emptyAction: a === "mini" || a === "summary" ? "新建任务" : "添加任务",
 		onEmptyAction: () => {
-			a === "mini" || a === "summary" ? dw(b) : S();
+			a === "mini" || a === "summary" ? vw(b) : S();
 		},
 		onToggle: (e) => {
 			let t = s.taskById(e);
 			t && s.setDone(e, !t.done);
 		},
-		onOpenDetail: uw,
+		onOpenDetail: _w,
 		onReorder: (e, t) => $.reorderTasks(e, t),
-		onOpenAll: fw,
+		onOpenAll: yw,
 		onSelectDay: (e) => p.setSelectedDay(e),
 		onAddDay: (e) => {
 			p.setComposerDue(e), S();
@@ -28949,7 +29014,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		onToggleCompleted: () => p.setCompletedOpen((e) => !e),
 		onSetCalMode: (e) => p.setCalMode(e),
 		onToggleHeatWeight: () => p.setHeatWeighted((e) => !e),
-		onOpenSettings: pw
+		onOpenSettings: bw
 	}), [
 		a,
 		b,
@@ -28959,7 +29024,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		p.weekCursor,
 		S
 	]);
-	sC(QC, (0, P.useMemo)(() => mw(), []));
+	sC(aw, (0, P.useMemo)(() => xw(), []));
 	let w = (0, P.useCallback)((e) => {
 		e.preventDefault();
 		let t = h.current, n = t?.value?.trim();
@@ -29038,11 +29103,11 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 			/* @__PURE__ */ (0, F.jsx)(Qv, {
 				className: n.menuItem,
 				icon: /* @__PURE__ */ (0, F.jsx)($u, {}),
-				onClick: pw,
+				onClick: bw,
 				children: "新建清单…"
 			})
 		] }),
-		/* @__PURE__ */ (0, F.jsxs)(Mv, { children: [/* @__PURE__ */ (0, F.jsx)(Rv, { children: "排序" }), Tw.map((e) => /* @__PURE__ */ (0, F.jsxs)(Qv, {
+		/* @__PURE__ */ (0, F.jsxs)(Mv, { children: [/* @__PURE__ */ (0, F.jsx)(Rv, { children: "排序" }), Mw.map((e) => /* @__PURE__ */ (0, F.jsxs)(Qv, {
 			className: n.menuItem,
 			onClick: () => p.setSort(e.value),
 			secondaryContent: p.sort === e.value ? /* @__PURE__ */ (0, F.jsx)(rd, {}) : null,
@@ -29052,7 +29117,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		/* @__PURE__ */ (0, F.jsx)(Qv, {
 			className: n.menuItem,
 			icon: /* @__PURE__ */ (0, F.jsx)(Xu, {}),
-			onClick: pw,
+			onClick: bw,
 			children: "待办设置…"
 		})
 	] }) })] }), D = {
@@ -29121,12 +29186,12 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 			...ee("summary"),
 			className: j(n.root, n.padSummary, n.summaryMain),
 			onContextMenu: (e) => {
-				e.preventDefault(), pw();
+				e.preventDefault(), bw();
 			},
 			"aria-label": `${x?.name || "待办"}：${e.length} 项未完成，${r.length} 项今日到期`,
 			children: [
 				/* @__PURE__ */ (0, F.jsx)(sS, {
-					toasterId: Yw,
+					toasterId: nT,
 					position: "bottom-end"
 				}),
 				/* @__PURE__ */ (0, F.jsx)("span", {
@@ -29149,18 +29214,18 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 			"aria-label": `${e.name}：${t.length} 项未完成`,
 			children: [
 				/* @__PURE__ */ (0, F.jsx)(sS, {
-					toasterId: Yw,
+					toasterId: nT,
 					position: "bottom-end"
 				}),
-				a === "mini" ? /* @__PURE__ */ (0, F.jsx)(Zw, {
+				a === "mini" ? /* @__PURE__ */ (0, F.jsx)(iT, {
 					count: t.length,
 					name: e.name
 				}) : null,
-				t.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Mw, {
+				t.length === 0 ? /* @__PURE__ */ (0, F.jsx)(zw, {
 					title: "没有待办",
 					actionLabel: C.emptyAction,
 					onAction: C.onEmptyAction
-				}) : /* @__PURE__ */ (0, F.jsx)(Qw, {
+				}) : /* @__PURE__ */ (0, F.jsx)(aT, {
 					tasks: t,
 					maxRows: o || 4,
 					budget: o,
@@ -29168,7 +29233,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 					onToggle: C.onToggle,
 					onOpenDetail: C.onOpenDetail,
 					onReorder: C.onReorder,
-					onMore: () => fw({ listId: e.id })
+					onMore: () => yw({ listId: e.id })
 				}),
 				a === "medium" ? O(/* @__PURE__ */ (0, F.jsxs)("div", {
 					className: n.countGroup,
@@ -29195,7 +29260,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 			"aria-label": `${e.name}：${t.length} 项未完成`,
 			children: [
 				/* @__PURE__ */ (0, F.jsx)(sS, {
-					toasterId: Yw,
+					toasterId: nT,
 					position: "bottom-end"
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -29235,14 +29300,14 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 							size: 200,
 							className: n.completeHint,
 							children: "全部做完了"
-						}) : /* @__PURE__ */ (0, F.jsx)(Qw, {
+						}) : /* @__PURE__ */ (0, F.jsx)(aT, {
 							tasks: t,
 							maxRows: 30,
 							manualSort: p.sort === "manual",
 							onToggle: C.onToggle,
 							onOpenDetail: C.onOpenDetail,
 							onReorder: C.onReorder,
-							onMore: () => fw({ listId: e.id })
+							onMore: () => yw({ listId: e.id })
 						})]
 					}), /* @__PURE__ */ (0, F.jsxs)("section", {
 						className: n.wideCol,
@@ -29263,13 +29328,13 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 							size: 200,
 							className: n.completeHint,
 							children: "暂无已完成"
-						}) : /* @__PURE__ */ (0, F.jsx)(Qw, {
+						}) : /* @__PURE__ */ (0, F.jsx)(aT, {
 							tasks: i,
 							maxRows: 30,
 							onToggle: C.onToggle,
 							onOpenDetail: C.onOpenDetail,
 							onReorder: C.onReorder,
-							onMore: () => fw({ done: !0 })
+							onMore: () => yw({ done: !0 })
 						})]
 					})]
 				}),
@@ -29291,13 +29356,13 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 				e.length,
 				"）"
 			]
-		}), e.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Mw, { title: "没有匹配" }) : /* @__PURE__ */ (0, F.jsx)(Fw, {
+		}), e.length === 0 ? /* @__PURE__ */ (0, F.jsx)(zw, { title: "没有匹配" }) : /* @__PURE__ */ (0, F.jsx)(Hw, {
 			tasks: e.slice(0, Math.max(1, Math.min(8, y))),
 			onToggle: C.onToggle,
 			onOpenDetail: C.onOpenDetail,
 			onReorder: C.onReorder
 		})] });
-	} else ne = p.view === "daytodo" ? /* @__PURE__ */ (0, F.jsx)(Ww, { ctx: D }) : p.view === "recent" ? /* @__PURE__ */ (0, F.jsx)(Gw, { ctx: D }) : p.view === "category" ? /* @__PURE__ */ (0, F.jsx)(Kw, { ctx: D }) : p.view === "calendar" ? /* @__PURE__ */ (0, F.jsx)(qw, { ctx: D }) : /* @__PURE__ */ (0, F.jsx)(Jw, { ctx: D });
+	} else ne = p.view === "daytodo" ? /* @__PURE__ */ (0, F.jsx)(Zw, { ctx: D }) : p.view === "recent" ? /* @__PURE__ */ (0, F.jsx)(Qw, { ctx: D }) : p.view === "category" ? /* @__PURE__ */ (0, F.jsx)($w, { ctx: D }) : p.view === "calendar" ? /* @__PURE__ */ (0, F.jsx)(eT, { ctx: D }) : /* @__PURE__ */ (0, F.jsx)(tT, { ctx: D });
 	let re = !p.query.trim() && (p.view === "calendar" || p.view === "weekmonth");
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		...ee("full"),
@@ -29305,7 +29370,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		"aria-label": "待办清单",
 		children: [
 			/* @__PURE__ */ (0, F.jsx)(sS, {
-				toasterId: Yw,
+				toasterId: nT,
 				position: "bottom-end"
 			}),
 			/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -29384,7 +29449,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 			/* @__PURE__ */ (0, F.jsx)("div", {
 				className: n.listViewport,
 				ref: g,
-				children: re ? ne : /* @__PURE__ */ (0, F.jsx)(Bw, { children: /* @__PURE__ */ (0, F.jsx)("div", {
+				children: re ? ne : /* @__PURE__ */ (0, F.jsx)(qw, { children: /* @__PURE__ */ (0, F.jsx)("div", {
 					className: r.content,
 					children: ne
 				}) })
@@ -29393,7 +29458,7 @@ function $w({ defaultSizeKey: t = "3x3" }) {
 		]
 	});
 }
-function eT(e, t, n, r) {
+function sT(e, t, n, r) {
 	let [i, a] = (0, P.useState)("daytodo"), [o, s] = (0, P.useState)(e === "full" ? "all" : r.settings.defaultListId || r.lists[0]?.id), [c, l] = (0, P.useState)(t.defaultSort), [u, d] = (0, P.useState)(""), [f, p] = (0, P.useState)(!1), [m, h] = (0, P.useState)(!1), [g, _] = (0, P.useState)(!1), [v, y] = (0, P.useState)(!1), [b, x] = (0, P.useState)(!1), [S, C] = (0, P.useState)(null), [w, T] = (0, P.useState)(() => dC(/* @__PURE__ */ new Date())), [E, D] = (0, P.useState)(() => _C(/* @__PURE__ */ new Date())), [O, k] = (0, P.useState)(() => gC(/* @__PURE__ */ new Date(), t.weekStart)), [ee, A] = (0, P.useState)("month"), te = (0, P.useRef)(!1);
 	return (0, P.useEffect)(() => {
 		n && !te.current && (te.current = !0, l(t.defaultSort), s(e === "full" ? "all" : t.defaultListId || r.settings.defaultListId || r.lists[0]?.id), k(gC(/* @__PURE__ */ new Date(), t.weekStart)));
@@ -29430,7 +29495,7 @@ function eT(e, t, n, r) {
 }
 //#endregion
 //#region public/plugins/todo/src/settings.jsx
-var tT = Kn({
+var cT = Kn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -29518,8 +29583,8 @@ var tT = Kn({
 	addInput: { flex: 1 },
 	danger: { color: W.colorPaletteRedForeground1 }
 });
-function nT() {
-	let e = tT(), [t, n, r] = nC(xw, Sw, Ew), i = aw(), [a, o] = (0, P.useState)(""), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), [d, f] = (0, P.useState)(null), p = i.lists, m = t.defaultListId && i.listById(t.defaultListId) ? t.defaultListId : p[0]?.id, h = i.listById(m)?.name || "", g = Tw.find((e) => e.value === t.defaultSort)?.label || "手动", _ = (e) => n((t) => ({
+function lT() {
+	let e = cT(), [t, n, r] = nC(Ow, kw, Nw), i = fw(), [a, o] = (0, P.useState)(""), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), [d, f] = (0, P.useState)(null), p = i.lists, m = t.defaultListId && i.listById(t.defaultListId) ? t.defaultListId : p[0]?.id, h = i.listById(m)?.name || "", g = Mw.find((e) => e.value === t.defaultSort)?.label || "手动", _ = (e) => n((t) => ({
 		...t,
 		...e
 	})), v = () => {
@@ -29653,7 +29718,7 @@ function nT() {
 										layout: "horizontal",
 										value: t.fontSize,
 										onChange: (e, t) => _({ fontSize: t.value }),
-										children: Cw.map((e) => /* @__PURE__ */ (0, F.jsx)(qy, {
+										children: Aw.map((e) => /* @__PURE__ */ (0, F.jsx)(qy, {
 											value: e.value,
 											label: e.label
 										}, e.value))
@@ -29693,7 +29758,7 @@ function nT() {
 									value: g,
 									selectedOptions: [t.defaultSort],
 									onOptionSelect: (e, t) => _({ defaultSort: t.optionValue }),
-									children: Tw.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
+									children: Mw.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
 										value: e.value,
 										children: e.label
 									}, e.value))
@@ -29717,7 +29782,7 @@ function nT() {
 										layout: "horizontal",
 										value: String(t.weekStart),
 										onChange: (e, t) => _({ weekStart: Number(t.value) }),
-										children: ww.map((e) => /* @__PURE__ */ (0, F.jsx)(qy, {
+										children: jw.map((e) => /* @__PURE__ */ (0, F.jsx)(qy, {
 											value: String(e.value),
 											label: e.label
 										}, e.value))
@@ -29902,15 +29967,15 @@ function nT() {
 }
 //#endregion
 //#region public/plugins/todo/src/detail.jsx
-var rT = [
+var uT = [
 	"无",
 	"低",
 	"中",
 	"高"
-], iT = [{
+], dT = [{
 	value: "",
 	label: "不重复"
-}, ...OC], aT = Kn({
+}, ...OC], fT = Kn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -29996,20 +30061,20 @@ var rT = [
 	dangerButton: { color: W.colorPaletteRedForeground1 },
 	progress: { marginBottom: W.spacingVerticalXS }
 });
-function oT(e, t = !1) {
+function pT(e, t = !1) {
 	let [n, r] = (xC(e) || "").split("T");
 	return {
 		date: n || "",
 		time: t && r === "23:59" ? "" : r || ""
 	};
 }
-function sT() {
+function mT() {
 	window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*");
 }
-function cT() {
-	let e = aT();
-	aw();
-	let t = (0, P.useMemo)(() => lw() || {}, []), n = t?.mode === "new", r = t?.taskId || (n ? null : $.state.tasks.find((e) => !e.done)?.id || null), i = r ? $.taskById(r) : null, [a, o] = (0, P.useState)(() => i?.title || ""), [s, c] = (0, P.useState)(() => i?.note || ""), [l, u] = (0, P.useState)(String(i?.priority ?? 0)), [d, f] = (0, P.useState)(() => i?.listId || t?.listId || $.lists[0]?.id), [p, m] = (0, P.useState)(() => oT(i?.dueAt, !0)), [h, g] = (0, P.useState)(() => oT(i?.remindAt)), [_, v] = (0, P.useState)(() => i?.recurrence || ""), [y, b] = (0, P.useState)(() => [...i?.tags || []]), [x, S] = (0, P.useState)(""), [C, w] = (0, P.useState)(() => (i?.subtasks || []).slice().sort((e, t) => e.order - t.order).map((e) => ({ ...e }))), [T, E] = (0, P.useState)(""), [D, O] = (0, P.useState)(null), [k, ee] = (0, P.useState)(!1), A = $.listById(d) || $.lists[0], te = C.filter((e) => e.done).length, j = C.length ? te / C.length : 0, ne = () => {
+function hT() {
+	let e = fT();
+	fw();
+	let t = (0, P.useMemo)(() => gw() || {}, []), n = t?.mode === "new", r = t?.taskId || (n ? null : $.state.tasks.find((e) => !e.done)?.id || null), i = r ? $.taskById(r) : null, [a, o] = (0, P.useState)(() => i?.title || ""), [s, c] = (0, P.useState)(() => i?.note || ""), [l, u] = (0, P.useState)(String(i?.priority ?? 0)), [d, f] = (0, P.useState)(() => i?.listId || t?.listId || $.lists[0]?.id), [p, m] = (0, P.useState)(() => pT(i?.dueAt, !0)), [h, g] = (0, P.useState)(() => pT(i?.remindAt)), [_, v] = (0, P.useState)(() => i?.recurrence || ""), [y, b] = (0, P.useState)(() => [...i?.tags || []]), [x, S] = (0, P.useState)(""), [C, w] = (0, P.useState)(() => (i?.subtasks || []).slice().sort((e, t) => e.order - t.order).map((e) => ({ ...e }))), [T, E] = (0, P.useState)(""), [D, O] = (0, P.useState)(null), [k, ee] = (0, P.useState)(!1), A = $.listById(d) || $.lists[0], te = C.filter((e) => e.done).length, j = C.length ? te / C.length : 0, ne = () => {
 		let e = x.trim();
 		e && (b((t) => t.includes(e) ? t : [...t, e]), S(""));
 	}, re = (e) => b((t) => t.filter((t) => t !== e)), ie = () => {
@@ -30083,7 +30148,7 @@ function cT() {
 							layout: "horizontal",
 							value: l,
 							onChange: (e, t) => u(t.value),
-							children: rT.map((e, t) => /* @__PURE__ */ (0, F.jsx)(qy, {
+							children: uT.map((e, t) => /* @__PURE__ */ (0, F.jsx)(qy, {
 								value: String(t),
 								label: e
 							}, t))
@@ -30169,10 +30234,10 @@ function cT() {
 						label: "重复",
 						children: /* @__PURE__ */ (0, F.jsx)(b_, {
 							size: "large",
-							value: iT.find((e) => e.value === _)?.label || "不重复",
+							value: dT.find((e) => e.value === _)?.label || "不重复",
 							selectedOptions: [_],
 							onOptionSelect: (e, t) => v(t.optionValue),
-							children: iT.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
+							children: dT.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
 								value: e.value,
 								children: e.label
 							}, e.value))
@@ -30278,7 +30343,7 @@ function cT() {
 								className: e.dangerButton,
 								onClick: () => {
 									try {
-										$.removeTask(i.id), ee(!1), sT();
+										$.removeTask(i.id), ee(!1), mT();
 									} catch (e) {
 										O({
 											intent: "error",
@@ -30319,7 +30384,7 @@ function cT() {
 				/* @__PURE__ */ (0, F.jsx)(X, {
 					size: "large",
 					appearance: "secondary",
-					onClick: sT,
+					onClick: mT,
 					children: "取消"
 				}),
 				/* @__PURE__ */ (0, F.jsx)(X, {
@@ -30353,11 +30418,11 @@ function cT() {
 								O({
 									intent: "success",
 									text: `已创建「${e.title}」`
-								}), sT();
-							} else lT($.updateTask(i.id, o).id, C), O({
+								}), mT();
+							} else gT($.updateTask(i.id, o).id, C), O({
 								intent: "success",
 								text: "已保存"
-							});
+							}), mT();
 						} catch (e) {
 							O({
 								intent: "error",
@@ -30371,7 +30436,7 @@ function cT() {
 		})]
 	});
 }
-function lT(e, t) {
+function gT(e, t) {
 	let n = $.taskById(e);
 	if (!n) return;
 	let r = new Set(t.filter((e) => e.id).map((e) => e.id));
@@ -30387,7 +30452,7 @@ function lT(e, t) {
 }
 //#endregion
 //#region public/plugins/todo/src/allTasks.jsx
-var uT = [
+var _T = [
 	{
 		value: "todo",
 		label: "未完成"
@@ -30400,7 +30465,7 @@ var uT = [
 		value: "all",
 		label: "全部"
 	}
-], dT = [
+], vT = [
 	{
 		value: "due",
 		label: "按截止时间"
@@ -30413,7 +30478,7 @@ var uT = [
 		value: "created",
 		label: "按创建时间"
 	}
-], fT = Kn({
+], yT = Kn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -30485,14 +30550,14 @@ var uT = [
 		fontVariantNumeric: "tabular-nums"
 	}
 });
-function pT() {
+function bT() {
 	let [e, t] = (0, P.useState)(() => window.innerWidth || 0);
 	return (0, P.useEffect)(() => {
 		let e = () => t(window.innerWidth || 0);
 		return window.addEventListener("resize", e), () => window.removeEventListener("resize", e);
 	}, []), e;
 }
-function mT(e, t) {
+function xT(e, t) {
 	let n = t.trim().toLowerCase();
 	return !n || [
 		e.title,
@@ -30501,7 +30566,7 @@ function mT(e, t) {
 		...(e.subtasks || []).map((e) => e.title)
 	].join(" ").toLowerCase().includes(n);
 }
-function hT(e, t) {
+function ST(e, t) {
 	let n = fC(/* @__PURE__ */ new Date()), r = pC(n, 1), i = [
 		{
 			key: "overdue",
@@ -30544,11 +30609,11 @@ function hT(e, t) {
 	}
 	return t === "done" ? [a.done] : t === "todo" ? i.filter((e) => e.key !== "done") : i;
 }
-function gT() {
-	let e = fT();
-	aw();
-	let t = pT(), n = (0, P.useMemo)(() => lw() || {}, []), r = n.done === !0 ? "done" : "todo", [i, a] = (0, P.useState)(r), [o, s] = (0, P.useState)("due"), [c, l] = (0, P.useState)(""), [u, d] = (0, P.useState)(0), f = n.listId ? $.listById(n.listId) : n.scope && n.scope !== "all" ? $.listById(n.scope) : null, p = f?.id || (n.scope && n.scope !== "all" ? n.scope : null), m = (0, P.useMemo)(() => {
-		let e = $.state.tasks.filter((e) => !p || e.listId === p).filter((e) => i === "todo" && e.done || i === "done" && !e.done ? !1 : mT(e, c)), t = $.sortTasks(e, o);
+function CT() {
+	let e = yT();
+	fw();
+	let t = bT(), n = (0, P.useMemo)(() => gw() || {}, []), r = n.done === !0 ? "done" : "todo", [i, a] = (0, P.useState)(r), [o, s] = (0, P.useState)("due"), [c, l] = (0, P.useState)(""), [u, d] = (0, P.useState)(0), f = n.listId ? $.listById(n.listId) : n.scope && n.scope !== "all" ? $.listById(n.scope) : null, p = f?.id || (n.scope && n.scope !== "all" ? n.scope : null), m = (0, P.useMemo)(() => {
+		let e = $.state.tasks.filter((e) => !p || e.listId === p).filter((e) => i === "todo" && e.done || i === "done" && !e.done ? !1 : xT(e, c)), t = $.sortTasks(e, o);
 		return i === "done" ? t.reverse() : t;
 	}, [
 		p,
@@ -30557,13 +30622,13 @@ function gT() {
 		c,
 		u,
 		$.state.tasks
-	]), h = hT(m, i).filter((e) => e.tasks.length > 0), g = t >= 760, _ = [h];
+	]), h = ST(m, i).filter((e) => e.tasks.length > 0), g = t >= 760, _ = [h];
 	if (g && h.length > 1) {
 		let e = h.reduce((e, t) => e + t.tasks.length, 0), t = 1, n = 0;
 		for (let r = 0; r < h.length - 1 && (n += h[r].tasks.length, t = r + 1, !(n >= e / 2)); r += 1);
 		_ = [h.slice(0, t), h.slice(t)];
 	}
-	let v = uT.find((e) => e.value === i)?.label || "未完成", y = dT.find((e) => e.value === o)?.label || "按截止时间", b = (t) => /* @__PURE__ */ (0, F.jsxs)("section", {
+	let v = _T.find((e) => e.value === i)?.label || "未完成", y = vT.find((e) => e.value === o)?.label || "按截止时间", b = (t) => /* @__PURE__ */ (0, F.jsxs)("section", {
 		className: e.group,
 		"aria-label": `${t.label}（${t.tasks.length}）`,
 		children: [/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -30578,13 +30643,13 @@ function gT() {
 				className: e.groupCount,
 				children: t.tasks.length
 			})]
-		}), /* @__PURE__ */ (0, F.jsx)(Fw, {
+		}), /* @__PURE__ */ (0, F.jsx)(Hw, {
 			tasks: t.tasks,
 			onToggle: (e) => {
 				let t = $.taskById(e);
 				t && ($.setDone(t.id, !t.done), d((e) => e + 1));
 			},
-			onOpenDetail: uw,
+			onOpenDetail: _w,
 			onReorder: (e, t) => $.reorderTasks(e, t)
 		})]
 	}, t.key);
@@ -30609,7 +30674,7 @@ function gT() {
 					value: v,
 					selectedOptions: [i],
 					onOptionSelect: (e, t) => a(t.optionValue),
-					children: uT.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
+					children: _T.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
 						value: e.value,
 						children: e.label
 					}, e.value))
@@ -30620,7 +30685,7 @@ function gT() {
 					value: y,
 					selectedOptions: [o],
 					onOptionSelect: (e, t) => s(t.optionValue),
-					children: dT.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
+					children: vT.map((e) => /* @__PURE__ */ (0, F.jsx)(r_, {
 						value: e.value,
 						children: e.label
 					}, e.value))
@@ -30638,7 +30703,7 @@ function gT() {
 			]
 		}), /* @__PURE__ */ (0, F.jsx)("div", {
 			className: e.scroll,
-			children: m.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Mw, { title: i === "done" ? "还没有已完成任务" : "没有匹配的任务" }) : g ? /* @__PURE__ */ (0, F.jsx)("div", {
+			children: m.length === 0 ? /* @__PURE__ */ (0, F.jsx)(zw, { title: i === "done" ? "还没有已完成任务" : "没有匹配的任务" }) : g ? /* @__PURE__ */ (0, F.jsx)("div", {
 				className: e.columns,
 				children: _.map((t, n) => /* @__PURE__ */ (0, F.jsx)("div", {
 					className: e.column,
@@ -30654,7 +30719,7 @@ function gT() {
 //#endregion
 //#region public/plugins/todo/src/main.jsx
 YS();
-var _T = new URLSearchParams(location.search), vT = _T.get("background") === "1" || _T.get("mode") === "background" || /background\.html$/.test(location.pathname), yT = Kn({
+var wT = new URLSearchParams(location.search), TT = wT.get("background") === "1" || wT.get("mode") === "background" || /background\.html$/.test(location.pathname), ET = Kn({
 	page: {
 		width: "100%",
 		height: "100%",
@@ -30688,8 +30753,8 @@ var _T = new URLSearchParams(location.search), vT = _T.get("background") === "1"
 		boxShadow: W.shadow16
 	}
 });
-function bT({ overlayView: e, defaultSizeKey: t, children: n }) {
-	let r = yT();
+function DT({ overlayView: e, defaultSizeKey: t, children: n }) {
+	let r = ET();
 	if (e) return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.pageOverlay,
 		children: /* @__PURE__ */ (0, F.jsx)("div", {
@@ -30697,7 +30762,7 @@ function bT({ overlayView: e, defaultSizeKey: t, children: n }) {
 			children: n
 		})
 	});
-	let i = bw(t);
+	let i = Dw(t);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.page,
 		children: /* @__PURE__ */ (0, F.jsx)("div", {
@@ -30710,7 +30775,7 @@ function bT({ overlayView: e, defaultSizeKey: t, children: n }) {
 		})
 	});
 }
-var xT = class extends P.Component {
+var OT = class extends P.Component {
 	constructor(e) {
 		super(e), this.state = { error: null };
 	}
@@ -30727,9 +30792,9 @@ var xT = class extends P.Component {
 		}) : this.props.children;
 	}
 };
-function ST() {
-	let { theme: t } = eC(), n = rC(), r = vw(_T.get("size")), i = r ? yw(r) : "3x3", a = !e.inHost, o = _T.get("raw") === "1" || _T.has("plugin") && _T.has("widget"), s = /* @__PURE__ */ (0, F.jsx)($w, { defaultSizeKey: i });
-	return n === "settings" ? s = /* @__PURE__ */ (0, F.jsx)(nT, {}) : n === "detail" ? s = /* @__PURE__ */ (0, F.jsx)(cT, {}) : n === "all" && (s = /* @__PURE__ */ (0, F.jsx)(gT, {})), /* @__PURE__ */ (0, F.jsx)(Jl, {
+function kT() {
+	let { theme: t } = eC(), n = rC(), r = Tw(wT.get("size")), i = r ? Ew(r) : "3x3", a = !e.inHost, o = wT.get("raw") === "1" || wT.has("plugin") && wT.has("widget"), s = /* @__PURE__ */ (0, F.jsx)(oT, { defaultSizeKey: i });
+	return n === "settings" ? s = /* @__PURE__ */ (0, F.jsx)(lT, {}) : n === "detail" ? s = /* @__PURE__ */ (0, F.jsx)(hT, {}) : n === "all" && (s = /* @__PURE__ */ (0, F.jsx)(CT, {})), /* @__PURE__ */ (0, F.jsx)(Jl, {
 		theme: t,
 		style: {
 			width: "100%",
@@ -30737,17 +30802,17 @@ function ST() {
 			background: "transparent",
 			colorScheme: "normal"
 		},
-		children: /* @__PURE__ */ (0, F.jsx)(xT, { children: a && !o ? /* @__PURE__ */ (0, F.jsx)(bT, {
+		children: /* @__PURE__ */ (0, F.jsx)(OT, { children: a && !o ? /* @__PURE__ */ (0, F.jsx)(DT, {
 			overlayView: n,
 			defaultSizeKey: i,
 			children: s
 		}) : s })
 	});
 }
-if (vT) {
-	rw();
-	let t = mw();
-	e.ready(QC), e.onToolCall(async (n) => {
+if (TT) {
+	uw();
+	let t = xw();
+	e.ready(aw), e.onToolCall(async (n) => {
 		if (!n || typeof n.name != "string") return;
 		let r = t[n.name];
 		try {
@@ -30760,11 +30825,11 @@ if (vT) {
 			e.toolResult(n.id, !1, t instanceof Error ? t.message : String(t));
 		}
 	}), window.addEventListener("message", (e) => {
-		e.source === window.parent && e.data?.type === "host:open-settings" && pw();
+		e.source === window.parent && e.data?.type === "host:open-settings" && bw();
 	});
 } else {
-	rw();
-	let e = document.getElementById("root");
-	e && (0, US.createRoot)(e).render(/* @__PURE__ */ (0, F.jsx)(ST, {}));
+	uw({ startReminders: !e.inHost });
+	let t = document.getElementById("root");
+	t && (0, US.createRoot)(t).render(/* @__PURE__ */ (0, F.jsx)(kT, {}));
 }
 //#endregion

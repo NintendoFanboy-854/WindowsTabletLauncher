@@ -153,6 +153,7 @@ function Root() {
 
 if (isBackground) {
   // 后台常驻 iframe：没有界面，只保证提醒定时器与 Agent 工具在跑
+  // （宿主里提醒的唯一调度者；卡片/浮层实例不启动提醒循环）
   startTodoData();
   const handlers = buildToolHandlers();
   plugin.ready(TOOL_DECLS);
@@ -175,7 +176,9 @@ if (isBackground) {
     if (event.data?.type === 'host:open-settings') openSettingsView();
   });
 } else {
-  startTodoData();
+  // 宿主里的卡片 / 设置 / 详情 / 全部任务视图只读数据，不跑提醒循环
+  // （后台 iframe 负责）；独立打开（无宿主）时由当前实例兜底，提醒照常工作。
+  startTodoData({ startReminders: !plugin.inHost });
   const rootElement = document.getElementById('root');
   if (rootElement) createRoot(rootElement).render(<Root />);
 }

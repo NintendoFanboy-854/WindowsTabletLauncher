@@ -81,6 +81,29 @@ function writeJson(key, value) {
   }
 }
 
+/** 读取 localStorage 里最新的提醒标记（跨 iframe 抢锁/去重用） */
+function readStoredReminders() {
+  const settings = readJson(KEYS.settings, null);
+  if (!settings || typeof settings !== 'object') return {};
+  const reminders = settings.reminders;
+  return reminders && typeof reminders === 'object' && !Array.isArray(reminders) ? { ...reminders } : {};
+}
+
+/**
+ * 提醒事件的“身份”按分钟归一化：
+ * 详情表单只保留到分钟（combineDateTime 会把秒归零），同一个提醒被保存一次后
+ * 字面量会变；按分钟比较才能把“同一分钟内的同一个提醒”认成同一事件。
+ */
+export function reminderMinuteOf(value) {
+  const date = toDate(value);
+  return date ? Math.floor(date.getTime() / 60000) : null;
+}
+
+function sameReminderMinute(a, b) {
+  const left = reminderMinuteOf(a);
+  return left !== null && left === reminderMinuteOf(b);
+}
+
 export function uid() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -208,6 +231,12 @@ export class TodoStore {
   }
 
   persistAll() {
+    // 整表落盘时保留其它 iframe 已写入的提醒标记（例如设置浮层删清单时，
+    // 它的 settings 快照可能早于后台 iframe 刚写入的标记）。
+    this.state.settings.reminders = {
+      ...readStoredReminders(),
+      ...(this.state.settings.reminders || {}),
+    };
     writeJson(KEYS.lists, this.state.lists);
     writeJson(KEYS.tasks, this.state.tasks);
     writeJson(KEYS.tags, this.state.tags);
@@ -444,8 +473,12 @@ export class TodoStore {
     }
     if (typeof changes.dueAt !== 'undefined') task.dueAt = parseDateInput(changes.dueAt) || undefined;
     if (typeof changes.remindAt !== 'undefined') {
-      task.remindAt = parseDateInput(changes.remindAt) || undefined;
-      if (task.remindAt) this.clearFiredReminder(task);
+      const previousRemindAt = task.remindAt;
+      const nextRemindAt = parseDateInput(changes.remindAt) || undefined;
+      task.remindAt = nextRemindAt;
+      // 只有提醒时间真的变了才重新武装；详情表单保存会把秒归一化，
+      // 同一分钟内保存标题/备注不能把已经弹过的提醒再弹一次。
+      if (!sameReminderMinute(previousRemindAt, nextRemindAt)) this.clearFiredReminder(task);
     }
     if (typeof changes.recurrence !== 'undefined') {
       if (changes.recurrence && !RECURRENCES.some((item) => item.value === changes.recurrence)) {
@@ -531,7 +564,9 @@ export class TodoStore {
     const index = this.state.tasks.findIndex((task) => task.id === taskId);
     if (index < 0) throw new Error(`找不到任务 ${taskId}`);
     const [removed] = this.state.tasks.splice(index, 1);
-    delete this.state.settings.reminders[taskId];
+    const reminders = { ...readStoredReminders(), ...(this.state.settings.reminders || {}) };
+    delete reminders[taskId];
+    this.state.settings.reminders = reminders;
     this.persistTasks();
     this.persistSettings();
     this.emit();
@@ -647,6 +682,12 @@ export class TodoStore {
 
   updateSettings(patch = {}) {
     Object.assign(this.state.settings, patch);
+    // 配置写入不能覆盖其它 iframe 已记录的提醒标记：卡片启动时可能拿着
+    // 抢锁前的旧 settings 快照，直接 persist 会把刚写入的标记抹掉并导致重弹。
+    this.state.settings.reminders = {
+      ...readStoredReminders(),
+      ...(this.state.settings.reminders || {}),
+    };
     if (!this.state.lists.some((list) => list.id === this.state.settings.defaultListId)) {
       this.state.settings.defaultListId = this.state.lists[0]?.id ?? null;
     }
@@ -657,33 +698,48 @@ export class TodoStore {
 
   // ---------------------------------------------------------------- 提醒
 
-  /** 找出到期且未触发的提醒并原子性标记（跨 iframe 通过 localStorage 抢锁） */
+  /**
+   * 找出到期且未触发的提醒并标记。
+   *
+   * 标记写进 `todo.settings.reminders`，跨 iframe 共享；同一个提醒按
+   * “任务 id + 提醒分钟”去重（详情表单会把秒归一化，不能按字面量比较）。
+   * 调用方（reminders.js）会用 navigator.locks 把这段读改写包成原子操作，
+   * 避免两个 iframe 同时读到未标记状态各弹一次。
+   */
   claimDueReminders(now = new Date()) {
     const due = [];
     const fresh = readJson(KEYS.settings, null);
-    const freshReminders = fresh && typeof fresh === 'object' && fresh.reminders && typeof fresh.reminders === 'object' ? fresh.reminders : {};
+    const freshSettings = fresh && typeof fresh === 'object' ? fresh : {};
+    const freshReminders = readStoredReminders();
     for (const task of this.state.tasks) {
       if (task.done || !task.remindAt) continue;
       const remind = toDate(task.remindAt);
       if (!remind || remind > now) continue;
-      if (freshReminders[task.id] === task.remindAt) continue;
+      if (
+        freshReminders[task.id] !== undefined &&
+        sameReminderMinute(freshReminders[task.id], task.remindAt)
+      ) {
+        continue;
+      }
       freshReminders[task.id] = task.remindAt;
       due.push(task);
     }
     if (due.length) {
-      this.state.settings.reminders = { ...this.state.settings.reminders, ...freshReminders };
-      this.persistSettings();
-      const nextFresh = { ...(fresh && typeof fresh === 'object' ? fresh : {}), reminders: freshReminders };
-      writeJson(KEYS.settings, nextFresh);
+      const nextSettings = { ...freshSettings, reminders: freshReminders };
+      writeJson(KEYS.settings, nextSettings);
+      this.state.settings = { ...this.state.settings, ...nextSettings, reminders: freshReminders };
     }
     return due;
   }
 
   clearFiredReminder(task) {
-    if (this.state.settings.reminders[task.id]) {
-      delete this.state.settings.reminders[task.id];
-      this.persistSettings();
-    }
+    // 只删目标任务的标记；先把其它 iframe 已写入的标记合并进来，避免旧快照
+    // 把一个不相关的提醒标记抹掉后导致它重弹。
+    const reminders = { ...readStoredReminders(), ...(this.state.settings.reminders || {}) };
+    if (!(task.id in reminders)) return;
+    delete reminders[task.id];
+    this.state.settings.reminders = reminders;
+    this.persistSettings();
   }
 
   /** 稍后提醒：把 remindAt 推后，并允许再次触发 */
@@ -691,7 +747,9 @@ export class TodoStore {
     const task = this.taskById(taskId);
     if (!task) return null;
     task.remindAt = new Date(Date.now() + ms).toISOString();
-    delete this.state.settings.reminders[task.id];
+    const reminders = { ...readStoredReminders(), ...(this.state.settings.reminders || {}) };
+    delete reminders[task.id];
+    this.state.settings.reminders = reminders;
     this.persistSettings();
     this.persistTasks();
     this.emit();

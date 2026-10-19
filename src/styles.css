@@ -49,7 +49,30 @@ body {
 /* ---------- 宿主容器与桌面入口 ---------- */
 
 .host-root {
+  position: relative;
   height: 100%;
+  overflow: hidden;
+}
+
+/*
+ * 桌面层：设置 / 复盘 / 插件页时仍然挂载，只做隐藏。
+ * 插件 iframe（含 background 常驻运行时）是 HostBridge 工具调用（todo.stats /
+ * pomodoro.stats）的接收方，整棵卸载会让复盘页报“插件当前不在桌面”。
+ * 绝对定位不占页面流；visibility 保留布局尺寸给桌面网格测量，也不会在页面
+ * 淡入时透出来；inert / aria-hidden 由 App.tsx 控制。
+ * right 跟随 Agent 侧栏让宽，和 .host-root 的 padding-right 对齐。
+ */
+.host-desktop-layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: var(--wtsl-agent-panel-width, 0px);
+}
+
+.host-desktop-layer[data-active='false'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /*

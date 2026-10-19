@@ -32,12 +32,20 @@ const useStyles = makeStyles({
 
 export interface PageTransitionProps {
   children: ReactNode;
+  /**
+   * 同一挂载实例内重放进入动画（不重挂载 children）。
+   *
+   * 桌面层在非桌面页保持挂载后，切回桌面不能再用 `key={page}` 触发动画——那会
+   * 卸载整棵桌面（插件 iframe 也跟着重建）。传一个每次切回桌面递增的值即可，
+   * Fluent motion 的 replayKey 只重放动画，DOM 与组件状态不动。
+   */
+  replayKey?: string | number;
 }
 
-export function PageTransition({ children }: PageTransitionProps) {
+export function PageTransition({ children, replayKey }: PageTransitionProps) {
   const styles = useStyles();
   return (
-    <PageMotion>
+    <PageMotion replayKey={replayKey}>
       <div className={styles.frame}>{children}</div>
     </PageMotion>
   );

@@ -13,8 +13,14 @@ import { TOOL_DECLS, runTool } from '../js/tools.js';
 
 let booted = false;
 
-/** 数据层启动：加载 localStorage、演示数据、跨 iframe 同步、提醒定时器 */
-export function startTodoData() {
+/**
+ * 数据层启动：加载 localStorage、演示数据、跨 iframe 同步、提醒定时器。
+ *
+ * `startReminders` 默认开启（独立预览 / 无宿主）。宿主里卡片、设置/详情浮层
+ * 都会各自加载一份本文件，但提醒只能由后台常驻 iframe 调度（manifest
+ * `background: true`），否则同一个提醒会被多个实例重复弹出。
+ */
+export function startTodoData({ startReminders = true } = {}) {
   if (booted) return store;
   booted = true;
   store.load();
@@ -24,7 +30,7 @@ export function startTodoData() {
     console.warn('[todo] 演示数据注入失败', error);
   }
   store.bindStorageSync();
-  startReminderLoop();
+  if (startReminders) startReminderLoop();
   return store;
 }
 

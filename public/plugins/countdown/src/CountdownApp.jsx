@@ -50,6 +50,7 @@ import {
   normalizeItems,
   normalizeSettings,
   setEditingTarget,
+  toDateString,
   toolAdd,
   toolList,
   toolRemove,
@@ -394,7 +395,9 @@ export default function CountdownApp({ fallbackSizeKey }) {
 
   /* 到日提醒：当天有事件时提醒一次（每个事件每天最多一次） */
   useEffect(() => {
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // 必须用本地日期：UTC 日界（Asia/Shanghai 08:00）会让同一个本地“今天”
+    // 换一个 key，同一条事件在一天内再弹一次。
+    const todayKey = toDateString(new Date());
     for (const entry of allEntries) {
       if (entry.status !== 'today') continue;
       const remindKey = `countdown.reminded:${entry.item.id}:${todayKey}`;

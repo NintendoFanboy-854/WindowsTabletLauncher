@@ -45,6 +45,11 @@ export function useLongPress(options: LongPressOptions): LongPressHandlers {
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // Portal（Fluent Dialog/Menu/Toast）里的 pointerdown 会沿 React 组件树冒泡到这里，
+    // 但 DOM 上并不在卡片内。此时不能抢指针：setPointerCapture 会把浮层里按钮的
+    // pointerup/click 重定向到卡片，导致按钮 onClick 永远不触发。
+    const target = event.target as Node | null;
+    if (target && !event.currentTarget.contains(target)) return;
     if (stateRef.current) return;
     const state: PressState = {
       pointerId: event.pointerId,

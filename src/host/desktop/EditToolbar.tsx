@@ -8,6 +8,7 @@
  * 触控：ToolbarButton 没有 size 入口（Fluent v9），按钮内部改用 Button size="large"
  * 保证 ≥40×40（DESIGN §1.2 / AUDIT V-06）。
  */
+import { useLayoutEffect, useRef } from 'react';
 import { Button, Text, Toolbar, ToolbarDivider, mergeClasses } from '@fluentui/react-components';
 import {
   Add20Regular,
@@ -38,13 +39,21 @@ export function EditToolbar({
   onDone,
 }: EditToolbarProps) {
   const styles = useStyles();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // Fluent Toolbar 内部用 getNativeElementProps 过滤属性，inert 不在白名单里，
+  // 传 inert prop 不生效（实测隐藏时 element.inert 仍为 false、Tab 能进按钮）。
+  // 直接写 DOM property，保证普通模式下工具栏不可聚焦。
+  useLayoutEffect(() => {
+    if (toolbarRef.current) toolbarRef.current.inert = !visible;
+  }, [visible]);
 
   return (
     <Toolbar
+      ref={toolbarRef}
       className={mergeClasses(styles.toolbar, visible && styles.toolbarVisible)}
       aria-label="编辑桌面"
       aria-hidden={!visible}
-      inert={!visible}
       data-no-desktop-gesture="true"
     >
       <Button

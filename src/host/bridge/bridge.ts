@@ -63,6 +63,8 @@ export class HostBridge {
   private frameSeq = 0;
   /** Agent 工具声明 + 归属插件：模型需要 description/parameters 才知道怎么调 */
   private toolDecls = new Map<string, { decl: AgentToolDecl; pluginId: string }>();
+  /** 工具声明变化（插件 ready 陆续到达）；复盘页深链时用它补取数据 */
+  private toolListeners = new Set<() => void>();
   private pendingTools = new Map<
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -143,6 +145,7 @@ export class HostBridge {
     for (const tool of message.payload.tools ?? []) {
       this.ownTool(tool, pluginId);
     }
+    if ((message.payload.tools?.length ?? 0) > 0) this.notifyToolsChanged();
   }
 
   /** 处理 plugin:focus-exit：插件把焦点交还宿主 */
@@ -256,6 +259,15 @@ export class HostBridge {
     return [...this.toolDecls.values()].map((entry) => ({ ...entry.decl }));
   }
 
+  /**
+   * 订阅工具声明变化（插件 `plugin:ready` 陆续到达）。
+   * 返回取消订阅函数。复盘页深链时插件 iframe 与页面同时挂载，用它补取数据。
+   */
+  onToolsChange(handler: () => void): () => void {
+    this.toolListeners.add(handler);
+    return () => this.toolListeners.delete(handler);
+  }
+
   /** 记录工具及其归属插件；同名工具后注册者覆盖，并 warn 一条 */
   private ownTool(decl: AgentToolDecl, pluginId: string): void {
     if (!decl || typeof decl.name !== 'string' || !decl.name) return;
@@ -268,9 +280,20 @@ export class HostBridge {
     this.toolDecls.set(decl.name, { decl, pluginId });
   }
 
+  private notifyToolsChanged(): void {
+    for (const listener of this.toolListeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.warn('[bridge] 工具变化监听器失败', error);
+      }
+    }
+  }
+
   /** 更新/覆盖单个工具声明（插件 ready 时带过来了） */
   registerToolDecl(decl: AgentToolDecl, pluginId: string): void {
     this.ownTool(decl, pluginId);
+    this.notifyToolsChanged();
   }
 
   hasTool(name: string): boolean {

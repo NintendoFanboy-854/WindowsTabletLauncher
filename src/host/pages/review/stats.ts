@@ -18,6 +18,8 @@ export type ReviewRange = 'yesterday' | 'week' | 'month';
 export interface ReviewBridge {
   listTools(): AgentToolDecl[];
   callTool(name: string, args: unknown, options?: { signal?: AbortSignal }): Promise<unknown>;
+  /** 工具声明变化（插件 ready 陆续到达）；不传时只做一次静默等待 */
+  onToolsChange?(handler: () => void): () => void;
 }
 
 export interface ProviderRangeStats {
@@ -57,6 +59,46 @@ export interface ReviewSnapshot {
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 /** 热力图窗口：16 周（取整周，避免半截列） */
 export const HEATMAP_WEEKS = 16;
+
+/**
+ * 插件 iframe 与宿主页面同时挂载时（深链直达 `?page=review`），插件的工具声明是
+ * 陆续到达的：todo 后台 iframe 往往比 pomodoro 组件 iframe 先 ready。若在第一份
+ * 声明到达时就取数，复盘页会漏掉后到的插件。这里等工具列表静默一小段时间，
+ * 有上限，不阻塞没有插件的场景。
+ */
+const TOOLS_SETTLE_TIMEOUT_MS = 3000;
+const TOOLS_SETTLE_QUIET_MS = 250;
+const TOOLS_POLL_MS = 100;
+
+function statsToolNames(bridge: ReviewBridge): string {
+  return bridge
+    .listTools()
+    .filter(isStatsTool)
+    .map((tool) => tool.name)
+    .sort()
+    .join('|');
+}
+
+async function waitForStatsTools(
+  bridge: ReviewBridge,
+  signal?: AbortSignal,
+): Promise<AgentToolDecl[]> {
+  const deadline = Date.now() + TOOLS_SETTLE_TIMEOUT_MS;
+  let lastNames = statsToolNames(bridge);
+  let lastChangeAt = Date.now();
+  for (;;) {
+    const names = statsToolNames(bridge);
+    if (names !== lastNames) {
+      lastNames = names;
+      lastChangeAt = Date.now();
+    }
+    const settled = lastNames !== '' && Date.now() - lastChangeAt >= TOOLS_SETTLE_QUIET_MS;
+    if (settled || Date.now() >= deadline || signal?.aborted) {
+      return bridge.listTools().filter(isStatsTool);
+    }
+    await new Promise((resolve) => setTimeout(resolve, TOOLS_POLL_MS));
+  }
+}
 
 const PROVIDER_LABELS: Record<string, string> = {
   todo: '待办',
@@ -199,7 +241,7 @@ export async function loadReviewSnapshot(
   options: { signal?: AbortSignal; now?: Date } = {},
 ): Promise<ReviewSnapshot> {
   const now = options.now ?? new Date();
-  const tools = bridge.listTools().filter(isStatsTool);
+  const tools = await waitForStatsTools(bridge, options.signal);
   if (tools.length === 0) return emptySnapshot();
 
   const rangeKeys: ReviewRange[] = ['week', 'month'];

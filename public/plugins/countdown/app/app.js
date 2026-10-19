@@ -22890,7 +22890,7 @@ function qy({ fallbackSizeKey: t }) {
 		jy(e ?? null), ey("edit", e ? "编辑倒数日" : "新增倒数日");
 	}, []);
 	ny(() => ty("倒数日设置")), (0, P.useEffect)(() => {
-		let t = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+		let t = Sy(/* @__PURE__ */ new Date());
 		for (let n of g) {
 			if (n.status !== "today") continue;
 			let r = `countdown.reminded:${n.item.id}:${t}`;
@@ -23375,6 +23375,9 @@ var Xy = Kn({
 	dangerButton: { color: q.colorPaletteRedForeground1 }
 });
 function Zy() {
+	window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*");
+}
+function Qy() {
 	let t = Xy(), [n, r, i] = Qv(uy, [], yy), [a, o] = (0, P.useState)(() => My().id), [s, c] = (0, P.useState)(""), [l, u] = (0, P.useState)(() => Sy(/* @__PURE__ */ new Date())), [d, f] = (0, P.useState)(!1), [p, m] = (0, P.useState)("accent"), [h, g] = (0, P.useState)(""), [_, v] = (0, P.useState)(""), [y, b] = (0, P.useState)(!1), [x, S] = (0, P.useState)(!1), C = (0, P.useMemo)(() => a ? n.find((e) => e.id === a) : null, [a, n]), w = (0, P.useMemo)(() => (my.find((e) => e.id === p) ?? my[0]).label, [p]);
 	return (0, P.useEffect)(() => {
 		i && !x && (C && (c(C.title), u(C.targetDate), f(C.repeatYearly), m(C.color)), S(!0));
@@ -23530,7 +23533,7 @@ function Zy() {
 									};
 									r((e) => [...e, i]), jy(i.id), o(i.id), e.notify(`已添加「${t.title}」`);
 								}
-								v("已保存；关闭此窗口后卡片会同步更新。");
+								v("已保存；关闭此窗口后卡片会同步更新。"), window.setTimeout(Zy, 0);
 							}
 						},
 						children: "保存"
@@ -23543,15 +23546,15 @@ function Zy() {
 //#endregion
 //#region public/plugins/countdown/src/main.jsx
 Wv();
-var Qy = new URLSearchParams(location.search), $y = $v(), eb = ly();
-function tb(t = 2500) {
+var $y = new URLSearchParams(location.search), eb = $v(), tb = ly();
+function nb(t = 2500) {
 	return !e.inHost || Gv() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(Gv() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function nb() {
+function rb() {
 	let { theme: t } = Xv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
 	return /* @__PURE__ */ (0, F.jsx)(Tl, {
 		theme: t,
@@ -23561,12 +23564,12 @@ function nb() {
 			background: n,
 			colorScheme: "normal"
 		},
-		children: $y === "settings" ? /* @__PURE__ */ (0, F.jsx)(Yy, {}) : $y === "edit" ? /* @__PURE__ */ (0, F.jsx)(Zy, {}) : /* @__PURE__ */ (0, F.jsx)(qy, { fallbackSizeKey: eb })
+		children: eb === "settings" ? /* @__PURE__ */ (0, F.jsx)(Yy, {}) : eb === "edit" ? /* @__PURE__ */ (0, F.jsx)(Qy, {}) : /* @__PURE__ */ (0, F.jsx)(qy, { fallbackSizeKey: tb })
 	});
 }
-async function rb() {
+async function ib() {
 	let e = document.getElementById("root");
-	e && (await tb(), Qy.get("demo") === "1" && await Ly(), (0, Rv.createRoot)(e).render(/* @__PURE__ */ (0, F.jsx)(nb, {})));
+	e && (await nb(), $y.get("demo") === "1" && await Ly(), (0, Rv.createRoot)(e).render(/* @__PURE__ */ (0, F.jsx)(rb, {})));
 }
-rb();
+ib();
 //#endregion

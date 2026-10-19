@@ -187,6 +187,8 @@ export default function TodoDetail() {
         const updated = store.updateTask(task.id, base);
         applySubtaskDiff(updated.id, subtasks);
         setMessage({ intent: 'success', text: '已保存' });
+        // 与「创建任务」一致：保存成功即关闭浮层，失败才留在浮层里显示错误
+        closeOverlay();
       }
     } catch (error) {
       setMessage({ intent: 'error', text: error instanceof Error ? error.message : String(error) });
