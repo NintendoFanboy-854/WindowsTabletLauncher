@@ -29358,14 +29358,14 @@ var Uw = Kn({
 	}
 });
 function Ww({ onClosed: e }) {
-	let t = Uw(), n = YS(), [r, i] = (0, P.useState)(""), [a, o] = (0, P.useState)(null), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), d = n.lists, f = n.settings.defaultListId, p = (e) => n.state.tasks.filter((t) => t.listId === e).length, m = () => {
+	let t = Uw(), n = YS(), [r, i] = (0, P.useState)(""), [a, o] = (0, P.useState)(null), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), [d, f] = (0, P.useState)(null), p = n.lists, m = n.settings.defaultListId, h = (e) => n.state.tasks.filter((t) => t.listId === e).length, g = _w(p.map((e) => e.id)), _ = () => {
 		let e = r.trim();
 		if (e) try {
 			$.addList(e), i(""), u(null);
 		} catch (e) {
 			u(e instanceof Error ? e.message : String(e));
 		}
-	}, h = () => {
+	}, v = () => {
 		if (!a) return;
 		let e = a.name.trim();
 		if (e) try {
@@ -29373,9 +29373,11 @@ function Ww({ onClosed: e }) {
 		} catch (e) {
 			u(e instanceof Error ? e.message : String(e));
 		}
-	}, g = (e) => {
+	}, y = (e) => {
+		c(e.id), f(e.id);
+	}, b = (e) => {
 		try {
-			$.removeList(e.id), c(null), u(null);
+			$.removeList(e.id), c(null), f(null), u(null);
 		} catch (e) {
 			u(e instanceof Error ? e.message : String(e));
 		}
@@ -29392,12 +29394,12 @@ function Ww({ onClosed: e }) {
 				"aria-label": "新清单名称",
 				onChange: (e, t) => i(t.value),
 				onKeyDown: (e) => {
-					e.key === "Enter" && (e.preventDefault(), m());
+					e.key === "Enter" && (e.preventDefault(), _());
 				}
 			}), /* @__PURE__ */ (0, F.jsx)(KC, {
 				appearance: "primary",
 				icon: /* @__PURE__ */ (0, F.jsx)(Ru, {}),
-				onClick: m,
+				onClick: _,
 				children: "新建"
 			})]
 		}),
@@ -29410,125 +29412,133 @@ function Ww({ onClosed: e }) {
 					onDismiss: () => u(null),
 					children: /* @__PURE__ */ (0, F.jsx)(dx, { children: l })
 				}) : null,
-				d.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Z, {
+				p.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Z, {
 					size: 300,
 					className: t.empty,
 					children: "还没有清单"
 				}) : null,
-				d.map((e) => {
-					let n = p(e.id), r = e.id === f;
-					return a?.id === e.id ? /* @__PURE__ */ (0, F.jsxs)("div", {
-						className: t.row,
-						children: [
-							/* @__PURE__ */ (0, F.jsx)(S_, {
-								size: "large",
-								className: t.renameInput,
-								value: a.name,
-								"aria-label": "清单名称",
-								autoFocus: !0,
-								onChange: (e, t) => o({
-									...a,
-									name: t.value
+				p.map((e) => {
+					let n = h(e.id), r = e.id === m;
+					return /* @__PURE__ */ (0, F.jsx)(pC, {
+						visible: d !== e.id,
+						appear: g.has(e.id),
+						unmountOnExit: !0,
+						onMotionFinish: (t, n) => {
+							n?.direction === "exit" && d === e.id && b(e);
+						},
+						children: a?.id === e.id ? /* @__PURE__ */ (0, F.jsxs)("div", {
+							className: t.row,
+							children: [
+								/* @__PURE__ */ (0, F.jsx)(S_, {
+									size: "large",
+									className: t.renameInput,
+									value: a.name,
+									"aria-label": "清单名称",
+									autoFocus: !0,
+									onChange: (e, t) => o({
+										...a,
+										name: t.value
+									}),
+									onKeyDown: (e) => {
+										e.key === "Enter" && (e.preventDefault(), v());
+									}
 								}),
-								onKeyDown: (e) => {
-									e.key === "Enter" && (e.preventDefault(), h());
-								}
-							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
-								appearance: "primary",
-								onClick: h,
-								children: "保存"
-							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
-								appearance: "secondary",
-								onClick: () => o(null),
-								children: "取消"
-							})
-						]
-					}, e.id) : s === e.id ? /* @__PURE__ */ (0, F.jsxs)("div", {
-						className: t.row,
-						children: [
-							/* @__PURE__ */ (0, F.jsx)("div", {
-								className: t.confirm,
-								children: /* @__PURE__ */ (0, F.jsx)(Z, {
-									size: 200,
-									className: t.confirmText,
-									children: /* @__PURE__ */ (0, F.jsxs)(lw, { children: [
-										"删除「",
-										e.name,
-										"」？同时删除其中的 ",
-										n,
-										" 个任务"
-									] })
+								/* @__PURE__ */ (0, F.jsx)(KC, {
+									appearance: "primary",
+									onClick: v,
+									children: "保存"
+								}),
+								/* @__PURE__ */ (0, F.jsx)(KC, {
+									appearance: "secondary",
+									onClick: () => o(null),
+									children: "取消"
 								})
-							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
-								appearance: "primary",
-								onClick: () => g(e),
-								children: "确认删除"
-							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
-								appearance: "secondary",
-								onClick: () => c(null),
-								children: "取消"
-							})
-						]
-					}, e.id) : /* @__PURE__ */ (0, F.jsxs)("div", {
-						className: t.row,
-						children: [
-							/* @__PURE__ */ (0, F.jsx)(gw, { color: e.color }),
-							/* @__PURE__ */ (0, F.jsxs)("div", {
-								className: t.main,
-								children: [/* @__PURE__ */ (0, F.jsx)(Z, {
-									size: 300,
-									className: t.name,
-									title: e.name,
-									children: /* @__PURE__ */ (0, F.jsx)(lw, { children: e.name })
-								}), /* @__PURE__ */ (0, F.jsxs)(Z, {
-									size: 200,
-									className: t.count,
-									children: [
-										n,
-										" 个任务",
-										r ? " · 默认清单" : ""
-									]
-								})]
-							}),
-							/* @__PURE__ */ (0, F.jsxs)("div", {
-								className: t.actions,
-								children: [
-									/* @__PURE__ */ (0, F.jsx)(KC, {
-										appearance: "subtle",
-										className: t.iconButton,
-										icon: r ? /* @__PURE__ */ (0, F.jsx)(Iu, {}) : /* @__PURE__ */ (0, F.jsx)(Lu, {}),
-										"aria-label": r ? `默认清单 ${e.name}` : `设为默认清单 ${e.name}`,
-										title: r ? "默认清单" : "设为默认",
-										disabled: r,
-										onClick: () => $.updateSettings({ defaultListId: e.id })
-									}),
-									/* @__PURE__ */ (0, F.jsx)(KC, {
-										appearance: "subtle",
-										className: t.iconButton,
-										icon: /* @__PURE__ */ (0, F.jsx)(zu, {}),
-										"aria-label": `重命名清单 ${e.name}`,
-										title: "重命名",
-										onClick: () => o({
-											id: e.id,
-											name: e.name
-										})
-									}),
-									/* @__PURE__ */ (0, F.jsx)(KC, {
-										appearance: "subtle",
-										className: t.iconButton,
-										icon: /* @__PURE__ */ (0, F.jsx)(Yu, {}),
-										"aria-label": `删除清单 ${e.name}`,
-										title: "删除",
-										disabled: d.length <= 1,
-										onClick: () => c(e.id)
+							]
+						}) : s === e.id ? /* @__PURE__ */ (0, F.jsxs)("div", {
+							className: t.row,
+							children: [
+								/* @__PURE__ */ (0, F.jsx)("div", {
+									className: t.confirm,
+									children: /* @__PURE__ */ (0, F.jsx)(Z, {
+										size: 200,
+										className: t.confirmText,
+										children: /* @__PURE__ */ (0, F.jsxs)(lw, { children: [
+											"删除「",
+											e.name,
+											"」？同时删除其中的 ",
+											n,
+											" 个任务"
+										] })
 									})
-								]
-							})
-						]
+								}),
+								/* @__PURE__ */ (0, F.jsx)(KC, {
+									appearance: "primary",
+									onClick: () => y(e),
+									children: "确认删除"
+								}),
+								/* @__PURE__ */ (0, F.jsx)(KC, {
+									appearance: "secondary",
+									onClick: () => c(null),
+									children: "取消"
+								})
+							]
+						}) : /* @__PURE__ */ (0, F.jsxs)("div", {
+							className: t.row,
+							children: [
+								/* @__PURE__ */ (0, F.jsx)(gw, { color: e.color }),
+								/* @__PURE__ */ (0, F.jsxs)("div", {
+									className: t.main,
+									children: [/* @__PURE__ */ (0, F.jsx)(Z, {
+										size: 300,
+										className: t.name,
+										title: e.name,
+										children: /* @__PURE__ */ (0, F.jsx)(lw, { children: e.name })
+									}), /* @__PURE__ */ (0, F.jsxs)(Z, {
+										size: 200,
+										className: t.count,
+										children: [
+											n,
+											" 个任务",
+											r ? " · 默认清单" : ""
+										]
+									})]
+								}),
+								/* @__PURE__ */ (0, F.jsxs)("div", {
+									className: t.actions,
+									children: [
+										/* @__PURE__ */ (0, F.jsx)(KC, {
+											appearance: "subtle",
+											className: t.iconButton,
+											icon: r ? /* @__PURE__ */ (0, F.jsx)(Iu, {}) : /* @__PURE__ */ (0, F.jsx)(Lu, {}),
+											"aria-label": r ? `默认清单 ${e.name}` : `设为默认清单 ${e.name}`,
+											title: r ? "默认清单" : "设为默认",
+											disabled: r,
+											onClick: () => $.updateSettings({ defaultListId: e.id })
+										}),
+										/* @__PURE__ */ (0, F.jsx)(KC, {
+											appearance: "subtle",
+											className: t.iconButton,
+											icon: /* @__PURE__ */ (0, F.jsx)(zu, {}),
+											"aria-label": `重命名清单 ${e.name}`,
+											title: "重命名",
+											onClick: () => o({
+												id: e.id,
+												name: e.name
+											})
+										}),
+										/* @__PURE__ */ (0, F.jsx)(KC, {
+											appearance: "subtle",
+											className: t.iconButton,
+											icon: /* @__PURE__ */ (0, F.jsx)(Yu, {}),
+											"aria-label": `删除清单 ${e.name}`,
+											title: "删除",
+											disabled: p.length <= 1,
+											onClick: () => c(e.id)
+										})
+									]
+								})
+							]
+						})
 					}, e.id);
 				})
 			]

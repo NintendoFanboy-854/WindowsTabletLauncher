@@ -44,6 +44,7 @@ import {
 } from '../../plugins/tauri';
 import type { HostPage } from '../../shell/routes';
 import type { ThemeMode } from '../../shell/themeMode';
+import { ContentTransition } from '../../shell/ContentTransition';
 import { quitApplication } from '../../shell/useGlobalShortcuts';
 import { PageScaffold } from '../shared/PageScaffold';
 import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
@@ -587,6 +588,8 @@ export function SettingsPage({
 
   const selectedSection = view.kind === 'section' ? view.section : undefined;
   const selectedPluginId = view.kind === 'plugin' ? view.pluginId : undefined;
+  /** 分区切换的内容键：变化时内容 150ms 淡入 + 4px 上移（MOTION §5） */
+  const contentKey = view.kind === 'section' ? `section:${view.section}` : `plugin:${view.pluginId}`;
 
   return (
     <PageScaffold
@@ -644,9 +647,9 @@ export function SettingsPage({
           )}
         </nav>
 
-        <div className={styles.content}>
+        <ContentTransition className={styles.content} viewKey={contentKey}>
           {view.kind === 'section' ? sections[view.section]() : renderPluginSettings(view.pluginId)}
-        </div>
+        </ContentTransition>
       </div>
     </PageScaffold>
   );

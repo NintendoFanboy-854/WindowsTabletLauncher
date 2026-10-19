@@ -46,6 +46,26 @@ export const useStyles = makeStyles({
   trackDragging: {
     transitionDuration: '0ms',
   },
+  /**
+   * 编辑模式的桌面衬底压暗（MOTION §3「桌面衬底轻微压暗 200ms」）。
+   * 不拦指针，绘制在卡片层下方：压暗壁纸但不影响卡片本身的材质与描边。
+   */
+  editBackdrop: {
+    position: 'absolute',
+    inset: '0',
+    zIndex: 0,
+    backgroundColor: tokens.colorBackgroundOverlay,
+    opacity: 0,
+    pointerEvents: 'none',
+    transitionProperty: 'opacity',
+    transitionDuration: `${motionTokens.durationFast}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMid,
+  },
+  editBackdropVisible: {
+    opacity: 0.5,
+    transitionDuration: `${motionTokens.durationNormal}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
   page: {
     position: 'relative',
     flex: '0 0 auto',
@@ -114,10 +134,11 @@ export const useStyles = makeStyles({
     transform: 'translateY(-4px) scale(0.985)',
     transformOrigin: 'center center',
     pointerEvents: 'none',
-    // 退出用更快的一档（Fluent accelerate），进入在 editOverlayVisible 里用 normal + decelerate
+    // 退出走退出类 token（MOTION §1/§3：150ms curveAccelerateMid），
+    // 进入在 editOverlayVisible 里用 200ms decelerateMid
     transitionProperty: 'opacity, transform',
-    transitionDuration: `${motionTokens.durationFaster}ms`,
-    transitionTimingFunction: motionTokens.curveAccelerateMin,
+    transitionDuration: `${motionTokens.durationFast}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMid,
   },
   editOverlayVisible: {
     opacity: 1,
@@ -223,9 +244,10 @@ export const useStyles = makeStyles({
     boxShadow: tokens.shadow8,
     opacity: 0,
     pointerEvents: 'none',
+    // 工具栏属于编辑 chrome：退出 150ms 加速（MOTION §1 退出类），进入 200ms 减速
     transitionProperty: 'opacity, transform',
-    transitionDuration: `${motionTokens.durationFaster}ms`,
-    transitionTimingFunction: motionTokens.curveAccelerateMin,
+    transitionDuration: `${motionTokens.durationFast}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMid,
   },
   toolbarVisible: {
     opacity: 1,

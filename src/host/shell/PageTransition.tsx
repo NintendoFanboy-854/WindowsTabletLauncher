@@ -6,6 +6,8 @@
  * 塞进去会报 “Invalid child element”，动画也不生效。所以这里包一层稳定的
  * `<div>`，页面内容放进 div 里；App 用 `key={page}` 触发整棵子树重挂载，
  * 每次切换重放一次淡入。曲线/时长全部来自 motionTokens（DESIGN §7）。
+ *
+ * reduced-motion（MOTION §7）：页面切换退化为 100ms 淡入，不做 6px 位移。
  */
 import type { ReactNode } from 'react';
 import { createMotionComponent, makeStyles, motionTokens, tokens } from '@fluentui/react-components';
@@ -19,6 +21,11 @@ const PageMotion = createMotionComponent({
   easing: motionTokens.curveDecelerateMid,
   // 动画结束后回到元素自然样式，避免残留 transform 形成 fixed 包含块
   fill: 'backwards',
+  reducedMotion: {
+    keyframes: [{ opacity: 0 }, { opacity: 1 }],
+    duration: motionTokens.durationFaster,
+    easing: motionTokens.curveDecelerateMid,
+  },
 });
 
 const useStyles = makeStyles({

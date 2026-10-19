@@ -130,6 +130,8 @@ export function WidgetCard({
   const [pressPhase, setPressPhase] = useState<PressPhase | null>(null);
   /** 松手/取消后 150ms 回弹（到 hover 或 rest），回弹结束前不切回普通过渡 */
   const [releasing, setReleasing] = useState(false);
+  /** 刚退出编辑模式：卡片 0.96→1 用 150ms 加速（MOTION §3「退出」），不是回弹的 100ms */
+  const [leavingEdit, setLeavingEdit] = useState(false);
 
   const pressRef = useRef<PressPhase | null>(null);
   const downTimerRef = useRef(0);
@@ -270,6 +272,20 @@ export function WidgetCard({
     setFrameHover(false);
   }, [clearDownTimer, clearReleaseTimer, editMode]);
 
+  // 退出编辑模式：卡片 0.96→1 用 150ms 加速（MOTION §3），窗口结束后回到普通过渡
+  const wasEditRef = useRef(editMode);
+  useEffect(() => {
+    const wasEditing = wasEditRef.current;
+    wasEditRef.current = editMode;
+    if (!wasEditing || editMode) {
+      setLeavingEdit(false);
+      return undefined;
+    }
+    setLeavingEdit(true);
+    const timer = window.setTimeout(() => setLeavingEdit(false), motionTokens.durationFast);
+    return () => window.clearTimeout(timer);
+  }, [editMode]);
+
   // 兜底：指针在 iframe 外抬起（宿主文档收到 pointerup）时也要回弹，避免按压状态卡死
   useEffect(() => {
     if (pressPhase === null) return undefined;
@@ -351,6 +367,10 @@ export function WidgetCard({
   if (editMode) {
     cardDuration = motionTokens.durationNormal;
     cardCurve = motionTokens.curveDecelerateMid;
+  } else if (leavingEdit) {
+    // 退出编辑模式：0.96→1 用退出类时长（MOTION §1/§3：150ms 加速）
+    cardDuration = motionTokens.durationFast;
+    cardCurve = motionTokens.curveAccelerateMid;
   } else if (visiblePress === 'down') {
     cardDuration = motionTokens.durationUltraFast;
     cardCurve = motionTokens.curveAccelerateMin;

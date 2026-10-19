@@ -20,6 +20,7 @@ export {
 } from './useGlobalShortcuts';
 export { syncAutostartOnStartup, type AutostartSyncResult } from './autostart';
 export { PageTransition } from './PageTransition';
+export { ContentTransition, type ContentTransitionProps } from './ContentTransition';
 export {
   THEME_KEY,
   applyColorSchemeToDocument,

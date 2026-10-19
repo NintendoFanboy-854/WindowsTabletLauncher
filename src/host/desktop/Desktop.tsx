@@ -1003,6 +1003,13 @@ export default function Desktop({
         theme={theme}
       />
 
+      {/* 编辑模式：桌面衬底轻微压暗（MOTION §3，200ms 减速进入 / 150ms 加速退出） */}
+      <div
+        className={mergeClasses(styles.editBackdrop, editMode && styles.editBackdropVisible)}
+        data-edit-backdrop="true"
+        aria-hidden="true"
+      />
+
       <div className={styles.pagesViewport}>
         <div
           className={mergeClasses(styles.track, swipeOffset !== null && styles.trackDragging)}

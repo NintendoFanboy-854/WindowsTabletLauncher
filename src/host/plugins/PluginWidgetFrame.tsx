@@ -21,16 +21,7 @@ import {
   type CSSProperties,
 } from 'react';
 
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  makeStyles,
-} from '@fluentui/react-components';
-import { Dismiss24Regular } from '@fluentui/react-icons';
+import { makeStyles } from '@fluentui/react-components';
 
 import { PROTOCOL_VERSION } from '../bridge/types';
 import type {
@@ -43,6 +34,9 @@ import type {
   WidgetSize,
 } from '../bridge/types';
 import { readFluentThemePayload } from './theme';
+import { captureOverlaySource } from './overlayMotion';
+import type { OverlaySource } from './overlayMotion';
+import { PluginOverlay } from './PluginOverlay';
 
 export type HostApiReply = (ok: boolean, result?: unknown, error?: string) => void;
 
@@ -140,21 +134,6 @@ const VISIBLE_FRAME_STYLE: CSSProperties = {
  * （DECISIONS.md D-02b；docs/PLUGIN-REACT.md「浮层视图」）。
  */
 const useSettingsStyles = makeStyles({
-  surface: {
-    width: 'min(880px, 92vw)',
-    maxWidth: '92vw',
-    height: 'min(72vh, 680px)',
-  },
-  body: {
-    height: '100%',
-    minHeight: 0,
-  },
-  content: {
-    height: '100%',
-    minHeight: 0,
-    padding: 0,
-    overflow: 'hidden',
-  },
   frame: {
     display: 'block',
     width: '100%',
@@ -214,19 +193,50 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     const settingsStyles = useSettingsStyles();
     const frameRef = useRef<HTMLIFrameElement>(null);
     const [loadedAt, setLoadedAt] = useState(0);
-    /** 插件请求的全窗口浮层视图：{ view: 'settings' | 'detail' | ..., title } */
-    const [overlay, setOverlay] = useState(null as null | { view: string; title: string });
+    /**
+     * 插件请求的全窗口浮层视图：`{ view, title, source }`。
+     * `source` 是请求那一刻的卡片快照（rect + 节点 + 窗口尺寸），container transform
+     * 的起点和“关闭后焦点回哪张卡片”都用它（MOTION §4）。
+     */
+    const [overlay, setOverlay] = useState(
+      null as null | { view: string; title: string; source: OverlaySource },
+    );
     const readyRef = useRef(false);
     const lastSize = useRef<WidgetSize | null>(null);
     const lastTheme = useRef<ThemePayload | undefined>(theme);
+    /** 浮层关闭后把焦点还给来源卡片（卸载后再聚焦，见下面的 effect） */
+    const overlaySourceRef = useRef<OverlaySource | null>(null);
+    const hadOverlayRef = useRef(false);
 
     const openOverlay = useCallback((view?: unknown, overlayTitle?: unknown) => {
       const viewName = typeof view === 'string' && view.trim() ? view.trim() : 'settings';
+      // 卡片 rect 在“请求浮层”这一刻量：此时卡片一定还在原位，动画起点才准
+      const source = captureOverlaySource(frameRef.current);
+      overlaySourceRef.current = source;
       setOverlay({
         view: viewName,
         title: typeof overlayTitle === 'string' && overlayTitle.trim() ? overlayTitle.trim() : '设置',
+        source,
       });
     }, []);
+
+    /** 浮层卸载：清状态 + 焦点还给来源卡片（MOTION §4「关闭后焦点回到原卡片」） */
+    const handleOverlayClosed = useCallback(() => {
+      setOverlay(null);
+    }, []);
+
+    useEffect(() => {
+      if (overlay) {
+        hadOverlayRef.current = true;
+        return;
+      }
+      if (!hadOverlayRef.current) return;
+      hadOverlayRef.current = false;
+      const element = overlaySourceRef.current?.element ?? null;
+      overlaySourceRef.current = null;
+      // 等浮层 DOM 真正卸载后再聚焦：聚焦会触发卡片的 onFocus，桌面层据此更新 focusedUid
+      if (element?.isConnected) element.focus({ preventScroll: true });
+    }, [overlay]);
 
     // 浮层视图的地址：同一插件页面加 `?view=<view>`（D-02b）
     const overlaySrc = useMemo(() => {
@@ -406,53 +416,36 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           }}
         />
         {overlay && overlaySrc && (
-          <Dialog
+          <PluginOverlay
             key={overlay.view}
-            open
-            modalType="modal"
-            onOpenChange={(_, detail) => {
-              if (!detail.open) setOverlay(null);
-            }}
+            source={overlay.source}
+            ariaLabel={`${title ?? pluginId} ${overlay.title}`}
+            title={title ? `${title} · ${overlay.title}` : overlay.title}
+            onClosed={handleOverlayClosed}
           >
-            <DialogSurface
-              className={settingsStyles.surface}
-              aria-label={`${title ?? pluginId} ${overlay.title}`}
-            >
-              <DialogBody className={settingsStyles.body}>
-                <DialogTitle
-                  action={
-                    <Button
-                      appearance="subtle"
-                      size="large"
-                      icon={<Dismiss24Regular />}
-                      aria-label="关闭浮层"
-                      onClick={() => setOverlay(null)}
-                    />
-                  }
-                >
-                  {title ? `${title} · ${overlay.title}` : overlay.title}
-                </DialogTitle>
-                <DialogContent className={settingsStyles.content}>
-                  {/* 浮层视图不会发卡片手势（SDK 在 ?view=... 下不挂 hook），
-                      不接 onCardPointer / onRequestEditMode，避免浮层误把宿主带进编辑模式 */}
-                  <PluginWidgetFrameRecursive
-                    src={overlaySrc}
-                    pluginId={pluginId}
-                    widgetId={widgetId}
-                    instanceUid={`${frameUid}:overlay:${overlay.view}`}
-                    size={size}
-                    theme={theme}
-                    config={config}
-                    title={`${title ?? pluginId} ${overlay.title}`}
-                    className={settingsStyles.frame}
-                    onApiCall={onApiCall}
-                    onOverlayClose={() => setOverlay(null)}
-                    onRequestHostSettings={onRequestHostSettings}
-                  />
-                </DialogContent>
-              </DialogBody>
-            </DialogSurface>
-          </Dialog>
+            {(close) => (
+              /* 浮层视图不会发卡片手势（SDK 在 ?view=... 下不挂 hook），
+                 不接 onCardPointer / onRequestEditMode，避免浮层误把宿主带进编辑模式 */
+              <PluginWidgetFrameRecursive
+                src={overlaySrc}
+                pluginId={pluginId}
+                widgetId={widgetId}
+                instanceUid={`${frameUid}:overlay:${overlay.view}`}
+                size={size}
+                theme={theme}
+                config={config}
+                title={`${title ?? pluginId} ${overlay.title}`}
+                className={settingsStyles.frame}
+                onApiCall={onApiCall}
+                onOverlayClose={close}
+                onRequestHostSettings={() => {
+                  // 浮层内「设置…」= 跨页导航：先收起浮层（走同一套收回动画）再跳设置页
+                  close();
+                  onRequestHostSettings?.();
+                }}
+              />
+            )}
+          </PluginOverlay>
         )}
       </>
     );

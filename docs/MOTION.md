@@ -144,6 +144,8 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
   - `prefers-reduced-motion: reduce`：hover/press 不做 transform，只保留 100ms 颜色/描边变化；
     编辑模式卡片也不缩放，直接切换 chrome；
   - container transform 由浮层组件计算 start/end rect、用 CSS transition 驱动 surface（位置/宽高/透明度），内容交叉淡入；锚点无效时走兜底。
+    （E4 落地时的微调：surface 固定在自己的最终 rect 上，位置/尺寸的变化用 `translate + scale` 表达，
+    等价于“位置/宽高过渡”但只走合成层；圆角/阴影仍随同一段 transition 一起变化。）
 - 插件：
   - `public/plugins/_shared/motion.js` 提供 `FadeSlide` / `Collapse` / `CrossFade` / `useReducedMotion`，内部只用 `motionTokens` + `createPresenceComponent`；
   - 插件不得写出毫秒字面量/自定义曲线；交互密集处（每次点击）不额外加动画。
@@ -151,6 +153,29 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 
 - **实现状态：E2 已按本文件落地（2026-10-19）。** 卡片 hover/press/长按视觉与 reduced-motion
   在 `WidgetCard.tsx`；手势转发与长按检测在 `_shared/host.js` 的 `useHostCardGesture`。
+- **E4 实现状态（2026-10-20）**：container transform、页面/分区切换、编辑模式与插件动效审计落地位置：
+  - **详情浮层 container transform（§4）**：`src/host/plugins/overlayMotion.ts`（几何/时序/reduced-motion/
+    兜底判定，导出 `useOverlayTransform` 与 `captureOverlaySource`）+ `src/host/plugins/PluginOverlay.tsx`
+    （Fluent Dialog 容器：关掉 Fluent 自带 surface 进场动效与 backdrop 淡入，换成自定义 scrim）。
+    `src/host/plugins/PluginWidgetFrame.tsx` 在 `plugin:request-overlay` 时用 `captureOverlaySource`
+    记录 `{element, rect, viewport}` 并随 overlay 状态保存；关闭动画结束后卸载浮层并把焦点还给来源卡片。
+  - 实现细节（参数不变）：surface 固定在自己的**最终 rect**上，用 `translate + scale`（`transform-origin: 0 0`）
+    把视觉矩形摆回来源卡片，因此每帧只走合成层、不触发布局；圆角按 `卡片半径 / 缩放` 反算（`borderRadius`
+    用双值 `x / y`）保证起始视觉圆角等于卡片圆角；阴影在 `shadow4 ↔ 浮层阴影` 之间过渡。
+    量尺前会 `cancel()` 掉 Fluent DialogSurface 自带的 `Scale` WAAPI 动画（该动画优先级高于内联样式，
+    不摘掉会量到 0.85 缩放后的 rect，且与 container transform 叠加）。
+  - **L2 push/pop（§4.1）**：插件侧 `_shared/ui.jsx` 的 `Subpage` + `_shared/motion.js` 的 `SlidePage`
+    （E3.0 已落地，本轮复核未改）。
+  - **页面切换（§5）**：`src/host/shell/PageTransition.tsx`（200ms/6px，新增 reduced-motion 变体 →
+    100ms 仅淡入）；设置页分区切换用 `src/host/shell/ContentTransition.tsx`（150ms 淡入 + 4px 上移，
+    仅 `viewKey` 变化时重放，首屏不叠加动画），接在 `SettingsPage.tsx` 的内容容器上。
+  - **编辑模式（§3）**：`WidgetCard.tsx` 的卡片缩放/进入 200ms 减速、退出 150ms `curveAccelerateMid`
+    （`EDIT_CARD_SCALE` 由 E2 的 0.97 对齐回规范 0.96）；`desktop.styles.ts` 的 chrome/工具栏退出统一
+    150ms `curveAccelerateMid`；新增 `editBackdrop`（桌面衬底 200ms 压暗 / 150ms 恢复），挂在 `Desktop.tsx`。
+  - **插件动效（§6）**：审计六个插件 `src/**`，无 ms 字面量/自定义曲线；补上 `todo/src/ListManager.jsx`
+    的清单列表增删（`FadeSlide`：新增 200ms 淡入 + 8px、删除 100ms 淡出后再移除），并重建
+    `public/plugins/todo/app/app.js`。其余场景（Tab/视图切换、列表增删、内联展开、勾选、阶段切换、
+    空态↔内容）已在 E3 用 `CrossFade` / `FadeSlide` / `Collapse` / `useMotionTransition` 覆盖，未改参数。
 
 ## 9. 验收
 

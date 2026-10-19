@@ -24,9 +24,10 @@ import {
   Star16Regular,
 } from '@fluentui/react-icons';
 import { ActionButton, Subpage } from '../../_shared/ui.jsx';
+import { FadeSlide } from '../../_shared/motion.js';
 import { store } from '../js/store.js';
 import { useTodoStore } from './todoData.js';
-import { ListColorDot, EllipsisText } from './parts.jsx';
+import { ListColorDot, EllipsisText, useNewIds } from './parts.jsx';
 
 const useStyles = makeStyles({
   list: {
@@ -101,10 +102,14 @@ export function ListManager({ onClosed }) {
   const [renaming, setRenaming] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [error, setError] = useState(null);
+  /** 正在播退场动画的清单 id：先淡出 100ms，动画结束再真正删（MOTION §6 列表项删除） */
+  const [removingId, setRemovingId] = useState(null);
 
   const lists = storeState.lists;
   const defaultListId = storeState.settings.defaultListId;
   const taskCount = (listId) => storeState.state.tasks.filter((task) => task.listId === listId).length;
+  /** 只给“本次渲染新出现的清单”播入场（MOTION §6 列表项新增，不逐项 stagger） */
+  const newIds = useNewIds(lists.map((list) => list.id));
 
   const createList = () => {
     const name = newName.trim();
@@ -131,10 +136,17 @@ export function ListManager({ onClosed }) {
     }
   };
 
+  /** 点「确认删除」只启动退场动画；真的删在 FadeSlide 的 exit 结束回调里 */
+  const requestRemove = (list) => {
+    setConfirmDelete(list.id);
+    setRemovingId(list.id);
+  };
+
   const removeList = (list) => {
     try {
       store.removeList(list.id);
       setConfirmDelete(null);
+      setRemovingId(null);
       setError(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
@@ -178,90 +190,99 @@ export function ListManager({ onClosed }) {
         {lists.map((list) => {
           const total = taskCount(list.id);
           const isDefault = list.id === defaultListId;
-          if (renaming?.id === list.id) {
-            return (
-              <div key={list.id} className={styles.row}>
-                <Input
-                  size="large"
-                  className={styles.renameInput}
-                  value={renaming.name}
-                  aria-label="清单名称"
-                  autoFocus
-                  onChange={(_event, data) => setRenaming({ ...renaming, name: data.value })}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    saveRename();
-                  }}
-                />
-                <ActionButton appearance="primary" onClick={saveRename}>
-                  保存
-                </ActionButton>
-                <ActionButton appearance="secondary" onClick={() => setRenaming(null)}>
-                  取消
-                </ActionButton>
-              </div>
-            );
-          }
-          if (confirmDelete === list.id) {
-            return (
-              <div key={list.id} className={styles.row}>
-                <div className={styles.confirm}>
-                  <Text size={200} className={styles.confirmText}>
-                    <EllipsisText>
-                      删除「{list.name}」？同时删除其中的 {total} 个任务
-                    </EllipsisText>
-                  </Text>
-                </div>
-                <ActionButton appearance="primary" onClick={() => removeList(list)}>
-                  确认删除
-                </ActionButton>
-                <ActionButton appearance="secondary" onClick={() => setConfirmDelete(null)}>
-                  取消
-                </ActionButton>
-              </div>
-            );
-          }
           return (
-            <div key={list.id} className={styles.row}>
-              <ListColorDot color={list.color} />
-              <div className={styles.main}>
-                <Text size={300} className={styles.name} title={list.name}>
-                  <EllipsisText>{list.name}</EllipsisText>
-                </Text>
-                <Text size={200} className={styles.count}>
-                  {total} 个任务{isDefault ? ' · 默认清单' : ''}
-                </Text>
-              </div>
-              <div className={styles.actions}>
-                <ActionButton
-                  appearance="subtle"
-                  className={styles.iconButton}
-                  icon={isDefault ? <Star16Filled /> : <Star16Regular />}
-                  aria-label={isDefault ? `默认清单 ${list.name}` : `设为默认清单 ${list.name}`}
-                  title={isDefault ? '默认清单' : '设为默认'}
-                  disabled={isDefault}
-                  onClick={() => store.updateSettings({ defaultListId: list.id })}
-                />
-                <ActionButton
-                  appearance="subtle"
-                  className={styles.iconButton}
-                  icon={<Edit20Regular />}
-                  aria-label={`重命名清单 ${list.name}`}
-                  title="重命名"
-                  onClick={() => setRenaming({ id: list.id, name: list.name })}
-                />
-                <ActionButton
-                  appearance="subtle"
-                  className={styles.iconButton}
-                  icon={<Delete20Regular />}
-                  aria-label={`删除清单 ${list.name}`}
-                  title="删除"
-                  disabled={lists.length <= 1}
-                  onClick={() => setConfirmDelete(list.id)}
-                />
-              </div>
-            </div>
+            // 清单行常驻 presence 容器：新增淡入 + 上移 8px（200ms），删除先淡出 100ms 再真正移除
+            <FadeSlide
+              key={list.id}
+              visible={removingId !== list.id}
+              appear={newIds.has(list.id)}
+              unmountOnExit
+              onMotionFinish={(_event, data) => {
+                if (data?.direction !== 'exit') return;
+                if (removingId !== list.id) return;
+                removeList(list);
+              }}
+            >
+              {renaming?.id === list.id ? (
+                <div className={styles.row}>
+                  <Input
+                    size="large"
+                    className={styles.renameInput}
+                    value={renaming.name}
+                    aria-label="清单名称"
+                    autoFocus
+                    onChange={(_event, data) => setRenaming({ ...renaming, name: data.value })}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      saveRename();
+                    }}
+                  />
+                  <ActionButton appearance="primary" onClick={saveRename}>
+                    保存
+                  </ActionButton>
+                  <ActionButton appearance="secondary" onClick={() => setRenaming(null)}>
+                    取消
+                  </ActionButton>
+                </div>
+              ) : confirmDelete === list.id ? (
+                <div className={styles.row}>
+                  <div className={styles.confirm}>
+                    <Text size={200} className={styles.confirmText}>
+                      <EllipsisText>
+                        删除「{list.name}」？同时删除其中的 {total} 个任务
+                      </EllipsisText>
+                    </Text>
+                  </div>
+                  <ActionButton appearance="primary" onClick={() => requestRemove(list)}>
+                    确认删除
+                  </ActionButton>
+                  <ActionButton appearance="secondary" onClick={() => setConfirmDelete(null)}>
+                    取消
+                  </ActionButton>
+                </div>
+              ) : (
+                <div className={styles.row}>
+                  <ListColorDot color={list.color} />
+                  <div className={styles.main}>
+                    <Text size={300} className={styles.name} title={list.name}>
+                      <EllipsisText>{list.name}</EllipsisText>
+                    </Text>
+                    <Text size={200} className={styles.count}>
+                      {total} 个任务{isDefault ? ' · 默认清单' : ''}
+                    </Text>
+                  </div>
+                  <div className={styles.actions}>
+                    <ActionButton
+                      appearance="subtle"
+                      className={styles.iconButton}
+                      icon={isDefault ? <Star16Filled /> : <Star16Regular />}
+                      aria-label={isDefault ? `默认清单 ${list.name}` : `设为默认清单 ${list.name}`}
+                      title={isDefault ? '默认清单' : '设为默认'}
+                      disabled={isDefault}
+                      onClick={() => store.updateSettings({ defaultListId: list.id })}
+                    />
+                    <ActionButton
+                      appearance="subtle"
+                      className={styles.iconButton}
+                      icon={<Edit20Regular />}
+                      aria-label={`重命名清单 ${list.name}`}
+                      title="重命名"
+                      onClick={() => setRenaming({ id: list.id, name: list.name })}
+                    />
+                    <ActionButton
+                      appearance="subtle"
+                      className={styles.iconButton}
+                      icon={<Delete20Regular />}
+                      aria-label={`删除清单 ${list.name}`}
+                      title="删除"
+                      disabled={lists.length <= 1}
+                      onClick={() => setConfirmDelete(list.id)}
+                    />
+                  </div>
+                </div>
+              )}
+            </FadeSlide>
           );
         })}
       </div>
