@@ -1,0 +1,129 @@
+{
+  "viewport": {
+    "w": 142,
+    "h": 142
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 142,
+    "h": 142
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 142,
+    "sh": 142,
+    "cw": 142,
+    "ch": 142
+  },
+  "texts": [
+    {
+      "text": "52",
+      "tag": "span",
+      "cls": "fui-Text ___kvecof0 fk6fouc",
+      "fs": 40,
+      "fw": "600",
+      "lh": "40px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 30.8,
+        "y": 64.5,
+        "w": 44.4,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "分钟",
+      "tag": "span",
+      "cls": "fui-Text ___5nx1ha0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 83.2,
+        "y": 85.5,
+        "w": 28,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "已超阈值",
+      "tag": "div",
+      "cls": "fui-Badge r1iycov ___1r2jx3n",
+      "fs": 12,
+      "fw": "600",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 41,
+        "y": 36.5,
+        "w": 60,
+        "h": 24
+      },
+      "aria": "状态：已超阈值",
+      "contrast": 5.2
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 3,
+    "graphicCount": 0,
+    "maxFs": 40,
+    "minFs": 12,
+    "fonts": {
+      "12": 1,
+      "14": 1,
+      "40": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 1,
+    "coveragePct": 26.6,
+    "rowStats": {
+      "maxGapPx": 36,
+      "maxGapFrom": 0,
+      "maxGapTo": 34,
+      "topGapPx": 36,
+      "bottomGapPx": 34,
+      "contentFromPx": 36,
+      "contentToPx": 108
+    },
+    "colStats": {
+      "maxGapPx": 30,
+      "maxGapFrom": 0,
+      "maxGapTo": 28,
+      "topGapPx": 30,
+      "bottomGapPx": 28,
+      "contentFromPx": 30,
+      "contentToPx": 114
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "sedentary",
+  "sizeKey": "1x1",
+  "resolution": "1024x768",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 142,
+    "h": 142
+  },
+  "gridCell": 154
+}

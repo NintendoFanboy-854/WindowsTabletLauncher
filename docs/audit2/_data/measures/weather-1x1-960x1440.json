@@ -1,0 +1,100 @@
+{
+  "viewport": {
+    "w": 131,
+    "h": 131
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 131,
+    "h": 131
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 131,
+    "sh": 131,
+    "cw": 131,
+    "ch": 131
+  },
+  "texts": [
+    {
+      "text": "24°",
+      "tag": "span",
+      "cls": "___1d3135l fp6vxd fl43uef",
+      "fs": 14,
+      "fw": "600",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 55.1,
+        "y": 87.6,
+        "w": 20.8,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 16.1
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "img",
+      "cls": "___1ee0f92 ftgm304",
+      "rect": {
+        "x": 35.4,
+        "y": 25.4,
+        "w": 60.3,
+        "h": 60.3
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 1,
+    "graphicCount": 1,
+    "maxFs": 14,
+    "minFs": 14,
+    "fonts": {
+      "14": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 0,
+    "coveragePct": 29.1,
+    "rowStats": {
+      "maxGapPx": 28,
+      "maxGapFrom": 104,
+      "maxGapTo": 130,
+      "topGapPx": 24,
+      "bottomGapPx": 28,
+      "contentFromPx": 24,
+      "contentToPx": 104
+    },
+    "colStats": {
+      "maxGapPx": 34,
+      "maxGapFrom": 0,
+      "maxGapTo": 32,
+      "topGapPx": 34,
+      "bottomGapPx": 34,
+      "contentFromPx": 34,
+      "contentToPx": 98
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    33,
+    33,
+    33
+  ],
+  "plugin": "weather",
+  "sizeKey": "1x1",
+  "resolution": "960x1440",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 131,
+    "h": 131
+  },
+  "gridCell": 143
+}

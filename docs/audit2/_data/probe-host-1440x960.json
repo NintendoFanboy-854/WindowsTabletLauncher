@@ -1,0 +1,195 @@
+{
+  "viewport": {
+    "w": 1440,
+    "h": 960
+  },
+  "bodyBg": "rgb(14, 15, 19)",
+  "htmlBg": "rgba(0, 0, 0, 0)",
+  "themeState": null,
+  "cards": [
+    {
+      "uid": "clock:clock",
+      "title": "时钟 小组件",
+      "x": 22,
+      "y": 46,
+      "w": 340,
+      "h": 164,
+      "iframe": {
+        "w": 328,
+        "h": 152,
+        "src": "/plugins/clock/index.html?plugin=clock&widget=clock"
+      },
+      "inner": {
+        "w": 328,
+        "h": 152,
+        "textCount": 3,
+        "maxFontSize": 40,
+        "fontSizeHistogram": {
+          "40px": 1,
+          "14px": 2
+        },
+        "text": "10:24\n13\n10月19日 星期一"
+      }
+    },
+    {
+      "uid": "countdown:countdown",
+      "title": "倒数日 小组件",
+      "x": 374,
+      "y": 46,
+      "w": 340,
+      "h": 164,
+      "iframe": {
+        "w": 328,
+        "h": 152,
+        "src": "/plugins/countdown/index.html?plugin=countdown&widget=countdown"
+      },
+      "inner": {
+        "w": 328,
+        "h": 152,
+        "textCount": 2,
+        "maxFontSize": 16,
+        "fontSizeHistogram": {
+          "14px": 1,
+          "16px": 1
+        },
+        "text": "还没有倒数日\n添加倒数日"
+      }
+    },
+    {
+      "uid": "sedentary:sedentary",
+      "title": "久坐提醒 小组件",
+      "x": 726,
+      "y": 46,
+      "w": 340,
+      "h": 164,
+      "iframe": {
+        "w": 328,
+        "h": 152,
+        "src": "/plugins/sedentary/index.html?plugin=sedentary&widget=sedentary"
+      },
+      "inner": {
+        "w": 328,
+        "h": 152,
+        "textCount": 4,
+        "maxFontSize": 28,
+        "fontSizeHistogram": {
+          "12px": 3,
+          "28px": 1
+        },
+        "text": "正常\n0\n分钟\n距提醒还有 45 分钟"
+      }
+    },
+    {
+      "uid": "pomodoro:pomodoro",
+      "title": "番茄钟 小组件",
+      "x": 1078,
+      "y": 46,
+      "w": 340,
+      "h": 164,
+      "iframe": {
+        "w": 328,
+        "h": 152,
+        "src": "/plugins/pomodoro/index.html?plugin=pomodoro&widget=pomodoro"
+      },
+      "inner": {
+        "w": 328,
+        "h": 152,
+        "textCount": 2,
+        "maxFontSize": 68,
+        "fontSizeHistogram": {
+          "12px": 1,
+          "68px": 1
+        },
+        "text": "专注\n25:00"
+      }
+    },
+    {
+      "uid": "todo:todo-list",
+      "title": "待办 小组件",
+      "x": 22,
+      "y": 222,
+      "w": 516,
+      "h": 516,
+      "iframe": {
+        "w": 504,
+        "h": 504,
+        "src": "/plugins/todo/index.html?plugin=todo&widget=todo-list"
+      },
+      "inner": {
+        "w": 504,
+        "h": 504,
+        "textCount": 5,
+        "maxFontSize": 16,
+        "fontSizeHistogram": {
+          "14px": 3,
+          "16px": 2
+        },
+        "text": "今日\n最近\n今天没有到期的任务\n添加任务\n添加"
+      }
+    },
+    {
+      "uid": "weather:weather-card",
+      "title": "天气 小组件",
+      "x": 550,
+      "y": 222,
+      "w": 516,
+      "h": 340,
+      "iframe": {
+        "w": 504,
+        "h": 328,
+        "src": "/plugins/weather/index.html?plugin=weather&widget=weather-card"
+      },
+      "inner": {
+        "w": 504,
+        "h": 328,
+        "textCount": 18,
+        "maxFontSize": 16,
+        "fontSizeHistogram": {
+          "12px": 9,
+          "14px": 2,
+          "16px": 7
+        },
+        "text": "北京\n12°\n晴\n19° / 7°\n今天\n19°\n明天\n13°\n周三\n14°\n周四\n15°\n周五\n15°\n周六\n18°\n周日\n16°"
+      }
+    }
+  ],
+  "styles": [
+    {
+      "uid": "clock:clock",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    },
+    {
+      "uid": "countdown:countdown",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    },
+    {
+      "uid": "sedentary:sedentary",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    },
+    {
+      "uid": "pomodoro:pomodoro",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    },
+    {
+      "uid": "todo:todo-list",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    },
+    {
+      "uid": "weather:weather-card",
+      "bg": "color(srgb 0.121569 0.121569 0.121569 / 0.72)",
+      "radius": "12px",
+      "shadow": "rgba(0, 0, 0, 0.24) 0px 0px 2px 0px, rgba(0, 0, 0, 0.28) 0px 2px 4px 0px"
+    }
+  ],
+  "layoutStorage": "{\"version\":2,\"pages\":1,\"activePage\":0,\"widgets\":[{\"uid\":\"clock:clock\",\"pluginId\":\"clock\",\"widgetId\":\"clock\",\"title\":\"时钟\",\"page\":0,\"col\":0,\"row\":0,\"size\":[2,1],\"sizes\":[[1,1],[2,1],[3,2]]},{\"uid\":\"countdown:countdown\",\"pluginId\":\"countdown\",\"widgetId\":\"countdown\",\"title\":\"倒数日\",\"page\":0,\"col\":2,\"row\":0,\"size\":[2,1],\"sizes\":[[1,1],[2,1],[2,2],[3,2]]},{\"uid\":\"sedentary:sedentary\",\"pluginId\":\"sedentary\",\"widgetId\":\"sedentary\",\"title\":\"久坐提醒\",\"page\":0,\"col\":4,\"row\":0,\"size\":[2,1],\"sizes\":[[1,1],[2,1],[2,2],[3,2]]},{\"uid\":\"pomodoro:pomodoro\",\"pluginId\":\"pomodoro\",\"widgetId\":\"pomodoro\",\"title\":\"番茄钟\",\"page\":0,\"col\":6,\"row\":0,\"size\":[2,1],\"sizes\":[[1,1],[2,1],[2,2],[3,2]]},{\"uid\":\"todo:todo-list\",\"pluginId\":\"todo\",\"widgetId\":\"todo-list\",\"title\":\"待办\",\"page\":0,\"col\":0,\"row\":1,\"size\":[3,3],\"sizes\":[[1,1],[2,2],[3,2],[3,3],[4,2]]},{\"uid\":\"weather:weather-card\",\"pluginId\":\"weather\",\"widgetId\":\"weather-card\",\"title\":\"天气\",\"page\":0,\"col\":3,\"row\":1,\"size\":[3,2],\"sizes\":[[1,1],[2,1],[2,2],[3,2],[4,2]]}],\"savedAt\":1792376591344}"
+}

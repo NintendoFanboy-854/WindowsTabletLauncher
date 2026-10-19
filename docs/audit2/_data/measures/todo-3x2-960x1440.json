@@ -1,0 +1,360 @@
+{
+  "viewport": {
+    "w": 540,
+    "h": 360
+  },
+  "card": {
+    "x": 49.5,
+    "y": 37,
+    "w": 441,
+    "h": 286
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 540,
+    "sh": 360,
+    "cw": 540,
+    "ch": 360
+  },
+  "texts": [
+    {
+      "text": "整理产品周报，把本周评审结论同步给设计组",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 44,
+        "w": 345.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "和设计评审 Fluent 动效 token",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 84,
+        "w": 339,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "提交上周差旅报销单",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 124,
+        "w": 339,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "准备下周一的方案初稿",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 164,
+        "w": 349,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "每周复盘（每周）",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 204,
+        "w": 349,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "季度目标对齐会",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 244,
+        "w": 349,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "查看全部（ 8 ）",
+      "tag": "button",
+      "cls": "fui-Button r1f29ykk ___1g337ic",
+      "fs": 14,
+      "fw": "600",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 161.6,
+        "y": 280,
+        "w": 117.8,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "添加",
+      "tag": "button",
+      "cls": "fui-Button r1f29ykk ___1wke22j",
+      "fs": 14,
+      "fw": "600",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 337,
+        "y": 238,
+        "w": 96,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "工作",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 8,
+        "y": 8,
+        "w": 24,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "8",
+      "tag": "span",
+      "cls": "fui-Text ___5yj2er0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(153, 153, 153)",
+      "opacity": 1,
+      "rect": {
+        "x": 40,
+        "y": 8,
+        "w": 6.5,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 5.11
+    },
+    {
+      "text": "17:00",
+      "tag": "span",
+      "cls": "fui-Text ___11r6f1q fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 405.3,
+        "y": 47,
+        "w": 23.7,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 399,
+        "y": 87,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 8.71
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 399,
+        "y": 127,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 8.71
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 409,
+        "y": 164,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 409,
+        "y": 204,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 409,
+        "y": 244,
+        "w": 20,
+        "h": 20
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 13,
+    "graphicCount": 3,
+    "maxFs": 14,
+    "minFs": 10,
+    "fonts": {
+      "10": 3,
+      "12": 2,
+      "14": 8
+    },
+    "under10": 0,
+    "under12": 3,
+    "under14": 5,
+    "coveragePct": 46.7,
+    "rowStats": {
+      "maxGapPx": 18,
+      "maxGapFrom": 26,
+      "maxGapTo": 42,
+      "topGapPx": 8,
+      "bottomGapPx": 0,
+      "contentFromPx": 8,
+      "contentToPx": 286
+    },
+    "colStats": {
+      "maxGapPx": 8,
+      "maxGapFrom": 0,
+      "maxGapTo": 6,
+      "topGapPx": 8,
+      "bottomGapPx": 6,
+      "contentFromPx": 8,
+      "contentToPx": 436
+    },
+    "overflow": [
+      {
+        "text": "查看全部（ 8 ）",
+        "rect": {
+          "x": 161.6,
+          "y": 280,
+          "w": 117.8,
+          "h": 40
+        }
+      }
+    ]
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "todo",
+  "sizeKey": "3x2",
+  "resolution": "960x1440",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 441,
+    "h": 286
+  },
+  "gridCell": 143
+}

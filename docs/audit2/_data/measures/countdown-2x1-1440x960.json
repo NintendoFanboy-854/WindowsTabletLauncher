@@ -1,0 +1,109 @@
+{
+  "viewport": {
+    "w": 328,
+    "h": 152
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 328,
+    "h": 152
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 328,
+    "sh": 152,
+    "cw": 328,
+    "ch": 152
+  },
+  "texts": [
+    {
+      "text": "今天",
+      "tag": "span",
+      "cls": "fui-Text ___2ixqtu0 fk6fouc",
+      "fs": 32,
+      "fw": "600",
+      "lh": "40px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 243,
+        "y": 56,
+        "w": 64,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 5.2
+    },
+    {
+      "text": "结婚纪念日",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 21,
+        "y": 65,
+        "w": 214,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 2,
+    "graphicCount": 0,
+    "maxFs": 32,
+    "minFs": 16,
+    "fonts": {
+      "16": 1,
+      "32": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 0,
+    "coveragePct": 18.7,
+    "rowStats": {
+      "maxGapPx": 56,
+      "maxGapFrom": 0,
+      "maxGapTo": 54,
+      "topGapPx": 56,
+      "bottomGapPx": 54,
+      "contentFromPx": 56,
+      "contentToPx": 98
+    },
+    "colStats": {
+      "maxGapPx": 20,
+      "maxGapFrom": 0,
+      "maxGapTo": 18,
+      "topGapPx": 20,
+      "bottomGapPx": 18,
+      "contentFromPx": 20,
+      "contentToPx": 310
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "countdown",
+  "sizeKey": "2x1",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 328,
+    "h": 152
+  },
+  "gridCell": 164
+}

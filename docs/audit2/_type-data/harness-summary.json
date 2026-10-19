@@ -1,0 +1,29 @@
+[
+  {
+    "name": "1440x960",
+    "grid": {
+      "columns": 8,
+      "rows": 5,
+      "cell": 164
+    },
+    "cases": 25
+  },
+  {
+    "name": "1024x768",
+    "grid": {
+      "columns": 6,
+      "rows": 4,
+      "cell": 154
+    },
+    "cases": 25
+  },
+  {
+    "name": "960x1440",
+    "grid": {
+      "columns": 6,
+      "rows": 9,
+      "cell": 143
+    },
+    "cases": 25
+  }
+]

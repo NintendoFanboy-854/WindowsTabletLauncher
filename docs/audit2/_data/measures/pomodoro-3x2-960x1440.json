@@ -1,0 +1,170 @@
+{
+  "viewport": {
+    "w": 441,
+    "h": 286
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 441,
+    "h": 286
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 441,
+    "sh": 286,
+    "cw": 441,
+    "ch": 286
+  },
+  "texts": [
+    {
+      "text": "10:55",
+      "tag": "span",
+      "cls": "fui-Text ___1wny0ca fk6fouc",
+      "fs": 68,
+      "fw": "600",
+      "lh": "68px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 60,
+        "y": 114,
+        "w": 167.4,
+        "h": 68
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "暂停",
+      "tag": "button",
+      "cls": "fui-Button r1f29ykk ___g6bjf20",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 264.2,
+        "y": 142,
+        "w": 96,
+        "h": 40
+      },
+      "aria": "暂停",
+      "contrast": 14.55
+    },
+    {
+      "text": "写周报",
+      "tag": "span",
+      "cls": "fui-Text ___137p32e fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 315.2,
+        "y": 114,
+        "w": 42,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "专注",
+      "tag": "div",
+      "cls": "fui-Badge r1iycov ___lposll0",
+      "fs": 12,
+      "fw": "600",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(71, 158, 245)",
+      "opacity": 1,
+      "rect": {
+        "x": 16,
+        "y": 136,
+        "w": 36,
+        "h": 24
+      },
+      "aria": "",
+      "contrast": 5.18
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 283.2,
+        "y": 152,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 378.2,
+        "y": 152,
+        "w": 20,
+        "h": 20
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 4,
+    "graphicCount": 2,
+    "maxFs": 68,
+    "minFs": 12,
+    "fonts": {
+      "12": 1,
+      "14": 1,
+      "16": 1,
+      "68": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 1,
+    "coveragePct": 16.7,
+    "rowStats": {
+      "maxGapPx": 114,
+      "maxGapFrom": 0,
+      "maxGapTo": 112,
+      "topGapPx": 114,
+      "bottomGapPx": 102,
+      "contentFromPx": 114,
+      "contentToPx": 184
+    },
+    "colStats": {
+      "maxGapPx": 40,
+      "maxGapFrom": 402,
+      "maxGapTo": 440,
+      "topGapPx": 16,
+      "bottomGapPx": 40,
+      "contentFromPx": 16,
+      "contentToPx": 402
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "pomodoro",
+  "sizeKey": "3x2",
+  "resolution": "960x1440",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 441,
+    "h": 286
+  },
+  "gridCell": 143
+}

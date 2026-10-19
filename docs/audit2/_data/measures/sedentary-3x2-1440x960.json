@@ -1,0 +1,265 @@
+{
+  "viewport": {
+    "w": 504,
+    "h": 328
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 504,
+    "h": 328
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 504,
+    "sh": 328,
+    "cw": 504,
+    "ch": 328
+  },
+  "texts": [
+    {
+      "text": "52",
+      "tag": "span",
+      "cls": "fui-Text ___gdymde0 fk6fouc",
+      "fs": 32,
+      "fw": "600",
+      "lh": "32px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 84,
+        "y": 137,
+        "w": 35.5,
+        "h": 32
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "我起来了",
+      "tag": "button",
+      "cls": "fui-Button r1f29ykk ___g6bjf20",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 312,
+        "y": 144,
+        "w": 128,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "已超过提醒阈值，起来活动一下",
+      "tag": "span",
+      "cls": "fui-Text ___11sa4s1 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 16,
+        "y": 171,
+        "w": 196,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "187 分钟",
+      "tag": "span",
+      "cls": "fui-Text ___15ff0os fk6fouc",
+      "fs": 14,
+      "fw": "600",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 228,
+        "y": 134,
+        "w": 54.9,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "3 次",
+      "tag": "span",
+      "cls": "fui-Text ___15ff0os fk6fouc",
+      "fs": 14,
+      "fw": "600",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 228,
+        "y": 190,
+        "w": 48,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "已超阈值",
+      "tag": "div",
+      "cls": "fui-Badge r1iycov ___1r2jx3n",
+      "fs": 12,
+      "fw": "600",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 16,
+        "y": 141,
+        "w": 60,
+        "h": 24
+      },
+      "aria": "状态：已超阈值",
+      "contrast": 5.2
+    },
+    {
+      "text": "分钟",
+      "tag": "span",
+      "cls": "fui-Text ___gczutb0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 127.5,
+        "y": 153,
+        "w": 24,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "今日久坐",
+      "tag": "span",
+      "cls": "fui-Text ___gczutb0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 228,
+        "y": 118,
+        "w": 54.9,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "起身次数",
+      "tag": "span",
+      "cls": "fui-Text ___gczutb0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 228,
+        "y": 174,
+        "w": 48,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 331,
+        "y": 154,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 458,
+        "y": 154,
+        "w": 20,
+        "h": 20
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 9,
+    "graphicCount": 2,
+    "maxFs": 32,
+    "minFs": 12,
+    "fonts": {
+      "12": 4,
+      "14": 3,
+      "16": 1,
+      "32": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 4,
+    "coveragePct": 12.5,
+    "rowStats": {
+      "maxGapPx": 118,
+      "maxGapFrom": 0,
+      "maxGapTo": 116,
+      "topGapPx": 118,
+      "bottomGapPx": 116,
+      "contentFromPx": 118,
+      "contentToPx": 212
+    },
+    "colStats": {
+      "maxGapPx": 26,
+      "maxGapFrom": 286,
+      "maxGapTo": 310,
+      "topGapPx": 16,
+      "bottomGapPx": 24,
+      "contentFromPx": 16,
+      "contentToPx": 480
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "sedentary",
+  "sizeKey": "3x2",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 504,
+    "h": 328
+  },
+  "gridCell": 164
+}

@@ -1,0 +1,158 @@
+{
+  "viewport": {
+    "w": 328,
+    "h": 152
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 328,
+    "h": 152
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 328,
+    "sh": 152,
+    "cw": 328,
+    "ch": 152
+  },
+  "texts": [
+    {
+      "text": "24°",
+      "tag": "span",
+      "cls": "___1d3135l fp6vxd fl43uef",
+      "fs": 14,
+      "fw": "600",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 60.5,
+        "y": 78,
+        "w": 20.8,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 16.1
+    },
+    {
+      "text": "雷阵雨",
+      "tag": "span",
+      "cls": "___ds1xlm0 fkfq4zb fz5stix",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 274,
+        "y": 66,
+        "w": 42,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 11.08
+    },
+    {
+      "text": "北京",
+      "tag": "span",
+      "cls": "___1omz8a2 fy9rknc fwrc4pm",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 12,
+        "y": 48,
+        "w": 304,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 7.18
+    },
+    {
+      "text": "26° / 15°",
+      "tag": "span",
+      "cls": "___vrlefm0 f11d4kpn f1pbl6dw",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 269.8,
+        "y": 88,
+        "w": 46.2,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 7.18
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "img",
+      "cls": "___1ee0f92 ftgm304",
+      "rect": {
+        "x": 12,
+        "y": 66.8,
+        "w": 36.5,
+        "h": 36.5
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 4,
+    "graphicCount": 1,
+    "maxFs": 14,
+    "minFs": 12,
+    "fonts": {
+      "12": 2,
+      "14": 2
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 2,
+    "coveragePct": 21,
+    "rowStats": {
+      "maxGapPx": 48,
+      "maxGapFrom": 0,
+      "maxGapTo": 46,
+      "topGapPx": 48,
+      "bottomGapPx": 46,
+      "contentFromPx": 48,
+      "contentToPx": 106
+    },
+    "colStats": {
+      "maxGapPx": 12,
+      "maxGapFrom": 0,
+      "maxGapTo": 10,
+      "topGapPx": 12,
+      "bottomGapPx": 10,
+      "contentFromPx": 12,
+      "contentToPx": 318
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    33,
+    33,
+    33
+  ],
+  "plugin": "weather",
+  "sizeKey": "2x1",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 328,
+    "h": 152
+  },
+  "gridCell": 164
+}

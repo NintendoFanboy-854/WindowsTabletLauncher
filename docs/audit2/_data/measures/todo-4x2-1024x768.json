@@ -1,0 +1,1409 @@
+{
+  "viewport": {
+    "w": 720,
+    "h": 360
+  },
+  "card": {
+    "x": 40,
+    "y": 26,
+    "w": 640,
+    "h": 308
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 720,
+    "sh": 360,
+    "cw": 720,
+    "ch": 360
+  },
+  "texts": [
+    {
+      "text": "整理产品周报，把本周评审结论同步给设计组",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 88,
+        "w": 280,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "和设计评审 Fluent 动效 token",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 128,
+        "w": 273.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "提交上周差旅报销单",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 168,
+        "w": 273.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "准备下周一的方案初稿",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 208,
+        "w": 283.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "每周复盘（每周）",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 248,
+        "w": 283.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "季度目标对齐会",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 288,
+        "w": 283.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "给桌面插件写使用说明",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 328,
+        "w": 283.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "整理插件截图，更新 README",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 368,
+        "w": 283.7,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 16.48
+    },
+    {
+      "text": "冥想 10 分钟",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 88,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "记 10 个单词",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 128,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理待办清单",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 168,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "拉伸放松",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 208,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "写日报",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 248,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "快走 30 分钟",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 288,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "写日报",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 328,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "记 10 个单词",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 368,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "检查部署日志",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 408,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "拉伸放松",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 448,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "清理收件箱",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 488,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理待办清单",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 528,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "快走 30 分钟",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 568,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "检查部署日志",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 608,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "复盘昨日计划",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 648,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "采购日用品",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 688,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "阅读 20 页",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 728,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理会议纪要",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 768,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "清理收件箱",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 808,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "检查部署日志",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 848,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "给团队写同步说明",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 888,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理待办清单",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 928,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理会议纪要",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 968,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "清理收件箱",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 1008,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "给团队写同步说明",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 1048,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "整理待办清单",
+      "tag": "span",
+      "cls": "fui-Text ___tsf4xs0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(92, 92, 92)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 1088,
+        "w": 192.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 2.46
+    },
+    {
+      "text": "工作",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 8,
+        "y": 25,
+        "w": 24,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 7.34
+    },
+    {
+      "text": "8",
+      "tag": "span",
+      "cls": "fui-Text ___5yj2er0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(153, 153, 153)",
+      "opacity": 1,
+      "rect": {
+        "x": 40,
+        "y": 25,
+        "w": 6.5,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 5.79
+    },
+    {
+      "text": "未完成",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 12,
+        "y": 58,
+        "w": 36,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 7.34
+    },
+    {
+      "text": "8",
+      "tag": "span",
+      "cls": "fui-Text ___5yj2er0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(153, 153, 153)",
+      "opacity": 1,
+      "rect": {
+        "x": 56,
+        "y": 58,
+        "w": 6.5,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 5.79
+    },
+    {
+      "text": "已完成",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 387.7,
+        "y": 58,
+        "w": 36,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 7.34
+    },
+    {
+      "text": "26",
+      "tag": "span",
+      "cls": "fui-Text ___5yj2er0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(153, 153, 153)",
+      "opacity": 1,
+      "rect": {
+        "x": 431.7,
+        "y": 58,
+        "w": 12.9,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 5.79
+    },
+    {
+      "text": "17:00",
+      "tag": "span",
+      "cls": "fui-Text ___11r6f1q fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 344,
+        "y": 91,
+        "w": 23.7,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 7.34
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 337.7,
+        "y": 131,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 9.87
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 337.7,
+        "y": 171,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 9.87
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 602,
+        "y": 18,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 347.7,
+        "y": 208,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 347.7,
+        "y": 248,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 347.7,
+        "y": 288,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 347.7,
+        "y": 328,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 347.7,
+        "y": 368,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 88,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 128,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 168,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 208,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 248,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 288,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 328,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 368,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 408,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 448,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 488,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 528,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 568,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 608,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 648,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 688,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 728,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 768,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 808,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 848,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 888,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 928,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 968,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 1008,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 1048,
+        "w": 12,
+        "h": 12
+      }
+    },
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 401.7,
+        "y": 1088,
+        "w": 12,
+        "h": 12
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 43,
+    "graphicCount": 32,
+    "maxFs": 14,
+    "minFs": 10,
+    "fonts": {
+      "10": 3,
+      "12": 6,
+      "14": 34
+    },
+    "under10": 0,
+    "under12": 3,
+    "under14": 9,
+    "coveragePct": 39.9,
+    "rowStats": {
+      "maxGapPx": 18,
+      "maxGapFrom": 0,
+      "maxGapTo": 16,
+      "topGapPx": 18,
+      "bottomGapPx": 0,
+      "contentFromPx": 18,
+      "contentToPx": 308
+    },
+    "colStats": {
+      "maxGapPx": 16,
+      "maxGapFrom": 370,
+      "maxGapTo": 384,
+      "topGapPx": 8,
+      "bottomGapPx": 14,
+      "contentFromPx": 8,
+      "contentToPx": 626
+    },
+    "overflow": [
+      {
+        "text": "给桌面插件写使用说明",
+        "rect": {
+          "x": 56,
+          "y": 328,
+          "w": 283.7,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理插件截图，更新 README",
+        "rect": {
+          "x": 56,
+          "y": 368,
+          "w": 283.7,
+          "h": 20
+        }
+      },
+      {
+        "text": "写日报",
+        "rect": {
+          "x": 431.7,
+          "y": 328,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "记 10 个单词",
+        "rect": {
+          "x": 431.7,
+          "y": 368,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "检查部署日志",
+        "rect": {
+          "x": 431.7,
+          "y": 408,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "拉伸放松",
+        "rect": {
+          "x": 431.7,
+          "y": 448,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "清理收件箱",
+        "rect": {
+          "x": 431.7,
+          "y": 488,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理待办清单",
+        "rect": {
+          "x": 431.7,
+          "y": 528,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "快走 30 分钟",
+        "rect": {
+          "x": 431.7,
+          "y": 568,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "检查部署日志",
+        "rect": {
+          "x": 431.7,
+          "y": 608,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "复盘昨日计划",
+        "rect": {
+          "x": 431.7,
+          "y": 648,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "采购日用品",
+        "rect": {
+          "x": 431.7,
+          "y": 688,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "阅读 20 页",
+        "rect": {
+          "x": 431.7,
+          "y": 728,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理会议纪要",
+        "rect": {
+          "x": 431.7,
+          "y": 768,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "清理收件箱",
+        "rect": {
+          "x": 431.7,
+          "y": 808,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "检查部署日志",
+        "rect": {
+          "x": 431.7,
+          "y": 848,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "给团队写同步说明",
+        "rect": {
+          "x": 431.7,
+          "y": 888,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理待办清单",
+        "rect": {
+          "x": 431.7,
+          "y": 928,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理会议纪要",
+        "rect": {
+          "x": 431.7,
+          "y": 968,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "清理收件箱",
+        "rect": {
+          "x": 431.7,
+          "y": 1008,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "给团队写同步说明",
+        "rect": {
+          "x": 431.7,
+          "y": 1048,
+          "w": 192.3,
+          "h": 20
+        }
+      },
+      {
+        "text": "整理待办清单",
+        "rect": {
+          "x": 431.7,
+          "y": 1088,
+          "w": 192.3,
+          "h": 20
+        }
+      }
+    ]
+  },
+  "bgSample": [
+    31,
+    31,
+    31
+  ],
+  "plugin": "todo",
+  "sizeKey": "4x2",
+  "resolution": "1024x768",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 640,
+    "h": 308
+  },
+  "gridCell": 154
+}

@@ -1,0 +1,109 @@
+{
+  "viewport": {
+    "w": 152,
+    "h": 152
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 152,
+    "h": 152
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 152,
+    "sh": 152,
+    "cw": 152,
+    "ch": 152
+  },
+  "texts": [
+    {
+      "text": "13:00",
+      "tag": "span",
+      "cls": "fui-Text ___1yk799n fk6fouc",
+      "fs": 40,
+      "fw": "600",
+      "lh": "40px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 26.8,
+        "y": 71,
+        "w": 98.5,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "专注",
+      "tag": "div",
+      "cls": "fui-Badge r1iycov ___lposll0",
+      "fs": 12,
+      "fw": "600",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(71, 158, 245)",
+      "opacity": 1,
+      "rect": {
+        "x": 58,
+        "y": 45,
+        "w": 36,
+        "h": 24
+      },
+      "aria": "",
+      "contrast": 5.18
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 2,
+    "graphicCount": 0,
+    "maxFs": 40,
+    "minFs": 12,
+    "fonts": {
+      "12": 1,
+      "40": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 1,
+    "coveragePct": 27,
+    "rowStats": {
+      "maxGapPx": 44,
+      "maxGapFrom": 0,
+      "maxGapTo": 42,
+      "topGapPx": 44,
+      "bottomGapPx": 38,
+      "contentFromPx": 44,
+      "contentToPx": 114
+    },
+    "colStats": {
+      "maxGapPx": 26,
+      "maxGapFrom": 0,
+      "maxGapTo": 24,
+      "topGapPx": 26,
+      "bottomGapPx": 24,
+      "contentFromPx": 26,
+      "contentToPx": 128
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "pomodoro",
+  "sizeKey": "1x1",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 152,
+    "h": 152
+  },
+  "gridCell": 164
+}

@@ -1,0 +1,332 @@
+[
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 960
+    },
+    "docFont": "\"Segoe UI Variable Display\", \"Segoe UI\", system-ui, sans-serif",
+    "htmlFont": "16px",
+    "cards": [
+      {
+        "uid": "clock:clock",
+        "w": 340,
+        "h": 164,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 328,
+          "h": 152
+        }
+      },
+      {
+        "uid": "countdown:countdown",
+        "w": 340,
+        "h": 164,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 328,
+          "h": 152
+        }
+      },
+      {
+        "uid": "sedentary:sedentary",
+        "w": 340,
+        "h": 164,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 328,
+          "h": 152
+        }
+      },
+      {
+        "uid": "pomodoro:pomodoro",
+        "w": 340,
+        "h": 164,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 328,
+          "h": 152
+        }
+      },
+      {
+        "uid": "todo:todo-list",
+        "w": 516,
+        "h": 516,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 504,
+          "h": 504
+        }
+      },
+      {
+        "uid": "weather:weather-card",
+        "w": 516,
+        "h": 340,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 504,
+          "h": 328
+        }
+      }
+    ],
+    "pages": 1,
+    "pageText": null,
+    "pageStyle": null,
+    "dock": {
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "400",
+      "color": "rgb(214, 214, 214)"
+    },
+    "dockAll": [
+      {
+        "text": "Agent",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "复盘",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "插件",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "设置",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      }
+    ],
+    "editTitle": null
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 768
+    },
+    "docFont": "\"Segoe UI Variable Display\", \"Segoe UI\", system-ui, sans-serif",
+    "htmlFont": "16px",
+    "cards": [
+      {
+        "uid": "clock:clock",
+        "w": 320,
+        "h": 154,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 308,
+          "h": 142
+        }
+      },
+      {
+        "uid": "countdown:countdown",
+        "w": 320,
+        "h": 154,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 308,
+          "h": 142
+        }
+      },
+      {
+        "uid": "sedentary:sedentary",
+        "w": 320,
+        "h": 154,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 308,
+          "h": 142
+        }
+      },
+      {
+        "uid": "pomodoro:pomodoro",
+        "w": 320,
+        "h": 154,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 308,
+          "h": 142
+        }
+      },
+      {
+        "uid": "todo:todo-list",
+        "w": 486,
+        "h": 486,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 474,
+          "h": 474
+        }
+      },
+      {
+        "uid": "weather:weather-card",
+        "w": 486,
+        "h": 320,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 474,
+          "h": 308
+        }
+      }
+    ],
+    "pages": 2,
+    "pageText": null,
+    "pageStyle": null,
+    "dock": {
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "400",
+      "color": "rgb(214, 214, 214)"
+    },
+    "dockAll": [
+      {
+        "text": "Agent",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "复盘",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "插件",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "设置",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      }
+    ],
+    "editTitle": null
+  },
+  {
+    "viewport": {
+      "w": 960,
+      "h": 1440
+    },
+    "docFont": "\"Segoe UI Variable Display\", \"Segoe UI\", system-ui, sans-serif",
+    "htmlFont": "16px",
+    "cards": [
+      {
+        "uid": "clock:clock",
+        "w": 298,
+        "h": 143,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 286,
+          "h": 131
+        }
+      },
+      {
+        "uid": "countdown:countdown",
+        "w": 298,
+        "h": 143,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 286,
+          "h": 131
+        }
+      },
+      {
+        "uid": "sedentary:sedentary",
+        "w": 298,
+        "h": 143,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 286,
+          "h": 131
+        }
+      },
+      {
+        "uid": "pomodoro:pomodoro",
+        "w": 298,
+        "h": 143,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 286,
+          "h": 131
+        }
+      },
+      {
+        "uid": "todo:todo-list",
+        "w": 453,
+        "h": 453,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 441,
+          "h": 441
+        }
+      },
+      {
+        "uid": "weather:weather-card",
+        "w": 453,
+        "h": 298,
+        "innerPad": "6px",
+        "iframe": {
+          "w": 441,
+          "h": 286
+        }
+      }
+    ],
+    "pages": 2,
+    "pageText": null,
+    "pageStyle": null,
+    "dock": {
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "fontWeight": "400",
+      "color": "rgb(214, 214, 214)"
+    },
+    "dockAll": [
+      {
+        "text": "Agent",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "复盘",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "插件",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      },
+      {
+        "text": "设置",
+        "fontSize": "12px",
+        "lineHeight": "16px",
+        "fontWeight": "400",
+        "color": "rgb(214, 214, 214)"
+      }
+    ],
+    "editTitle": null
+  }
+]

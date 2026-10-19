@@ -1,0 +1,4639 @@
+[
+  {
+    "viewport": "1440x960",
+    "pluginId": "clock",
+    "size": "1x1",
+    "case": "clock-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "11:34",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      40
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "40:11:34"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "clock",
+    "size": "2x1",
+    "case": "clock-2x1",
+    "inner": {
+      "w": 328,
+      "h": 152
+    },
+    "primary": {
+      "text": "11:34",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": {
+      "text": "10月19日 星期一",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "58",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1virlwc"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "40:11:34",
+      "14:58",
+      "14:10月19日 星期一"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "clock",
+    "size": "3x2",
+    "case": "clock-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": {
+      "text": "11:34",
+      "px": 68,
+      "lh": 92,
+      "ratio": 1.35,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___iua35l0"
+    },
+    "secondary": {
+      "text": "10月19日 · 星期一",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___lxrhoz0"
+    },
+    "tertiary": {
+      "text": "58",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___dmquwe0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "12px",
+    "fontSizes": [
+      16,
+      68
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "68:11:34",
+      "16:58",
+      "16:10月19日 · 星期一"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "countdown",
+    "size": "1x1",
+    "case": "countdown-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "就是今天",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___c086640"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "0px",
+    "fontSizes": [
+      12
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:就是今天",
+      "12:产品发布"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "countdown",
+    "size": "2x1",
+    "case": "countdown-2x1",
+    "inner": {
+      "w": 328,
+      "h": 152
+    },
+    "primary": {
+      "text": "今天",
+      "px": 32,
+      "lh": 40,
+      "ratio": 1.25,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___2ixqtu0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      16,
+      32
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "16:产品发布",
+      "32:今天"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "countdown",
+    "size": "2x2",
+    "case": "countdown-2x2",
+    "inner": {
+      "w": 328,
+      "h": 328
+    },
+    "primary": {
+      "text": "今天",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___46ohwc0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1g6lu38"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      16
+    ],
+    "textCount": 8,
+    "sampleTexts": [
+      "14:产品发布",
+      "16:今天",
+      "14:项目终期评审会",
+      "16:还有 12 天",
+      "14:春节回家",
+      "16:还有 110 天",
+      "14:结婚纪念日",
+      "16:还有 213 天"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "countdown",
+    "size": "3x2",
+    "case": "countdown-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": {
+      "text": "今天",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___4y29by0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": {
+      "text": "倒数日",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___16pfnek"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      16,
+      20
+    ],
+    "textCount": 12,
+    "sampleTexts": [
+      "20:倒数日",
+      "12:5 项",
+      "16:产品发布",
+      "20:今天",
+      "16:项目终期评审会",
+      "20:还有 12 天",
+      "16:春节回家",
+      "20:还有 110 天",
+      "16:结婚纪念日",
+      "20:还有 213 天",
+      "16:年度体检",
+      "20:已过 3 天"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "pomodoro",
+    "size": "1x1",
+    "case": "pomodoro-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1yk799n"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      40
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "40:25:00"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "pomodoro",
+    "size": "2x1",
+    "case": "pomodoro-2x1",
+    "inner": {
+      "w": 328,
+      "h": 152
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "12px",
+    "fontSizes": [
+      12,
+      68
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "pomodoro",
+    "size": "2x2",
+    "case": "pomodoro-2x2",
+    "inner": {
+      "w": 328,
+      "h": 328
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "pomodoro",
+    "size": "3x2",
+    "case": "pomodoro-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "sedentary",
+    "size": "1x1",
+    "case": "sedentary-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "0",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___kvecof0"
+    },
+    "secondary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "12:正常",
+      "40:0",
+      "14:分钟"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "sedentary",
+    "size": "2x1",
+    "case": "sedentary-2x1",
+    "inner": {
+      "w": 328,
+      "h": 152
+    },
+    "primary": {
+      "text": "0",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "刚起身，久坐计时还没开始",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___otttm10"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      28
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:正常",
+      "28:0",
+      "12:分钟",
+      "12:刚起身，久坐计时还没开始"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "sedentary",
+    "size": "2x2",
+    "case": "sedentary-2x2",
+    "inner": {
+      "w": 328,
+      "h": 328
+    },
+    "primary": {
+      "text": "0",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "刚起身，久坐计时还没开始",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "0 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      28
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "28:0",
+      "12:分钟",
+      "14:刚起身，久坐计时还没开始",
+      "12:今日久坐",
+      "14:0 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "sedentary",
+    "size": "3x2",
+    "case": "sedentary-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": {
+      "text": "0",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gdymde0"
+    },
+    "secondary": {
+      "text": "刚起身，久坐计时还没开始",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "0 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      32
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "32:0",
+      "12:分钟",
+      "14:刚起身，久坐计时还没开始",
+      "12:今日久坐",
+      "14:0 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "todo",
+    "size": "1x1",
+    "case": "todo-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "5",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___118tge5"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      32
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "32:5",
+      "12:未完成 · 今日 2",
+      "12:整理季度汇报材料"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "todo",
+    "size": "2x2",
+    "case": "todo-2x2",
+    "inner": {
+      "w": 328,
+      "h": 328
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:查看全部（ 5 ）"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "todo",
+    "size": "3x2",
+    "case": "todo-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 10,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "todo",
+    "size": "3x3",
+    "case": "todo-3x3",
+    "inner": {
+      "w": 504,
+      "h": 504
+    },
+    "primary": null,
+    "secondary": {
+      "text": "最近",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1bw8k0o"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 13,
+    "sampleTexts": [
+      "14:今日",
+      "14:最近",
+      "12:今天 · 10月19日",
+      "12:2",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "12:明天",
+      "12:2",
+      "14:修复天气插件图标错位",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "todo",
+    "size": "4x2",
+    "case": "todo-4x2",
+    "inner": {
+      "w": 680,
+      "h": 328
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 14,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "12:未完成",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "12:已完成",
+      "12:1",
+      "14:给番茄钟补周末统计"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "weather",
+    "size": "1x1",
+    "case": "weather-1x1",
+    "inner": {
+      "w": 152,
+      "h": 152
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "4px 4px 4px 4px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "14:24°"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "weather",
+    "size": "2x1",
+    "case": "weather-2x1",
+    "inner": {
+      "w": 328,
+      "h": 152
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": null,
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "weather",
+    "size": "2x2",
+    "case": "weather-2x2",
+    "inner": {
+      "w": 328,
+      "h": 328
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "现在",
+      "px": 10,
+      "lh": 20,
+      "ratio": 2,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1dm2tgb"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": null,
+    "hourlyLabel": {
+      "text": "现在",
+      "px": 10,
+      "lh": 20,
+      "ratio": 2,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1dm2tgb"
+    },
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 16,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "10:现在",
+      "14:26°",
+      "10:12:00",
+      "14:26°",
+      "10:13:00",
+      "14:26°",
+      "10:14:00",
+      "14:28°",
+      "10:15:00",
+      "14:26°",
+      "10:16:00",
+      "14:26°"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "weather",
+    "size": "3x2",
+    "case": "weather-3x2",
+    "inner": {
+      "w": 504,
+      "h": 328
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16
+    ],
+    "textCount": 18,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "12:今天",
+      "16:26°",
+      "12:明天",
+      "16:29°",
+      "12:周三",
+      "16:27°",
+      "12:周四",
+      "16:27°",
+      "12:周五",
+      "16:27°",
+      "12:周六",
+      "16:27°",
+      "12:周日",
+      "16:29°"
+    ]
+  },
+  {
+    "viewport": "1440x960",
+    "pluginId": "weather",
+    "size": "4x2",
+    "case": "weather-4x2",
+    "inner": {
+      "w": 680,
+      "h": 328
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": {
+      "text": "AQI",
+      "px": 10,
+      "lh": 10.5,
+      "ratio": 1.05,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___15z5403"
+    },
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      10,
+      12,
+      14,
+      16
+    ],
+    "textCount": 28,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "16:71",
+      "10:AQI",
+      "12:良",
+      "12:今天",
+      "14:26°",
+      "14:15°",
+      "12:明天",
+      "14:29°",
+      "14:17°",
+      "12:周三",
+      "14:27°",
+      "14:16°",
+      "12:周四",
+      "14:27°",
+      "14:17°",
+      "12:周五",
+      "14:27°",
+      "14:17°",
+      "12:周六",
+      "14:27°",
+      "14:16°",
+      "12:周日",
+      "14:29°",
+      "14:17°"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "clock",
+    "size": "1x1",
+    "case": "clock-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": {
+      "text": "11:35",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      40
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "40:11:35"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "clock",
+    "size": "2x1",
+    "case": "clock-2x1",
+    "inner": {
+      "w": 308,
+      "h": 142
+    },
+    "primary": {
+      "text": "11:35",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": {
+      "text": "10月19日 星期一",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "38",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1virlwc"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "40:11:35",
+      "14:38",
+      "14:10月19日 星期一"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "clock",
+    "size": "3x2",
+    "case": "clock-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": {
+      "text": "11:35",
+      "px": 68,
+      "lh": 92,
+      "ratio": 1.35,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___iua35l0"
+    },
+    "secondary": {
+      "text": "10月19日 · 星期一",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___lxrhoz0"
+    },
+    "tertiary": {
+      "text": "38",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___dmquwe0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "12px",
+    "fontSizes": [
+      16,
+      68
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "68:11:35",
+      "16:38",
+      "16:10月19日 · 星期一"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "countdown",
+    "size": "1x1",
+    "case": "countdown-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": {
+      "text": "就是今天",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___c086640"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "0px",
+    "fontSizes": [
+      12
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:就是今天",
+      "12:产品发布"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "countdown",
+    "size": "2x1",
+    "case": "countdown-2x1",
+    "inner": {
+      "w": 308,
+      "h": 142
+    },
+    "primary": {
+      "text": "今天",
+      "px": 32,
+      "lh": 40,
+      "ratio": 1.25,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___2ixqtu0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      16,
+      32
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "16:产品发布",
+      "32:今天"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "countdown",
+    "size": "2x2",
+    "case": "countdown-2x2",
+    "inner": {
+      "w": 308,
+      "h": 308
+    },
+    "primary": {
+      "text": "今天",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___46ohwc0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1g6lu38"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      16
+    ],
+    "textCount": 8,
+    "sampleTexts": [
+      "14:产品发布",
+      "16:今天",
+      "14:项目终期评审会",
+      "16:还有 12 天",
+      "14:春节回家",
+      "16:还有 110 天",
+      "14:结婚纪念日",
+      "16:还有 213 天"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "countdown",
+    "size": "3x2",
+    "case": "countdown-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": {
+      "text": "今天",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___4y29by0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": {
+      "text": "倒数日",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___16pfnek"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      16,
+      20
+    ],
+    "textCount": 12,
+    "sampleTexts": [
+      "20:倒数日",
+      "12:5 项",
+      "16:产品发布",
+      "20:今天",
+      "16:项目终期评审会",
+      "20:还有 12 天",
+      "16:春节回家",
+      "20:还有 110 天",
+      "16:结婚纪念日",
+      "20:还有 213 天",
+      "16:年度体检",
+      "20:已过 3 天"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "pomodoro",
+    "size": "1x1",
+    "case": "pomodoro-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1yk799n"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      40
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "40:25:00"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "pomodoro",
+    "size": "2x1",
+    "case": "pomodoro-2x1",
+    "inner": {
+      "w": 308,
+      "h": 142
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "12px",
+    "fontSizes": [
+      12,
+      68
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "pomodoro",
+    "size": "2x2",
+    "case": "pomodoro-2x2",
+    "inner": {
+      "w": 308,
+      "h": 308
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "pomodoro",
+    "size": "3x2",
+    "case": "pomodoro-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "sedentary",
+    "size": "1x1",
+    "case": "sedentary-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": {
+      "text": "0",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___kvecof0"
+    },
+    "secondary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "12:正常",
+      "40:0",
+      "14:分钟"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "sedentary",
+    "size": "2x1",
+    "case": "sedentary-2x1",
+    "inner": {
+      "w": 308,
+      "h": 142
+    },
+    "primary": {
+      "text": "0",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "距提醒还有 45 分钟",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___otttm10"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      28
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:正常",
+      "28:0",
+      "12:分钟",
+      "12:距提醒还有 45 分钟"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "sedentary",
+    "size": "2x2",
+    "case": "sedentary-2x2",
+    "inner": {
+      "w": 308,
+      "h": 308
+    },
+    "primary": {
+      "text": "0",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "距提醒还有 45 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "0 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      28
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "28:0",
+      "12:分钟",
+      "14:距提醒还有 45 分钟",
+      "12:今日久坐",
+      "14:0 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "sedentary",
+    "size": "3x2",
+    "case": "sedentary-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": {
+      "text": "0",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gdymde0"
+    },
+    "secondary": {
+      "text": "距提醒还有 45 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "0 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      32
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "32:0",
+      "12:分钟",
+      "14:距提醒还有 45 分钟",
+      "12:今日久坐",
+      "14:0 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "todo",
+    "size": "1x1",
+    "case": "todo-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": {
+      "text": "5",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___118tge5"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      32
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "32:5",
+      "12:未完成 · 今日 2",
+      "12:整理季度汇报材料"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "todo",
+    "size": "2x2",
+    "case": "todo-2x2",
+    "inner": {
+      "w": 308,
+      "h": 308
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:查看全部（ 5 ）"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "todo",
+    "size": "3x2",
+    "case": "todo-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 10,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "todo",
+    "size": "3x3",
+    "case": "todo-3x3",
+    "inner": {
+      "w": 474,
+      "h": 474
+    },
+    "primary": null,
+    "secondary": {
+      "text": "最近",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1bw8k0o"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 13,
+    "sampleTexts": [
+      "14:今日",
+      "14:最近",
+      "12:今天 · 10月19日",
+      "12:2",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "12:明天",
+      "12:2",
+      "14:修复天气插件图标错位",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "todo",
+    "size": "4x2",
+    "case": "todo-4x2",
+    "inner": {
+      "w": 640,
+      "h": 308
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 14,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "12:未完成",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "12:已完成",
+      "12:1",
+      "14:给番茄钟补周末统计"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "weather",
+    "size": "1x1",
+    "case": "weather-1x1",
+    "inner": {
+      "w": 142,
+      "h": 142
+    },
+    "primary": null,
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "4px 4px 4px 4px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "12:配置 Key"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "weather",
+    "size": "2x1",
+    "case": "weather-2x1",
+    "inner": {
+      "w": 308,
+      "h": 142
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": null,
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "weather",
+    "size": "2x2",
+    "case": "weather-2x2",
+    "inner": {
+      "w": 308,
+      "h": 308
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "现在",
+      "px": 10,
+      "lh": 20,
+      "ratio": 2,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1dm2tgb"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": null,
+    "hourlyLabel": {
+      "text": "现在",
+      "px": 10,
+      "lh": 20,
+      "ratio": 2,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1dm2tgb"
+    },
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 16,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "10:现在",
+      "14:26°",
+      "10:12:00",
+      "14:26°",
+      "10:13:00",
+      "14:26°",
+      "10:14:00",
+      "14:28°",
+      "10:15:00",
+      "14:26°",
+      "10:16:00",
+      "14:26°"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "weather",
+    "size": "3x2",
+    "case": "weather-3x2",
+    "inner": {
+      "w": 474,
+      "h": 308
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16
+    ],
+    "textCount": 18,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "12:今天",
+      "16:26°",
+      "12:明天",
+      "16:29°",
+      "12:周三",
+      "16:27°",
+      "12:周四",
+      "16:27°",
+      "12:周五",
+      "16:27°",
+      "12:周六",
+      "16:27°",
+      "12:周日",
+      "16:29°"
+    ]
+  },
+  {
+    "viewport": "1024x768",
+    "pluginId": "weather",
+    "size": "4x2",
+    "case": "weather-4x2",
+    "inner": {
+      "w": 640,
+      "h": 308
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": {
+      "text": "AQI",
+      "px": 10,
+      "lh": 10.5,
+      "ratio": 1.05,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___15z5403"
+    },
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      10,
+      12,
+      14,
+      16
+    ],
+    "textCount": 28,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "16:71",
+      "10:AQI",
+      "12:良",
+      "12:今天",
+      "14:26°",
+      "14:15°",
+      "12:明天",
+      "14:29°",
+      "14:17°",
+      "12:周三",
+      "14:27°",
+      "14:16°",
+      "12:周四",
+      "14:27°",
+      "14:17°",
+      "12:周五",
+      "14:27°",
+      "14:17°",
+      "12:周六",
+      "14:27°",
+      "14:16°",
+      "12:周日",
+      "14:29°",
+      "14:17°"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "clock",
+    "size": "1x1",
+    "case": "clock-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "11:36",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      40
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "40:11:36"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "clock",
+    "size": "2x1",
+    "case": "clock-2x1",
+    "inner": {
+      "w": 286,
+      "h": 131
+    },
+    "primary": {
+      "text": "11:36",
+      "px": 40,
+      "lh": 52,
+      "ratio": 1.3,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gju2190"
+    },
+    "secondary": {
+      "text": "10月19日 星期一",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "18",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___1virlwc"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "40:11:36",
+      "14:18",
+      "14:10月19日 星期一"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "clock",
+    "size": "3x2",
+    "case": "clock-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": {
+      "text": "11:36",
+      "px": 68,
+      "lh": 92,
+      "ratio": 1.35,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___iua35l0"
+    },
+    "secondary": {
+      "text": "10月19日 · 星期一",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___lxrhoz0"
+    },
+    "tertiary": {
+      "text": "18",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___dmquwe0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "12px",
+    "fontSizes": [
+      16,
+      68
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "68:11:36",
+      "16:18",
+      "16:10月19日 · 星期一"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "countdown",
+    "size": "1x1",
+    "case": "countdown-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "就是今天",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___c086640"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "0px",
+    "fontSizes": [
+      12
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:就是今天",
+      "12:产品发布"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "countdown",
+    "size": "2x1",
+    "case": "countdown-2x1",
+    "inner": {
+      "w": 286,
+      "h": 131
+    },
+    "primary": {
+      "text": "今天",
+      "px": 32,
+      "lh": 40,
+      "ratio": 1.25,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___2ixqtu0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      16,
+      32
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "16:产品发布",
+      "32:今天"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "countdown",
+    "size": "2x2",
+    "case": "countdown-2x2",
+    "inner": {
+      "w": 286,
+      "h": 286
+    },
+    "primary": {
+      "text": "今天",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___46ohwc0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1g6lu38"
+    },
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14,
+      16
+    ],
+    "textCount": 8,
+    "sampleTexts": [
+      "14:产品发布",
+      "16:今天",
+      "14:项目终期评审会",
+      "16:还有 12 天",
+      "14:春节回家",
+      "16:还有 110 天",
+      "14:结婚纪念日",
+      "16:还有 213 天"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "countdown",
+    "size": "3x2",
+    "case": "countdown-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": {
+      "text": "今天",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorPaletteRedForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___4y29by0"
+    },
+    "secondary": {
+      "text": "产品发布",
+      "px": 16,
+      "lh": 22,
+      "ratio": 1.38,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___rrfi3i0"
+    },
+    "tertiary": {
+      "text": "倒数日",
+      "px": 20,
+      "lh": 28,
+      "ratio": 1.4,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___16pfnek"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      16,
+      20
+    ],
+    "textCount": 12,
+    "sampleTexts": [
+      "20:倒数日",
+      "12:5 项",
+      "16:产品发布",
+      "20:今天",
+      "16:项目终期评审会",
+      "20:还有 12 天",
+      "16:春节回家",
+      "20:还有 110 天",
+      "16:结婚纪念日",
+      "20:还有 213 天",
+      "16:年度体检",
+      "20:已过 3 天"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "pomodoro",
+    "size": "1x1",
+    "case": "pomodoro-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1yk799n"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      40
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "40:25:00"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "pomodoro",
+    "size": "2x1",
+    "case": "pomodoro-2x1",
+    "inner": {
+      "w": 286,
+      "h": 131
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": null,
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "12px",
+    "fontSizes": [
+      12,
+      68
+    ],
+    "textCount": 2,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "pomodoro",
+    "size": "2x2",
+    "case": "pomodoro-2x2",
+    "inner": {
+      "w": 286,
+      "h": 286
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "pomodoro",
+    "size": "3x2",
+    "case": "pomodoro-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": {
+      "text": "25:00",
+      "px": 68,
+      "lh": 68,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1wny0ca"
+    },
+    "secondary": {
+      "text": "未关联任务",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___137p32e"
+    },
+    "tertiary": {
+      "text": "专注",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "600",
+      "color": "colorBrandForeground1",
+      "fvn": "normal",
+      "cls": "___lposll0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "8px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      68
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:专注",
+      "68:25:00",
+      "14:未关联任务",
+      "16:开始"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "sedentary",
+    "size": "1x1",
+    "case": "sedentary-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "1",
+      "px": 40,
+      "lh": 40,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___kvecof0"
+    },
+    "secondary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___5nx1ha0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      40
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "12:正常",
+      "40:1",
+      "14:分钟"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "sedentary",
+    "size": "2x1",
+    "case": "sedentary-2x1",
+    "inner": {
+      "w": 286,
+      "h": 131
+    },
+    "primary": {
+      "text": "1",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "距提醒还有 44 分钟",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___otttm10"
+    },
+    "tertiary": {
+      "text": "分钟",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___gczutb0"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      28
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:正常",
+      "28:1",
+      "12:分钟",
+      "12:距提醒还有 44 分钟"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "sedentary",
+    "size": "2x2",
+    "case": "sedentary-2x2",
+    "inner": {
+      "w": 286,
+      "h": 286
+    },
+    "primary": {
+      "text": "1",
+      "px": 28,
+      "lh": 28,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___17jv56q"
+    },
+    "secondary": {
+      "text": "距提醒还有 44 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "1 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      28
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "28:1",
+      "12:分钟",
+      "14:距提醒还有 44 分钟",
+      "12:今日久坐",
+      "14:1 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "sedentary",
+    "size": "3x2",
+    "case": "sedentary-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": {
+      "text": "1",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___gdymde0"
+    },
+    "secondary": {
+      "text": "距提醒还有 44 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___11sa4s1"
+    },
+    "tertiary": {
+      "text": "1 分钟",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "600",
+      "color": "colorNeutralForeground2",
+      "fvn": "tabular-nums",
+      "cls": "___15ff0os"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "16px 16px 16px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16,
+      32
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:正常",
+      "32:1",
+      "12:分钟",
+      "14:距提醒还有 44 分钟",
+      "12:今日久坐",
+      "14:1 分钟",
+      "12:起身次数",
+      "14:0 次",
+      "16:我起来了"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "todo",
+    "size": "1x1",
+    "case": "todo-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "5",
+      "px": 32,
+      "lh": 32,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___118tge5"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 12px 12px 12px",
+    "rootGap": "2px",
+    "fontSizes": [
+      12,
+      32
+    ],
+    "textCount": 3,
+    "sampleTexts": [
+      "32:5",
+      "12:未完成 · 今日 2",
+      "12:整理季度汇报材料"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "todo",
+    "size": "2x2",
+    "case": "todo-2x2",
+    "inner": {
+      "w": 286,
+      "h": 286
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 9,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:查看全部（ 5 ）"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "todo",
+    "size": "3x2",
+    "case": "todo-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 10,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "todo",
+    "size": "3x3",
+    "case": "todo-3x3",
+    "inner": {
+      "w": 441,
+      "h": 441
+    },
+    "primary": null,
+    "secondary": {
+      "text": "最近",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___1bw8k0o"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 13,
+    "sampleTexts": [
+      "14:今日",
+      "14:最近",
+      "12:今天 · 10月19日",
+      "12:2",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "12:明天",
+      "12:2",
+      "14:修复天气插件图标错位",
+      "14:读完《设计中的设计》第三章",
+      "14:添加"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "todo",
+    "size": "4x2",
+    "case": "todo-4x2",
+    "inner": {
+      "w": 596,
+      "h": 286
+    },
+    "primary": null,
+    "secondary": {
+      "text": "整理季度汇报材料",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground1",
+      "fvn": "normal",
+      "cls": "___5onnuy0"
+    },
+    "tertiary": {
+      "text": "18:00",
+      "px": 10,
+      "lh": 14,
+      "ratio": 1.4,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___11r6f1q"
+    },
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 8px 8px 8px",
+    "rootGap": "2px",
+    "fontSizes": [
+      10,
+      12,
+      14
+    ],
+    "textCount": 14,
+    "sampleTexts": [
+      "12:工作",
+      "12:5",
+      "12:未完成",
+      "12:5",
+      "14:整理季度汇报材料",
+      "10:18:00",
+      "14:和设计确认卡片字号方案",
+      "10:18:00",
+      "14:修复天气插件图标错位",
+      "14:预约牙科复诊",
+      "14:读完《设计中的设计》第三章",
+      "12:已完成",
+      "12:1",
+      "14:给番茄钟补周末统计"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "weather",
+    "size": "1x1",
+    "case": "weather-1x1",
+    "inner": {
+      "w": 131,
+      "h": 131
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "4px 4px 4px 4px",
+    "rootGap": "4px",
+    "fontSizes": [
+      14
+    ],
+    "textCount": 1,
+    "sampleTexts": [
+      "14:24°"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "weather",
+    "size": "2x1",
+    "case": "weather-2x1",
+    "inner": {
+      "w": 286,
+      "h": 131
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": null,
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "weather",
+    "size": "2x2",
+    "case": "weather-2x2",
+    "inner": {
+      "w": 286,
+      "h": 286
+    },
+    "primary": null,
+    "secondary": null,
+    "tertiary": null,
+    "city": null,
+    "condition": null,
+    "hilo": null,
+    "dailyLabel": null,
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "8px 12px 8px 12px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      16
+    ],
+    "textCount": 4,
+    "sampleTexts": [
+      "16:未配置和风天气 API Key",
+      "12:在设置里填入 API Key 与 API Host 后即可显示实时天气。没有 Key 时也可以先用内置演示数据预览。",
+      "16:去设置填 Key",
+      "16:使用演示数据"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "weather",
+    "size": "3x2",
+    "case": "weather-3x2",
+    "inner": {
+      "w": 441,
+      "h": 286
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": null,
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      12,
+      14,
+      16
+    ],
+    "textCount": 18,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "12:今天",
+      "16:26°",
+      "12:明天",
+      "16:29°",
+      "12:周三",
+      "16:27°",
+      "12:周四",
+      "16:27°",
+      "12:周五",
+      "16:27°",
+      "12:周六",
+      "16:27°",
+      "12:周日",
+      "16:29°"
+    ]
+  },
+  {
+    "viewport": "960x1440",
+    "pluginId": "weather",
+    "size": "4x2",
+    "case": "weather-4x2",
+    "inner": {
+      "w": 596,
+      "h": 286
+    },
+    "primary": {
+      "text": "24°",
+      "px": 14,
+      "lh": 14,
+      "ratio": 1,
+      "weight": "600",
+      "color": "colorNeutralForeground1",
+      "fvn": "tabular-nums",
+      "cls": "___1d3135l"
+    },
+    "secondary": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "tertiary": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "city": {
+      "text": "北京",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___1omz8a2"
+    },
+    "condition": {
+      "text": "雷阵雨",
+      "px": 14,
+      "lh": 20,
+      "ratio": 1.43,
+      "weight": "400",
+      "color": "colorNeutralForeground2",
+      "fvn": "normal",
+      "cls": "___ds1xlm0"
+    },
+    "hilo": {
+      "text": "26° / 15°",
+      "px": 12,
+      "lh": 16,
+      "ratio": 1.33,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "tabular-nums",
+      "cls": "___vrlefm0"
+    },
+    "dailyLabel": {
+      "text": "今天",
+      "px": 12,
+      "lh": 20,
+      "ratio": 1.67,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___42ixem0"
+    },
+    "hourlyLabel": null,
+    "aqiLabel": {
+      "text": "AQI",
+      "px": 10,
+      "lh": 10.5,
+      "ratio": 1.05,
+      "weight": "400",
+      "color": "colorNeutralForeground3",
+      "fvn": "normal",
+      "cls": "___15z5403"
+    },
+    "rootPad": "12px 16px 12px 16px",
+    "rootGap": "4px",
+    "fontSizes": [
+      10,
+      12,
+      14,
+      16
+    ],
+    "textCount": 28,
+    "sampleTexts": [
+      "12:北京",
+      "14:24°",
+      "14:雷阵雨",
+      "12:26° / 15°",
+      "16:71",
+      "10:AQI",
+      "12:良",
+      "12:今天",
+      "14:26°",
+      "14:15°",
+      "12:明天",
+      "14:29°",
+      "14:17°",
+      "12:周三",
+      "14:27°",
+      "14:16°",
+      "12:周四",
+      "14:27°",
+      "14:17°",
+      "12:周五",
+      "14:27°",
+      "14:17°",
+      "12:周六",
+      "14:27°",
+      "14:16°",
+      "12:周日",
+      "14:29°",
+      "14:17°"
+    ]
+  }
+]

@@ -1,0 +1,128 @@
+{
+  "viewport": {
+    "w": 474,
+    "h": 308
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 474,
+    "h": 308
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 474,
+    "sh": 308,
+    "cw": 474,
+    "ch": 308
+  },
+  "texts": [
+    {
+      "text": "11:09",
+      "tag": "span",
+      "cls": "fui-Text ___iua35l0 fk6fouc",
+      "fs": 68,
+      "fw": "600",
+      "lh": "92px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 143.7,
+        "y": 91,
+        "w": 167.4,
+        "h": 92
+      },
+      "aria": "",
+      "contrast": 16.1
+    },
+    {
+      "text": "11",
+      "tag": "span",
+      "cls": "fui-Text ___dmquwe0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 313.1,
+        "y": 148,
+        "w": 17.3,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 7.18
+    },
+    {
+      "text": "10月19日 · 星期一",
+      "tag": "span",
+      "cls": "fui-Text ___lxrhoz0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 173.6,
+        "y": 195,
+        "w": 126.7,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 11.08
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 3,
+    "graphicCount": 0,
+    "maxFs": 68,
+    "minFs": 16,
+    "fonts": {
+      "16": 2,
+      "68": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 0,
+    "coveragePct": 15.4,
+    "rowStats": {
+      "maxGapPx": 90,
+      "maxGapFrom": 0,
+      "maxGapTo": 88,
+      "topGapPx": 90,
+      "bottomGapPx": 88,
+      "contentFromPx": 90,
+      "contentToPx": 220
+    },
+    "colStats": {
+      "maxGapPx": 142,
+      "maxGapFrom": 0,
+      "maxGapTo": 140,
+      "topGapPx": 142,
+      "bottomGapPx": 140,
+      "contentFromPx": 142,
+      "contentToPx": 334
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    33,
+    33,
+    33
+  ],
+  "plugin": "clock",
+  "sizeKey": "3x2",
+  "resolution": "1024x768",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 474,
+    "h": 308
+  },
+  "gridCell": 154
+}

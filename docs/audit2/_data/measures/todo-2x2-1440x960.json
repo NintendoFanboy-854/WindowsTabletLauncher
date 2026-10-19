@@ -1,0 +1,273 @@
+{
+  "viewport": {
+    "w": 360,
+    "h": 360
+  },
+  "card": {
+    "x": 16,
+    "y": 16,
+    "w": 328,
+    "h": 328
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 360,
+    "sh": 360,
+    "cw": 360,
+    "ch": 360
+  },
+  "texts": [
+    {
+      "text": "整理产品周报，把本周评审结论同步给设计组",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 44,
+        "w": 232.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "和设计评审 Fluent 动效 token",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 84,
+        "w": 226,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "提交上周差旅报销单",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 124,
+        "w": 226,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "准备下周一的方案初稿",
+      "tag": "span",
+      "cls": "fui-Text ___5onnuy0 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 52,
+        "y": 164,
+        "w": 236,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "查看全部（ 8 ）",
+      "tag": "button",
+      "cls": "fui-Button r1f29ykk ___1g337ic",
+      "fs": 14,
+      "fw": "600",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 105.1,
+        "y": 200,
+        "w": 117.8,
+        "h": 40
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "工作",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 8,
+        "y": 8,
+        "w": 24,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "8",
+      "tag": "span",
+      "cls": "fui-Text ___5yj2er0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(153, 153, 153)",
+      "opacity": 1,
+      "rect": {
+        "x": 40,
+        "y": 8,
+        "w": 6.5,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 5.11
+    },
+    {
+      "text": "17:00",
+      "tag": "span",
+      "cls": "fui-Text ___11r6f1q fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 292.3,
+        "y": 47,
+        "w": 23.7,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 286,
+        "y": 87,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 8.71
+    },
+    {
+      "text": "已逾期",
+      "tag": "span",
+      "cls": "fui-Text ___1wshuje fk6fouc",
+      "fs": 10,
+      "fw": "400",
+      "lh": "14px",
+      "ls": "normal",
+      "color": "rgb(241, 187, 188)",
+      "opacity": 1,
+      "rect": {
+        "x": 286,
+        "y": 127,
+        "w": 30,
+        "h": 14
+      },
+      "aria": "",
+      "contrast": 8.71
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 296,
+        "y": 164,
+        "w": 20,
+        "h": 20
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 10,
+    "graphicCount": 1,
+    "maxFs": 14,
+    "minFs": 10,
+    "fonts": {
+      "10": 3,
+      "12": 2,
+      "14": 5
+    },
+    "under10": 0,
+    "under12": 3,
+    "under14": 5,
+    "coveragePct": 29.6,
+    "rowStats": {
+      "maxGapPx": 86,
+      "maxGapFrom": 242,
+      "maxGapTo": 326,
+      "topGapPx": 8,
+      "bottomGapPx": 86,
+      "contentFromPx": 8,
+      "contentToPx": 242
+    },
+    "colStats": {
+      "maxGapPx": 10,
+      "maxGapFrom": 318,
+      "maxGapTo": 326,
+      "topGapPx": 8,
+      "bottomGapPx": 10,
+      "contentFromPx": 8,
+      "contentToPx": 318
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "todo",
+  "sizeKey": "2x2",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 328,
+    "h": 328
+  },
+  "gridCell": 164
+}

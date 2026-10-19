@@ -1,0 +1,311 @@
+{
+  "viewport": {
+    "w": 474,
+    "h": 308
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 474,
+    "h": 308
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 474,
+    "sh": 308,
+    "cw": 474,
+    "ch": 308
+  },
+  "texts": [
+    {
+      "text": "倒数日",
+      "tag": "span",
+      "cls": "fui-Text ___16pfnek fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 16,
+        "y": 22,
+        "w": 60,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "今天",
+      "tag": "span",
+      "cls": "fui-Text ___4y29by0 fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 409,
+        "y": 70,
+        "w": 40,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 5.2
+    },
+    {
+      "text": "还有 3 天",
+      "tag": "span",
+      "cls": "fui-Text ___4y29by0 fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 366.9,
+        "y": 110,
+        "w": 82.1,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "还有 45 天",
+      "tag": "span",
+      "cls": "fui-Text ___4y29by0 fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(198, 177, 222)",
+      "opacity": 1,
+      "rect": {
+        "x": 355.8,
+        "y": 150,
+        "w": 93.2,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 7.44
+    },
+    {
+      "text": "还有 175 天",
+      "tag": "span",
+      "cls": "fui-Text ___4y29by0 fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(84, 176, 84)",
+      "opacity": 1,
+      "rect": {
+        "x": 345.1,
+        "y": 190,
+        "w": 103.9,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 5.34
+    },
+    {
+      "text": "已过 20 天",
+      "tag": "span",
+      "cls": "fui-Text ___4y29by0 fk6fouc",
+      "fs": 20,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(169, 211, 242)",
+      "opacity": 1,
+      "rect": {
+        "x": 355.8,
+        "y": 230,
+        "w": 93.2,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 9.2
+    },
+    {
+      "text": "结婚纪念日",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 25,
+        "y": 73,
+        "w": 376,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "项目截止",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 25,
+        "y": 113,
+        "w": 333.9,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "期末考试",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 25,
+        "y": 153,
+        "w": 322.8,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "妈妈生日",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 25,
+        "y": 193,
+        "w": 312.1,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "搬家",
+      "tag": "span",
+      "cls": "fui-Text ___rrfi3i0 fk6fouc",
+      "fs": 16,
+      "fw": "400",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 25,
+        "y": 233,
+        "w": 322.8,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "5 项",
+      "tag": "span",
+      "cls": "fui-Text ___b04cup0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 84,
+        "y": 31,
+        "w": 21.8,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    }
+  ],
+  "graphics": [
+    {
+      "tag": "svg",
+      "cls": "",
+      "rect": {
+        "x": 428,
+        "y": 26,
+        "w": 20,
+        "h": 20
+      }
+    }
+  ],
+  "stats": {
+    "textCount": 12,
+    "graphicCount": 1,
+    "maxFs": 20,
+    "minFs": 12,
+    "fonts": {
+      "12": 1,
+      "16": 5,
+      "20": 6
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 1,
+    "coveragePct": 46.3,
+    "rowStats": {
+      "maxGapPx": 48,
+      "maxGapFrom": 260,
+      "maxGapTo": 306,
+      "topGapPx": 22,
+      "bottomGapPx": 48,
+      "contentFromPx": 22,
+      "contentToPx": 260
+    },
+    "colStats": {
+      "maxGapPx": 22,
+      "maxGapFrom": 452,
+      "maxGapTo": 472,
+      "topGapPx": 16,
+      "bottomGapPx": 22,
+      "contentFromPx": 16,
+      "contentToPx": 452
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "countdown",
+  "sizeKey": "3x2",
+  "resolution": "1024x768",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 474,
+    "h": 308
+  },
+  "gridCell": 154
+}

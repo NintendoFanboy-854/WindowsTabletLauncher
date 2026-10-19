@@ -1,0 +1,147 @@
+{
+  "viewport": {
+    "w": 328,
+    "h": 152
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 328,
+    "h": 152
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 328,
+    "sh": 152,
+    "cw": 328,
+    "ch": 152
+  },
+  "texts": [
+    {
+      "text": "52",
+      "tag": "span",
+      "cls": "fui-Text ___17jv56q fk6fouc",
+      "fs": 28,
+      "fw": "600",
+      "lh": "28px",
+      "ls": "normal",
+      "color": "rgb(255, 255, 255)",
+      "opacity": 1,
+      "rect": {
+        "x": 132.5,
+        "y": 66,
+        "w": 31.1,
+        "h": 28
+      },
+      "aria": "",
+      "contrast": 14.55
+    },
+    {
+      "text": "已超阈值",
+      "tag": "div",
+      "cls": "fui-Badge r1iycov ___1r2jx3n",
+      "fs": 12,
+      "fw": "600",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 134,
+        "y": 38,
+        "w": 60,
+        "h": 24
+      },
+      "aria": "状态：已超阈值",
+      "contrast": 5.2
+    },
+    {
+      "text": "分钟",
+      "tag": "span",
+      "cls": "fui-Text ___gczutb0 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 171.5,
+        "y": 78,
+        "w": 24,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    },
+    {
+      "text": "已超过提醒阈值，起来活动一下",
+      "tag": "span",
+      "cls": "fui-Text ___otttm10 fk6fouc",
+      "fs": 12,
+      "fw": "400",
+      "lh": "16px",
+      "ls": "normal",
+      "color": "rgb(173, 173, 173)",
+      "opacity": 1,
+      "rect": {
+        "x": 80,
+        "y": 98,
+        "w": 168,
+        "h": 16
+      },
+      "aria": "",
+      "contrast": 6.48
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 4,
+    "graphicCount": 0,
+    "maxFs": 28,
+    "minFs": 12,
+    "fonts": {
+      "12": 3,
+      "28": 1
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 3,
+    "coveragePct": 15.9,
+    "rowStats": {
+      "maxGapPx": 38,
+      "maxGapFrom": 0,
+      "maxGapTo": 36,
+      "topGapPx": 38,
+      "bottomGapPx": 36,
+      "contentFromPx": 38,
+      "contentToPx": 116
+    },
+    "colStats": {
+      "maxGapPx": 80,
+      "maxGapFrom": 0,
+      "maxGapTo": 78,
+      "topGapPx": 80,
+      "bottomGapPx": 78,
+      "contentFromPx": 80,
+      "contentToPx": 250
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "sedentary",
+  "sizeKey": "2x1",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 328,
+    "h": 152
+  },
+  "gridCell": 164
+}

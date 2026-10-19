@@ -1,0 +1,223 @@
+{
+  "viewport": {
+    "w": 328,
+    "h": 328
+  },
+  "card": {
+    "x": 0,
+    "y": 0,
+    "w": 328,
+    "h": 328
+  },
+  "bodyBg": "rgb(33, 33, 33)",
+  "rootBg": "rgb(33, 33, 33)",
+  "scroll": {
+    "sw": 328,
+    "sh": 328,
+    "cw": 328,
+    "ch": 328
+  },
+  "texts": [
+    {
+      "text": "今天",
+      "tag": "span",
+      "cls": "fui-Text ___46ohwc0 fk6fouc",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(227, 125, 128)",
+      "opacity": 1,
+      "rect": {
+        "x": 275,
+        "y": 93,
+        "w": 32,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 5.2
+    },
+    {
+      "text": "还有 3 天",
+      "tag": "span",
+      "cls": "fui-Text ___46ohwc0 fk6fouc",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 241.3,
+        "y": 133,
+        "w": 65.7,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "还有 45 天",
+      "tag": "span",
+      "cls": "fui-Text ___46ohwc0 fk6fouc",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(198, 177, 222)",
+      "opacity": 1,
+      "rect": {
+        "x": 232.4,
+        "y": 173,
+        "w": 74.6,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 7.44
+    },
+    {
+      "text": "还有 175 天",
+      "tag": "span",
+      "cls": "fui-Text ___46ohwc0 fk6fouc",
+      "fs": 16,
+      "fw": "600",
+      "lh": "22px",
+      "ls": "normal",
+      "color": "rgb(84, 176, 84)",
+      "opacity": 1,
+      "rect": {
+        "x": 223.9,
+        "y": 213,
+        "w": 83.1,
+        "h": 22
+      },
+      "aria": "",
+      "contrast": 5.34
+    },
+    {
+      "text": "结婚纪念日",
+      "tag": "span",
+      "cls": "fui-Text ___1g6lu38 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 21,
+        "y": 94,
+        "w": 246,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "项目截止",
+      "tag": "span",
+      "cls": "fui-Text ___1g6lu38 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 21,
+        "y": 134,
+        "w": 212.3,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "期末考试",
+      "tag": "span",
+      "cls": "fui-Text ___1g6lu38 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 21,
+        "y": 174,
+        "w": 203.4,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    },
+    {
+      "text": "妈妈生日",
+      "tag": "span",
+      "cls": "fui-Text ___1g6lu38 fk6fouc",
+      "fs": 14,
+      "fw": "400",
+      "lh": "20px",
+      "ls": "normal",
+      "color": "rgb(214, 214, 214)",
+      "opacity": 1,
+      "rect": {
+        "x": 21,
+        "y": 214,
+        "w": 194.9,
+        "h": 20
+      },
+      "aria": "",
+      "contrast": 10.01
+    }
+  ],
+  "graphics": [],
+  "stats": {
+    "textCount": 8,
+    "graphicCount": 0,
+    "maxFs": 16,
+    "minFs": 14,
+    "fonts": {
+      "14": 4,
+      "16": 4
+    },
+    "under10": 0,
+    "under12": 0,
+    "under14": 0,
+    "coveragePct": 30.4,
+    "rowStats": {
+      "maxGapPx": 92,
+      "maxGapFrom": 0,
+      "maxGapTo": 90,
+      "topGapPx": 92,
+      "bottomGapPx": 90,
+      "contentFromPx": 92,
+      "contentToPx": 238
+    },
+    "colStats": {
+      "maxGapPx": 20,
+      "maxGapFrom": 0,
+      "maxGapTo": 18,
+      "topGapPx": 20,
+      "bottomGapPx": 18,
+      "contentFromPx": 20,
+      "contentToPx": 310
+    },
+    "overflow": []
+  },
+  "bgSample": [
+    41,
+    41,
+    41
+  ],
+  "plugin": "countdown",
+  "sizeKey": "2x2",
+  "resolution": "1440x960",
+  "mode": "standalone-injected-bg",
+  "injectedBg": "#212121",
+  "expectedIframe": {
+    "w": 328,
+    "h": 328
+  },
+  "gridCell": 164
+}
