@@ -10,6 +10,7 @@
  */
 
 import type { WidgetInstance, WidgetSize } from '../bridge/types';
+import { normalizeSettingsSchema } from './settings';
 import type { NormalizedPlugin, NormalizedWidget } from './types';
 
 const ID_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -91,6 +92,10 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
         !!widget && typeof widget === 'object' && (widget as Record<string, unknown>).background === true,
     );
 
+  // 设置 schema 与组件无关；坏字段在 normalizeSettingsSchema 里跳过并记录，
+  // 让设置页显示「暂不支持」而不是把整份配置写坏。
+  const settings = normalizeSettingsSchema(record.settings);
+
   return {
     id,
     name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : id,
@@ -98,6 +103,7 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
     background,
     dir,
     widgets,
+    ...(settings ? { settings } : {}),
   };
 }
 

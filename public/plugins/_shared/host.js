@@ -257,6 +257,17 @@ export function requestSettings(title = '设置') {
   requestOverlay('settings', title);
 }
 
+/**
+ * 请求宿主导航到「设置页 → 插件 → 本插件」分区（契约 §5）。
+ * 插件不需要知道宿主路由；宿主按消息来源的 pluginId 选中对应分区，
+ * 分区内容由 manifest.json 的 settings schema 通用渲染。
+ *
+ * 新插件统一用这个入口；`host:open-settings` 旧通道仅保留兼容。
+ */
+export function requestHostSettings() {
+  window.parent.postMessage({ type: 'plugin:request-host-settings' }, '*');
+}
+
 // 浮层视图里按 Esc：焦点在 iframe 内时宿主收不到按键，这里主动请求宿主关闭浮层。
 // （卡片视图不装这个监听，Esc 仍交给宿主/插件自己的焦点逻辑。）
 if (typeof window !== 'undefined' && getOverlayView()) {

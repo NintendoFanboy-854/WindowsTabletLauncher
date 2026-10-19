@@ -10,7 +10,7 @@
  * 统计工具时显示空状态；单个插件失败只影响它自己那一块。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -24,6 +24,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 
+import { usePlugins } from '../../plugins';
 import { PageScaffold } from '../shared/PageScaffold';
 import { EmptyState } from '../shared/EmptyState';
 import { Heatmap } from './Heatmap';
@@ -145,7 +146,7 @@ function metricsOf(stat: ProviderRangeStats): Metric[] {
 }
 
 /** 一个插件在一个统计区间里的 Primary（主数值）+ 次要说明 */
-function ProviderBlock({ stat }: { stat: ProviderRangeStats }) {
+function ProviderBlock({ stat, label }: { stat: ProviderRangeStats; label: string }) {
   const styles = useStyles();
   const metrics = metricsOf(stat);
   const hasCompleted = typeof stat.completed === 'number';
@@ -153,7 +154,7 @@ function ProviderBlock({ stat }: { stat: ProviderRangeStats }) {
   return (
     <div className={styles.providerBlock}>
       <Text size={300} className={styles.providerLabel}>
-        {stat.label}
+        {label}
       </Text>
       {!stat.ok ? (
         <Text size={200} className={styles.errorText}>
@@ -186,10 +187,12 @@ function RangeCard({
   title,
   hint,
   stats,
+  pluginNames,
 }: {
   title: string;
   hint: string;
   stats: ProviderRangeStats[];
+  pluginNames: Record<string, string>;
 }) {
   const styles = useStyles();
   return (
@@ -206,7 +209,13 @@ function RangeCard({
             没有可用的统计工具
           </Text>
         ) : (
-          stats.map((stat) => <ProviderBlock key={`${stat.range}:${stat.tool}`} stat={stat} />)
+          stats.map((stat) => (
+            <ProviderBlock
+              key={`${stat.range}:${stat.tool}`}
+              stat={stat}
+              label={providerLabel(stat.provider, pluginNames)}
+            />
+          ))
         )}
       </div>
     </section>
@@ -215,6 +224,13 @@ function RangeCard({
 
 export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewPageProps) {
   const styles = useStyles();
+  const { plugins } = usePlugins();
+  /** 插件展示名只从 manifest.name 来（宿不写死插件 id/名称） */
+  const pluginNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const plugin of plugins) names[plugin.id] = plugin.name;
+    return names;
+  }, [plugins]);
   const [snapshot, setSnapshot] = useState<ReviewSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -254,7 +270,7 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
   const providers = snapshot
     ? Array.from(new Set(snapshot.tools)).map((tool) => {
         const provider = tool.split('.')[0] || tool;
-        return { provider, label: providerLabel(provider) };
+        return { provider, label: providerLabel(provider, pluginNames) };
       })
     : [];
 
@@ -353,8 +369,18 @@ export function ReviewPage({ bridge, onBack, onOpenAgent, sourceLabel }: ReviewP
               </div>
             </section>
 
-            <RangeCard title="本周" hint="周一到现在" stats={snapshot.ranges.week} />
-            <RangeCard title="本月" hint="本月 1 号到现在" stats={snapshot.ranges.month} />
+            <RangeCard
+              title="本周"
+              hint="周一到现在"
+              stats={snapshot.ranges.week}
+              pluginNames={pluginNames}
+            />
+            <RangeCard
+              title="本月"
+              hint="本月 1 号到现在"
+              stats={snapshot.ranges.month}
+              pluginNames={pluginNames}
+            />
 
             <section className={mergeClasses(styles.card, styles.wideCard)} aria-label="工作量热力图">
               <div className={styles.cardHead}>

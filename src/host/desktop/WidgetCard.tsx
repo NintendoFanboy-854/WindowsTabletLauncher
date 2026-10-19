@@ -69,6 +69,8 @@ export interface WidgetCardProps {
   onFocus(widget: WidgetInstance): void;
   onDelete(widget: WidgetInstance): void;
   onOpenSettings(widget: WidgetInstance): void;
+  /** 插件 iframe 请求打开宿主设置页的本插件分区（契约 §5） */
+  onRequestHostSettings(widget: WidgetInstance): void;
   onChangeSize(widget: WidgetInstance, size: WidgetSize): void;
   onEditPointerDown(event: ReactPointerEvent<HTMLDivElement>, widget: WidgetInstance): void;
   /** 把 iframe 句柄登记给桌面层（Enter 进入组件时用 FocusPlugin） */
@@ -92,6 +94,7 @@ export function WidgetCard({
   onFocus,
   onDelete,
   onOpenSettings,
+  onRequestHostSettings,
   onChangeSize,
   onEditPointerDown,
   registerFrameHandle,
@@ -184,6 +187,7 @@ export function WidgetCard({
           src={src}
           size={widget.size}
           notify={notify}
+          onRequestHostSettings={() => onRequestHostSettings(widget)}
         />
       </div>
 

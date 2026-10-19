@@ -26,7 +26,6 @@ export interface ProviderRangeStats {
   tool: string;
   /** 插件 id（工具名前缀，如 todo） */
   provider: string;
-  label: string;
   range: ReviewRange;
   ok: boolean;
   error?: string;
@@ -38,7 +37,6 @@ export interface ProviderRangeStats {
 
 export interface ProviderDailyStats {
   provider: string;
-  label: string;
   byDay: Record<string, number>;
 }
 
@@ -100,25 +98,24 @@ async function waitForStatsTools(
   }
 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  todo: '待办',
-  pomodoro: '番茄钟',
-  sedentary: '久坐',
-  clock: '时钟',
-  countdown: '倒数日',
-  weather: '天气',
-};
+/**
+ * 宿主不认识具体插件：展示名从 manifest.name 取。
+ * 插件名单由 ReviewPage 通过 PluginManager/usePlugins 传入（深链时也会随扫描结果更新）。
+ */
+export function providerLabel(provider: string, pluginNames?: Record<string, string>): string {
+  return pluginNames?.[provider] ?? provider;
+}
 
+/**
+ * 统计主值的量词。manifest 目前没有声明字段，这是纯展示口径（不参与插件识别）；
+ * 未知插件回落「条」。插件名不在这里，统一走 providerLabel（manifest.name）。
+ */
 const PROVIDER_UNITS: Record<string, string> = {
   todo: '项任务',
   pomodoro: '轮专注',
   sedentary: '次',
   countdown: '个事件',
 };
-
-export function providerLabel(provider: string): string {
-  return PROVIDER_LABELS[provider] ?? provider;
-}
 
 export function completedUnit(provider: string): string {
   return PROVIDER_UNITS[provider] ?? '条';
@@ -278,7 +275,6 @@ export async function loadReviewSnapshot(
       const base: ProviderRangeStats = {
         tool: tool.name,
         provider,
-        label: providerLabel(provider),
         range,
         ok: outcome.ok,
       };
@@ -306,7 +302,7 @@ export async function loadReviewSnapshot(
     if (!record) return;
     const byDay = readByDay(record);
     if (!byDay || Object.keys(byDay).length === 0) return;
-    daily.push({ provider, label: providerLabel(provider), byDay });
+    daily.push({ provider, byDay });
     for (const [date, count] of Object.entries(byDay)) {
       merged[date] = (merged[date] ?? 0) + count;
     }

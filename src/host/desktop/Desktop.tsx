@@ -20,6 +20,7 @@ import {
   addPage,
   autoPlace,
   clampPage,
+  clearLayout,
   compareReadingOrder,
   layoutNeedsReflow,
   moveWidgetToPage,
@@ -70,6 +71,12 @@ export interface DesktopProps {
    * 旧行为里的“离开桌面 = 重挂载桌面”。
    */
   active?: boolean;
+  /** App 层「编辑桌面布局」请求（自增 token）：active 时进入编辑模式 */
+  editModeRequest?: number;
+  /** App 层「重置布局」请求（自增 token）：清除 wtsl.layout 后按 manifest 默认摆放重算 */
+  layoutResetRequest?: number;
+  /** 编辑模式「设置」/ Enter：交给 App 导航到设置页对应插件分区 */
+  onOpenPluginSettings?: (pluginId: string) => void;
 }
 
 interface SwipeSession {
@@ -234,6 +241,9 @@ export default function Desktop({
   manager: managerProp,
   bridge: bridgeProp,
   active = true,
+  editModeRequest,
+  layoutResetRequest,
+  onOpenPluginSettings,
 }: DesktopProps) {
   const styles = useStyles();
   const manager = managerProp ?? getPluginManager();
@@ -344,6 +354,8 @@ export default function Desktop({
     }
     return map;
   }, [plugins]);
+  const catalogRef = useRef(catalog);
+  catalogRef.current = catalog;
 
   useEffect(() => {
     if (pluginsLoading) return;
@@ -447,6 +459,37 @@ export default function Desktop({
     setSwipeOffset(null);
   }, [active]);
 
+  // App「外观 → 编辑桌面布局」：回到桌面后进入编辑模式（token 只在请求时变化）
+  const handledEditRequestRef = useRef(editModeRequest ?? 0);
+  useEffect(() => {
+    if (!active || editModeRequest === undefined) return;
+    if (editModeRequest === handledEditRequestRef.current) return;
+    handledEditRequestRef.current = editModeRequest;
+    enterEditMode();
+  }, [active, editModeRequest, enterEditMode]);
+
+  // App「外观 → 重置布局」：清掉持久化，按当前插件目录重新生成默认摆放。
+  // 桌面在非桌面页也保持挂载，所以设置页里点重置会立刻生效（无需切换页面）。
+  const handledResetRequestRef = useRef(layoutResetRequest ?? 0);
+  useEffect(() => {
+    if (layoutResetRequest === undefined) return;
+    if (layoutResetRequest === handledResetRequestRef.current) return;
+    handledResetRequestRef.current = layoutResetRequest;
+    if (catalogRef.current.size === 0) return;
+    clearLayout();
+    setDragView(null);
+    setEditMode(false);
+    setFocusedUid(null);
+    setLayout(
+      reconcileLayout(
+        null,
+        catalogRef.current,
+        metricsRef.current.columns,
+        metricsRef.current.rows,
+      ),
+    );
+  }, [layoutResetRequest]);
+
   const changePage = useCallback((delta: number) => {
     setLayout((previous) =>
       previous ? setActivePage(previous, previous.activePage + delta) : previous,
@@ -498,17 +541,28 @@ export default function Desktop({
   );
 
   /**
-   * 编辑模式的「设置」/ Enter：不弹宿主占位 Dialog，直接把 host:open-settings 转发给插件，
-   * 由插件打开它自己的设置面板（clock 抽屉 / pomodoro 对话框等）。
+   * 编辑模式「设置」/ Enter：导航到宿主设置页对应插件分区（契约 §5）。
+   * 不再向插件转发 host:open-settings：插件设置统一在宿主渲染。
    */
-  const openPluginSettings = useCallback((widget: WidgetInstance) => {
-    setFocusedUid(widget.uid);
-    const handle = frameHandlesRef.current.get(widget.uid);
-    if (!handle) return;
-    handle.openSettings();
-    // 焦点交给插件，让设置面板里的键盘操作（含插件自己的 Esc 关闭）生效
-    handle.focusPlugin();
-  }, []);
+  const openPluginSettings = useCallback(
+    (widget: WidgetInstance) => {
+      setFocusedUid(widget.uid);
+      if (onOpenPluginSettings) {
+        onOpenPluginSettings(widget.pluginId);
+        return;
+      }
+      notify('宿主设置页未接入，无法打开插件设置');
+    },
+    [notify, onOpenPluginSettings],
+  );
+
+  /** 插件 iframe 的 `plugin:request-host-settings`（卡片或浮层任意视图）→ 同一入口 */
+  const handleHostSettingsRequest = useCallback(
+    (widget: WidgetInstance) => {
+      onOpenPluginSettings?.(widget.pluginId);
+    },
+    [onOpenPluginSettings],
+  );
 
   // ---------- 焦点移动 ----------
 
@@ -983,6 +1037,7 @@ export default function Desktop({
                       onFocus={handleCardFocus}
                       onDelete={deleteWidget}
                       onOpenSettings={openPluginSettings}
+                      onRequestHostSettings={handleHostSettingsRequest}
                       onChangeSize={changeWidgetSize}
                       onEditPointerDown={beginEditDrag}
                       registerFrameHandle={registerFrameHandle}

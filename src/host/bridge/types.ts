@@ -119,11 +119,17 @@ export interface PluginFocusExitMessage {
   type: 'plugin:focus-exit';
 }
 
+/** 插件请求打开宿主设置页里的本插件分区（契约 §5） */
+export interface PluginRequestHostSettingsMessage {
+  type: 'plugin:request-host-settings';
+}
+
 export type PluginToHostMessage =
   | PluginReadyMessage
   | PluginCallMessage
   | PluginToolResultMessage
-  | PluginFocusExitMessage;
+  | PluginFocusExitMessage
+  | PluginRequestHostSettingsMessage;
 
 // ---------- API 参数/返回值 ----------
 
@@ -169,6 +175,65 @@ export interface WidgetManifest {
   cell?: WidgetSize;
 }
 
+// ---------- manifest settings schema（契约 §2.1） ----------
+
+/** v1 支持的设置字段类型；宿主不认识其它类型 */
+export type SettingFieldType = 'boolean' | 'number' | 'enum' | 'text' | 'timeRange';
+
+/**
+ * enum 选项值允许数字：如「一周起始日」用 0/1、「刷新间隔」用 15/30/60。
+ * 宿主写配置时按原类型写回，不把数字转成字符串。
+ */
+export type SettingOptionValue = string | number;
+
+export interface SettingOption {
+  value: SettingOptionValue;
+  label: string;
+}
+
+export interface TimeRangeValue {
+  start: string;
+  end: string;
+}
+
+export type SettingValue = boolean | number | string | TimeRangeValue;
+
+/** manifest.json 里声明的设置字段（未归一化：default/options 可能缺失或不合法） */
+export interface SettingFieldManifest {
+  key: string;
+  type: SettingFieldType;
+  label: string;
+  /** 行内次要说明（12 fg3） */
+  description?: string;
+  default?: SettingValue;
+  /** number：取值范围与步长 */
+  min?: number;
+  max?: number;
+  step?: number;
+  /** number：显示在后缀的单位，如「分钟」 */
+  unit?: string;
+  /** enum：≤4 用横向 Radio，>4 用 Dropdown */
+  options?: SettingOption[];
+  /** text：占位符 / 密码态 / 最大长度 */
+  placeholder?: string;
+  secret?: boolean;
+  maxLength?: number;
+}
+
+export interface SettingGroupManifest {
+  id?: string;
+  title: string;
+  hint?: string;
+  fields: SettingFieldManifest[];
+}
+
+export interface PluginSettingsManifest {
+  /** 配置存储键：plugin.<pluginId>.<key>；缺省 settings */
+  key?: string;
+  version?: number;
+  groups: SettingGroupManifest[];
+}
+
 export interface PluginManifest {
   id: string;
   name: string;
@@ -176,6 +241,8 @@ export interface PluginManifest {
   /** 没有组件、只后台运行的插件 */
   background?: boolean;
   widgets: WidgetManifest[];
+  /** 声明式设置：宿主设置页据此渲染通用表单（插件不提供设置界面） */
+  settings?: PluginSettingsManifest;
 }
 
 /** 布局里保存的组件实例 */

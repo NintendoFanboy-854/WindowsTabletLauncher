@@ -1,6 +1,10 @@
 /** 时钟插件的设置模型与时间格式化（纯 JS，不依赖 React）。 */
 
-export const SETTINGS_KEY = 'clock.settings';
+/**
+ * 设置存储键。宿主桥接层会加插件命名空间：`plugin.<pluginId>.<key>`，
+ * 所以这里只用 `settings`（与 manifest `settings.key` 一致），不能写 `clock.settings`。
+ */
+export const SETTINGS_KEY = 'settings';
 
 export const DEFAULT_SETTINGS = {
   hour12: false,

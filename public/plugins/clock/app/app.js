@@ -14001,7 +14001,7 @@ function uc(e) {
 }
 //#endregion
 //#region public/plugins/clock/src/settings.js
-var dc = "clock.settings", fc = {
+var dc = "settings", fc = {
 	hour12: !1,
 	showSeconds: !0,
 	dateFormat: "zh"

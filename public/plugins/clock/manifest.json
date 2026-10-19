@@ -10,5 +10,43 @@
       "defaultSize": [2, 1],
       "cell": [0, 0]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "时间显示",
+        "hint": "只影响卡片与详情的显示方式",
+        "fields": [
+          {
+            "key": "hour12",
+            "type": "boolean",
+            "label": "12 小时制",
+            "description": "关闭时用 24 小时制",
+            "default": false
+          },
+          {
+            "key": "showSeconds",
+            "type": "boolean",
+            "label": "显示秒",
+            "description": "1×1 档位空间不足，按规格不显示秒",
+            "default": true
+          },
+          {
+            "key": "dateFormat",
+            "type": "enum",
+            "label": "日期格式",
+            "default": "zh",
+            "options": [
+              { "value": "zh", "label": "10月18日 星期日" },
+              { "value": "iso", "label": "2026-10-18" },
+              { "value": "en", "label": "10/18 Sun" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -115,6 +115,35 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
   const openAgent = useCallback(() => setAgentOpen(true), []);
 
   /**
+   * 设置页的目标插件分区。`plugin:request-host-settings` / 编辑模式「设置」都走这里；
+   * token 让“同一插件重复请求”也能重新选中（用户可能先手动切到了别的分区）。
+   */
+  const [settingsTarget, setSettingsTarget] = useState<{
+    pluginId: string | null;
+    token: number;
+  }>({ pluginId: null, token: 0 });
+  const openSettings = useCallback(
+    (pluginId: string | null = null) => {
+      setSettingsTarget((previous) => ({ pluginId, token: previous.token + 1 }));
+      navigate('settings');
+    },
+    [navigate],
+  );
+
+  /** 「外观 → 编辑桌面布局」：回桌面并让桌面层进入编辑模式 */
+  const [editModeRequest, setEditModeRequest] = useState(0);
+  const editDesktopLayout = useCallback(() => {
+    setEditModeRequest((token) => token + 1);
+    navigate('desktop');
+  }, [navigate]);
+
+  /** 「外观 → 重置布局」：桌面层清掉 wtsl.layout 后按 manifest 默认摆放重算 */
+  const [layoutResetRequest, setLayoutResetRequest] = useState(0);
+  const resetLayout = useCallback(() => {
+    setLayoutResetRequest((token) => token + 1);
+  }, []);
+
+  /**
    * 桌面层常驻后，切回桌面时用 replayKey 重放 PageTransition 的淡入。
    * 不能再用 `key={page}`：那会重挂载桌面，插件 iframe（工具调用接收方）跟着
    * 卸载、重建，iframe 数量也会增长。
@@ -142,6 +171,10 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
           themeMode={themeMode}
           onThemeModeChange={onThemeModeChange}
           onOpenAgent={openAgent}
+          initialPluginId={settingsTarget.pluginId}
+          settingsRequestToken={settingsTarget.token}
+          onEditDesktopLayout={editDesktopLayout}
+          onResetLayout={resetLayout}
         />
       );
       break;
@@ -169,12 +202,25 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
         inert={page !== 'desktop'}
       >
         <PageTransition replayKey={desktopReplayKey}>
-          <Desktop bridge={bridge} notify={notify} active={page === 'desktop'} />
+          <Desktop
+            bridge={bridge}
+            notify={notify}
+            active={page === 'desktop'}
+            editModeRequest={editModeRequest}
+            layoutResetRequest={layoutResetRequest}
+            onOpenPluginSettings={openSettings}
+          />
         </PageTransition>
       </div>
 
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
-      {page === 'desktop' && <DesktopDock navigate={navigate} onOpenAgent={openAgent} />}
+      {page === 'desktop' && (
+        <DesktopDock
+          onOpenSettings={() => openSettings()}
+          onOpenAgent={openAgent}
+          navigate={navigate}
+        />
+      )}
       <AgentSurface open={agentOpen} onOpenChange={setAgentOpen} hideFab />
     </div>
   );
@@ -182,11 +228,12 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
 
 interface DesktopDockProps {
   navigate: (page: HostPage) => void;
+  onOpenSettings: () => void;
   onOpenAgent: () => void;
 }
 
 /** 桌面右下入口：设置 / 复盘 / 插件 / Agent */
-function DesktopDock({ navigate, onOpenAgent }: DesktopDockProps) {
+function DesktopDock({ navigate, onOpenSettings, onOpenAgent }: DesktopDockProps) {
   return (
     <div className="desktop-dock" role="toolbar" aria-label="桌面入口">
       <Button size="small" appearance="subtle" onClick={onOpenAgent}>
@@ -198,7 +245,7 @@ function DesktopDock({ navigate, onOpenAgent }: DesktopDockProps) {
       <Button size="small" appearance="subtle" onClick={() => navigate('plugins')}>
         插件
       </Button>
-      <Button size="small" appearance="subtle" onClick={() => navigate('settings')}>
+      <Button size="small" appearance="subtle" onClick={onOpenSettings}>
         设置
       </Button>
     </div>

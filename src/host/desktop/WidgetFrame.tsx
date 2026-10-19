@@ -3,7 +3,7 @@
  * - 内部直接用插件管理器提供的 `PluginWidgetFrame`（协议收发、init/resize/theme 都在那里）；
  * - 把它接到宿主桥接层 `HostBridge`：注册 iframe 句柄（reply / focusPlugin / toolCall），
  *   插件 API 调用走 `bridge.handleApiCall`，`host:init` 的 config 用 `bridge.configSnapshot`；
- * - 对外暴露桌面层需要的能力：focusPlugin()（Enter 进组件）、openSettings()（编辑模式「设置」转发）。
+ * - 对外暴露桌面层需要的能力：focusPlugin()（Enter 进组件）。
  *
  * 旧原型插件的 `wtsl:notify` 也在这里兜住（老插件升级前仍能弹通知）。
  */
@@ -11,7 +11,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
 import { getHostBridge } from '../bridge';
 import type { HostBridge, PluginFrameHandle } from '../bridge';
 import type {
-  HostToPluginMessage,
   PluginCallMessage,
   PluginToHostMessage,
   ThemePayload,
@@ -24,8 +23,6 @@ import { useStyles } from './desktop.styles';
 export interface WidgetFrameHandle {
   /** 把键盘焦点交给插件（含 iframe 的 DOM 焦点） */
   focusPlugin(): void;
-  /** 让插件打开自己的设置面板（编辑模式「设置」按钮 / Enter 转发 host:open-settings） */
-  openSettings(): void;
 }
 
 interface WidgetFrameProps {
@@ -41,10 +38,23 @@ interface WidgetFrameProps {
   /** FluentProvider 现读的主题 token；不传 PluginWidgetFrame 会自己从 body 读（可能读不到 provider 变量） */
   theme?: ThemePayload;
   notify(text: string): void;
+  /** 插件请求打开宿主设置页的本插件分区（plugin:request-host-settings） */
+  onRequestHostSettings?: () => void;
 }
 
 export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(function WidgetFrame(
-  { bridge: bridgeProp, pluginId, widgetId, title, instanceUid, src, size, theme, notify },
+  {
+    bridge: bridgeProp,
+    pluginId,
+    widgetId,
+    title,
+    instanceUid,
+    src,
+    size,
+    theme,
+    notify,
+    onRequestHostSettings,
+  },
   ref,
 ) {
   const styles = useStyles();
@@ -110,11 +120,6 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
         frame.contentWindow?.focus();
         frame.focusPlugin();
       },
-      openSettings() {
-        // 插件协议里没有 host:open-settings 类型（types.ts 不扩），插件侧按原始 message 监听
-        const message = { type: 'host:open-settings' } as unknown as HostToPluginMessage;
-        frameRef.current?.send(message);
-      },
     }),
     [],
   );
@@ -132,6 +137,7 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
       title={title ?? `${pluginId} / ${widgetId}`}
       onApiCall={handleApiCall}
       onMessage={handleMessage}
+      onRequestHostSettings={onRequestHostSettings}
     />
   );
 });

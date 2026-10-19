@@ -72,6 +72,11 @@ export interface PluginWidgetFrameProps {
   onApiCall?: (message: PluginCallMessage, reply: HostApiReply) => void;
   /** 浮层视图 iframe 里按 Esc 时回调（由外层实例关闭浮层）；卡片实例不传 */
   onOverlayClose?: () => void;
+  /**
+   * 插件请求打开宿主设置页里的本插件分区（`plugin:request-host-settings`，契约 §5）。
+   * 由桌面层接线到 App 导航；浮层视图里同样生效。
+   */
+  onRequestHostSettings?: () => void;
   /** 不可见的常驻 iframe（后台插件用） */
   hidden?: boolean;
 }
@@ -167,6 +172,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       onMessage,
       onApiCall,
       onOverlayClose,
+      onRequestHostSettings,
       hidden = false,
     } = props;
 
@@ -256,6 +262,11 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           onOverlayClose?.();
           return;
         }
+        // 插件 → 宿主设置：任意视图都能请求，由 App 选中本插件分区（契约 §5）
+        if (rawType === 'plugin:request-host-settings') {
+          onRequestHostSettings?.();
+          return;
+        }
         // 插件请求全窗口浮层视图（D-02b：设置/详情是独立视图，宿主用 ?view=... 加载）
         if (rawType === 'plugin:request-overlay') {
           const payload = (data as unknown as { payload?: { view?: unknown; title?: unknown } }).payload;
@@ -292,7 +303,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       };
       window.addEventListener('message', onWindowMessage);
       return () => window.removeEventListener('message', onWindowMessage);
-    }, [onMessage, onApiCall, onOverlayClose, openOverlay, post]);
+    }, [onMessage, onApiCall, onOverlayClose, onRequestHostSettings, openOverlay, post]);
 
     useImperativeHandle(
       ref,
@@ -374,6 +385,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
                     className={settingsStyles.frame}
                     onApiCall={onApiCall}
                     onOverlayClose={() => setOverlay(null)}
+                    onRequestHostSettings={onRequestHostSettings}
                   />
                 </DialogContent>
               </DialogBody>

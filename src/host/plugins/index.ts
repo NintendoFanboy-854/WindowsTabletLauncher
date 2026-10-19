@@ -20,6 +20,19 @@ export { toError } from './errors';
 export { normalizeManifest, createDefaultInstances } from './manifest';
 export type { DefaultInstancesOptions } from './manifest';
 export {
+  cloneSettingDefault,
+  defaultSettingsValues,
+  isTimeRangeValue,
+  isTimeValue,
+  mergeSettingsValues,
+  normalizeSettingsSchema,
+  settingsFieldCount,
+  settingsFields,
+  validateSettingValue,
+  type SettingsMergeResult,
+  type SettingsValues,
+} from './settings';
+export {
   PluginManager,
   getPluginManager,
   type PluginManagerListener,
