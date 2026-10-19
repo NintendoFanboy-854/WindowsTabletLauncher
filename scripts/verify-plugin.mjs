@@ -416,7 +416,9 @@ async function openDesktopAndFindCard(cdp) {
   await cdp.setViewport(1440, 960);
   cdp.clearConsoleErrors();
   await cdp.navigate(new URL('/?page=desktop', baseUrl).href, { timeout: 30000 });
-  const iframeSelector = `iframe[src*="/plugins/${id}/"]`;
+  // 只认桌面卡片里的 iframe：background:true 插件还会挂一个 1×1 的隐藏后台 iframe
+  // （src 带 background=1），按 src 前缀直接 querySelector 会先选中它，导致尺寸断言永远失败。
+  const iframeSelector = `[data-widget-card] iframe[src*="/plugins/${id}/"]`;
   await cdp.waitFor(
     `(() => {
       const frame = document.querySelector(${JSON.stringify(iframeSelector)});
@@ -606,9 +608,10 @@ async function verifyHost(cdp, results) {
     let dialog = opened.dialog;
 
     if (!dialog) {
-      // 按模板约定：不发 plugin:request-overlay 的卡片只检查渲染，不算失败；
-      // 契约要求“所有卡片点主体都能进详情”，由各插件 subagent 在扩展点补断言。
-      console.log('  PASS 卡片渲染正常；未请求宿主浮层（仅检查卡片）');
+      // 契约要求“所有卡片点主体都能进详情”，未打开浮层是硬失败，不能当软 PASS 掩盖回归。
+      const message = '点卡片主体没有打开宿主详情浮层（契约要求卡片点击 = 详情）';
+      fails.push(message);
+      console.log(`  FAIL ${message}`);
       if (screenshots) {
         const shot = join(SHOTS_ROOT, id, `${id}-host-card-${scheme}.png`);
         await cdp.screenshot(shot);

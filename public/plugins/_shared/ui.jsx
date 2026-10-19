@@ -196,7 +196,7 @@ export function CardHeader({ title, trailing, className, style }) {
   return (
     <div className={mergeClasses(styles.header, className)} style={style}>
       {typeof title === 'string' || typeof title === 'number' ? (
-        <Text size={200} weight="semibold" truncate className={styles.title}>
+        <Text size={200} weight="semibold" truncate wrap={false} className={styles.title}>
           {title}
         </Text>
       ) : (
@@ -439,12 +439,12 @@ export function ListRow({
       {leading ? <div className={styles.leading}>{leading}</div> : null}
       <div className={styles.main}>
         {title ? (
-          <Text size={titleSize} truncate className={styles.title}>
+          <Text size={titleSize} truncate wrap={false} className={styles.title}>
             {title}
           </Text>
         ) : null}
         {subtitle ? (
-          <Text size={200} truncate className={styles.subtitle}>
+          <Text size={200} truncate wrap={false} className={styles.subtitle}>
             {subtitle}
           </Text>
         ) : null}
@@ -738,7 +738,7 @@ export function DetailTabs({ items, value, onChange, ariaLabel, className, style
               {isValidElement(item.badge) ? (
                 item.badge
               ) : (
-                <Badge appearance="tint" size="small">
+                <Badge appearance="tint" size="medium">
                   {item.badge}
                 </Badge>
               )}
@@ -948,7 +948,7 @@ export function Subpage({
               onClick={requestClose}
               style={TOUCH_TARGET_STYLE}
             />
-            <Text size={400} weight="semibold" truncate className={styles.title}>
+            <Text size={400} weight="semibold" truncate wrap={false} className={styles.title}>
               {title}
             </Text>
             {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
