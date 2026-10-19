@@ -6,7 +6,6 @@
 import * as api from './api.js';
 import { mockGeoLookup, mockReverseLookup, mockWeatherData, mockPlaceById } from './mock.js';
 import { hasApiKey, WeatherApiError } from './api.js';
-import { currentPlace } from './store.js';
 
 export { WeatherApiError };
 
@@ -14,6 +13,14 @@ const REQUIRED_SECTIONS = ['current', 'hourly', 'daily'];
 
 export function isMock(settings) {
   return Boolean(settings?.mock);
+}
+
+/**
+ * 工具处理器从宿主配置读到的 settings 不含 `mock`（它不是 schema 字段）；
+ * 视图内把 URL 演示开关作为运行时标志注回去，保证工具与 UI 走同一份数据源。
+ */
+export function applyMock(settings, mock) {
+  return mock ? { ...settings, mock: true } : settings;
 }
 
 export function hasKeyOrMock(settings) {
@@ -58,7 +65,7 @@ export async function loadWeather(settings, place, previous) {
     return { data, offline: false, failures: [], fetchedAt: data.fetchedAt };
   }
   if (!hasApiKey(settings)) {
-    throw new WeatherApiError('未配置和风天气 API Key：长按天气卡片打开设置，填写 API Key 与 API Host', {
+    throw new WeatherApiError('未配置和风天气 API Key：请在宿主「设置 → 插件 → 天气」填写 API Key 与 API Host', {
       status: 401,
       code: 'NO_KEY',
     });
@@ -129,11 +136,6 @@ export async function loadDetailSection(settings, place, section) {
     default:
       return null;
   }
-}
-
-/** 当前城市（Agent 工具与 UI 共用） */
-export function currentPlaceOf(settings) {
-  return currentPlace(settings);
 }
 
 /** mock 城市（Agent addPlace 在 mock 模式下只接受内置城市） */

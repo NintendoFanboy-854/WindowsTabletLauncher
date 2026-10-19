@@ -1,106 +1,174 @@
 # 天气（weather）插件
 
-桌面上的天气卡片，数据来自和风天气（QWeather）。规格见 [docs/components/weather.md](../../../docs/components/weather.md)，公共设计约定见 [docs/DESIGN.md](../../../docs/DESIGN.md)，实现规范见 [docs/PLUGIN-REACT.md](../../../docs/PLUGIN-REACT.md)。
+桌面上的天气卡片，数据来自和风天气（QWeather）。规格见 [docs/components/weather.md](../../../docs/components/weather.md)，
+公共设计约定见 [docs/DESIGN.md](../../../docs/DESIGN.md)，实现规范见 [docs/PLUGIN-REACT.md](../../../docs/PLUGIN-REACT.md)，
+自动定位决策见 [docs/DECISIONS.md](../../../docs/DECISIONS.md) D-16。
 
 ## 目录
 
 ```
 public/plugins/weather/
-├── manifest.json          # 一个组件，声明 1×1 / 2×1 / 2×2 / 3×2 / 4×2 五档
-├── index.html             # iframe 页面，只加载 app/app.js
-├── weather.css            # 全局重置（视觉样式在 React 里走 Fluent token）
+├── manifest.json          # 一个组件，五档尺寸 + settings schema（宿主设置页通用渲染）
+├── index.html             # 只加载 ../_shared/base.css 与 app/app.js
 ├── app/app.js             # 构建产物：React + Fluent UI React v9 的 ES module bundle
 ├── icons/{dark,light}/    # 和风官方图标（按 icon code 命名，本地文件不联网）
 └── src/
-    ├── main.jsx           # 入口：按 getOverlayView() 组合卡片 / 设置 / 详情视图
-    ├── WeatherApp.jsx     # 卡片视图：刷新、轮询、缓存、Agent 工具
-    ├── utils.js           # 尺寸/缓存新鲜度/URL 调试参数小工具
-    ├── components/        # Card / CityMenu / forecast / atoms（纯展示组件）
+    ├── main.jsx           # 入口：?view=detail → L1 详情；否则卡片
+    ├── WeatherApp.jsx     # 卡片视图：数据轮询、缓存、Agent 工具注册
+    ├── utils.js           # 尺寸档位 / 演示开关 / 缓存新鲜度
+    ├── components/
+    │   ├── Card.jsx       # 五档卡片（CardRoot，纯展示）
+    │   ├── CityMenu.jsx   # L1 头部城市菜单（切换 / 当前位置 / 管理城市…）
+    │   ├── forecast.jsx   # 逐时列/行、7 天列、AQI 环、昼夜判断
+    │   └── atoms.jsx      # 天气图标 / 现象 / 高低温 / 更新时间 / 预警 Badge
     ├── views/
-    │   ├── SettingsView.jsx   # ?view=settings 全窗口设置视图
-    │   ├── DetailView.jsx     # ?view=detail 全窗口详情视图
-    │   └── panels.jsx         # 逐时 / 7 天 / 空气 / 生活指数 / 预警面板
-    ├── data/
-    │   ├── api.js         # 和风 API：认证、v1/v7 两套接口、响应归一化
-    │   ├── mock.js        # 无 Key 演示数据（形状与归一化结果一致）
-    │   ├── service.js     # 请求编排：按城市缓存、失败回退缓存、按需补详情段落
-    │   ├── store.js       # 设置/缓存读写（plugin.getConfig/setConfig）、城市增删
-    │   ├── tools.js       # 9 个 Agent 工具
-    │   ├── icons.js       # icon code → 图标文件（含夜间/遗留 code 兜底）
-    │   └── format.js      # 温度/时间/风/AQI 等格式化
-    └── ../../_shared/host.js  # 共享宿主脚手架（init 捕获 / 主题 / 尺寸 / 配置 / 浮层）
+    │   ├── DetailView.jsx # L1：header 56 + 摘要 96 + 环境 44 + Tabs 40 + 内容
+    │   ├── panels.jsx     # 逐时 / 7 天 / 空气 / 生活指数 / 预警面板
+    │   └── ManageCities.jsx # L2：搜索 / 添加 / 删除（行内确认）/ 设为当前
+    └── data/
+        ├── api.js         # 和风 API：认证、v1/v7 两套接口、响应归一化
+        ├── mock.js        # 演示数据（形状与归一化结果一致；北京带两条预警）
+        ├── service.js     # 请求编排：按城市缓存、失败回退缓存、按需补详情段落
+        ├── locate.js      # D-16：系统定位 → ip.cn 网络归属地 → GeoAPI，8s 封顶
+        ├── useWeather.js  # 卡片/详情共用的状态（配置/城市/缓存/定位/刷新）
+        ├── store.js       # 配置与缓存归一化、旧版 places 迁移、城市增删
+        ├── tools.js       # 14 个 Agent 工具（UI 路径一一对应）
+        ├── icons.js       # icon code → 图标文件（含夜间/遗留 code 兜底）
+        └── format.js      # 温度/时间/风/AQI 等格式化
 ```
 
 ## 构建
 
-插件是 `public/` 下的静态 iframe 页面，Vite 不会处理它的 import；Fluent UI React 由共享脚本用 Vite lib 模式预先打成自包含 bundle（`app/app.js`），运行时不需要构建步骤。改了 `src/` 之后重新打包：
+插件是 `public/` 下的静态 iframe 页面，Fluent UI React 由共享脚本用 Vite lib 模式打成自包含
+bundle（`app/app.js`），运行时不需要构建步骤。改了 `src/` 之后重新打包：
 
 ```powershell
 node scripts/build-plugin.mjs weather
+node scripts/verify-plugin.mjs weather
 ```
 
-`app/app.js` 是提交进 git 的产物；`npm run build` 只负责把 `public/` 原样拷进 `dist/`，不会再编译插件。
+## 卡片（L0）
 
-## 浮层视图（D-02b）
+纯展示，点卡 = `requestOverlay('detail', '天气详情')`；卡片上没有城市菜单、刷新、设置、长按、右键。
+手势与主操作由共享 `CardRoot`（`useHostCardGesture`）接管。
 
-设置和详情不再在卡片 iframe 里弹 Dialog/Drawer（会被卡片边界裁切），而是请求宿主用整窗 Fluent Dialog
-加载同一插件页面的 `?view=<name>`：
+| 尺寸 | 内容 | 内边距 |
+|---|---|---|
+| `1×1` | 图标 40 + 温度 48 | 8 |
+| `2×1` | 图标 48 + 温度 48 + 现象 16 + 今日高低温 14 | 8 纵 / 12 横 |
+| `2×2` | 上：城市 12 + 当前天气；下：逐时 6 列（时间 12 / 图标 20 / 温度 14） | 12 |
+| `3×2` | 左：城市 12 / 图标 56 / 温度 68 / 现象 14 / 高低温 14；右：逐时 6 行（行高 40，时间 12 / 图标 20 / 温度 16 右对齐）；**不放 7 天** | 12 纵 / 16 横 |
+| `4×2` | 上：当前（左）+ AQI 环 72（右）；下：未来 7 天等宽 7 列（星期 12 / 图标 20 / 高温 16 / 低温 12） | 12 纵 / 16 横 |
 
-- 点卡片 → `requestOverlay('detail', '天气详情')` → 宿主加载 `?view=detail`，标题「天气 · 天气详情」；
-- 长按 / 右键 / 编辑模式设置 → `requestSettings('天气设置')` → 宿主加载 `?view=settings`，标题「天气 · 天气设置」；
-- `main.jsx` 用共享脚手架的 `getOverlayView()` 分支渲染；两个视图都是整页排版，不依赖浮层容器；
-- 设置视图里的修改即时写入配置（`plugin.setConfig('settings')`），卡片视图通过 `useStoredConfig` 的 storage 事件同步并自动刷新；
-- 详情视图里的「设置」按钮同样 `requestSettings`，宿主会再开一层设置浮层。
+- 预警只在 `3×2` / `4×2` 的城市行显示一个紧凑 Badge（12），完整内容在详情预警 Tab；
+  缓存离线时同一行显示 12 号「离线」，不额外加 chrome。
+- 无 Key：卡片显示「配置 Key」引导（详细操作在详情里的「设置…」）。
+- 城市为空：显示「还没有城市 / 正在定位…」，点卡进入详情管理城市。
 
-## 配置
+## 详情（L1，`?view=detail`）
 
-- **API Key**：和风控制台创建。`eyJ` 开头的 JWT 走 `Authorization: Bearer`，其余按 API KEY 走 `X-QW-Api-Key`。
-- **API Host（必填）**：控制台 → 设置里查看的专属域名，形如 `abcd1234.qweatherapi.com`。
-  填自定义 Host 时走新版 `/weather/v1`、`/airquality/v1`、`/weatheralert/v1`、`/geo/v2` 接口；
-  旧的公共域名 `devapi.qweather.com` / `api.qweather.com` 已停用（实测返回 403 INVALID HOST），
-  只保留在代码里兼容旧配置；不填 API Host 时插件会直接提示去控制台获取，而不是发无效请求。
-- API Key / Host 存在 `weather.settings`（本地存储，不进 git）；按城市缓存存在 `weather.cache`。
+- **header 56**：城市按钮 16 semibold + chevron（打开城市菜单）+ 更新时间 12 fg3；
+  右侧刷新 40、设置… 40（图标 + 文字，只发 `requestHostSettings()`）。
+- **摘要 96**：图标 56 + 温度 48（Display XL）+ 现象 16 + 高低温 14；最右 AQI Badge（值 16 + 类别 14）。
+- **环境信息 44**：六项单行等宽网格（gap 16）：体感 / 湿度 / 风 / 气压 / 能见度 / 紫外线；
+  容器宽 <700px 时两行三列。
+- **Tabs 40 常显**：逐时 / 7 天 / 空气 / 生活指数 / 预警；有预警时默认进预警；`showAir` /
+  `showWarnings` 关闭时对应 Tab 不出现（平级内容仍始终由 Tabs 直接可见）。
+- **内容**：逐时行 44；7 天行 44；空气 = AQI 环 88 + 类别 14 + 首要污染物 12 + 污染物行 44；
+  生活指数行 48–64；预警 Fluent Accordion（标题 14 semibold / 正文 14 fg2 / 时间 12 fg3）。
+- 内容区滚动，header / 摘要 / 环境信息 / Tabs 固定；Tab 切换用共享 `CrossFade`。
 
-## 演示数据（无 Key 也能看界面）
+## 管理城市（L2，同一浮层 push）
 
-- URL 加 `?mock=1`，或设置里打开「演示数据」。
-- 内置城市：北京 / 上海 / 杭州 / 广州 / 深圳 / 成都；北京的演示数据带两条预警，用来验证「预警优先」。
-- 演示数据不联网、不消耗和风额度，Agent 工具在 mock 下同样可用。
+- 从城市菜单「管理城市…」进入；`Subpage` header 56（← 返回 + 标题）。
+- 搜索 Input 40（和风 GeoAPI；mock 模式走内置城市）；结果行 44：城市 14 + 行政区 12 fg3 +「添加」40。
+- 已添加城市行 44：城市 14 + 当前 Badge +「设为当前」40 +「删除」40（行内二次确认）。
+- 顶部「当前位置 · X」来自自动定位，可一键加入或切换；添加/删除/设为当前后 pop 回 L1，
+  卡片通过同一份配置刷新。
+- 未配置 Key 时搜索禁用，但已保存城市仍可切换 / 删除。
+
+## 设置（manifest schema）
+
+全部在 `manifest.json` 的 `settings` 里，由宿主设置页按 schema 渲染并即时保存；
+插件不再提供 `?view=settings` 视图，也不读宿主路由。
+
+| key | type | default | 说明 |
+|---|---|---|---|
+| `unit` | enum | `c` | 摄氏 / 华氏 |
+| `refreshMin` | enum（数字） | `30` | 15 / 30 / 60 分钟 |
+| `showAir` | boolean | `true` | 卡片 AQI 与详情空气 Tab |
+| `showWarnings` | boolean | `true` | 卡片预警 Badge 与详情预警 Tab、预警优先 |
+| `showMinutely` | boolean | `false` | 逐时 Tab 的分钟级降水 |
+| `autoLocate` | boolean | `false` | 打开时才请求系统定位 / ip.cn |
+| `apiKey` | text（secret） | `""` | 和风 API Key（JWT 或普通 Key） |
+| `apiHost` | text | `""` | 和风控制台的专属 API Host |
+
+城市列表属于内容，存 `places` 键，不进设置 schema（宿主设置页不会把它当成未声明字段）；
+旧版把 `places` 写在 `settings` 里的配置会在首次加载时迁移到 `places` 并清洗 `settings`。
+
+## 自动定位（D-16）
+
+1. `plugin.getLocation()`（Windows 定位，有坐标）→ 和风 GeoAPI 反查最近城市；
+2. 失败 → `plugin.ipLocate()`（ip.cn 网络归属地：省/市/区/运营商，无坐标）→
+   和风 GeoAPI `geoLookup(城市名)` 换 id/经纬度；
+3. 全失败返回 null：保留上次城市，提示手动搜索。
+
+整条链路 **8 秒封顶**（系统定位 2.5s、ip.cn 4s、GeoAPI 2.5s 的剩余预算），不阻塞首屏；
+浏览器 dev 没有 Tauri 后端时 `getLocation()` / `ipLocate()` 都返回 null，静默跳过。
+无 API Key 时自动定位直接跳过；mock 模式用内置城市演示。
+语义：城市列表为空时定位城市自动加入并设为当前；已有城市时**不自动切换**，
+只在城市菜单显示「当前位置 · X」一键切换。定位结果缓存 30 分钟（`location` 键），
+卡片和详情共享，避免重复请求 ip.cn。
+
+## 数据与缓存
+
+- `settings`：上面 8 个 schema 字段；`places`：城市列表（`isCurrent` 有且只有一个）；
+  `cache`：按 LocationID 存整套归一化数据（current/hourly/daily/air/warnings/indices/minutely）；
+  `location`：最近一次定位结果 `{ place, source, at }`。
+- 首屏先读缓存，再按 `refreshMin` 轮询；页面隐藏暂停，回到前台补一拍。
+- 请求失败 / 429：用缓存并标注「离线 · N 分钟前更新」；缓存超过 2×刷新间隔时加「数据可能过期」。
+- 卡片与 L1/L2 是同一 origin 的不同 iframe，通过宿主 `plugin.weather.*` 的 storage 事件同步。
+
+## Agent 工具（UI 路径 ↔ 工具）
+
+| UI 路径 | 工具 |
+|---|---|
+| 卡片 / 详情·当前天气 | `weather.current` |
+| 详情·逐时 | `weather.hourly` |
+| 详情·7 天 | `weather.daily` |
+| 详情·空气 | `weather.air` |
+| 详情·预警 | `weather.warning` |
+| 详情·L2 搜索任意城市 | `weather.queryPlace` |
+| 城市菜单 / 管理城市 | `weather.places` / `weather.addPlace` / `weather.removePlace` / `weather.setCurrentPlace` |
+| 详情·刷新 | `weather.refresh` |
+| 自动定位 | `weather.locate` |
+| 宿主设置页·天气 | `weather.settings.get` / `weather.settings.set` |
+
+`weather.settings.get/set` 不回传 API Key 明文，只返回 `hasApiKey`；`settings.set` 只接受
+schema 里的字段并做类型/取值校验。工具从宿主配置读最新状态，与 UI 共用 `useWeather` 数据层；
+卡片 iframe 常驻桌面，L1 浮层打开期间工具仍可用。
 
 ## 独立开发 / 截图用 URL 参数
 
 | 参数 | 作用 |
 |---|---|
-| `?mock=1` | 使用内置演示数据（不联网） |
-| `?view=settings` | 直接渲染设置视图（等价于宿主浮层里的那页） |
-| `?view=detail` | 直接渲染详情视图 |
+| `?mock=1` 或 `?demo=1` | 使用内置演示数据（不联网；`verify-plugin.mjs` 用 `demo=1`） |
+| `?view=detail` | 直接渲染 L1 详情 |
 | `?size=3x2` | 指定卡片尺寸（1x1 / 2x1 / 2x2 / 3x2 / 4x2），脱离宿主时决定布局 |
-| `?theme=light` | 指定亮色主题（默认深色） |
-| `?tab=warning` | 详情视图默认打开的 Tab（hourly / daily / air / indices / warning） |
 
-宿主内运行时，尺寸/主题从 `plugin.onInit/onResize/onTheme` 拿，URL 的 `size/theme` 只用于独立开发。
-
-## 信息密度（docs/DENSITY.md / D-04）
-
-- 每张卡片只有一个 Primary：当前温度；现象、今日高低温是仅有的 Secondary。
-- 正常模式无 chrome：没有刷新按钮、更新时间文字、齿轮；城市切换/刷新/设置都在宿主浮层里（点卡片或长按卡片打开）。
-- 预警条用 Fluent `MessageBar`（intent warning），多条在详情里用 Fluent `Accordion` 折叠展开；`1×1` 不显示独立预警图标，预警数量并入卡片 aria-label。
-- 设置视图的 Fluent 控件（Input / Button / Switch / Radio）统一 40px 高；面向用户的文案不出现域名、JWT、CORS 等实现细节。
-- 卡片只保留 城市 + 温度 + 现象 + 今日高低温；2×2 的逐时、3×2/4×2 的 7 天、4×2 的 AQI 是该尺寸声明的内容，不是额外的 chrome。
-- `3×2` 的 7 天每格只留 星期 / 图标 / 高温（低温省略）。
-- 详情视图用 Fluent type ramp（base200/300/400/Hero）与 foreground1/2/3 分层，不靠分割线；预警默认折叠成一行。
-- 离线时卡片只在右上角显示一个 6px 状态点（不占文字），详细更新时间/离线状态在详情视图顶部。
+宿主内运行时尺寸/主题从 `plugin.onInit/onResize/onTheme` 拿，URL 参数只用于独立开发与验收。
+演示数据不写 `mock` 到设置；关闭页面后设置里不会留下演示开关。
 
 ## 宿主协议
 
-- 通过共享脚手架 `public/plugins/_shared/host.js` 使用 `/plugin-sdk.js`：`startHostCapture` / `useHostTheme` / `useHostSize` / `useStoredConfig` / `getOverlayView` / `requestOverlay` / `requestSettings` / `useSettingsRequest` / `useAgentTools`。
-- 宿主能力：`getConfig` / `setConfig` / `notify` / `getLocation`。
-- 注册 9 个 Agent 工具：`weather.current/hourly/daily/air/warning/queryPlace/places/addPlace/removePlace`。
+- 只使用 `/plugin-sdk.js` 与 `public/plugins/_shared/**`（`host.js` / `ui.jsx` / `motion.js` /
+  `base.css` / `typography.js`），不 import `src/host/**`。
+- 宿主能力：`getConfig` / `setConfig` / `getLocation` / `ipLocate` / `notify` 等。
+- 设置入口只发 `plugin:request-host-settings`；L2 的返回/取消/保存是页内导航，X / Esc / 遮罩由宿主关闭浮层。
 
 ## 边界
 
-- 请求失败或 429：用缓存渲染并显示「离线 · N 分钟前更新」，缓存超过 2×刷新间隔时加「数据可能过期」。
-- 未配置 Key：卡片显示引导；Agent 工具返回可读错误。
-- 预警优先：卡片顶部预警条，详情默认打开「预警」页。
-- 分钟级降水只有开启且接口有数据时才占位。
-- 浏览器直连和风 API 依赖对方 CORS 与「网址限制」配置；如果以后被拦截，需要宿主侧加代理（当前按可以直连实现）。
+- 无 Key：卡片与详情显示配置引导；Agent 工具返回可读错误。
+- ip.cn 首调冷启动：Rust 后端要先取首页 ticket 再取 JSON，真机首次可能接近 4s 预算；
+  超时按“定位失败”处理，不影响手动搜索。
+- 雷达图 / 天气地图 / 台风路径 / 历史天气 / 多日 AQI 趋势不在本插件范围内。

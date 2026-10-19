@@ -1,4 +1,4 @@
-/** 少量通用小工具。 */
+/** 少量通用小工具（尺寸档位、演示开关、缓存时效）。 */
 
 export const SUPPORTED_SIZES = {
   '1x1': [1, 1],
@@ -24,40 +24,6 @@ export function parseSizeParam(value) {
   return SUPPORTED_SIZES[key] ? SUPPORTED_SIZES[key] : null;
 }
 
-/** 解析 "rgb(r, g, b)" / "rgba(...)" / "#rrggbb" 的亮度，决定叠在上面的文字用黑还是白 */
-export function contrastTextColor(color) {
-  if (!color || typeof color !== 'string') return '#ffffff';
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(color);
-  if (rgb) {
-    r = Number(rgb[1]);
-    g = Number(rgb[2]);
-    b = Number(rgb[3]);
-  } else {
-    const hex = /#([0-9a-f]{3}|[0-9a-f]{6})/i.exec(color);
-    if (hex) {
-      const value = hex[1].length === 3 ? hex[1].split('').map((c) => c + c).join('') : hex[1];
-      r = parseInt(value.slice(0, 2), 16);
-      g = parseInt(value.slice(2, 4), 16);
-      b = parseInt(value.slice(4, 6), 16);
-    } else {
-      return '#ffffff';
-    }
-  }
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? '#1a1a1a' : '#ffffff';
-}
-
-export function classNames(...values) {
-  return values.filter(Boolean).join(' ');
-}
-
-export function isVisibleDocument() {
-  return typeof document === 'undefined' || document.visibilityState !== 'hidden';
-}
-
 /** 相对当前时间的毫秒差，用于判断缓存是否“可能过期” */
 export function isStaleCache(fetchedAt, refreshMin, now = Date.now()) {
   if (!fetchedAt) return false;
@@ -65,12 +31,16 @@ export function isStaleCache(fetchedAt, refreshMin, now = Date.now()) {
   return now - fetchedAt > maxAge;
 }
 
-/** 独立开发/截图：`?mock=1` 让当前会话强制使用演示数据 */
-export function urlMockOverride() {
-  return new URLSearchParams(location.search).get('mock') === '1';
+/**
+ * 独立开发/截图：`?mock=1` 或宿主验收脚本的 `?demo=1` 打开内置演示数据。
+ * 宿主卡片/浮层地址不会带这两个参数，线上行为不受影响。
+ */
+export function urlMockEnabled() {
+  const params = new URLSearchParams(location.search);
+  return params.get('mock') === '1' || params.get('demo') === '1';
 }
 
-/** 独立开发/截图：当前会话的尺寸档位参数（宿主内由 host:init 覆盖） */
+/** 独立开发/截图：当前会话的尺寸档位参数（宿主内由 host:init / host:resize 覆盖） */
 export function urlSizeParam() {
   return parseSizeParam(new URLSearchParams(location.search).get('size'));
 }

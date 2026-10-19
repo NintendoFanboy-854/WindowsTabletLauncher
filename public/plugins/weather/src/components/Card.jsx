@@ -1,97 +1,68 @@
 /**
- * 天气卡片：五档尺寸，按 UI-REWRITE-SPEC §3.6 重排。
+ * 天气卡片（L0）：纯展示，点卡 = 打开 L1 详情。
  *
- * 字号只走 Fluent 字阶：温度用 D-07 Display XL（1×1/2×1/2×2 = 48）或
- * fontSizeHero1000（3×2/4×2 = 68）；文本全部 `<Text size>`；无 clamp、无 lineHeight 覆盖。
- * 正常模式无 chrome；预警 MessageBar 只在有预警时出现；AQI 环 88px 不裁切。
+ * 五档尺寸（docs/components/weather.md）：
+ * - 1×1 图标 + 温度 48；
+ * - 2×1 图标 + 温度 48 + 现象 16 + 今日高低温 14；
+ * - 2×2 上当前天气、下逐时 6 列（时间 12 / 图标 20 / 温度 14）；
+ * - 3×2 左当前（城市 12 / 图标 56 / 温度 68 / 现象 14 / 高低温 14）+ 右逐时 6 行（行高 40），不放 7 天；
+ * - 4×2 上当前 + 空气质量（AQI 环 72），下未来 7 天等宽 7 列。
+ *
+ * 卡片上没有城市菜单、刷新、设置、长按、右键：手势与主操作由共享 CardRoot 接管。
  */
 
-import { useCallback, useRef } from 'react';
-import { Button, Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { ArrowClockwise20Regular, Key20Regular } from '@fluentui/react-icons';
-import { displayXl } from '../../../_shared/typography.js';
-import { AirRing, DailyColumns, HourlyStrip, isNight } from './forecast.jsx';
-import { Condition, HiLo, WarningStrip, WeatherIcon } from './atoms.jsx';
+import { Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Key20Regular, Location20Regular } from '@fluentui/react-icons';
+import { CardRoot, Metric } from '../../../_shared/ui.jsx';
+import { Condition, HiLo, WarningBadge, WeatherIcon } from './atoms.jsx';
+import { AirRing, DailyColumns, HourlyRows, HourlyStrip, isNight } from './forecast.jsx';
+import { conditionText } from '../data/icons.js';
 import { fmtTemp } from '../data/format.js';
 
 const useStyles = makeStyles({
-  card: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    minWidth: 0,
-    minHeight: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    // 卡片材质由宿主 WidgetCard 提供，插件根节点保持透明（D-02b）
-    backgroundColor: 'transparent',
-    color: tokens.colorNeutralForeground1,
-    fontFamily: tokens.fontFamilyBase,
-    userSelect: 'none',
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorSubtleBackgroundHover },
-    ':active': { backgroundColor: tokens.colorSubtleBackgroundPressed },
-    ':focus-visible': {
-      outline: `2px solid ${tokens.colorStrokeFocus2}`,
-      outlineOffset: '-2px',
-    },
-  },
-  gapXS: { gap: tokens.spacingVerticalXS },
-  gapS: { gap: tokens.spacingVerticalS },
-
-  // 间距按 UI-REWRITE-SPEC §2：1×1=8；2×1=8v/12h；2×2=12；3×2/4×2=12v/16h
+  // 内边距：1×1=8；2×1=8 纵 / 12 横；2×2=12；3×2 / 4×2=12 纵 / 16 横
   pad1: { padding: tokens.spacingHorizontalS },
-  pad2: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}` },
+  pad21: { padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}` },
   pad22: { padding: tokens.spacingVerticalM },
   padLarge: { padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}` },
 
-  offlineDot: {
-    position: 'absolute',
-    top: tokens.spacingVerticalS,
-    right: tokens.spacingHorizontalS,
-    width: tokens.spacingHorizontalS,
-    height: tokens.spacingHorizontalS,
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: tokens.colorStatusWarningForeground1,
-  },
-  body: { flex: 1, minHeight: 0, minWidth: 0, display: 'flex' },
-  city: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-
-  // 数字主信息：1×1/2×1/2×2 = XL-48；3×2/4×2 = Display 68（Hero1000）
-  temp48: {
-    ...displayXl(48),
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    color: tokens.colorNeutralForeground1,
-    whiteSpace: 'nowrap',
-  },
-  temp68: {
-    fontSize: tokens.fontSizeHero1000,
-    lineHeight: tokens.lineHeightHero1000,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    color: tokens.colorNeutralForeground1,
-    whiteSpace: 'nowrap',
+  body: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    minWidth: 0,
   },
 
-  // 1×1：图标 + 温度水平居中，padding 8，gap 8
+  // 1×1：图标在上、温度在下，避免 −10° 这类宽值在 152px 卡里被裁切
   body1: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: tokens.spacingHorizontalS,
+    gap: tokens.spacingVerticalXS,
+    minHeight: 0,
+    minWidth: 0,
   },
 
-  // 2×1：左图标+温度，右现象+高低温；删城市
-  body2: {
+  // 2×1：左图标 + 温度，右现象 + 高低温
+  body21: {
+    flex: 1,
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexDirection: 'row',
     gap: tokens.spacingHorizontalM,
+    minHeight: 0,
+    minWidth: 0,
   },
-  left2: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
-  right2: {
+  left21: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  right21: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
@@ -101,14 +72,22 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
 
-  // 2×2：上块 0–55%（当前），下块 55–100%（6 列逐时）
-  body22: { flexDirection: 'column', gap: tokens.spacingVerticalS, minHeight: 0 },
+  // 2×2：上 55% 当前天气、下逐时 6 列；组间距 8（DENSITY 2×2 映射）
+  body22: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    minHeight: 0,
+    minWidth: 0,
+  },
   top22: {
     flexBasis: '55%',
     flexGrow: 0,
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
+    justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     minHeight: 0,
     minWidth: 0,
@@ -116,423 +95,391 @@ const useStyles = makeStyles({
   top22Row: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalM,
-    minWidth: 0,
-    flex: 1,
+    gap: tokens.spacingHorizontalS,
     minHeight: 0,
+    minWidth: 0,
   },
   meta22: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
+    gap: tokens.spacingVerticalXS,
     minWidth: 0,
+    flexShrink: 1,
+  },
+  hourly22: {
     flex: 1,
-  },
-  hourly22: { flexBasis: '45%', flexGrow: 1, flexShrink: 1, minHeight: 0 },
-
-  // 3×2：左 42% 当前 / 右 58% 7 天；列间距 16；padding 12v/16h
-  body32: { flexDirection: 'row', gap: tokens.spacingHorizontalL, minHeight: 0 },
-  current32: {
-    flex: '42 1 0',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalS,
+    minHeight: 0,
     minWidth: 0,
+    paddingTop: tokens.spacingVerticalXS,
   },
-  currentRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, minWidth: 0 },
-  meta32: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
-  daily32: { flex: '58 1 0', minWidth: 0, minHeight: 0 },
 
-  // 4×2：左 55% 当前 / 中 30% AQI / 底 96px 7 天通栏；padding 12v/16h
-  body42: { flexDirection: 'column', gap: tokens.spacingVerticalS, minHeight: 0 },
-  top42: {
+  // 3×2：左当前 46% / 右逐时 6 行；列间距 16
+  body32: {
     flex: 1,
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    flexDirection: 'row',
     gap: tokens.spacingHorizontalL,
     minHeight: 0,
     minWidth: 0,
   },
-  current42: {
-    flexBasis: '55%',
-    flexGrow: 0,
-    flexShrink: 0,
+  current32: {
+    flex: '46 1 0',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     minWidth: 0,
   },
-  aqi42: {
-    flexBasis: '30%',
-    flexGrow: 0,
+  hourly32: {
+    flex: '54 1 0',
+    minWidth: 0,
+    minHeight: 0,
+  },
+
+  // 4×2：上当前 + AQI，下 7 天 96 高
+  body42: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    minHeight: 0,
+    minWidth: 0,
+  },
+  top42: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    minHeight: 0,
+    minWidth: 0,
+  },
+  current42: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
+    minWidth: 0,
+    minHeight: 0,
+  },
+  current42Row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  meta42: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  air42: {
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 0,
-    minHeight: 0,
   },
-  daily42: { flex: '0 0 96px', minHeight: 0 },
+  daily42: {
+    flex: '0 0 96px',
+    minHeight: 0,
+    minWidth: 0,
+  },
 
-  // 状态
-  stateBody: {
+  cityRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+  },
+  cityName: {
+    color: tokens.colorNeutralForeground3,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: 0,
+  },
+  offline: {
+    color: tokens.colorStatusWarningForeground1,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+
+  // 状态（加载 / 空 / 无 Key / 错误）：居中、只用排版，不加卡片级按钮
+  state: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalM,
-    textAlign: 'center',
-    padding: tokens.spacingVerticalL,
-    minHeight: 0,
-  },
-  stateText: { color: tokens.colorNeutralForeground2, maxWidth: '46ch' },
-  stateButtons: { display: 'flex', gap: tokens.spacingHorizontalS, flexWrap: 'wrap', justifyContent: 'center' },
-  keyIcon: { color: tokens.colorNeutralForeground3 },
-  loading: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
     gap: tokens.spacingVerticalS,
-    color: tokens.colorNeutralForeground2,
+    textAlign: 'center',
+    minHeight: 0,
+    minWidth: 0,
+  },
+  stateText: {
+    color: tokens.colorNeutralForeground3,
+    maxWidth: '30ch',
+  },
+  stateTitle: { color: tokens.colorNeutralForeground2 },
+  stateIcon: { color: tokens.colorNeutralForeground3 },
+  stateInline: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    color: tokens.colorNeutralForeground3,
   },
 });
 
-function LoadingState({ compact }) {
+function KeyState({ compact }) {
   const styles = useStyles();
   return (
-    <div className={styles.stateBody}>
-      <div className={styles.loading}>
-        <Spinner size={compact ? 'tiny' : 'medium'} />
-        {!compact && (
-          <Text size={300} className={styles.stateText}>
-            正在获取天气…
+    <div className={styles.state}>
+      <Key20Regular className={styles.stateIcon} />
+      {compact ? (
+        <Text size={200} className={styles.stateText}>
+          配置 Key
+        </Text>
+      ) : (
+        <>
+          <Text size={400} weight="semibold" className={styles.stateTitle}>
+            未配置和风天气 API Key
           </Text>
-        )}
-      </div>
+          <Text size={200} className={styles.stateText}>
+            在设置 → 插件 → 天气里填写 API Key 与 API Host
+          </Text>
+        </>
+      )}
     </div>
   );
 }
 
-function NoKeyState({ compact, onOpenSettings, onUseMock }) {
+function CityEmptyState({ compact, locating }) {
   const styles = useStyles();
-  if (compact) {
+  if (locating) {
     return (
-      <div className={styles.stateBody}>
-        <Key20Regular className={styles.keyIcon} />
-        <Text size={300} className={styles.stateText}>
-          配置 Key
-        </Text>
+      <div className={styles.state}>
+        <div className={styles.stateInline}>
+          <Spinner size="tiny" />
+          <Text size={200}>正在定位…</Text>
+        </div>
       </div>
     );
   }
   return (
-    <div className={styles.stateBody}>
-      <Key20Regular className={styles.keyIcon} />
-      <Text size={400} weight="semibold">
-        未配置和风天气 API Key
+    <div className={styles.state}>
+      <Location20Regular className={styles.stateIcon} />
+      <Text size={compact ? 200 : 400} weight="semibold" className={styles.stateTitle}>
+        {compact ? '添加城市' : '还没有城市'}
       </Text>
-      <Text size={300} className={styles.stateText}>
-        在设置里填入 API Key 与数据地址后即可显示实时天气。没有 Key 时也可以先用内置演示数据预览。
-      </Text>
-      <span className={styles.stateButtons}>
-        <Button
-          appearance="primary"
-          size="large"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenSettings();
-          }}
-        >
-          去设置填 Key
-        </Button>
-        <Button
-          appearance="secondary"
-          size="large"
-          onClick={(event) => {
-            event.stopPropagation();
-            onUseMock();
-          }}
-        >
-          使用演示数据
-        </Button>
-      </span>
+      {compact ? null : (
+        <Text size={200} className={styles.stateText}>
+          打开详情搜索并添加城市
+        </Text>
+      )}
     </div>
   );
 }
 
-function ErrorState({ error, onRetry }) {
+function LoadingState({ compact }) {
   const styles = useStyles();
   return (
-    <div className={styles.stateBody}>
-      <Text size={400} weight="semibold">
-        天气数据加载失败
-      </Text>
-      <Text size={300} className={styles.stateText}>
-        {error || '请检查网络、API Key 与数据地址。'}
-      </Text>
-      <Button
-        appearance="primary"
-        size="large"
-        icon={<ArrowClockwise20Regular />}
-        onClick={(event) => {
-          event.stopPropagation();
-          onRetry();
-        }}
-      >
-        重试
-      </Button>
+    <div className={styles.state}>
+      <div className={styles.stateInline}>
+        <Spinner size="tiny" />
+        <Text size={200}>{compact ? '加载中' : '正在获取天气…'}</Text>
+      </div>
     </div>
   );
 }
 
-export default function Card({
-  sizeKey,
-  scheme,
-  settings,
-  place,
-  data,
-  status,
-  onOpenDetail,
-  onOpenSettings,
-  onRefresh,
-  onUseMock,
-}) {
+function ErrorState({ compact }) {
+  const styles = useStyles();
+  return (
+    <div className={styles.state}>
+      <Text size={compact ? 200 : 400} weight="semibold" className={styles.stateTitle}>
+        {compact ? '暂无数据' : '天气数据暂不可用'}
+      </Text>
+      {compact ? null : (
+        <Text size={200} className={styles.stateText}>
+          打开详情可重试；已缓存的数据会继续显示
+        </Text>
+      )}
+    </div>
+  );
+}
+
+export default function Card({ sizeKey, scheme, settings, place, data, status, locating, onOpenDetail }) {
   const styles = useStyles();
   const size = sizeKey || '3x2';
-  const longPress = useRef({ timer: null, fired: false });
-
-  const clearTimer = () => {
-    if (longPress.current.timer) {
-      clearTimeout(longPress.current.timer);
-      longPress.current.timer = null;
-    }
-  };
-
-  const openPrimary = useCallback(
-    (event) => {
-      if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      if (status.noKey) onOpenSettings();
-      else onOpenDetail();
-    },
-    [status.noKey, onOpenDetail, onOpenSettings],
-  );
-
-  const handlePointerDown = (event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    longPress.current.fired = false;
-    clearTimer();
-    longPress.current.timer = setTimeout(() => {
-      longPress.current.fired = true;
-      onOpenSettings();
-    }, 500);
-  };
-
-  const handleClick = (event) => {
-    clearTimer();
-    if (longPress.current.fired) {
-      longPress.current.fired = false;
-      return;
-    }
-    openPrimary(event);
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openPrimary(event);
-    } else if (event.key === 'F10' || (event.shiftKey && event.key === 'F10')) {
-      event.preventDefault();
-      event.stopPropagation();
-      onOpenSettings();
-    }
-  };
-
-  const warnings = settings.showWarnings ? data?.warnings : [];
-  const current = data?.current;
-  const today = data?.daily?.[0];
+  const compact = size === '1x1';
+  const large = size === '3x2' || size === '4x2';
+  const current = data?.current || null;
+  const today = data?.daily?.[0] || null;
   const currentNight = current
     ? isNight(current.obsTime || new Date().toISOString(), today?.sunrise, today?.sunset)
     : false;
-  const loading = status.loading && !data;
-  const error = status.error && !data;
+  const warnings = settings.showWarnings ? data?.warnings || [] : [];
   const air = settings.showAir ? data?.air : null;
-  const showOfflineDot = Boolean(status.offline && data);
+  const offline = Boolean(status.offline && data);
+
+  let content = null;
+  if (!settings.apiKey && !settings.mock) {
+    content = <KeyState compact={compact} />;
+  } else if (!place) {
+    content = <CityEmptyState compact={compact} locating={locating} />;
+  } else if (!current) {
+    content =
+      status.loading || !status.error ? <LoadingState compact={compact} /> : <ErrorState compact={compact} />;
+  } else {
+    content = (
+      <div className={mergeClasses(styles.body)}>
+        {size === '1x1' ? (
+          <div className={styles.body1}>
+            <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={40} title={current.text} />
+            <Metric value={fmtTemp(current.temp, settings.unit)} size={48} />
+          </div>
+        ) : null}
+
+        {size === '2x1' ? (
+          <div className={styles.body21}>
+            <div className={styles.left21}>
+              <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={48} title={current.text} />
+              <Metric value={fmtTemp(current.temp, settings.unit)} size={48} />
+            </div>
+            <div className={styles.right21}>
+              <Condition code={current.icon} text={current.text} />
+              <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+            </div>
+          </div>
+        ) : null}
+
+        {size === '2x2' ? (
+          <div className={styles.body22}>
+            <div className={styles.top22}>
+              <Text size={200} className={styles.cityName}>
+                {place.name}
+              </Text>
+              <div className={styles.top22Row}>
+                <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={48} title={current.text} />
+                <Metric value={fmtTemp(current.temp, settings.unit)} size={48} />
+                <div className={styles.meta22}>
+                  <Condition code={current.icon} text={current.text} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+                </div>
+              </div>
+            </div>
+            <div className={styles.hourly22}>
+              <HourlyStrip
+                items={data.hourly}
+                unit={settings.unit}
+                scheme={scheme}
+                sunrise={today?.sunrise}
+                sunset={today?.sunset}
+                count={6}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {size === '3x2' ? (
+          <div className={styles.body32}>
+            <div className={styles.current32}>
+              <div className={styles.cityRow}>
+                <Text size={200} className={styles.cityName}>
+                  {place.name}
+                </Text>
+                <WarningBadge count={warnings.length} />
+                {offline ? (
+                  <Text size={200} className={styles.offline}>
+                    离线
+                  </Text>
+                ) : null}
+              </div>
+              <div className={styles.cityRow}>
+                <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={56} title={current.text} />
+                <Metric value={fmtTemp(current.temp, settings.unit)} size={68} />
+              </div>
+              <Condition code={current.icon} text={current.text} size={300} />
+              <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+            </div>
+            <div className={styles.hourly32}>
+              <HourlyRows
+                items={data.hourly}
+                unit={settings.unit}
+                scheme={scheme}
+                sunrise={today?.sunrise}
+                sunset={today?.sunset}
+                count={6}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {size === '4x2' ? (
+          <div className={styles.body42}>
+            <div className={styles.top42}>
+              <div className={styles.current42}>
+                <div className={styles.cityRow}>
+                  <Text size={200} className={styles.cityName}>
+                    {place.name}
+                  </Text>
+                  <WarningBadge count={warnings.length} />
+                  {offline ? (
+                    <Text size={200} className={styles.offline}>
+                      离线
+                    </Text>
+                  ) : null}
+                </div>
+                <div className={styles.current42Row}>
+                  <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={56} title={current.text} />
+                  <Metric value={fmtTemp(current.temp, settings.unit)} size={68} />
+                </div>
+                <div className={styles.meta42}>
+                  <Condition code={current.icon} text={current.text} size={300} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+                </div>
+              </div>
+              {air && air.aqi != null ? (
+                <div className={styles.air42}>
+                  <AirRing air={air} size={72} />
+                </div>
+              ) : null}
+            </div>
+            <div className={styles.daily42}>
+              <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} />
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  const ariaLabel = !settings.apiKey && !settings.mock
+    ? '天气：尚未配置和风天气 API Key，点击打开详情'
+    : !place
+      ? `天气：还没有城市${locating ? '，正在定位' : ''}，点击打开详情`
+      : current
+        ? `天气：${place.name}，${fmtTemp(current.temp, settings.unit)}，${conditionText(
+            current.icon,
+            current.text,
+          )}${warnings.length > 0 ? `，${warnings.length} 条天气预警` : ''}，点击打开详情`
+        : '天气：正在加载，点击打开详情';
 
   return (
-    <div
+    <CardRoot
+      ariaLabel={ariaLabel}
+      onActivate={onOpenDetail}
+      data-size={size}
       className={mergeClasses(
-        styles.card,
-        size === '1x1' && mergeClasses(styles.pad1, styles.gapXS),
-        size === '2x1' && mergeClasses(styles.pad2, styles.gapXS),
-        size === '2x2' && mergeClasses(styles.pad22, styles.gapS),
-        (size === '3x2' || size === '4x2') && mergeClasses(styles.padLarge, styles.gapS),
+        compact && styles.pad1,
+        size === '2x1' && styles.pad21,
+        size === '2x2' && styles.pad22,
+        large && styles.padLarge,
       )}
-      role="button"
-      tabIndex={0}
-      data-weather-card
-      aria-label={`天气卡片${place ? `：${place.name}` : ''}${
-        warnings?.length ? `，有 ${warnings.length} 条天气预警` : ''
-      }，按回车打开详情，长按打开设置`}
-      onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerUp={clearTimer}
-      onPointerLeave={clearTimer}
-      onPointerCancel={clearTimer}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onOpenSettings();
-      }}
-      onKeyDown={handleKeyDown}
     >
-      {warnings && warnings.length > 0 && size !== '1x1' && <WarningStrip warnings={warnings} />}
-
-      {status.noKey ? (
-        <NoKeyState compact={size === '1x1'} onOpenSettings={onOpenSettings} onUseMock={onUseMock} />
-      ) : loading ? (
-        <LoadingState compact={size === '1x1'} />
-      ) : error ? (
-        <ErrorState error={status.error} onRetry={onRefresh} />
-      ) : !data ? (
-        <LoadingState compact={size === '1x1'} />
-      ) : (
-        <div className={styles.body}>
-          {size === '1x1' && (
-            <div className={mergeClasses(styles.body, styles.body1)}>
-              <WeatherIcon
-                code={current.icon}
-                night={currentNight}
-                scheme={scheme}
-                size={44}
-                title={current.text}
-              />
-              <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
-            </div>
-          )}
-
-          {size === '2x1' && (
-            <div className={mergeClasses(styles.body, styles.body2)}>
-              <div className={styles.left2}>
-                <WeatherIcon
-                  code={current.icon}
-                  night={currentNight}
-                  scheme={scheme}
-                  size={48}
-                  title={current.text}
-                />
-                <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
-              </div>
-              <div className={styles.right2}>
-                <Condition code={current.icon} text={current.text} />
-                <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
-              </div>
-            </div>
-          )}
-
-          {size === '2x2' && (
-            <div className={mergeClasses(styles.body, styles.body22)}>
-              <div className={styles.top22}>
-                <Text size={200} className={styles.city}>
-                  {place?.name}
-                </Text>
-                <div className={styles.top22Row}>
-                  <WeatherIcon
-                    code={current.icon}
-                    night={currentNight}
-                    scheme={scheme}
-                    size={56}
-                    title={current.text}
-                  />
-                  <span className={styles.temp48}>{fmtTemp(current.temp, settings.unit)}</span>
-                  <div className={styles.meta22}>
-                    <Condition code={current.icon} text={current.text} />
-                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
-                  </div>
-                </div>
-              </div>
-              <div className={styles.hourly22}>
-                <HourlyStrip
-                  items={data.hourly}
-                  unit={settings.unit}
-                  scheme={scheme}
-                  sunrise={today?.sunrise}
-                  sunset={today?.sunset}
-                  count={6}
-                />
-              </div>
-            </div>
-          )}
-
-          {size === '3x2' && (
-            <div className={mergeClasses(styles.body, styles.body32)}>
-              <div className={styles.current32}>
-                <Text size={300} className={styles.city}>
-                  {place?.name}
-                </Text>
-                <div className={styles.currentRow}>
-                  <WeatherIcon
-                    code={current.icon}
-                    night={currentNight}
-                    scheme={scheme}
-                    size={64}
-                    title={current.text}
-                  />
-                  <span className={styles.temp68}>{fmtTemp(current.temp, settings.unit)}</span>
-                </div>
-                <div className={styles.meta32}>
-                  <Condition code={current.icon} text={current.text} />
-                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={400} />
-                </div>
-              </div>
-              <div className={styles.daily32}>
-                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} variant="panel" />
-              </div>
-            </div>
-          )}
-
-          {size === '4x2' && (
-            <div className={mergeClasses(styles.body, styles.body42)}>
-              <div className={styles.top42}>
-                <div className={styles.current42}>
-                  <Text size={300} className={styles.city}>
-                    {place?.name}
-                  </Text>
-                  <div className={styles.currentRow}>
-                    <WeatherIcon
-                      code={current.icon}
-                      night={currentNight}
-                      scheme={scheme}
-                      size={72}
-                      title={current.text}
-                    />
-                    <span className={styles.temp68}>{fmtTemp(current.temp, settings.unit)}</span>
-                  </div>
-                  <div className={styles.meta32}>
-                    <Condition code={current.icon} text={current.text} />
-                    <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={400} />
-                  </div>
-                </div>
-                {air && (
-                  <div className={styles.aqi42}>
-                    <AirRing air={air} size={88} />
-                  </div>
-                )}
-              </div>
-              <div className={styles.daily42}>
-                <DailyColumns items={data.daily} unit={settings.unit} scheme={scheme} variant="row" />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {showOfflineDot && <span className={styles.offlineDot} title="离线数据" />}
-    </div>
+      {content}
+    </CardRoot>
   );
 }

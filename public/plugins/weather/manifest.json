@@ -1,7 +1,8 @@
 {
   "id": "weather",
   "name": "天气",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "background": false,
   "widgets": [
     {
       "id": "weather-card",
@@ -16,5 +17,91 @@
       "defaultSize": [3, 2],
       "cell": [1, 1]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "显示",
+        "hint": "由宿主设置页按本清单渲染并即时保存；城市列表在详情「管理城市」里维护。",
+        "fields": [
+          {
+            "key": "unit",
+            "type": "enum",
+            "label": "温度单位",
+            "default": "c",
+            "options": [
+              { "value": "c", "label": "摄氏 °C" },
+              { "value": "f", "label": "华氏 °F" }
+            ]
+          },
+          {
+            "key": "refreshMin",
+            "type": "enum",
+            "label": "刷新间隔",
+            "default": 30,
+            "options": [
+              { "value": 15, "label": "15 分钟" },
+              { "value": 30, "label": "30 分钟" },
+              { "value": 60, "label": "60 分钟" }
+            ]
+          },
+          {
+            "key": "showAir",
+            "type": "boolean",
+            "label": "显示空气质量",
+            "default": true
+          },
+          {
+            "key": "showWarnings",
+            "type": "boolean",
+            "label": "显示天气预警",
+            "default": true
+          },
+          {
+            "key": "showMinutely",
+            "type": "boolean",
+            "label": "显示分钟级降水",
+            "default": false
+          }
+        ]
+      },
+      {
+        "id": "behavior",
+        "title": "行为",
+        "fields": [
+          {
+            "key": "autoLocate",
+            "type": "boolean",
+            "label": "自动定位",
+            "description": "系统定位优先，失败用 ip.cn 网络归属地兜底；只在你打开时请求",
+            "default": false
+          }
+        ]
+      },
+      {
+        "id": "source",
+        "title": "数据源",
+        "hint": "和风天气控制台的 API Key 与 API Host；没有 Key 时卡片只显示配置引导。",
+        "fields": [
+          {
+            "key": "apiKey",
+            "type": "text",
+            "label": "和风天气 API Key",
+            "secret": true,
+            "default": ""
+          },
+          {
+            "key": "apiHost",
+            "type": "text",
+            "label": "API Host",
+            "placeholder": "例如 abcdef.qweatherapi.com",
+            "default": ""
+          }
+        ]
+      }
+    ]
+  }
 }

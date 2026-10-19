@@ -1,4 +1,9 @@
-/** 详情 Drawer 顶部的城市切换菜单（卡片正常模式不出现菜单，保持无 chrome）。 */
+/**
+ * L1 header 的城市按钮 + 下拉菜单。
+ *
+ * 菜单只放城市切换、定位得到的「当前位置 · X」一键切换、以及「管理城市…」（进 L2）。
+ * 设置与刷新在 header 右侧，不重复进菜单；卡片上没有这个菜单（DENSITY chrome on demand）。
+ */
 
 import {
   Button,
@@ -8,12 +13,12 @@ import {
   MenuList,
   MenuPopover,
   MenuTrigger,
+  Text,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
-  ArrowClockwise16Regular,
   Checkmark16Filled,
   ChevronDown16Regular,
   Location16Regular,
@@ -25,12 +30,11 @@ const useStyles = makeStyles({
   trigger: {
     minWidth: 0,
     maxWidth: '100%',
+    minHeight: '40px',
     justifyContent: 'flex-start',
-    paddingLeft: tokens.spacingHorizontalXXS,
-    paddingRight: tokens.spacingHorizontalXS,
-    gap: tokens.spacingHorizontalS,
+    paddingInline: tokens.spacingHorizontalXS,
+    gap: tokens.spacingHorizontalXS,
     color: tokens.colorNeutralForeground1,
-    fontWeight: tokens.fontWeightSemibold,
   },
   cityName: {
     overflow: 'hidden',
@@ -38,32 +42,32 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     minWidth: 0,
   },
-  located: {
-    color: tokens.colorBrandForeground1,
-    marginLeft: 'auto',
-    flexShrink: 0,
-  },
-  menuItemText: {
+  itemText: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    maxWidth: '220px',
+    maxWidth: '260px',
+  },
+  itemHint: {
+    color: tokens.colorNeutralForeground3,
+    marginLeft: tokens.spacingHorizontalS,
+    flexShrink: 0,
   },
 });
 
 export function CityMenu({
-  settings,
-  locatedPlace,
-  className,
-  triggerClassName,
+  places,
+  currentPlace,
+  located,
   onSelectPlace,
+  onAddPlace,
   onManageCities,
-  onOpenSettings,
-  onRefresh,
+  className,
 }) {
   const styles = useStyles();
-  const places = settings?.places || [];
-  const locatedMissing = locatedPlace && !places.some((place) => place.id === locatedPlace.id);
+  const list = Array.isArray(places) ? places : [];
+  const locatedInList = Boolean(located && list.some((place) => place.id === located.id));
+  const showLocated = Boolean(located && !located.isCurrent);
 
   return (
     <Menu>
@@ -71,43 +75,41 @@ export function CityMenu({
         <Button
           appearance="subtle"
           size="large"
-          className={mergeClasses(styles.trigger, triggerClassName)}
-          icon={<Location16Regular />}
+          className={mergeClasses(styles.trigger, className)}
+          aria-label={currentPlace ? `当前城市 ${currentPlace.name}，切换城市` : '选择城市'}
           title="切换城市"
-          aria-label="切换城市"
         >
-          <span className={mergeClasses(styles.cityName, className)}>
-            {places.find((place) => place.isCurrent)?.name || '选择城市'}
-          </span>
+          <Text size={400} weight="semibold" className={styles.cityName}>
+            {currentPlace?.name || '选择城市'}
+          </Text>
           <ChevronDown16Regular />
         </Button>
       </MenuTrigger>
       <MenuPopover>
         <MenuList>
-          {places.map((place) => (
+          {list.map((place) => (
             <MenuItem
               key={place.id}
               icon={place.isCurrent ? <Checkmark16Filled /> : <Location16Regular />}
               onClick={() => onSelectPlace(place.id)}
             >
-              <span className={styles.menuItemText}>{placeMenuLabel(place)}</span>
+              <span className={styles.itemText}>{placeMenuLabel(place)}</span>
             </MenuItem>
           ))}
-          {locatedMissing && (
-            <MenuItem icon={<Location16Regular />} onClick={() => onSelectPlace(locatedPlace.id, { addIfMissing: true })}>
-              <span className={styles.menuItemText}>当前位置 · {locatedPlace.name}</span>
-              <span className={styles.located}>定位</span>
+          {showLocated ? (
+            <MenuItem
+              icon={<Location16Regular />}
+              onClick={() => (locatedInList ? onSelectPlace(located.id) : onAddPlace(located))}
+            >
+              <span className={styles.itemText}>当前位置 · {placeMenuLabel(located)}</span>
+              <Text size={200} className={styles.itemHint}>
+                {locatedInList ? '切换' : '添加'}
+              </Text>
             </MenuItem>
-          )}
+          ) : null}
           <MenuDivider />
-          <MenuItem icon={<ArrowClockwise16Regular />} onClick={onRefresh}>
-            刷新数据
-          </MenuItem>
           <MenuItem icon={<Settings16Regular />} onClick={onManageCities}>
             管理城市…
-          </MenuItem>
-          <MenuItem icon={<Settings16Regular />} onClick={onOpenSettings}>
-            天气设置…
           </MenuItem>
         </MenuList>
       </MenuPopover>

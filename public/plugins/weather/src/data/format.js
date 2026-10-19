@@ -35,6 +35,23 @@ export function monthDayLabel(dateStr) {
   return date ? `${date.getMonth() + 1}月${date.getDate()}日` : dateStr || '';
 }
 
+/** 7 天列表的星期：今天 / 明天 / 周X（14 号字） */
+export function weekdayLabel(dateStr, index = -1) {
+  const date = parseDateOnly(dateStr);
+  if (!date) return dateStr || '--';
+  const today = startOfToday();
+  const diff = Math.round((startOfDay(date) - today) / 86400000);
+  if (diff === 0 || index === 0) return '今天';
+  if (diff === 1 || index === 1) return '明天';
+  return WEEKDAYS[date.getDay()];
+}
+
+/** 7 天列表的日期：10/19（12 号字 fg3） */
+export function shortDate(dateStr) {
+  const date = parseDateOnly(dateStr);
+  return date ? `${date.getMonth() + 1}/${date.getDate()}` : '';
+}
+
 /** v7 的 fxDate / v1 的 forecastStartTime 取本地日期部分 */
 export function dateOnly(value) {
   if (!value) return '';

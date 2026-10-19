@@ -1,8 +1,12 @@
 /**
- * 天气详情各面板（按 OVERLAY-REWRITE-SPEC §3.1 重排）。
+ * L1 详情各 Tab 的内容（平级内容，用 DetailTabs + CrossFade 切换）。
  *
- * 统计用两列 statCard（≥160×88、colorNeutralBackground2、圆角 8、padding 12，
- * 值 24–32 semibold、标签 12 fg3）；逐时/7 天/预警用列表，行高 ≥44，正文 ≥12。
+ * 行高与字号按 docs/components/weather.md：
+ * - 逐时：行 44，时间 14 fg2 / 图标 24 / 温度 16 semibold / 现象 14 / 风 12 fg3 / 降水 12 fg3；
+ * - 7 天：行 44，星期 14 + 日期 12 fg3 / 图标 24 / 现象 14 / 高温 20 semibold + 低温 14 fg3 / 风 12；
+ * - 空气：AQI 环 88 + 类别 14 + 首要污染物 12；污染物行 44（名称 14 / 值 16 semibold 右对齐 / 单位 12 fg3）；
+ * - 生活指数：行 48–64，名称 14 / 类别 14 fg2 / 建议 14 fg2；
+ * - 预警：Accordion，标题 14 semibold / 正文 14 fg2 / 时间 12 fg3，不裁切。
  */
 
 import {
@@ -10,112 +14,85 @@ import {
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
-  Button,
   Spinner,
   Text,
   makeStyles,
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { Warning16Filled, WeatherSunny24Regular } from '@fluentui/react-icons';
+import { Water20Regular, WeatherSunny24Regular } from '@fluentui/react-icons';
+import { ActionButton, EmptyState } from '../../../_shared/ui.jsx';
 import { WeatherIcon } from '../components/atoms.jsx';
-import { isNight } from '../components/forecast.jsx';
+import { AirRing, isNight } from '../components/forecast.jsx';
 import {
-  dayLabel,
-  fmtHumidity,
   fmtPop,
   fmtTemp,
-  fmtUv,
   fmtWind,
   hourLabel,
+  shortDate,
+  weekdayLabel,
 } from '../data/format.js';
 
 const useStyles = makeStyles({
-  panel: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, minWidth: 0 },
-  sectionTitle: { color: tokens.colorNeutralForeground1, display: 'block' },
-
-  statGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: tokens.spacingHorizontalM,
-    minWidth: 0,
-    width: '100%',
-  },
-  statCard: {
-    minWidth: '160px',
-    minHeight: '88px',
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusXLarge,
-    padding: tokens.spacingVerticalM,
+  stack: {
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
-    boxSizing: 'border-box',
+    gap: tokens.spacingVerticalL,
+    minWidth: 0,
   },
-  statValueLg: {
-    fontSize: tokens.fontSizeHero800,
-    lineHeight: tokens.lineHeightHero800,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    whiteSpace: 'nowrap',
-  },
-  statValueMd: {
-    fontSize: tokens.fontSizeBase600,
-    lineHeight: tokens.lineHeightBase600,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    whiteSpace: 'nowrap',
-  },
-  statUnit: {
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    fontWeight: tokens.fontWeightRegular,
-    color: tokens.colorNeutralForeground3,
-    marginLeft: tokens.spacingHorizontalXS,
-  },
-  statLabel: { color: tokens.colorNeutralForeground3 },
-
   list: { display: 'flex', flexDirection: 'column', minWidth: 0 },
-  row: {
+
+  hourlyRow: {
     display: 'grid',
-    gridTemplateColumns: '56px 28px minmax(0, 1fr) auto',
+    gridTemplateColumns: '56px 24px 56px minmax(0, 1fr) 104px 80px',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
     minHeight: '44px',
     minWidth: 0,
   },
-  rowTime: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  rowText: {
+  dailyRow: {
+    display: 'grid',
+    gridTemplateColumns: '104px 24px minmax(0, 1fr) 112px 96px',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '44px',
+    minWidth: 0,
+  },
+  dayCell: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  time: { color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
+  muted: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+  text: {
     color: tokens.colorNeutralForeground1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     minWidth: 0,
   },
-  rowSub: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  rowRight: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXXS,
+  right: { justifySelf: 'end', whiteSpace: 'nowrap' },
+  temp: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  high: {
+    fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   },
-  rowTemp: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
-
-  dailyRow: {
-    display: 'grid',
-    gridTemplateColumns: '64px 24px minmax(0, 1fr) auto',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalM,
-    minHeight: '44px',
+  low: {
+    color: tokens.colorNeutralForeground3,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+  },
+  temps: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalS,
     minWidth: 0,
   },
-  dailyTemps: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
-  dailyLow: { color: tokens.colorNeutralForeground3, fontVariantNumeric: 'tabular-nums' },
 
-  minutelyBox: {
+  minutely: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalS,
@@ -124,7 +101,19 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalM,
     minWidth: 0,
   },
-  minutelyBars: { display: 'flex', alignItems: 'flex-end', gap: tokens.spacingHorizontalXXS, height: '48px', minWidth: 0 },
+  minutelyHead: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    color: tokens.colorNeutralForeground2,
+  },
+  minutelyBars: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalXXS,
+    height: '48px',
+    minWidth: 0,
+  },
   minutelyBar: {
     flex: 1,
     minWidth: '2px',
@@ -132,352 +121,273 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorBrandBackground,
   },
 
-  adviceGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: tokens.spacingHorizontalM,
-    minWidth: 0,
-  },
-  adviceCard: {
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusXLarge,
-    padding: tokens.spacingVerticalM,
+  airTop: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
-  },
-  adviceText: { color: tokens.colorNeutralForeground2, whiteSpace: 'pre-wrap' },
-
-  indexGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: tokens.spacingHorizontalM,
-    minWidth: 0,
-  },
-  indexCard: {
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusXLarge,
-    padding: tokens.spacingVerticalM,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
-  },
-  indexTop: { display: 'flex', alignItems: 'baseline', gap: tokens.spacingHorizontalS, minWidth: 0 },
-  indexName: { color: tokens.colorNeutralForeground1 },
-  indexCategory: { color: tokens.colorNeutralForeground2 },
-  indexText: { color: tokens.colorNeutralForeground3, whiteSpace: 'pre-wrap' },
-
-  warningHeader: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, minWidth: 0, flexWrap: 'wrap' },
-  warningTitle: { color: tokens.colorNeutralForeground1 },
-  warningMeta: { color: tokens.colorNeutralForeground3 },
-  warningBody: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS, paddingBottom: tokens.spacingVerticalM },
-  warningText: { color: tokens.colorNeutralForeground2, whiteSpace: 'pre-wrap' },
-  accordionHeader: { minHeight: '44px' },
-
-  empty: {
-    display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalM,
-    padding: tokens.spacingVerticalXXL,
-    color: tokens.colorNeutralForeground3,
-    textAlign: 'center',
+    gap: tokens.spacingHorizontalXXL,
+    minWidth: 0,
+    flexWrap: 'wrap',
   },
-  sectionLoading: {
+  airMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  airMetric: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto 72px',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '44px',
+    minWidth: 0,
+  },
+  airValue: { justifySelf: 'end', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  airUnit: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
+
+  indexRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    minHeight: '48px',
+    paddingBlock: tokens.spacingVerticalS,
+    minWidth: 0,
+  },
+  indexHead: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+  },
+  indexAdvice: { color: tokens.colorNeutralForeground2, whiteSpace: 'pre-wrap' },
+
+  warningHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    width: '100%',
+    minWidth: 0,
+    minHeight: '44px',
+  },
+  warningDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: tokens.borderRadiusCircular,
+    flexShrink: 0,
+  },
+  warningTitle: { color: tokens.colorNeutralForeground1, minWidth: 0, flex: '1 1 auto' },
+  warningMeta: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap', flexShrink: 0 },
+  warningBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalM,
+    minWidth: 0,
+  },
+  warningText: { color: tokens.colorNeutralForeground2, whiteSpace: 'pre-wrap' },
+  warningTime: { color: tokens.colorNeutralForeground3 },
+
+  loading: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     color: tokens.colorNeutralForeground3,
-    padding: tokens.spacingVerticalS,
+    paddingBlock: tokens.spacingVerticalM,
   },
-  errorText: { color: tokens.colorStatusDangerForeground1, padding: tokens.spacingVerticalS },
+  error: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: tokens.spacingVerticalS,
+    color: tokens.colorStatusDangerForeground1,
+    paddingBlock: tokens.spacingVerticalS,
+  },
 });
 
-export function tabItems() {
-  return [
-    { value: 'hourly', label: '逐小时' },
-    { value: 'daily', label: '7 天' },
-    { value: 'air', label: '空气' },
-    { value: 'indices', label: '生活指数' },
-    { value: 'warning', label: '预警' },
-  ];
-}
-
-/** 统计卡：值 24/32 semibold，标签 12 fg3；可选副行（类别）14 semibold */
-export function StatCard({ label, value, unit, sub, subColor, valueSize = 'lg', className }) {
+function SectionLoading({ label }) {
   const styles = useStyles();
   return (
-    <div className={mergeClasses(styles.statCard, className)} data-stat-card>
-      <span className={valueSize === 'lg' ? styles.statValueLg : styles.statValueMd}>
-        {value}
-        {unit ? <span className={styles.statUnit}>{unit}</span> : null}
-      </span>
-      <Text size={200} className={styles.statLabel}>
-        {label}
-      </Text>
-      {sub ? (
-        <Text size={300} weight="semibold" style={subColor ? { color: subColor } : undefined}>
-          {sub}
-        </Text>
-      ) : null}
+    <div className={styles.loading}>
+      <Spinner size="tiny" />
+      <Text size={300}>{label}</Text>
     </div>
   );
 }
 
-export function HourlyPanel({ data, settings, scheme, minutelyLoading }) {
+function SectionError({ message, onRetry }) {
+  const styles = useStyles();
+  return (
+    <div className={styles.error}>
+      <Text size={300}>{message}</Text>
+      {onRetry ? <ActionButton onClick={onRetry}>重试</ActionButton> : null}
+    </div>
+  );
+}
+
+export function HourlyPanel({ data, settings, scheme, minutelyState, onRetry }) {
   const styles = useStyles();
   const today = data.daily?.[0];
   const minutely = data.minutely;
+  const hourly = data.hourly || [];
+
   return (
-    <div className={styles.panel}>
-      {settings.showMinutely && (
-        <div className={styles.minutelyBox}>
-          <Text size={400} weight="semibold">
-            分钟级降水
-          </Text>
-          {minutely && minutely.summary ? (
-            <>
-              <Text size={300} className={styles.adviceText}>
-                {minutely.summary}
-              </Text>
-              <div className={styles.minutelyBars} aria-hidden="true">
-                {minutely.items.slice(0, 24).map((item, index) => {
-                  const max = Math.max(...minutely.items.map((entry) => entry.precip), 0.1);
-                  return (
-                    <span
-                      key={item.time || index}
-                      className={styles.minutelyBar}
-                      style={{ height: `${Math.max(4, (item.precip / max) * 100)}%` }}
-                      title={`${hourLabel(item.time)} ${item.precip}mm`}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <Text size={300} className={styles.adviceText}>
-              {minutelyLoading ? '正在获取分钟级降水…' : '当前没有分钟级降水数据'}
+    <div className={styles.stack}>
+      {settings.showMinutely && minutely && minutely.items?.length > 0 ? (
+        <div className={styles.minutely}>
+          <div className={styles.minutelyHead}>
+            <Water20Regular />
+            <Text size={300} weight="semibold">
+              分钟级降水
             </Text>
-          )}
+          </div>
+          {minutely.summary ? (
+            <Text size={300} className={styles.indexAdvice}>
+              {minutely.summary}
+            </Text>
+          ) : null}
+          <div className={styles.minutelyBars} aria-hidden="true">
+            {minutely.items.slice(0, 24).map((item, index) => {
+              const max = Math.max(...minutely.items.map((entry) => entry.precip), 0.1);
+              return (
+                <span
+                  key={item.time || index}
+                  className={styles.minutelyBar}
+                  style={{ height: `${Math.max(4, (item.precip / max) * 100)}%` }}
+                  title={`${hourLabel(item.time)} ${item.precip}mm`}
+                />
+              );
+            })}
+          </div>
         </div>
-      )}
-      <Text size={400} weight="semibold">
-        未来 24 小时
-      </Text>
-      <div className={styles.list}>
-        {(data.hourly || []).map((item, index) => (
-          <div className={styles.row} key={item.fxTime || index}>
-            <Text size={300} className={styles.rowTime}>
-              {index === 0 ? '现在' : hourLabel(item.fxTime)}
-            </Text>
-            <WeatherIcon
-              code={item.icon}
-              night={isNight(item.fxTime, today?.sunrise, today?.sunset)}
-              scheme={scheme}
-              size={28}
-              title={item.text}
-            />
-            <Text size={300} className={styles.rowText}>
-              {item.text}
-              {item.pop > 0 ? ` · ${fmtPop(item.pop)}` : ''}
-            </Text>
-            <div className={styles.rowRight}>
-              <Text size={400} weight="semibold" className={styles.rowTemp}>
+      ) : null}
+      {settings.showMinutely && !minutely && minutelyState?.loading ? (
+        <SectionLoading label="正在获取分钟级降水…" />
+      ) : null}
+
+      {hourly.length === 0 ? (
+        <SectionError message="暂时没有逐时预报" onRetry={onRetry} />
+      ) : (
+        <div className={styles.list}>
+          {hourly.map((item, index) => (
+            <div className={styles.hourlyRow} data-hourly-row key={item.fxTime || index}>
+              <Text size={300} className={styles.time}>
+                {index === 0 ? '现在' : hourLabel(item.fxTime)}
+              </Text>
+              <WeatherIcon
+                code={item.icon}
+                night={isNight(item.fxTime, today?.sunrise, today?.sunset)}
+                scheme={scheme}
+                size={24}
+                title={item.text}
+              />
+              <Text size={400} weight="semibold" className={styles.temp}>
                 {fmtTemp(item.temp, settings.unit)}
               </Text>
-              <Text size={200} className={styles.rowSub}>
+              <Text size={300} className={styles.text}>
+                {item.text}
+              </Text>
+              <Text size={200} className={mergeClasses(styles.muted, styles.right)}>
                 {fmtWind(item.windDir, item.windScale)}
               </Text>
+              <Text size={200} className={mergeClasses(styles.muted, styles.right)}>
+                {item.pop > 0 ? fmtPop(item.pop) : ''}
+              </Text>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export function DailyPanel({ data, settings, scheme }) {
   const styles = useStyles();
-  const today = data.daily?.[0];
+  const daily = (data.daily || []).slice(0, 7);
+  if (daily.length === 0) {
+    return <SectionError message="暂时没有 7 天预报" />;
+  }
   return (
-    <div className={styles.panel}>
-      <Text size={400} weight="semibold">
-        7 天预报
-      </Text>
-      <div className={styles.list}>
-        {(data.daily || []).slice(0, 7).map((item, index) => (
-          <div className={styles.dailyRow} key={item.fxDate || index}>
-            <Text size={300}>
-              {index === 0 ? '今天' : dayLabel(item.fxDate, index)}
+    <div className={styles.list}>
+      {daily.map((item, index) => (
+        <div className={styles.dailyRow} data-daily-row key={item.fxDate || index}>
+          <div className={styles.dayCell}>
+            <Text size={300}>{weekdayLabel(item.fxDate, index)}</Text>
+            <Text size={200} className={styles.muted}>
+              {shortDate(item.fxDate)}
             </Text>
-            <WeatherIcon code={item.icon} scheme={scheme} size={24} title={item.text} />
-            <Text size={300} className={styles.rowText}>
-              {item.text}
-            </Text>
-            <div className={styles.rowRight}>
-              <span className={styles.dailyTemps}>
-                <Text size={500} weight="semibold" className={styles.dailyTemps}>
-                  {fmtTemp(item.tempMax, settings.unit)}
-                </Text>{' '}
-                <Text size={300} className={styles.dailyLow}>
-                  {fmtTemp(item.tempMin, settings.unit)}
-                </Text>
-              </span>
-              <Text size={200} className={styles.rowSub}>
-                {item.pop > 0 ? fmtPop(item.pop) : `紫外线 ${fmtUv(item.uvIndex)}`}
-              </Text>
-            </div>
           </div>
-        ))}
-      </div>
-      <div className={styles.row} style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
-        <Text size={300} className={styles.rowSub}>
-          日出 {hourLabel(today?.sunrise)} · 日落 {hourLabel(today?.sunset)} · 湿度 {fmtHumidity(today?.humidity)}
-        </Text>
-        <Text size={300} className={styles.rowSub}>
-          {fmtWind(today?.windDir, today?.windScale)}
-        </Text>
-      </div>
+          <WeatherIcon code={item.icon} scheme={scheme} size={24} title={item.text} />
+          <Text size={300} className={styles.text}>
+            {item.text}
+          </Text>
+          <div className={styles.temps}>
+            <Text size={500} weight="semibold" className={styles.high}>
+              {fmtTemp(item.tempMax, settings.unit)}
+            </Text>
+            <Text size={300} className={styles.low}>
+              {fmtTemp(item.tempMin, settings.unit)}
+            </Text>
+          </div>
+          <Text size={200} className={mergeClasses(styles.muted, styles.right)}>
+            {fmtWind(item.windDir, item.windScale)}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }
 
-export function AirPanel({ data, loading, error, requestSection }) {
+export function AirPanel({ data, state, onRetry, showAir = true }) {
   const styles = useStyles();
   const air = data.air;
-  if (loading && !air) {
+
+  if (!showAir) {
     return (
-      <div className={styles.sectionLoading}>
-        <Spinner size="tiny" />
-        <Text size={300}>正在获取空气质量…</Text>
-      </div>
+      <EmptyState
+        icon={<WeatherSunny24Regular />}
+        title="已在设置里关闭空气质量"
+        description="打开「显示空气质量」后，这里会显示 AQI 与污染物浓度"
+      />
     );
   }
-  if (error && !air) {
-    return (
-      <Text size={300} className={styles.errorText}>
-        {error}
-      </Text>
-    );
-  }
+  if (!air && state?.loading) return <SectionLoading label="正在获取空气质量…" />;
+  if (!air && state?.error) return <SectionError message={state.error} onRetry={onRetry} />;
   if (!air) {
     return (
-      <div className={styles.empty}>
-        <Text size={300}>当前没有空气质量数据</Text>
-        <Button size="large" onClick={() => requestSection('air')}>
-          重新获取
-        </Button>
-      </div>
+      <EmptyState
+        icon={<WeatherSunny24Regular />}
+        title="暂无空气质量数据"
+        description="该城市当前没有返回空气质量数据"
+        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+      />
     );
   }
-  const pollutants = Object.entries(air.pollutants || {});
-  return (
-    <div className={styles.panel}>
-      <div className={styles.statGrid}>
-        <StatCard
-          label="空气质量指数"
-          value={air.aqiDisplay || air.aqi || '—'}
-          sub={air.category || '—'}
-          subColor={air.color}
-        />
-        <StatCard label="首要污染物" value={air.primary || '—'} sub={air.aqiStandard === 'cn-mee' ? '中国 AQI 标准' : 'AQI'} valueSize="md" />
-      </div>
-      <Text size={400} weight="semibold">
-        污染物浓度
-      </Text>
-      <div className={styles.statGrid}>
-        {pollutants.map(([code, item]) => (
-          <StatCard
-            key={code}
-            label={item.name || code}
-            value={item.value == null ? '—' : Math.round(item.value * 10) / 10}
-            unit={item.unit}
-            valueSize="md"
-          />
-        ))}
-      </div>
-      {(air.health?.general || air.health?.sensitive) && (
-        <>
-          <Text size={400} weight="semibold">
-            健康建议
-          </Text>
-          <div className={styles.adviceGrid}>
-            {air.health.general && (
-              <div className={styles.adviceCard}>
-                <Text size={200} className={styles.statLabel}>
-                  一般人群
-                </Text>
-                <Text size={300} className={styles.adviceText}>
-                  {air.health.general}
-                </Text>
-              </div>
-            )}
-            {air.health.sensitive && (
-              <div className={styles.adviceCard}>
-                <Text size={200} className={styles.statLabel}>
-                  敏感人群
-                </Text>
-                <Text size={300} className={styles.adviceText}>
-                  {air.health.sensitive}
-                </Text>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
-export function IndicesPanel({ data, loading, error, requestSection }) {
-  const styles = useStyles();
-  const indices = data.indices;
-  if (loading && !indices) {
-    return (
-      <div className={styles.sectionLoading}>
-        <Spinner size="tiny" />
-        <Text size={300}>正在获取生活指数…</Text>
-      </div>
-    );
-  }
-  if (error && !indices) {
-    return (
-      <Text size={300} className={styles.errorText}>
-        {error}
-      </Text>
-    );
-  }
-  if (!indices || indices.length === 0) {
-    return (
-      <div className={styles.empty}>
-        <Text size={300}>当前城市暂无生活指数</Text>
-        <Button size="large" onClick={() => requestSection('indices')}>
-          重新获取
-        </Button>
-      </div>
-    );
-  }
+  const pollutants = Object.entries(air.pollutants || {}).filter(([, item]) => item && item.value != null);
+
   return (
-    <div className={styles.panel}>
-      <Text size={400} weight="semibold">
-        今日生活指数
-      </Text>
-      <div className={styles.indexGrid}>
-        {indices.map((item) => (
-          <div className={styles.indexCard} key={`${item.type}-${item.date}`}>
-            <div className={styles.indexTop}>
-              <Text size={300} weight="semibold" className={styles.indexName}>
-                {item.name}
-              </Text>
-              <Text size={200} className={styles.indexCategory}>
-                {item.category}
-              </Text>
-            </div>
-            <Text size={200} className={styles.indexText}>
-              {item.text}
+    <div className={styles.stack}>
+      <div className={styles.airTop}>
+        <AirRing air={air} size={88} />
+        <div className={styles.airMeta}>
+          <Text size={200} className={styles.muted}>
+            首要污染物 {air.primary || '—'}
+          </Text>
+          <Text size={200} className={styles.muted}>
+            {air.aqiStandard === 'cn-mee' ? '中国 AQI 标准' : 'AQI'}
+          </Text>
+        </div>
+      </div>
+
+      <div className={styles.list}>
+        {pollutants.map(([code, item]) => (
+          <div className={styles.airMetric} data-air-row key={code}>
+            <Text size={300}>{item.name || code}</Text>
+            <Text size={400} weight="semibold" className={styles.airValue}>
+              {Math.round(Number(item.value) * 10) / 10}
+            </Text>
+            <Text size={200} className={styles.airUnit}>
+              {item.unit || 'μg/m³'}
             </Text>
           </div>
         ))}
@@ -486,74 +396,106 @@ export function IndicesPanel({ data, loading, error, requestSection }) {
   );
 }
 
-export function WarningPanel({ data, loading, error, requestSection }) {
+export function IndicesPanel({ data, state, onRetry }) {
   const styles = useStyles();
-  const warnings = data.warnings;
-  if (loading && !warnings) {
+  const indices = data.indices;
+
+  if (!indices && state?.loading) return <SectionLoading label="正在获取生活指数…" />;
+  if (!indices && state?.error) return <SectionError message={state.error} onRetry={onRetry} />;
+  if (!indices || indices.length === 0) {
     return (
-      <div className={styles.sectionLoading}>
-        <Spinner size="tiny" />
-        <Text size={300}>正在获取天气预警…</Text>
-      </div>
+      <EmptyState
+        icon={<WeatherSunny24Regular />}
+        title="暂无生活指数"
+        description="该城市当前没有返回生活指数数据"
+        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+      />
     );
   }
-  if (error && !warnings) {
-    return (
-      <Text size={300} className={styles.errorText}>
-        {error}
-      </Text>
-    );
-  }
-  if (!warnings || warnings.length === 0) {
-    return (
-      <div className={styles.empty}>
-        <WeatherSunny24Regular />
-        <Text size={300}>当前没有生效的天气预警</Text>
-        <Button size="large" onClick={() => requestSection('warnings')}>
-          重新获取
-        </Button>
-      </div>
-    );
-  }
+
   return (
-    <div className={styles.panel}>
-      <Text size={400} weight="semibold">
-        正在生效的预警（点开查看详情）
-      </Text>
-      <Accordion multiple collapsible>
-        {warnings.map((item) => (
-          <AccordionItem value={item.id} key={item.id}>
-            <AccordionHeader className={styles.accordionHeader} expandIconPosition="end">
-              <span className={styles.warningHeader}>
-                <Warning16Filled style={{ color: item.color, flexShrink: 0 }} />
-                <Text size={300} weight="semibold" className={styles.warningTitle}>
-                  {item.title}
-                </Text>
-                <Text size={200} className={styles.warningMeta}>
-                  {[item.typeName, item.severityText].filter(Boolean).join(' · ')}
-                </Text>
-              </span>
-            </AccordionHeader>
-            <AccordionPanel>
-              <div className={styles.warningBody}>
-                <Text size={200} className={styles.warningMeta}>
-                  {item.startTime && `生效 ${new Date(item.startTime).toLocaleString('zh-CN', { hour12: false })}`}
-                  {item.endTime && ` → ${new Date(item.endTime).toLocaleString('zh-CN', { hour12: false })}`}
-                </Text>
-                <Text size={300} className={styles.warningText}>
-                  {item.text}
-                </Text>
-                {item.guide && (
-                  <Text size={200} className={styles.warningText}>
-                    {item.guide}
-                  </Text>
-                )}
-              </div>
-            </AccordionPanel>
-          </AccordionItem>
-        ))}
-      </Accordion>
+    <div className={styles.list}>
+      {indices.map((item) => (
+        <div className={styles.indexRow} data-index-row key={`${item.type}-${item.date}`}>
+          <div className={styles.indexHead}>
+            <Text size={300} weight="semibold">
+              {item.name}
+            </Text>
+            <Text size={300} className={styles.muted}>
+              {item.category}
+            </Text>
+          </div>
+          <Text size={300} className={styles.indexAdvice}>
+            {item.text}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }
 
+function formatWarningRange(item) {
+  const format = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString('zh-CN', { hour12: false });
+  };
+  const start = format(item.startTime);
+  const end = format(item.endTime);
+  if (start && end) return `生效 ${start} → ${end}`;
+  return start || end || '';
+}
+
+export function WarningPanel({ data, state, onRetry }) {
+  const styles = useStyles();
+  const warnings = data.warnings;
+
+  if (!warnings && state?.loading) return <SectionLoading label="正在获取天气预警…" />;
+  if (!warnings && state?.error) return <SectionError message={state.error} onRetry={onRetry} />;
+  if (!warnings || warnings.length === 0) {
+    return (
+      <EmptyState
+        icon={<WeatherSunny24Regular />}
+        title="当前没有生效的天气预警"
+        description="有新的预警时，详情会默认打开这个 Tab"
+        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+      />
+    );
+  }
+
+  return (
+    <Accordion multiple collapsible>
+      {warnings.map((item) => (
+        <AccordionItem value={item.id} key={item.id}>
+          <AccordionHeader expandIconPosition="end">
+            <span className={styles.warningHeader} data-warning-head>
+              <span className={styles.warningDot} style={{ backgroundColor: item.color }} />
+              <Text size={300} weight="semibold" className={styles.warningTitle}>
+                {item.title}
+              </Text>
+              <Text size={200} className={styles.warningMeta}>
+                {[item.typeName, item.severityText].filter(Boolean).join(' · ')}
+              </Text>
+            </span>
+          </AccordionHeader>
+          <AccordionPanel>
+            <div className={styles.warningBody}>
+              <Text size={200} className={styles.warningTime}>
+                {formatWarningRange(item)}
+              </Text>
+              <Text size={300} className={styles.warningText}>
+                {item.text}
+              </Text>
+              {item.guide ? (
+                <Text size={300} className={styles.warningText}>
+                  {item.guide}
+                </Text>
+              ) : null}
+            </div>
+          </AccordionPanel>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
+}

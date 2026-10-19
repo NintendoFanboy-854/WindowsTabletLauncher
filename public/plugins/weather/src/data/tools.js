@@ -1,25 +1,55 @@
 /**
- * Agent 工具：声明 + 执行。
+ * Agent 工具：声明 + 执行（契约 §6，UI 路径 ↔ 工具一一对应）。
  *
- * 工具名严格按 docs/components/weather.md：weather.current/hourly/daily/air/warning/
- * queryPlace/places/addPlace/removePlace。place 参数接受城市名、LocationID 或 "current"。
+ * 工具名严格按 docs/components/weather.md：
+ *   weather.current / hourly / daily / air / warning / queryPlace
+ *   weather.places / addPlace / removePlace / setCurrentPlace
+ *   weather.refresh / locate / settings.get / settings.set
+ *
+ * `place` 参数接受城市名、和风 LocationID 或 "current"（默认当前城市）。
+ * 工具从宿主配置读最新状态，与卡片/详情 UI 共用同一份数据层。
  */
 
 import {
-  currentPlace,
+  CACHE_KEY,
+  PLACES_KEY,
+  SETTINGS_KEY,
+  addPlaceToList,
+  currentPlaceOf,
   findPlace,
-  addPlaceToSettings,
-  removePlaceFromSettings,
-  placeMenuLabel,
+  normalizeCache,
+  normalizePlaces,
+  normalizeSettings,
+  removePlaceFromList,
+  withCurrentPlace,
 } from './store.js';
-import { loadWeather, loadDetailSection, searchPlaces, isMock } from './service.js';
-import { hasApiKey, WeatherApiError } from './api.js';
+import { plugin } from '/plugin-sdk.js';
+import {
+  applyMock,
+  hasKeyOrMock,
+  loadDetailSection,
+  loadWeather,
+  searchPlaces,
+} from './service.js';
+import { WeatherApiError } from './api.js';
+import { canLocate, locatePlace } from './locate.js';
 import { fmtUpdatedAgo, WIND_COMPASS_ZH } from './format.js';
 
 const placeSchema = {
   type: 'string',
   description: '城市名、和风 LocationID 或 "current"（默认当前城市）',
 };
+
+const SETTING_KEYS = [
+  'unit',
+  'refreshMin',
+  'autoLocate',
+  'showAir',
+  'showWarnings',
+  'showMinutely',
+  'apiKey',
+  'apiHost',
+];
 
 export const AGENT_TOOLS = [
   {
@@ -51,7 +81,7 @@ export const AGENT_TOOLS = [
   },
   {
     name: 'weather.air',
-    description: '获取指定城市的实时空气质量（AQI、等级、首要污染物、PM2.5 等浓度与健康建议）。',
+    description: '获取指定城市的实时空气质量（AQI、等级、首要污染物、PM2.5 等浓度）。',
     parameters: { type: 'object', properties: { place: placeSchema } },
   },
   {
@@ -91,56 +121,52 @@ export const AGENT_TOOLS = [
       required: ['id'],
     },
   },
+  {
+    name: 'weather.setCurrentPlace',
+    description: '把城市列表里已有的某个城市设为当前显示城市（不改变列表）。',
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'string', description: '和风 LocationID' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'weather.refresh',
+    description: '立即刷新天气数据（默认当前城市），忽略缓存。',
+    parameters: { type: 'object', properties: { place: placeSchema } },
+  },
+  {
+    name: 'weather.locate',
+    description:
+      '自动定位并返回定位城市：系统定位优先，失败用 ip.cn 网络归属地兜底，再由和风 GeoAPI 换成坐标。城市列表为空时自动加入并设为当前；已有城市时不自动切换。',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'weather.settings.get',
+    description: '读取天气插件设置（温度单位、刷新间隔、显示项、自动定位、API Key 是否已配置）。',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'weather.settings.set',
+    description:
+      '修改天气插件设置。只传要改的字段：unit(c/f)、refreshMin(15/30/60)、autoLocate、showAir、showWarnings、showMinutely、apiKey、apiHost。',
+    parameters: {
+      type: 'object',
+      properties: {
+        unit: { type: 'string', enum: ['c', 'f'], description: '温度单位' },
+        refreshMin: { type: 'number', enum: [15, 30, 60], description: '刷新间隔（分钟）' },
+        autoLocate: { type: 'boolean', description: '自动定位' },
+        showAir: { type: 'boolean', description: '显示空气质量' },
+        showWarnings: { type: 'boolean', description: '显示天气预警' },
+        showMinutely: { type: 'boolean', description: '显示分钟级降水' },
+        apiKey: { type: 'string', description: '和风天气 API Key' },
+        apiHost: { type: 'string', description: '和风天气 API Host' },
+      },
+    },
+  },
 ];
 
 const FETCH_TTL_MS = 5 * 60 * 1000;
-/** 工具自己的短缓存，避免 Agent 连续调用时重复打接口 */
-const toolCache = new Map();
-
-function cacheKey(settings, placeId) {
-  return `${isMock(settings) ? 'mock' : 'live'}:${settings.apiHost || 'devapi'}:${placeId}`;
-}
-
-async function weatherFor(settings, place, { force = false } = {}) {
-  const key = cacheKey(settings, place.id);
-  const cached = toolCache.get(key);
-  if (!force && cached && Date.now() - cached.fetchedAt < FETCH_TTL_MS) return cached.data;
-  const { data, fetchedAt } = await loadWeather(settings, place, cached?.data);
-  toolCache.set(key, { data, fetchedAt: fetchedAt || Date.now() });
-  return data;
-}
-
-function requireConfigured(settings) {
-  if (!isMock(settings) && !hasApiKey(settings)) {
-    throw new WeatherApiError('天气插件还没配置和风天气 API Key：请长按天气卡片打开设置填写 API Key 与 API Host。', {
-      status: 401,
-      code: 'NO_KEY',
-    });
-  }
-}
-
-function ensureSection(settings, data, section) {
-  if (data && data[section]) return data[section];
-  return null;
-}
-
-async function resolvePlace(settings, placeArg) {
-  requireConfigured(settings);
-  const text = typeof placeArg === 'string' ? placeArg.trim() : '';
-  if (!text || text === 'current' || text === '当前' || text === '当前城市') {
-    const place = currentPlace(settings);
-    if (!place) throw new WeatherApiError('天气插件还没有任何城市', { code: 'NO_PLACE' });
-    return place;
-  }
-  const byId = findPlace(settings, text);
-  if (byId) return byId;
-  const byName = settings.places.find((place) => place.name === text || place.name.includes(text));
-  if (byName) return byName;
-  // 不在列表里就按城市名搜索
-  const results = await searchPlaces(settings, text);
-  if (results.length === 0) throw new WeatherApiError(`没有找到城市“${text}”`, { code: 'NO_LOCATION' });
-  return results[0];
-}
 
 function round(value, digits = 0) {
   if (value == null || Number.isNaN(Number(value))) return null;
@@ -149,22 +175,48 @@ function round(value, digits = 0) {
 }
 
 function fmtPlace(place) {
-  return { id: place.id, name: place.name, region: placeMenuLabel(place), lat: place.lat, lon: place.lon };
+  return {
+    id: place.id,
+    name: place.name,
+    region: [place.adm2, place.adm1].filter(Boolean).join(' · ') || place.adm1 || '',
+    lat: place.lat,
+    lon: place.lon,
+  };
+}
+
+function publicSettings(settings) {
+  return {
+    unit: settings.unit,
+    refreshMin: settings.refreshMin,
+    autoLocate: settings.autoLocate,
+    showAir: settings.showAir,
+    showWarnings: settings.showWarnings,
+    showMinutely: settings.showMinutely,
+    apiHost: settings.apiHost,
+    hasApiKey: Boolean(settings.apiKey),
+  };
+}
+
+function fmtWind(dir, scale, speed) {
+  const name = dir || WIND_COMPASS_ZH.none;
+  if (scale != null) return `${name}${scale}级`;
+  if (speed != null) return `${name}${Math.round(Number(speed) * 3.6)}km/h`;
+  return name;
 }
 
 function currentResult(place, data) {
-  const current = data.current;
+  const current = data.current || {};
   return {
     place: fmtPlace(place),
     updated: fmtUpdatedAgo(data.fetchedAt),
     current: {
-      text: current.text,
+      text: current.text || '',
       temperatureC: round(current.temp, 1),
       feelsLikeC: round(current.feelsLike, 1),
       humidityPercent: current.humidity,
-      wind: `${current.windDir || WIND_COMPASS_ZH.none}${current.windScale != null ? `${current.windScale}级` : ''}`,
+      wind: fmtWind(current.windDir, current.windScale, current.windSpeed),
       pressureHpa: round(current.pressure),
-      visibilityKm: round(current.vis / 1000, 1),
+      visibilityKm: current.vis == null ? null : round(current.vis / 1000, 1),
       precipitationMm: round(current.precip, 1),
       uvIndex: current.uvIndex,
       observedAt: current.obsTime,
@@ -182,21 +234,86 @@ function currentResult(place, data) {
   };
 }
 
-export async function runTool(name, args, context) {
-  const settings = context.getSettings();
-  requireConfigured(settings);
-  const argMap = args && typeof args === 'object' ? args : {};
+function requireConfigured(settings) {
+  if (!hasKeyOrMock(settings)) {
+    throw new WeatherApiError(
+      '天气插件还没配置和风天气 API Key：请打开桌面「设置 → 插件 → 天气」填写 API Key 与 API Host。',
+      { status: 401, code: 'NO_KEY' },
+    );
+  }
+}
 
-  switch (name) {
-    case 'weather.current': {
-      const place = await resolvePlace(settings, argMap.place);
-      const data = await weatherFor(settings, place);
+async function loadState(context) {
+  const [rawSettings, rawPlaces, rawCache] = await Promise.all([
+    plugin.getConfig(SETTINGS_KEY).catch(() => null),
+    plugin.getConfig(PLACES_KEY).catch(() => null),
+    plugin.getConfig(CACHE_KEY).catch(() => null),
+  ]);
+  const settings = applyMock(normalizeSettings(rawSettings), context.mock);
+  let places = normalizePlaces(rawPlaces);
+  // 迁移尚未跑完时的兜底：旧版把 places 写在 settings 里
+  if (places.length === 0 && rawSettings && typeof rawSettings === 'object') {
+    places = normalizePlaces(rawSettings.places);
+  }
+  return { settings, places, cache: normalizeCache(rawCache) };
+}
+
+async function resolvePlace(state, placeArg) {
+  const text = typeof placeArg === 'string' ? placeArg.trim() : '';
+  if (!text || text === 'current' || text === '当前' || text === '当前城市') {
+    const place = currentPlaceOf(state.places);
+    if (!place) throw new WeatherApiError('天气插件还没有任何城市', { code: 'NO_PLACE' });
+    return place;
+  }
+  const byId = findPlace(state.places, text);
+  if (byId) return byId;
+  const byName = state.places.find((place) => place.name === text || place.name.includes(text));
+  if (byName) return byName;
+  const results = await searchPlaces(state.settings, text);
+  if (results.length === 0) throw new WeatherApiError(`没有找到城市“${text}”`, { code: 'NO_LOCATION' });
+  return results[0];
+}
+
+/** 同一个城市 5 分钟内复用缓存，避免 Agent 连续调用重复打接口；refresh 工具强制重取 */
+async function weatherFor(context, place, { force = false } = {}) {
+  const state = await loadState(context);
+  const previous = state.cache[place.id] || null;
+  if (!force && previous && previous.fetchedAt && Date.now() - previous.fetchedAt < FETCH_TTL_MS) {
+    return previous;
+  }
+  const result = await loadWeather(state.settings, place, previous);
+  const merged = { ...result.data, placeId: place.id };
+  context.weather.putCache(place.id, merged);
+  return merged;
+}
+
+function ensurePlaceInList(state, id) {
+  const place = findPlace(state.places, id);
+  if (!place) throw new WeatherApiError(`城市列表里没有 id 为 ${id} 的城市`, { code: 'NO_PLACE' });
+  return place;
+}
+
+function swappedMessage({ hadPlaces, alreadyCurrent }) {
+  if (!hadPlaces) return '城市列表为空：定位城市已加入并设为当前城市';
+  if (alreadyCurrent) return '当前城市就是定位城市';
+  return '已有城市，未自动切换；可在城市菜单一键切换';
+}
+
+/** 注册到 useAgentTools 的处理器表；context 由卡片视图提供 */
+export function createToolHandlers(context) {
+  return {
+    'weather.current': async (args = {}) => {
+      const state = await loadState(context);
+      const place = await resolvePlace(state, args.place);
+      const data = await weatherFor(context, place);
       return currentResult(place, data);
-    }
-    case 'weather.hourly': {
-      const place = await resolvePlace(settings, argMap.place);
-      const data = await weatherFor(settings, place);
-      const hours = Math.min(24, Math.max(1, Number(argMap.hours) || 12));
+    },
+
+    'weather.hourly': async (args = {}) => {
+      const state = await loadState(context);
+      const place = await resolvePlace(state, args.place);
+      const data = await weatherFor(context, place);
+      const hours = Math.min(24, Math.max(1, Number(args.hours) || 12));
       return {
         place: fmtPlace(place),
         hours: (data.hourly || []).slice(0, hours).map((item) => ({
@@ -204,16 +321,18 @@ export async function runTool(name, args, context) {
           text: item.text,
           temperatureC: round(item.temp, 1),
           precipitationProbabilityPercent: item.pop,
-          wind: `${item.windDir || ''}${item.windScale != null ? `${item.windScale}级` : ''}`,
+          wind: fmtWind(item.windDir, item.windScale, item.windSpeed),
           humidityPercent: item.humidity,
           uvIndex: item.uvIndex,
         })),
       };
-    }
-    case 'weather.daily': {
-      const place = await resolvePlace(settings, argMap.place);
-      const data = await weatherFor(settings, place);
-      const days = Math.min(7, Math.max(1, Number(argMap.days) || 7));
+    },
+
+    'weather.daily': async (args = {}) => {
+      const state = await loadState(context);
+      const place = await resolvePlace(state, args.place);
+      const data = await weatherFor(context, place);
+      const days = Math.min(7, Math.max(1, Number(args.days) || 7));
       return {
         place: fmtPlace(place),
         days: (data.daily || []).slice(0, days).map((item) => ({
@@ -226,18 +345,16 @@ export async function runTool(name, args, context) {
           uvIndex: item.uvIndex,
           sunrise: item.sunrise,
           sunset: item.sunset,
-          wind: `${item.windDir || ''}${item.windScale != null ? `${item.windScale}级` : ''}`,
+          wind: fmtWind(item.windDir, item.windScale),
         })),
       };
-    }
-    case 'weather.air': {
-      const place = await resolvePlace(settings, argMap.place);
-      let data = await weatherFor(settings, place);
-      let air = ensureSection(settings, data, 'air');
-      if (!air) {
-        air = await loadDetailSection(settings, place, 'air');
-        data = { ...data, air };
-      }
+    },
+
+    'weather.air': async (args = {}) => {
+      const state = await loadState(context);
+      const place = await resolvePlace(state, args.place);
+      const data = await weatherFor(context, place);
+      const air = data.air || (await loadDetailSection(state.settings, place, 'air'));
       return {
         place: fmtPlace(place),
         aqi: air.aqi,
@@ -253,16 +370,15 @@ export async function runTool(name, args, context) {
           co: air.co,
           o3: air.o3,
         },
-        health: air.health,
+        updated: fmtUpdatedAgo(data.fetchedAt),
       };
-    }
-    case 'weather.warning': {
-      const place = await resolvePlace(settings, argMap.place);
-      const data = await weatherFor(settings, place);
-      let warnings = ensureSection(settings, data, 'warnings');
-      if (!warnings) {
-        warnings = (await loadDetailSection(settings, place, 'warnings')) || [];
-      }
+    },
+
+    'weather.warning': async (args = {}) => {
+      const state = await loadState(context);
+      const place = await resolvePlace(state, args.place);
+      const data = await weatherFor(context, place);
+      const warnings = data.warnings || (await loadDetailSection(state.settings, place, 'warnings')) || [];
       return {
         place: fmtPlace(place),
         count: warnings.length,
@@ -277,51 +393,183 @@ export async function runTool(name, args, context) {
           instruction: item.guide,
         })),
       };
-    }
-    case 'weather.queryPlace': {
-      const city = String(argMap.city || '').trim();
+    },
+
+    'weather.queryPlace': async (args = {}) => {
+      const city = String(args.city || '').trim();
       if (!city) throw new WeatherApiError('queryPlace 需要 city 参数');
-      const results = await searchPlaces(settings, city);
+      const state = await loadState(context);
+      requireConfigured(state.settings);
+      const results = await searchPlaces(state.settings, city);
       if (results.length === 0) throw new WeatherApiError(`没有找到城市“${city}”`);
       const place = results[0];
-      const { data } = await loadWeather(settings, place);
+      const data = await weatherFor(context, place);
       return {
         ...currentResult(place, data),
-        matchedLocation: { id: place.id, name: place.name, adm1: place.adm1, adm2: place.adm2, country: place.country },
-      };
-    }
-    case 'weather.places': {
-      return {
-        currentPlaceId: currentPlace(settings)?.id || null,
-        places: settings.places.map((place) => ({
+        matchedLocation: {
           id: place.id,
           name: place.name,
-          region: placeMenuLabel(place),
+          adm1: place.adm1,
+          adm2: place.adm2,
+          country: place.country,
+        },
+      };
+    },
+
+    'weather.places': async () => {
+      const state = await loadState(context);
+      return {
+        currentPlaceId: currentPlaceOf(state.places)?.id || null,
+        places: state.places.map((place) => ({
+          id: place.id,
+          name: place.name,
+          region: [place.adm2, place.adm1].filter(Boolean).join(' · '),
           isCurrent: Boolean(place.isCurrent),
         })),
       };
-    }
-    case 'weather.addPlace': {
-      const city = String(argMap.city || '').trim();
+    },
+
+    'weather.addPlace': async (args = {}) => {
+      const city = String(args.city || '').trim();
       if (!city) throw new WeatherApiError('addPlace 需要 city 参数');
-      const results = await searchPlaces(settings, city);
+      const state = await loadState(context);
+      requireConfigured(state.settings);
+      const results = await searchPlaces(state.settings, city);
       if (results.length === 0) throw new WeatherApiError(`没有找到城市“${city}”`);
       const place = results[0];
-      const next = addPlaceToSettings(settings, place);
-      await context.updateSettings(next);
-      return { added: fmtPlace(place), currentPlaceId: place.id, places: next.places.map((item) => ({ id: item.id, name: item.name })) };
-    }
-    case 'weather.removePlace': {
-      const id = String(argMap.id || '').trim();
+      const next = addPlaceToList(state.places, place);
+      context.weather.updatePlaces(next);
+      return {
+        added: fmtPlace(place),
+        currentPlaceId: place.id,
+        places: next.map((item) => ({ id: item.id, name: item.name, isCurrent: item.isCurrent })),
+      };
+    },
+
+    'weather.removePlace': async (args = {}) => {
+      const id = String(args.id || '').trim();
       if (!id) throw new WeatherApiError('removePlace 需要 id 参数');
-      if (!findPlace(settings, id)) throw new WeatherApiError(`城市列表里没有 id 为 ${id} 的城市`);
-      const next = removePlaceFromSettings(settings, id);
-      await context.updateSettings(next);
-      return { removed: id, currentPlaceId: currentPlace(next)?.id || null, places: next.places.map((item) => ({ id: item.id, name: item.name })) };
-    }
-    default:
-      throw new WeatherApiError(`未知的天气工具：${name}`, { code: 'UNKNOWN_TOOL' });
-  }
+      const state = await loadState(context);
+      ensurePlaceInList(state, id);
+      const next = removePlaceFromList(state.places, id);
+      context.weather.updatePlaces(next);
+      return {
+        removed: id,
+        currentPlaceId: currentPlaceOf(next)?.id || null,
+        places: next.map((item) => ({ id: item.id, name: item.name, isCurrent: item.isCurrent })),
+      };
+    },
+
+    'weather.setCurrentPlace': async (args = {}) => {
+      const id = String(args.id || '').trim();
+      if (!id) throw new WeatherApiError('setCurrentPlace 需要 id 参数');
+      const state = await loadState(context);
+      ensurePlaceInList(state, id);
+      const next = withCurrentPlace(state.places, id);
+      context.weather.updatePlaces(next);
+      return {
+        currentPlaceId: id,
+        current: fmtPlace(findPlace(next, id)),
+      };
+    },
+
+    'weather.refresh': async (args = {}) => {
+      const state = await loadState(context);
+      requireConfigured(state.settings);
+      const place = await resolvePlace(state, args.place);
+      const active = currentPlaceOf(state.places);
+      if (active && active.id === place.id) {
+        const merged = await context.weather.refresh();
+        if (!merged) throw new WeatherApiError('刷新失败，暂时保留已缓存的数据');
+        return currentResult(place, merged);
+      }
+      const data = await weatherFor(context, place, { force: true });
+      return currentResult(place, data);
+    },
+
+    'weather.locate': async () => {
+      const state = await loadState(context);
+      requireConfigured(state.settings);
+      if (!state.settings.autoLocate) {
+        throw new WeatherApiError('自动定位已关闭：请先在设置里打开「自动定位」', { code: 'LOCATE_OFF' });
+      }
+      const result = await locatePlace(state.settings);
+      if (!result?.place) {
+        throw new WeatherApiError('定位失败：系统定位与 ip.cn 网络归属地都没有返回可用城市', {
+          code: 'LOCATE_FAILED',
+        });
+      }
+      const located = { ...result.place };
+      const locationValue = { place: located, source: result.source, at: Date.now() };
+      context.weather.setLocation(locationValue);
+
+      const hadPlaces = state.places.length > 0;
+      const existing = findPlace(state.places, located.id);
+      const alreadyCurrent = Boolean(existing?.isCurrent);
+      let next = state.places;
+      let added = false;
+      let switched = false;
+      if (!hadPlaces) {
+        next = addPlaceToList(state.places, located);
+        context.weather.updatePlaces(next);
+        added = true;
+        switched = true;
+      }
+      return {
+        located: fmtPlace(located),
+        source: result.source,
+        added,
+        switched,
+        alreadyCurrent,
+        canSwitch: hadPlaces && !alreadyCurrent,
+        currentPlaceId: currentPlaceOf(next)?.id || null,
+        message: swappedMessage({ hadPlaces, alreadyCurrent }),
+      };
+    },
+
+    'weather.settings.get': async () => {
+      const state = await loadState(context);
+      return {
+        settings: publicSettings(state.settings),
+        placesCount: state.places.length,
+        currentPlaceId: currentPlaceOf(state.places)?.id || null,
+      };
+    },
+
+    'weather.settings.set': async (args = {}) => {
+      const state = await loadState(context);
+      const patch = {};
+
+      if ('unit' in args) {
+        if (args.unit !== 'c' && args.unit !== 'f') throw new WeatherApiError('unit 只能是 c 或 f');
+        patch.unit = args.unit;
+      }
+      if ('refreshMin' in args) {
+        const value = Number(args.refreshMin);
+        if (![15, 30, 60].includes(value)) throw new WeatherApiError('refreshMin 只能是 15 / 30 / 60');
+        patch.refreshMin = value;
+      }
+      for (const key of ['autoLocate', 'showAir', 'showWarnings', 'showMinutely']) {
+        if (!(key in args)) continue;
+        if (typeof args[key] !== 'boolean') throw new WeatherApiError(`${key} 需要是布尔值`);
+        patch[key] = args[key];
+      }
+      for (const key of ['apiKey', 'apiHost']) {
+        if (!(key in args)) continue;
+        patch[key] = String(args[key] ?? '');
+      }
+      if (Object.keys(patch).length === 0) {
+        throw new WeatherApiError(`settings.set 至少需要一个字段：${SETTING_KEYS.join(' / ')}`);
+      }
+
+      const next = normalizeSettings({ ...state.settings, ...patch });
+      context.weather.setSettings(next);
+      return {
+        settings: publicSettings(next),
+        changed: Object.keys(patch),
+      };
+    },
+  };
 }
 
-export { loadWeather };
+export { loadState };
