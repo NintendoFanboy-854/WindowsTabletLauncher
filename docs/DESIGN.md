@@ -133,6 +133,9 @@
 
 ## 7. 动效：完全按 Fluent 2
 
+> 完整参数、卡片状态机、浮层 container transform、插件内容动效与 reduced-motion 细则见
+> **[MOTION.md](MOTION.md)**。本节只保留工程约定；冲突时以 MOTION.md 为准。
+
 - 用 `motionTokens` 的时长和曲线 + `@fluentui/react-motion`（`createPresenceComponent` / `createMotionComponent`），不自定义 easing。
 - Drawer / Dialog / Toast：Fluent 组件自带过渡，不覆写。
 - 编辑模式进出：卡片缩放淡入淡出，用 Fluent 标准缩放过渡。

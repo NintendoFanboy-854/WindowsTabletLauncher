@@ -163,7 +163,7 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 | E1 | 宿主通用设置页 | manifest `settings` schema → 通用表单（5 种字段）、插件分区动态生成、即时保存 +「保存」羡余按钮 +「恢复默认」；「外观」分组加「编辑桌面布局」「重置布局」；`plugin:request-host-settings` 导航 | 六插件设置全部由 schema 渲染；插件内不再有设置界面 |
 | E2 | 卡片手势与反馈 | SDK `useHostCardGesture`：转发 hover（鼠标/笔）、pointer down/up/cancel、长按（500ms）→ `plugin:request-edit-mode`、长按后吞 click；宿主统一按压/悬停/长按进度视觉；浮层点遮罩=关闭 | 触控长按进编辑稳定；鼠标/触控都有按压反馈；遮罩点击关闭 |
 | E3 | 六插件重构 | clock（详情+世界时钟+设置迁移）、countdown（整卡详情、表单保存/取消语义）、sedentary（卡片展示+起来了、详情 7 天）、pomodoro（开始/暂停/重置、详情清空）、todo（卡片仅展示+勾选、详情完整管理+删除）、weather（3×2 逐时、4×2 等宽 7 天、详情紧凑化）；每个插件补 Agent 对等工具 | PLUGIN-CONTRACT 验收清单逐项通过；每插件截图 |
-| E4 | 动效 | hover 轻微放大（≤2%）、按下收缩、长按 500ms 进度、详情/设置从卡片 rect 展开并收回、遮罩淡入；全部 `motionTokens`，尊重 `prefers-reduced-motion` | 1440×960 录屏/截图对比；无自定义时长/曲线 |
+| E4 | 动效 | 按 [MOTION.md](MOTION.md) 实现：hover 1.5%、按下 0.985、长按 500ms 下沉、详情/设置完整 container transform（所有尺寸，内容交叉淡入，关闭 150ms 收回）、插件内容按 Fluent motion；全部 token，尊重 reduced-motion | 1440×960 录屏/截图对比；无自定义时长/曲线 |
 | E5 | 视觉收口 | spacing/分组/层级/字号统一（HIG 分组原则 + Fluent 2 token）；天气右端对齐、卡片内边距、详情首屏密度；亮暗两套 | 1440×960 / 1024×768 截图；审计无 P0/P1 |
 | E6 | 测试脚手架清理 | 删除 `src/host/{shell,agent,plugins}/demo.html` 三套演示宿主与 `bridge-check`，能力收敛到正式 host 的 dev-only 参数或 `tests/`；去掉演示页的“Agent 模块演示 / scenario / 源码路径”测试横幅与假桌面；Agent「演示模式」移出主设置（只保留高级/URL `?mock=1`） | `npm run build` 后 `dist` 无 demo 页面与演示文案；运行时只有一个 host；产品 UI 无“测试/演示”入口 |
 | E7 | 回归与发布 | 更新 `verify-widgets` / `verify-overlays`；做一个最小第三方插件跑 plug-and-play 验收（零宿主改动）；更新 RELEASE/RELEASE-REPORT；截图归档 | 断言全 PASS；契约验收清单全勾 |
