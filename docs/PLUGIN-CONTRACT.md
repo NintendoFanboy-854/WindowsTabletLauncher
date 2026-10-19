@@ -113,16 +113,34 @@
 
 ### 3.2 卡片手势协议（跨 iframe 的最小转发）
 
-宿主收不到 iframe 内的事件，所以由共享 SDK 在卡片根节点挂一个 hook（`useHostCardGesture`）：
+宿主收不到 iframe 内的事件，所以由共享 SDK 在卡片根节点挂一个 hook（`useHostCardGesture`）。
+协议只有插件 → 宿主两条消息，**只在卡片实例的 iframe 里发**；`?view=...` 浮层视图与后台常驻
+iframe 不发，宿主也没有新增 host → plugin 消息：
 
-1. 只转发**触控/笔**的 `pointerdown / pointerup / pointercancel` 给宿主，宿主在卡片外层做统一的按压视觉
-   （按下轻微收缩、抬起回弹；时长/曲线用 `motionTokens`，触控没有 hover，按压是唯一的物理暗示）。
-2. 在插件侧检测长按：500ms 内移动不超过容差；触发时发 `plugin:request-edit-mode`，
-   宿主进入编辑模式并选中该卡片。
-3. 长按触发后 SDK 负责吞掉后续 click，避免“进了编辑模式又打开详情”。
-4. 插件**不得自行处理**长按、右键、hover：不监听长按（开设置/编辑条目等一律删掉），
-   不实现右键菜单；原生 contextmenu 在宿主与插件两侧都禁用。
-5. 插件只负责：点击卡片主体 → 主操作（通常是 `requestOverlay('detail')`）；内部显式控件 → 就地操作。
+| 消息 | 字段 | 何时发 |
+|---|---|---|
+| `plugin:card-pointer` | `phase: 'down' \| 'up' \| 'cancel' \| 'hover-enter' \| 'hover-leave'`、`pointerType: 'touch' \| 'pen' \| 'mouse'` | 指针按下/抬起/取消；hover 只对 `mouse` / `pen` 发进入、离开 |
+| `plugin:request-edit-mode` | —（无字段） | SDK 检测到 500ms 长按，触发时发一次 |
+
+规则：
+
+1. **长按检测在 SDK**：`pointerdown` 后 500ms 内移动不超过 8px 触发；移动超 8px、
+   500ms 内 `pointerup`、`pointercancel` 都取消。宿主不跑卡片长按计时器，只根据消息做视觉与进编辑。
+2. 只响应主键（`button === 0`）。**press / 长按对 `touch / pen / mouse` 都生效**（MOTION §0
+   “行为统一”）；**hover 只有鼠标/笔有**，触控没有 hover。
+3. SDK 过滤卡片根节点内部的显式控件及其内部：
+   `button, input, textarea, select, a, [role="button"], [role="tab"], [role="switch"],
+   [role="checkbox"], [role="radio"], [role="slider"], [contenteditable]`。
+   这些目标不触发卡片级 press / hover / 长按；根节点自身可以是 `role="button"`，不算控件。
+4. **长按后的 click 由 SDK 吞掉**：触发时长按计时器的同一 tick 里在 capture 阶段装一次性
+   click 监听并 `preventDefault/stopPropagation`；click 未出现时在抬起/取消 1s 后清理，
+   收不到抬起事件则最多 10s 兜底，避免永久劫持点击。
+5. 插件**不得自行处理**长按、右键、hover：不监听长按（开设置/编辑条目等一律删掉），
+   不实现右键菜单；SDK 在 capture 阶段禁用插件页原生 contextmenu。
+6. 宿主视觉状态：`data-hover`、`data-press="down|holding"`；hover `scale(1.015)` + `shadow8` +
+   1px `colorNeutralStroke1`，按下 50ms 到 0.985、长按 500ms 线性到 0.97、松手/取消 150ms 回弹；
+   `prefers-reduced-motion: reduce` 下不做 scale，只保留颜色/描边。插件不再自加卡片级缩放/阴影。
+7. 插件只负责：点击卡片主体 → 主操作（通常是 `requestOverlay('detail')`）；内部显式控件 → 就地操作。
 
 ### 3.3 宿主编辑模式入口
 

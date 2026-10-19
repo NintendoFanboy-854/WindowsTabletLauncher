@@ -5,8 +5,15 @@
  * 只在悬停时于卡片顶部淡入一个极轻的拖拽提示（overlay，不占布局高度）。
  * 编辑模式：浮层才出现标题 + 删除 / 改尺寸 / 设置，并用 Fluent motionTokens 做进出过渡
  * （浮层常驻 DOM，靠 opacity/transform 过渡，避免退出时瞬间消失）。
+ *
+ * 卡片手势（E2 / MOTION §2）：
+ * - iframe 内的指针事件由插件 SDK `useHostCardGesture` 转发成 `plugin:card-pointer`；
+ * - 长按 500ms 由 SDK 检测并发 `plugin:request-edit-mode`，宿主这里只做视觉与进编辑，
+ *   不再跑第二份长按计时器；
+ * - hover / press 的缩放加在 iframe 内层 wrapper 上，Card 本身只保留定位 translate
+ *   与编辑模式 scale；缩放值、时长、曲线全部来自 MOTION §2 与 motionTokens。
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import {
   Button,
@@ -19,6 +26,7 @@ import {
   Text,
   Tooltip,
   mergeClasses,
+  motionTokens,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -28,16 +36,17 @@ import {
   Settings20Regular,
 } from '@fluentui/react-icons';
 import type { HostBridge } from '../bridge';
-import type { ThemePayload, WidgetInstance, WidgetSize } from '../bridge/types';
+import type {
+  CardPointerPhase,
+  CardPointerType,
+  ThemePayload,
+  WidgetInstance,
+  WidgetSize,
+} from '../bridge/types';
 import type { GridMetrics } from '../layout';
+import { useMediaQuery } from '../pages/shared/useMediaQuery';
 import { CARD_MATERIAL, CARD_RADIUS, useStyles } from './desktop.styles';
-import {
-  EDIT_CARD_SCALE,
-  EDIT_TOUCH_TARGET,
-  LONG_PRESS_MS,
-  LONG_PRESS_MOVE_TOLERANCE,
-} from './interaction';
-import { useLongPress } from './useLongPress';
+import { EDIT_CARD_SCALE, EDIT_TOUCH_TARGET } from './interaction';
 import { WidgetFrame } from './WidgetFrame';
 import type { WidgetFrameHandle } from './WidgetFrame';
 
@@ -49,6 +58,16 @@ const TOUCH_TARGET: CSSProperties = {
   minWidth: EDIT_TOUCH_TARGET,
   minHeight: EDIT_TOUCH_TARGET,
 };
+
+/** MOTION §2 卡片状态机：hover 放大 1.5%，按下 0.985，长按线性下沉到 0.97 */
+const HOVER_SCALE = 1.015;
+const PRESS_SCALE = 0.985;
+const LONG_PRESS_SCALE = 0.97;
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+/** 按下 → holding 只需一个 50ms 的视觉阶段切换；长按 500ms 检测不在这里跑 */
+type PressPhase = 'down' | 'holding';
 
 export interface WidgetCardProps {
   widget: WidgetInstance;
@@ -64,8 +83,8 @@ export interface WidgetCardProps {
   /** FluentProvider 现读的主题 token（插件 init 用） */
   theme?: ThemePayload;
   notify(text: string): void;
-  onLongPress(widget: WidgetInstance): void;
-  onTap(widget: WidgetInstance): void;
+  /** 插件 SDK 长按（plugin:request-edit-mode）→ 宿主进编辑模式并选中该卡 */
+  onRequestEditMode(widget: WidgetInstance): void;
   onFocus(widget: WidgetInstance): void;
   onDelete(widget: WidgetInstance): void;
   onOpenSettings(widget: WidgetInstance): void;
@@ -89,8 +108,7 @@ export function WidgetCard({
   bridge,
   theme,
   notify,
-  onLongPress,
-  onTap,
+  onRequestEditMode,
   onFocus,
   onDelete,
   onOpenSettings,
@@ -102,19 +120,178 @@ export function WidgetCard({
 }: WidgetCardProps) {
   const styles = useStyles();
   const frameRef = useRef<WidgetFrameHandle>(null);
-  const [hovered, setHovered] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+
+  /** iframe 内 SDK 转发的 hover（鼠标/笔） */
+  const [frameHover, setFrameHover] = useState(false);
+  /** 宿主自己的卡片边缘（6px 内衬）hover；与 iframe 转发取或 */
+  const [hostHover, setHostHover] = useState(false);
+  const [pressPhase, setPressPhase] = useState<PressPhase | null>(null);
+  /** 松手/取消后 150ms 回弹（到 hover 或 rest），回弹结束前不切回普通过渡 */
+  const [releasing, setReleasing] = useState(false);
+
+  const pressRef = useRef<PressPhase | null>(null);
+  const downTimerRef = useRef(0);
+  const releaseTimerRef = useRef(0);
 
   useEffect(() => {
     registerFrameHandle(widget.uid, frameRef.current);
     return () => registerFrameHandle(widget.uid, null);
   }, [registerFrameHandle, widget.uid]);
 
-  const longPress = useLongPress({
-    delay: LONG_PRESS_MS,
-    moveTolerance: LONG_PRESS_MOVE_TOLERANCE,
-    onLongPress: () => onLongPress(widget),
-    onTap: () => onTap(widget),
-  });
+  const clearDownTimer = useCallback(() => {
+    if (!downTimerRef.current) return;
+    window.clearTimeout(downTimerRef.current);
+    downTimerRef.current = 0;
+  }, []);
+
+  const clearReleaseTimer = useCallback(() => {
+    if (!releaseTimerRef.current) return;
+    window.clearTimeout(releaseTimerRef.current);
+    releaseTimerRef.current = 0;
+  }, []);
+
+  // 卸载时清掉视觉阶段计时器（长按计时器在插件 SDK 里，由 SDK 自己清理）
+  useEffect(
+    () => () => {
+      clearDownTimer();
+      clearReleaseTimer();
+    },
+    [clearDownTimer, clearReleaseTimer],
+  );
+
+  const startHolding = useCallback(() => {
+    if (pressRef.current !== 'down') return;
+    pressRef.current = 'holding';
+    setPressPhase('holding');
+  }, []);
+
+  const beginPress = useCallback(() => {
+    clearDownTimer();
+    clearReleaseTimer();
+    pressRef.current = 'down';
+    setPressPhase('down');
+    setReleasing(false);
+    // 按下 50ms 落到 0.985，随后交给 500ms 线性长按下沉（MOTION §2）。
+    // down → holding 由 transform 的 transitionend 驱动：低帧率/headless 下若从
+    // pointerdown 直接跑 50ms 定时器，down 的 transition 可能连一帧都没拿到就被切走。
+    // 250ms 只是 transitionend 不触发时的兜底，不是动效时长。
+    if (reducedMotion) {
+      downTimerRef.current = window.setTimeout(() => {
+        downTimerRef.current = 0;
+        startHolding();
+      }, motionTokens.durationUltraFast);
+      return;
+    }
+    downTimerRef.current = window.setTimeout(() => {
+      downTimerRef.current = 0;
+      startHolding();
+    }, motionTokens.durationGentle);
+  }, [clearDownTimer, clearReleaseTimer, reducedMotion, startHolding]);
+
+  /**
+   * down 的 0.985 落位完成后切到 holding（MOTION §2）。
+   * 用原生 transitionend 而不是再起一个 50ms 定时器：低帧率下定时器会在 transition
+   * 真正跑完前触发，down 阶段被整段跳过（React DOM 也没有 transitionstart 合成事件）。
+   */
+  useEffect(() => {
+    const node = contentRef.current;
+    if (!node) return undefined;
+    const onTransitionEnd = (event: TransitionEvent) => {
+      if (event.target !== node || event.propertyName !== 'transform') return;
+      if (pressRef.current !== 'down') return;
+      // 只认按下落位（0.985）的结束；hover 进入的 1.015 结束事件不能触发 holding
+      const currentScale = new DOMMatrixReadOnly(getComputedStyle(node).transform).a;
+      if (Math.abs(currentScale - PRESS_SCALE) > 0.005) return;
+      if (downTimerRef.current) {
+        window.clearTimeout(downTimerRef.current);
+        downTimerRef.current = 0;
+      }
+      startHolding();
+    };
+    node.addEventListener('transitionend', onTransitionEnd);
+    return () => node.removeEventListener('transitionend', onTransitionEnd);
+  }, [startHolding]);
+
+  const finishPress = useCallback(() => {
+    if (pressRef.current === null) return;
+    clearDownTimer();
+    clearReleaseTimer();
+    pressRef.current = null;
+    setPressPhase(null);
+    setReleasing(true);
+    releaseTimerRef.current = window.setTimeout(() => {
+      releaseTimerRef.current = 0;
+      setReleasing(false);
+    }, motionTokens.durationFast);
+  }, [clearDownTimer, clearReleaseTimer]);
+
+  /** iframe 转发的指针状态（契约 §3.2） */
+  const handleCardPointer = useCallback(
+    (phase: CardPointerPhase, _pointerType: CardPointerType) => {
+      // 编辑模式 / 拖拽中不参与 hover / press，避免和编辑覆盖层抢状态
+      if (editMode || dragging) return;
+      if (phase === 'hover-enter') {
+        // 指针已进入 iframe：宿主边缘 hover 让位给转发状态，避免两路取或后无法清除
+        setHostHover(false);
+        setFrameHover(true);
+        return;
+      }
+      if (phase === 'hover-leave') {
+        setFrameHover(false);
+        return;
+      }
+      if (phase === 'down') beginPress();
+      else finishPress();
+    },
+    [beginPress, dragging, editMode, finishPress],
+  );
+
+  /** SDK 检测到长按：清掉按压视觉，交给宿主进编辑（Desktop 负责选中/聚焦） */
+  const handleRequestEditMode = useCallback(() => {
+    clearDownTimer();
+    clearReleaseTimer();
+    pressRef.current = null;
+    setPressPhase(null);
+    setReleasing(false);
+    onRequestEditMode(widget);
+  }, [clearDownTimer, clearReleaseTimer, onRequestEditMode, widget]);
+
+  // 进入编辑模式：立即结束按压/hover 视觉与计时器（编辑 chrome 由 CSS 接管）
+  useEffect(() => {
+    if (!editMode) return;
+    clearDownTimer();
+    clearReleaseTimer();
+    pressRef.current = null;
+    setPressPhase(null);
+    setReleasing(false);
+    setHostHover(false);
+    setFrameHover(false);
+  }, [clearDownTimer, clearReleaseTimer, editMode]);
+
+  // 兜底：指针在 iframe 外抬起（宿主文档收到 pointerup）时也要回弹，避免按压状态卡死
+  useEffect(() => {
+    if (pressPhase === null) return undefined;
+    const end = () => finishPress();
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    return () => {
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+  }, [finishPress, pressPhase]);
+
+  const handleHostPointerEnter = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // 触控没有 hover（MOTION §0）
+    if (event.pointerType === 'touch') return;
+    setHostHover(true);
+  };
+
+  const handleHostPointerLeave = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
+    setHostHover(false);
+  };
 
   const [widthCells, heightCells] = widget.size;
   const x = origin.x + widget.col * (metrics.cell + metrics.gap);
@@ -122,18 +299,128 @@ export function WidgetCard({
   const width = widthCells * metrics.cell + (widthCells - 1) * metrics.gap;
   const height = heightCells * metrics.cell + (heightCells - 1) * metrics.gap;
 
+  const hoverActive = !editMode && !dragging && (hostHover || frameHover);
+  const visiblePress = editMode || dragging ? null : pressPhase;
+
+  // ---- 内容层 scale / 过渡（MOTION §2，全部来自 motionTokens） ----
+  let contentDuration: number = motionTokens.durationFaster;
+  let contentCurve: string = motionTokens.curveAccelerateMin;
+  if (visiblePress === 'down') {
+    contentDuration = motionTokens.durationUltraFast;
+    contentCurve = motionTokens.curveAccelerateMin;
+  } else if (visiblePress === 'holding') {
+    contentDuration = motionTokens.durationUltraSlow;
+    contentCurve = motionTokens.curveLinear;
+  } else if (releasing) {
+    contentDuration = motionTokens.durationFast;
+    contentCurve = motionTokens.curveDecelerateMid;
+  } else if (hoverActive) {
+    contentDuration = motionTokens.durationFaster;
+    contentCurve = motionTokens.curveDecelerateMin;
+  }
+  if (reducedMotion) {
+    // 减少动效：不做 scale 位移，只保留描边/颜色（100ms）
+    contentDuration = motionTokens.durationFaster;
+    contentCurve = motionTokens.curveDecelerateMin;
+  }
+
+  const contentScale = reducedMotion
+    ? 1
+    : visiblePress === 'holding'
+      ? LONG_PRESS_SCALE
+      : visiblePress === 'down'
+        ? PRESS_SCALE
+        : releasing
+          ? hoverActive
+            ? HOVER_SCALE
+            : 1
+          : hoverActive
+            ? HOVER_SCALE
+            : 1;
+
+  const contentStyle: CSSProperties = {
+    transform: reducedMotion ? 'none' : `scale(${contentScale})`,
+    transitionProperty: 'transform',
+    transitionDuration: `${contentDuration}ms`,
+    transitionTimingFunction: contentCurve,
+  };
+
+  // ---- Card 本身的过渡只服务编辑模式 scale / shadow，不参与 hover/press 缩放 ----
+  let cardDuration: number = motionTokens.durationFaster;
+  let cardCurve: string = motionTokens.curveAccelerateMin;
+  if (editMode) {
+    cardDuration = motionTokens.durationNormal;
+    cardCurve = motionTokens.curveDecelerateMid;
+  } else if (visiblePress === 'down') {
+    cardDuration = motionTokens.durationUltraFast;
+    cardCurve = motionTokens.curveAccelerateMin;
+  } else if (visiblePress === 'holding') {
+    cardDuration = motionTokens.durationUltraSlow;
+    cardCurve = motionTokens.curveLinear;
+  } else if (releasing) {
+    cardDuration = motionTokens.durationFast;
+    cardCurve = motionTokens.curveDecelerateMid;
+  } else if (hoverActive) {
+    cardDuration = motionTokens.durationFaster;
+    cardCurve = motionTokens.curveDecelerateMin;
+  }
+  if (reducedMotion) {
+    cardDuration = motionTokens.durationFaster;
+    cardCurve = motionTokens.curveDecelerateMin;
+  }
+
   const cardStyle: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
-    transform: `translate(${x}px, ${y}px) scale(${editMode ? EDIT_CARD_SCALE : 1})`,
+    // 定位 translate 与编辑模式 scale 留在 Card 上；hover/press 只动内层内容
+    transform: `translate(${x}px, ${y}px) scale(${
+      editMode && !reducedMotion ? EDIT_CARD_SCALE : 1
+    })`,
     width,
     height,
     padding: 0,
     gap: 0,
     borderRadius: CARD_RADIUS,
     ...CARD_MATERIAL,
-    boxShadow: editMode ? tokens.shadow8 : tokens.shadow4,
+    boxShadow: editMode || (hoverActive && !visiblePress) ? tokens.shadow8 : tokens.shadow4,
+    transitionProperty: 'transform, width, height, opacity, box-shadow',
+    transitionDuration: `${cardDuration}ms`,
+    transitionTimingFunction: cardCurve,
+  };
+
+  // ---- 描边：hover 中性色常驻；长按品牌色 overlay 用 500ms 线性渐显 ----
+  let hoverStrokeDuration: number = motionTokens.durationFaster;
+  let hoverStrokeCurve: string = motionTokens.curveAccelerateMin;
+  if (hoverActive) {
+    hoverStrokeCurve = motionTokens.curveDecelerateMin;
+  }
+  if (reducedMotion) {
+    hoverStrokeDuration = motionTokens.durationFaster;
+    hoverStrokeCurve = motionTokens.curveDecelerateMin;
+  }
+  const hoverStrokeStyle: CSSProperties = {
+    borderColor: tokens.colorNeutralStroke1,
+    opacity: hoverActive ? 1 : 0,
+    transitionDuration: `${hoverStrokeDuration}ms`,
+    transitionTimingFunction: hoverStrokeCurve,
+  };
+
+  let pressStrokeDuration: number = motionTokens.durationUltraSlow;
+  let pressStrokeCurve: string = motionTokens.curveLinear;
+  if (visiblePress === null) {
+    pressStrokeDuration = motionTokens.durationFast;
+    pressStrokeCurve = motionTokens.curveDecelerateMid;
+  }
+  if (reducedMotion) {
+    pressStrokeDuration = motionTokens.durationFaster;
+    pressStrokeCurve = motionTokens.curveDecelerateMin;
+  }
+  const pressStrokeStyle: CSSProperties = {
+    borderColor: tokens.colorBrandStroke1,
+    opacity: visiblePress ? 0.35 : 0,
+    transitionDuration: `${pressStrokeDuration}ms`,
+    transitionTimingFunction: pressStrokeCurve,
   };
 
   const availableSizes = useMemo(() => {
@@ -161,42 +448,57 @@ export function WidgetCard({
       data-widget-card="true"
       data-widget-uid={widget.uid}
       data-widget-page={widget.page}
+      data-hover={hoverActive ? 'true' : undefined}
+      data-press={visiblePress ?? undefined}
       onFocus={() => onFocus(widget)}
     >
       <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          padding: tokens.spacingHorizontalSNudge,
-        }}
-        onPointerDown={longPress.onPointerDown}
-        onPointerMove={longPress.onPointerMove}
-        onPointerUp={longPress.onPointerUp}
-        onPointerCancel={longPress.onPointerCancel}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
+        className={styles.gestureArea}
+        data-card-gesture-area="true"
+        onPointerEnter={handleHostPointerEnter}
+        onPointerLeave={handleHostPointerLeave}
       >
-        <WidgetFrame
-          ref={frameRef}
-          bridge={bridge}
-          theme={theme}
-          title={widget.title}
-          instanceUid={widget.uid}
-          pluginId={widget.pluginId}
-          widgetId={widget.widgetId}
-          src={src}
-          size={widget.size}
-          notify={notify}
-          onRequestHostSettings={() => onRequestHostSettings(widget)}
-        />
+        <div
+          ref={contentRef}
+          className={styles.contentLayer}
+          data-widget-scale="true"
+          style={contentStyle}
+        >
+          <WidgetFrame
+            ref={frameRef}
+            bridge={bridge}
+            theme={theme}
+            title={widget.title}
+            instanceUid={widget.uid}
+            pluginId={widget.pluginId}
+            widgetId={widget.widgetId}
+            src={src}
+            size={widget.size}
+            notify={notify}
+            onRequestHostSettings={() => onRequestHostSettings(widget)}
+            onCardPointer={handleCardPointer}
+            onRequestEditMode={handleRequestEditMode}
+          />
+        </div>
       </div>
+
+      {/* 1px 描边绘制在 iframe 之上：hover 中性描边 + 长按品牌描边（不拦指针） */}
+      <div
+        className={styles.interactionStroke}
+        data-card-hover-stroke="true"
+        aria-hidden="true"
+        style={hoverStrokeStyle}
+      />
+      <div
+        className={styles.interactionStroke}
+        data-card-press-stroke="true"
+        aria-hidden="true"
+        style={pressStrokeStyle}
+      />
 
       {/* 正常模式唯一允许的轻量提示：悬停时出现，overlay 不占布局高度 */}
       <div
-        className={mergeClasses(
-          styles.dragHint,
-          hovered && !editMode && !dragging && styles.dragHintVisible,
-        )}
+        className={mergeClasses(styles.dragHint, hoverActive && styles.dragHintVisible)}
         data-drag-hint="true"
         aria-hidden="true"
       >

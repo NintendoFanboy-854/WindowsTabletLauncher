@@ -22,7 +22,7 @@ public/plugins/<id>/
 - `public/plugins/_shared/theme.js` —— 主题载荷 → Fluent Theme。
 - `public/plugins/_shared/host.js` —— `startHostCapture` / `useHostTheme` /
   `useHostSize` / `useStoredConfig` / `getOverlayView` / `requestOverlay` /
-  `requestSettings` / `useAgentTools` / `useSettingsRequest`。
+  `requestSettings` / `useAgentTools` / `useSettingsRequest` / `useHostCardGesture`。
 - 相对引用：插件 `src/*.jsx` 里 `import { ... } from '../../_shared/host.js'`。
 
 ## 构建
@@ -80,6 +80,39 @@ createRoot(document.getElementById('root')).render(<Root />);
    `docs/DENSITY.md`），小档位优先保主信息。
 9. **等待态**：按 `docs/FLUENT2.md §12`：<1s 不显示；1–3s Spinner；>3s 进度/文案。
 10. **空态**：Fluent 排版 + 一个主操作，不用两套空态文案。
+
+## 卡片手势（`useHostCardGesture`）
+
+宿主收不到 iframe 内的指针事件，卡片级 press / hover / 长按统一走共享 SDK 的
+`useHostCardGesture`。插件只把返回的 `ref` 挂到**卡片根节点**，不自己写任何手势或计时器：
+
+```jsx
+import { useHostCardGesture } from '../../_shared/host.js';
+
+export default function ClockApp() {
+  const gesture = useHostCardGesture();
+
+  return (
+    <div ref={gesture.ref} role="button" tabIndex={0} onClick={openDetail}>
+      {/* 卡片内容；内部按钮照常绑自己的 onClick */}
+    </div>
+  );
+}
+```
+
+注意：
+
+- 只在宿主卡片视图生效：`window.parent === window`（standalone/demo）和
+  `?view=detail|settings|…` 浮层视图都不挂监听，没有副作用；不要自己 post
+  `plugin:card-pointer`。
+- 必须挂在卡片根 DOM 上。根节点自身可以是 `role="button"`；hook 只过滤根节点**内部**的
+  交互控件（`button / input / textarea / select / a / [role=…] / [contenteditable]`），
+  这些控件上的 press / hover / 长按不会上升为卡片手势。
+- 不要自己实现长按、右键菜单或 hover：长按 500ms 由 hook 检测并发
+  `plugin:request-edit-mode`，触发后的 click 也由 hook 在 capture 阶段吞掉。
+  自写计时器会与宿主/SDK 状态重复。
+- 卡片根节点还需要用于 `plugin.onFocus` 聚焦时，直接复用 `gesture.ref`，不要另建一个 ref。
+- 主操作（点击打开详情/执行快捷操作）仍由插件实现；hook 只负责把指针状态转给宿主。
 
 ## 主信息与可访问性
 

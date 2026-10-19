@@ -268,6 +268,229 @@ export function requestHostSettings() {
   window.parent.postMessage({ type: 'plugin:request-host-settings' }, '*');
 }
 
+/* ------------------------------------------------------------------ */
+/* 卡片手势（契约 §3.2 / MOTION §2）                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 长按进编辑模式：500ms，交互阈值不是动效时长（DESIGN §1.2 / 契约 §3.2）。
+ * 与宿主 `src/host/desktop/interaction.ts` 同值；长按计时器只在 SDK 跑这一份。
+ */
+const LONG_PRESS_MS = 500;
+
+/** 手指/笔抖动容差（px）：移动超过就不算长按（与宿主 interaction.ts 同值） */
+const LONG_PRESS_MOVE_TOLERANCE = 8;
+
+/**
+ * 卡片内的显式控件：这些目标（及其内部）不触发卡片级 press / hover / 长按，
+ * 事件留给控件自己处理（契约 §3.2 第 3 条）。
+ */
+const CARD_GESTURE_CONTROLS = [
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'a',
+  '[role="button"]',
+  '[role="tab"]',
+  '[role="switch"]',
+  '[role="checkbox"]',
+  '[role="radio"]',
+  '[role="slider"]',
+  '[contenteditable]',
+].join(',');
+
+/**
+ * 卡片根节点自己常常是 role="button"（PLUGIN-REACT「主信息与可访问性」），
+ * 过滤时必须排除根节点本身；只有根节点内部的控件才算“交互目标”。
+ */
+function isCardGestureControl(rootNode, target) {
+  if (!(target instanceof Element)) return false;
+  const control = target.closest(CARD_GESTURE_CONTROLS);
+  return Boolean(control && control !== rootNode && rootNode.contains(control));
+}
+
+/**
+ * 把卡片 iframe 内的指针状态转发给宿主（契约 §3.2）。
+ *
+ * 返回 `{ ref }`：把它挂到卡片根节点上即可。
+ *   const gesture = useHostCardGesture();
+ *   <div ref={gesture.ref} role="button" ...>...</div>
+ *
+ * 行为：
+ * - 只在宿主卡片 iframe 里生效；`window.parent === window`（standalone/demo）与
+ *   `?view=...` 浮层视图都不挂监听，没有任何副作用；
+ * - `pointerdown / pointerup / pointercancel` 原样转发 pointerType；
+ * - hover 只对 mouse / pen 的进入/离开转发（触控没有 hover）；
+ * - 只响应主键（button === 0）；移动超过 8px、pointercancel、提前抬起都取消长按；
+ * - 长按 500ms 发 `plugin:request-edit-mode`，并在 capture 阶段一次性吞掉后续 click；
+ * - 禁用插件页原生右键菜单（contextmenu preventDefault）。
+ *
+ * 插件不要自己处理长按/右键/hover，也不要再发 `plugin:card-pointer`。
+ */
+export function useHostCardGesture() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return undefined;
+    // standalone / demo 页面不挂监听；浮层视图（?view=detail|settings|…）也不发卡片手势。
+    if (!plugin.inHost || getOverlayView()) return undefined;
+
+    let activePointerId = null;
+    let startX = 0;
+    let startY = 0;
+    let longPressTimer = 0;
+    let longPressFired = false;
+    let hovering = false;
+    let swallowTimer = 0;
+    let swallowArmed = false;
+
+    const isMouseLike = (pointerType) => pointerType === 'mouse' || pointerType === 'pen';
+
+    const postPointer = (phase, pointerType) => {
+      window.parent.postMessage({ type: 'plugin:card-pointer', phase, pointerType }, '*');
+    };
+
+    const clearLongPress = () => {
+      if (!longPressTimer) return;
+      window.clearTimeout(longPressTimer);
+      longPressTimer = 0;
+    };
+
+    /** 长按触发后吞掉紧随的 click：一次性 capture 监听 + 超时清理（契约 §3.2 第 4 条） */
+    function onSwallowClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      stopSwallowingClick();
+    }
+
+    function stopSwallowingClick() {
+      swallowArmed = false;
+      window.removeEventListener('click', onSwallowClick, true);
+      if (swallowTimer) {
+        window.clearTimeout(swallowTimer);
+        swallowTimer = 0;
+      }
+    }
+
+    const swallowNextClick = () => {
+      stopSwallowingClick();
+      swallowArmed = true;
+      window.addEventListener('click', onSwallowClick, true);
+      // 兜底：极端情况下（收不到 up/cancel）最多吞 10s，避免永久劫持点击
+      swallowTimer = window.setTimeout(stopSwallowingClick, 10000);
+    };
+
+    /**
+     * 长按可能被用户继续按住很久（>1s），click 在 pointerup 之后才产生：
+     * 因此清理计时从 pointerup/cancel 开始，而不是从长按触发那一刻开始。
+     */
+    const scheduleSwallowCleanup = () => {
+      if (!swallowArmed) return;
+      if (swallowTimer) window.clearTimeout(swallowTimer);
+      swallowTimer = window.setTimeout(stopSwallowingClick, 1000);
+    };
+
+    const onPointerDown = (event) => {
+      // 只响应主键；触控/笔的 button 也是 0
+      if (event.button !== 0) return;
+      if (isCardGestureControl(root, event.target)) return;
+      if (activePointerId !== null) return;
+
+      activePointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      longPressFired = false;
+      postPointer('down', event.pointerType);
+
+      // 长按检测在 SDK：宿主只做视觉与进编辑，不重复跑计时器（MOTION §8）
+      longPressTimer = window.setTimeout(() => {
+        longPressTimer = 0;
+        longPressFired = true;
+        // 先装吞 click 的监听，再通知宿主；抬起产生的 click 一定晚于这两步
+        swallowNextClick();
+        window.parent.postMessage({ type: 'plugin:request-edit-mode' }, '*');
+      }, LONG_PRESS_MS);
+    };
+
+    const onPointerMove = (event) => {
+      // hover 只对鼠标/笔：指针在卡片内移动时按“当前目标是否控件”切换状态
+      if (isMouseLike(event.pointerType)) {
+        const overCard = !isCardGestureControl(root, event.target);
+        if (overCard !== hovering) {
+          hovering = overCard;
+          postPointer(overCard ? 'hover-enter' : 'hover-leave', event.pointerType);
+        }
+      }
+
+      if (activePointerId === null || event.pointerId !== activePointerId) return;
+      const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+      if (distance <= LONG_PRESS_MOVE_TOLERANCE) return;
+
+      // 移动超容差：取消长按，并让宿主回弹（MOTION §2 状态机）
+      clearLongPress();
+      if (longPressFired) return;
+      activePointerId = null;
+      postPointer('cancel', event.pointerType);
+    };
+
+    const onPointerUp = (event) => {
+      if (activePointerId === null || event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      clearLongPress();
+      postPointer('up', event.pointerType);
+      if (longPressFired) scheduleSwallowCleanup();
+    };
+
+    const onPointerCancel = (event) => {
+      if (activePointerId === null || event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      clearLongPress();
+      postPointer('cancel', event.pointerType);
+      if (longPressFired) scheduleSwallowCleanup();
+    };
+
+    const onPointerLeave = (event) => {
+      if (isMouseLike(event.pointerType) && hovering) {
+        hovering = false;
+        postPointer('hover-leave', event.pointerType);
+      }
+      // 指针离开 iframe：收不到 pointerup 时按取消处理，避免宿主按压状态卡死
+      if (activePointerId === null || event.pointerId !== activePointerId) return;
+      activePointerId = null;
+      clearLongPress();
+      if (longPressFired) scheduleSwallowCleanup();
+      else postPointer('cancel', event.pointerType);
+    };
+
+    // 插件不得自造右键菜单：在 capture 阶段禁掉插件页原生 contextmenu（契约 §3.2 第 5 条）
+    const onContextMenu = (event) => event.preventDefault();
+
+    // capture：即使插件内部某处 stopPropagation，卡片级手势仍能收到事件
+    root.addEventListener('pointerdown', onPointerDown, true);
+    root.addEventListener('pointermove', onPointerMove, true);
+    root.addEventListener('pointerleave', onPointerLeave);
+    // up/cancel 挂 window：指针移出根节点后仍能收到（pointer capture 由浏览器按控件处理）
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+    document.addEventListener('contextmenu', onContextMenu, true);
+
+    return () => {
+      root.removeEventListener('pointerdown', onPointerDown, true);
+      root.removeEventListener('pointermove', onPointerMove, true);
+      root.removeEventListener('pointerleave', onPointerLeave);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerCancel);
+      document.removeEventListener('contextmenu', onContextMenu, true);
+      clearLongPress();
+      stopSwallowingClick();
+    };
+  }, []);
+
+  return { ref };
+}
+
 // 浮层视图里按 Esc：焦点在 iframe 内时宿主收不到按键，这里主动请求宿主关闭浮层。
 // （卡片视图不装这个监听，Esc 仍交给宿主/插件自己的焦点逻辑。）
 if (typeof window !== 'undefined' && getOverlayView()) {

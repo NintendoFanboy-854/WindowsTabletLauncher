@@ -34,6 +34,8 @@ import { Dismiss24Regular } from '@fluentui/react-icons';
 
 import { PROTOCOL_VERSION } from '../bridge/types';
 import type {
+  CardPointerPhase,
+  CardPointerType,
   HostToPluginMessage,
   PluginCallMessage,
   PluginToHostMessage,
@@ -77,6 +79,16 @@ export interface PluginWidgetFrameProps {
    * 由桌面层接线到 App 导航；浮层视图里同样生效。
    */
   onRequestHostSettings?: () => void;
+  /**
+   * 卡片 iframe 内由 SDK 转发的指针状态（`plugin:card-pointer`，契约 §3.2）。
+   * 只有桌面卡片实例需要视觉反馈；浮层视图不会发这类消息。
+   */
+  onCardPointer?: (phase: CardPointerPhase, pointerType: CardPointerType) => void;
+  /**
+   * 插件 SDK 检测到长按（`plugin:request-edit-mode`，契约 §3.2）。
+   * 宿主只负责进编辑模式并聚焦该卡，不重复跑长按计时器。
+   */
+  onRequestEditMode?: () => void;
   /** 不可见的常驻 iframe（后台插件用） */
   hidden?: boolean;
 }
@@ -156,6 +168,23 @@ function sameSize(a: WidgetSize, b: WidgetSize): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
 
+const CARD_POINTER_PHASES: readonly string[] = [
+  'down',
+  'up',
+  'cancel',
+  'hover-enter',
+  'hover-leave',
+];
+const CARD_POINTER_TYPES: readonly string[] = ['touch', 'pen', 'mouse'];
+
+function isCardPointerPhase(value: unknown): value is CardPointerPhase {
+  return typeof value === 'string' && CARD_POINTER_PHASES.includes(value);
+}
+
+function isCardPointerType(value: unknown): value is CardPointerType {
+  return typeof value === 'string' && CARD_POINTER_TYPES.includes(value);
+}
+
 export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidgetFrameProps>(
   function PluginWidgetFrame(props, ref) {
     const {
@@ -173,6 +202,8 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       onApiCall,
       onOverlayClose,
       onRequestHostSettings,
+      onCardPointer,
+      onRequestEditMode,
       hidden = false,
     } = props;
 
@@ -267,6 +298,23 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           onRequestHostSettings?.();
           return;
         }
+        // 卡片手势：SDK 只在卡片视图转发（契约 §3.2）。浮层实例不会收到这类消息，
+        // 这里只把合法状态交给桌面层的卡片视觉/编辑入口。
+        if (rawType === 'plugin:card-pointer') {
+          const { phase, pointerType } = data as unknown as {
+            phase?: unknown;
+            pointerType?: unknown;
+          };
+          if (isCardPointerPhase(phase) && isCardPointerType(pointerType)) {
+            onCardPointer?.(phase, pointerType);
+          }
+          return;
+        }
+        // 长按检测在 SDK；宿主只负责进编辑/聚焦，不重复跑计时器。
+        if (rawType === 'plugin:request-edit-mode') {
+          onRequestEditMode?.();
+          return;
+        }
         // 插件请求全窗口浮层视图（D-02b：设置/详情是独立视图，宿主用 ?view=... 加载）
         if (rawType === 'plugin:request-overlay') {
           const payload = (data as unknown as { payload?: { view?: unknown; title?: unknown } }).payload;
@@ -303,7 +351,16 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       };
       window.addEventListener('message', onWindowMessage);
       return () => window.removeEventListener('message', onWindowMessage);
-    }, [onMessage, onApiCall, onOverlayClose, onRequestHostSettings, openOverlay, post]);
+    }, [
+      onMessage,
+      onApiCall,
+      onOverlayClose,
+      onRequestHostSettings,
+      onCardPointer,
+      onRequestEditMode,
+      openOverlay,
+      post,
+    ]);
 
     useImperativeHandle(
       ref,
@@ -373,6 +430,8 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
                   {title ? `${title} · ${overlay.title}` : overlay.title}
                 </DialogTitle>
                 <DialogContent className={settingsStyles.content}>
+                  {/* 浮层视图不会发卡片手势（SDK 在 ?view=... 下不挂 hook），
+                      不接 onCardPointer / onRequestEditMode，避免浮层误把宿主带进编辑模式 */}
                   <PluginWidgetFrameRecursive
                     src={overlaySrc}
                     pluginId={pluginId}

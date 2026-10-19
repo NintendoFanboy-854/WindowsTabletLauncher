@@ -137,13 +137,20 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 ## 8. 实现约束
 
 - 宿主：
-  - 卡片状态用 `data-hover` / `data-pressed` / `data-longpress` + CSS transition（值全部取 `motionTokens`）；
-  - 长按计时器只在宿主跑一份；SDK 以 rAF 节流转发 pointer 事件（过滤交互控件），到点进编辑模式并通知插件吞掉 click；
+  - 卡片状态用 `data-hover` / `data-press="down|holding"` + CSS transition（值全部取 `motionTokens`）；
+    1px 描边用独立 overlay：hover 中性描边常驻、长按品牌描边 500ms 线性渐显到 0.35；
+  - **长按计时器只在插件侧 SDK（`useHostCardGesture`）跑一份**；宿主只做视觉与进编辑，不重复计时。
+    SDK 转发 pointer 事件时过滤交互控件，到点发 `plugin:request-edit-mode`，并负责吞掉后续 click；
+  - `prefers-reduced-motion: reduce`：hover/press 不做 transform，只保留 100ms 颜色/描边变化；
+    编辑模式卡片也不缩放，直接切换 chrome；
   - container transform 由浮层组件计算 start/end rect、用 CSS transition 驱动 surface（位置/宽高/透明度），内容交叉淡入；锚点无效时走兜底。
 - 插件：
   - `public/plugins/_shared/motion.js` 提供 `FadeSlide` / `Collapse` / `CrossFade` / `useReducedMotion`，内部只用 `motionTokens` + `createPresenceComponent`；
   - 插件不得写出毫秒字面量/自定义曲线；交互密集处（每次点击）不额外加动画。
 - 禁止：动画阻塞操作（动画中仍可点击/关闭）；为动画延迟内容渲染；用动画掩盖加载。
+
+- **实现状态：E2 已按本文件落地（2026-10-19）。** 卡片 hover/press/长按视觉与 reduced-motion
+  在 `WidgetCard.tsx`；手势转发与长按检测在 `_shared/host.js` 的 `useHostCardGesture`。
 
 ## 9. 验收
 

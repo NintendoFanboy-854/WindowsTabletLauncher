@@ -69,6 +69,33 @@ export const useStyles = makeStyles({
   cardEditing: {
     boxShadow: tokens.shadow8,
   },
+  /**
+   * 卡片内容区：承载 iframe，并接住宿主边缘（6px 内衬）的 hover。
+   * 缩放放在内部的 contentLayer 上，让 hover 的 1.015 倍只长进内衬，不裁到 Card 外。
+   */
+  gestureArea: {
+    position: 'absolute',
+    inset: '0',
+    padding: tokens.spacingHorizontalSNudge,
+  },
+  contentLayer: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    transformOrigin: 'center center',
+    willChange: 'transform',
+  },
+  /** 1px 描边 overlay：hover 用中性色、长按用品牌色，绘制在 iframe 之上且不拦点击 */
+  interactionStroke: {
+    position: 'absolute',
+    inset: '0',
+    zIndex: 1,
+    border: `${tokens.strokeWidthThin} solid transparent`,
+    borderRadius: CARD_RADIUS,
+    pointerEvents: 'none',
+    opacity: 0,
+    transitionProperty: 'opacity, border-color',
+  },
   frame: {
     display: 'block',
     width: '100%',

@@ -4,20 +4,20 @@
  * - 1×1：只显示 HH:MM，Display XL 48（D-07），秒/日期按规格砍掉
  * - 2×1：时间 Fluent Display 68 + 秒 16 + 日期 16
  * - 3×2：墙钟 hero：时间 Display XL 112 + 秒 16 + 日期/星期 20
- * - 点击卡片切换 12 / 24 小时制；长按 / 右键菜单打开设置（宿主全窗口浮层）
+ * - 点击卡片切换 12 / 24 小时制；长按由 `useHostCardGesture` 上报宿主进入编辑模式。
+ *   插件不再自行处理长按 / 右键 / hover（契约 §3.2），设置入口统一走宿主设置页。
  *
  * 文本字号用 Fluent Text 的 size/weight；数字主信息用项目 Display XL（D-07，
  * `_shared/typography.js`），不在组件里裸写任意 px。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { plugin } from '/plugin-sdk.js';
 import {
-  requestSettings,
   useAgentTools,
+  useHostCardGesture,
   useHostSize,
-  useSettingsRequest,
   useStoredConfig,
 } from '../../_shared/host.js';
 import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
@@ -31,9 +31,7 @@ import {
   normalizeSettings,
 } from './settings.js';
 
-const LONG_PRESS_MS = 500; // 交互阈值（不是动效时长，DESIGN.md §1.2）
-const LONG_PRESS_MOVE_TOLERANCE = 8;
-const TAP_TOGGLE_HINT = '点击切换 12 / 24 小时制，长按打开设置';
+const TAP_TOGGLE_HINT = '点击切换 12 / 24 小时制，长按编辑桌面';
 
 const useStyles = makeStyles({
   root: {
@@ -119,7 +117,9 @@ export default function ClockApp() {
   const sizeKey = useHostSize(sizeKeyOf, '2x1');
   const [settings, setSettings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
   const [now, setNow] = useState(() => new Date());
-  const rootRef = useRef(null);
+  // 卡片手势：SDK 转发 press/hover、长按 500ms 进编辑；返回的 ref 同时给焦点用
+  const gesture = useHostCardGesture();
+  const rootRef = gesture.ref;
 
   const compact = sizeKey === '1x1';
   const large = sizeKey === '3x2';
@@ -138,9 +138,6 @@ export default function ClockApp() {
   /* 宿主把键盘焦点交进来时，落到卡片根上 */
   useEffect(() => plugin.onFocus(() => rootRef.current?.focus({ preventScroll: true })), []);
 
-  /* 编辑模式点「设置」：宿主发 host:open-settings，改成请求全窗口设置浮层 */
-  useSettingsRequest(() => requestSettings());
-
   const time = formatTime(now, settings);
   const date = formatDate(now, settings);
   const showSeconds = settings.showSeconds && !compact;
@@ -154,49 +151,15 @@ export default function ClockApp() {
     setSettings((previous) => ({ ...previous, hour12: !previous.hour12 }));
   }, [setSettings]);
 
-  /* 长按打开设置 / 轻点切换小时制（与旧版交互一致） */
-  const pressRef = useRef({ timer: 0, origin: null, suppressClick: false });
-  const clearPress = useCallback(() => {
-    window.clearTimeout(pressRef.current.timer);
-    pressRef.current.timer = 0;
-    pressRef.current.origin = null;
-  }, []);
-  useEffect(() => clearPress, [clearPress]);
-
-  const onPointerDown = useCallback((event) => {
-    if (event.button !== 0) return;
-    pressRef.current.origin = { x: event.clientX, y: event.clientY };
-    pressRef.current.timer = window.setTimeout(() => {
-      pressRef.current.suppressClick = true;
-      requestSettings();
-    }, LONG_PRESS_MS);
-  }, []);
-  const onPointerMove = useCallback(
-    (event) => {
-      const origin = pressRef.current.origin;
-      if (!origin) return;
-      if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > LONG_PRESS_MOVE_TOLERANCE) {
-        clearPress();
-      }
-    },
-    [clearPress],
-  );
+  /* 轻点切换小时制；长按由 useHostCardGesture 上报宿主，插件不再自行计时/吞 click */
   const onClick = useCallback(() => {
-    if (pressRef.current.suppressClick) {
-      pressRef.current.suppressClick = false;
-      return;
-    }
     toggleHour12();
   }, [toggleHour12]);
   const onKeyDown = useCallback(
     (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        toggleHour12();
-      } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-        event.preventDefault();
-        requestSettings();
-      }
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      toggleHour12();
     },
     [toggleHour12],
   );
@@ -227,15 +190,6 @@ export default function ClockApp() {
       aria-label={ariaLabel}
       onClick={onClick}
       onKeyDown={onKeyDown}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={clearPress}
-      onPointerCancel={clearPress}
-      onPointerLeave={clearPress}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        requestSettings();
-      }}
     >
       <div className={styles.timeRow}>
         {compact && (

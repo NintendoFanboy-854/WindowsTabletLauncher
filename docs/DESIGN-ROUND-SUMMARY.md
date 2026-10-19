@@ -45,7 +45,8 @@
 | 键盘 | Tab 聚焦、Enter/Space 主操作 | Esc 退出编辑 | 方向键移动、Delete、Enter、Esc |
 
 - 卡片按压：按下 0.985；长按 500ms 内线性下沉到 0.97，到点进编辑；松手回弹。
-- 手势由共享 SDK `useHostCardGesture` 上报（过滤按钮/输入等控件），长按计时器只在宿主跑一份。
+- 手势由共享 SDK `useHostCardGesture` 上报（过滤按钮/输入等控件），长按计时器只在插件侧 SDK 跑一份，
+  宿主只做视觉与进编辑。
 
 ## 4. 设置归属（插件声明式 schema）
 

@@ -124,12 +124,38 @@ export interface PluginRequestHostSettingsMessage {
   type: 'plugin:request-host-settings';
 }
 
+/** 卡片手势的指针阶段（契约 §3.2；hover 只对 mouse/pen 发） */
+export type CardPointerPhase = 'down' | 'up' | 'cancel' | 'hover-enter' | 'hover-leave';
+
+/** 指针类型原样转发；触控没有 hover，press/长按三种都生效 */
+export type CardPointerType = 'touch' | 'pen' | 'mouse';
+
+/**
+ * SDK 把卡片 iframe 内的指针状态转发给宿主（契约 §3.2）。
+ * 只在卡片实例的 iframe 里发；浮层视图（?view=...）与后台 iframe 不发。
+ */
+export interface PluginCardPointerMessage {
+  type: 'plugin:card-pointer';
+  phase: CardPointerPhase;
+  pointerType: CardPointerType;
+}
+
+/**
+ * 插件侧 SDK 检测到 500ms 长按（契约 §3.2）。
+ * 长按计时器只在 SDK 跑一份，宿主收到后只负责进编辑模式并聚焦该卡。
+ */
+export interface PluginRequestEditModeMessage {
+  type: 'plugin:request-edit-mode';
+}
+
 export type PluginToHostMessage =
   | PluginReadyMessage
   | PluginCallMessage
   | PluginToolResultMessage
   | PluginFocusExitMessage
-  | PluginRequestHostSettingsMessage;
+  | PluginRequestHostSettingsMessage
+  | PluginCardPointerMessage
+  | PluginRequestEditModeMessage;
 
 // ---------- API 参数/返回值 ----------
 

@@ -11,6 +11,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
 import { getHostBridge } from '../bridge';
 import type { HostBridge, PluginFrameHandle } from '../bridge';
 import type {
+  CardPointerPhase,
+  CardPointerType,
   PluginCallMessage,
   PluginToHostMessage,
   ThemePayload,
@@ -40,6 +42,10 @@ interface WidgetFrameProps {
   notify(text: string): void;
   /** 插件请求打开宿主设置页的本插件分区（plugin:request-host-settings） */
   onRequestHostSettings?: () => void;
+  /** iframe 内转发出来的卡片按压/hover 状态（plugin:card-pointer，契约 §3.2） */
+  onCardPointer?: (phase: CardPointerPhase, pointerType: CardPointerType) => void;
+  /** SDK 检测到卡片长按（plugin:request-edit-mode），宿主进编辑并聚焦 */
+  onRequestEditMode?: () => void;
 }
 
 export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(function WidgetFrame(
@@ -54,6 +60,8 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
     theme,
     notify,
     onRequestHostSettings,
+    onCardPointer,
+    onRequestEditMode,
   },
   ref,
 ) {
@@ -138,6 +146,8 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
       onApiCall={handleApiCall}
       onMessage={handleMessage}
       onRequestHostSettings={onRequestHostSettings}
+      onCardPointer={onCardPointer}
+      onRequestEditMode={onRequestEditMode}
     />
   );
 });

@@ -606,19 +606,20 @@ export default function Desktop({
 
   // ---------- 卡片交互 ----------
 
-  const handleCardTap = useCallback(
+  /**
+   * 插件 SDK 检测到卡片长按（`plugin:request-edit-mode`，契约 §3.2）。
+   * 宿主不重复跑长按计时器：已在编辑模式则只选中/聚焦该卡，否则复用 enterEditMode。
+   */
+  const handleCardRequestEditMode = useCallback(
     (widget: WidgetInstance) => {
-      setFocusedUid(widget.uid);
-      focusCardNode(widget.uid);
-    },
-    [focusCardNode],
-  );
-
-  const handleCardLongPress = useCallback(
-    (widget: WidgetInstance) => {
+      if (editModeRef.current) {
+        setFocusedUid(widget.uid);
+        focusCardNode(widget.uid);
+        return;
+      }
       enterEditMode(widget);
     },
-    [enterEditMode],
+    [enterEditMode, focusCardNode],
   );
 
   // ---------- 编辑模式拖拽（浮层 → 吸附 / 交换 / 边缘翻页） ----------
@@ -1032,8 +1033,7 @@ export default function Desktop({
                       bridge={bridge}
                       theme={theme}
                       notify={notify}
-                      onLongPress={handleCardLongPress}
-                      onTap={handleCardTap}
+                      onRequestEditMode={handleCardRequestEditMode}
                       onFocus={handleCardFocus}
                       onDelete={deleteWidget}
                       onOpenSettings={openPluginSettings}
