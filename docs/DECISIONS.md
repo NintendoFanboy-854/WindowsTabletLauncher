@@ -103,6 +103,9 @@
 - 浮层标题与关闭按钮只由宿主 Dialog 提供，插件视图内不再画标题栏/关闭按钮。
 - 回归入口：`node scripts/verify-overlays.mjs`（12 视图断言）+ `node scripts/shot-host-overlays.mjs`
   （宿主内联调截图）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
+- 宽度口径（E5 复核，2026-10-20）：**表单/设置内容 max-width 720 居中；详情里的列表/统计区可用满宽 834**
+  （见 [OVERLAY-REWRITE-SPEC.md](OVERLAY-REWRITE-SPEC.md) §2）。组件文档未要求 720 的详情页不强制收窄，
+  避免改变列表密度与列对齐。
 - 后续新增任何插件浮层视图都按此骨架执行；不再逐页另立规格。
 
 ## D-12 三个运行时 bug 的修复口径（2026-10-19，已落地）

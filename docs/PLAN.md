@@ -157,10 +157,11 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 > 背景：六个插件的交互/信息架构/视觉已逐个定稿，宿主与插件解耦契约见 [PLUGIN-CONTRACT.md](PLUGIN-CONTRACT.md)；
 > 汇总见 [DESIGN-ROUND-SUMMARY.md](DESIGN-ROUND-SUMMARY.md)，动效见 [MOTION.md](MOTION.md)，
 > 原则参考 [APPLE-HIG.md](reference/APPLE-HIG.md)。本轮不再按旧阶段表，按下面顺序执行。
-> **E0–E4 已完成（2026-10-20）**：设置页 `bd6a8b8`、卡片手势 `5f65153`、网络定位（D-16）`05fbafd`、
+> **E0–E5 已完成（2026-10-20）**：设置页 `bd6a8b8`、卡片手势 `5f65153`、网络定位（D-16）`05fbafd`、
 > 共享插件底座 `d2c3ae8`、模板 `27ef06c`、六插件 `15bb70d`…`03be1e6`、B5 设置隔离 `b970287`、
-> E4 动效 `4a6ac2a`；附带修掉 P1/P2 回归：布局 reload 覆盖 `8c43d0b`、reload 后插件尺寸/主题不同步
-> `0bca3ab`、同会话换配色不跟随 `a467830`。接下来 **E5 视觉 → E6 清理 → E7 回归发布**。
+> E4 动效 `4a6ac2a`、E5 视觉 `f568c86`；附带修掉 P1/P2 回归：布局 reload 覆盖 `8c43d0b`、
+> reload 后插件尺寸/主题不同步 `0bca3ab`、同会话换配色不跟随 `a467830`。
+> 接下来 **E6 清理 → E7 回归发布**。
 
 | # | 任务 | 内容 | 验收 |
 |---|---|---|---|
@@ -173,7 +174,7 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 | E3 | 六插件重构 ✅ | clock（详情+世界时钟+设置迁移）、countdown（整卡详情、表单保存/取消语义）、sedentary（卡片展示+起来了、详情 7 天）、pomodoro（开始/暂停/重置、详情清空）、todo（卡片仅展示+勾选、详情完整管理+删除）、weather（3×2 逐时、4×2 等宽 7 天、详情紧凑化、自动定位接 ip.cn 网络归属地）；每个插件补 Agent 对等工具 | 已完成（2026-10-20，commit `15bb70d`/`2d7fed2`/`9a14a0b`/`286f4cf`/`67faf87`/`03be1e6`，共享收口 `c71ff1f`）：六插件 `verify-plugin` 25 档全 PASS、暗/亮色宿主冒烟 X/Esc/console 0 error；宿主 E2E B1–B4、B6–B10 PASS；B5 设置串写修复 `b970287` 后 44/44 复测 PASS；复盘/插件页正常 |
 | E4 | 动效 ✅ | 按 [MOTION.md](MOTION.md) 实现：hover 1.5%、按下 0.985、长按 500ms 下沉、详情/设置完整 container transform（所有尺寸，内容交叉淡入，关闭 150ms 收回）、插件内容按 Fluent motion；全部 token，尊重 reduced-motion | 已完成（2026-10-20，commit `4a6ac2a`）：CDP 采样 overlay 首帧与卡片 rect 差 0px、末帧 880×680、关闭 150ms 收回 + 焦点归还；fallback/reduced-motion 路径 PASS；六插件无自造时长/曲线 |
 | E4b | 持久化/主题回归修复 ✅ | P1 布局 reload 被空目录覆盖、P1b reload 后插件尺寸档位/主题不同步、P2 同会话换配色插件卡不跟随 | 已完成（2026-10-20，commit `8c43d0b`/`0bca3ab`/`a467830`）：focused 复测 52/52 PASS；六插件 `verify-plugin` 重打包后全 PASS；布局/尺寸/主题三条链均有 raw 证据（`shots/e3-final/p1-fix*`） |
-| E5 | 视觉收口 | spacing/分组/层级/字号统一（HIG 分组原则 + Fluent 2 token）；天气右端对齐、卡片内边距、详情首屏密度；亮暗两套 | 1440×960 / 1024×768 截图；审计无 P0/P1 |
+| E5 | 视觉收口 ✅ | spacing/分组/层级/字号统一（HIG 分组原则 + Fluent 2 token）；天气右端对齐、卡片内边距、详情首屏密度；亮暗两套 | 已完成（2026-10-20，commit `f568c86`）：P0/P1 清零；5 组 P1 修复（详情溢出渐隐、countdown 主层/Badge、设置标题 20、AQI 对比 10.05:1）；1440×960/1024×768 × 亮暗全量截图与量测；P2 清单见 `shots/e5/REPORT.md` §4（不阻塞交付） |
 | E6 | 测试脚手架清理 | 删除 `src/host/{shell,agent,plugins}/demo.html` 三套演示宿主与 `bridge-check`，能力收敛到正式 host 的 dev-only 参数或 `tests/`；去掉演示页的“Agent 模块演示 / scenario / 源码路径”测试横幅与假桌面；Agent「演示模式」移出主设置（只保留高级/URL `?mock=1`） | `npm run build` 后 `dist` 无 demo 页面与演示文案；运行时只有一个 host；产品 UI 无“测试/演示”入口 |
 | E7 | 回归与发布 | 更新 `verify-widgets` / `verify-overlays`；做一个最小第三方插件跑 plug-and-play 验收（零宿主改动）；更新 RELEASE/RELEASE-REPORT；截图归档 | 断言全 PASS；契约验收清单全勾 |
 
