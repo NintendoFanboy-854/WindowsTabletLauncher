@@ -8,7 +8,7 @@
 interface Settings {
   hour12: boolean;       // 12 小时制，默认 false
   showSeconds: boolean;  // 默认 true
-  dateFormat: 'cn' | 'iso' | 'en'; // 默认 cn
+  dateFormat: 'zh' | 'iso' | 'en'; // 默认 zh（旧数据 cn 读取时归一为 zh）
 }
 
 interface WorldClock {
@@ -59,9 +59,9 @@ interface WorldClock {
     "fields": [
       { "key": "hour12", "type": "boolean", "label": "12 小时制", "default": false },
       { "key": "showSeconds", "type": "boolean", "label": "显示秒", "default": true },
-      { "key": "dateFormat", "type": "enum", "label": "日期格式", "default": "cn",
+      { "key": "dateFormat", "type": "enum", "label": "日期格式", "default": "zh",
         "options": [
-          { "value": "cn", "label": "10月18日 星期日" },
+          { "value": "zh", "label": "10月18日 星期日" },
           { "value": "iso", "label": "2026-10-18" },
           { "value": "en", "label": "10/18 Sun" }
         ] }

@@ -1,7 +1,8 @@
 {
   "id": "clock",
   "name": "时钟",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "background": false,
   "widgets": [
     {
       "id": "clock",
@@ -18,7 +19,7 @@
       {
         "id": "display",
         "title": "时间显示",
-        "hint": "只影响卡片与详情的显示方式",
+        "hint": "只影响卡片与世界时钟的显示方式；修改即时生效。",
         "fields": [
           {
             "key": "hour12",
@@ -31,13 +32,14 @@
             "key": "showSeconds",
             "type": "boolean",
             "label": "显示秒",
-            "description": "1×1 档位空间不足，按规格不显示秒",
+            "description": "1×1 档位空间不足，按规格始终不显示秒",
             "default": true
           },
           {
             "key": "dateFormat",
             "type": "enum",
             "label": "日期格式",
+            "description": "影响卡片与详情 header 的日期",
             "default": "zh",
             "options": [
               { "value": "zh", "label": "10月18日 星期日" },

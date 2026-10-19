@@ -61,9 +61,9 @@
             "key": "dateFormat",
             "type": "enum",
             "label": "日期格式",
-            "default": "cn",
+            "default": "zh",
             "options": [
-              { "value": "cn", "label": "10月18日 星期日" },
+              { "value": "zh", "label": "10月18日 星期日" },
               { "value": "iso", "label": "2026-10-18" },
               { "value": "en", "label": "10/18 Sun" }
             ]

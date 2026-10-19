@@ -1,100 +1,88 @@
 /**
- * 时钟卡片视图（正常模式没有任何操作 chrome，DECISIONS D-02b / DENSITY 规则）。
+ * 时钟卡片（L0）：纯展示，主体点击 / Enter / Space 打开宿主详情浮层。
  *
- * - 1×1：只显示 HH:MM，Display XL 48（D-07），秒/日期按规格砍掉
- * - 2×1：时间 Fluent Display 68 + 秒 16 + 日期 16
- * - 3×2：墙钟 hero：时间 Display XL 112 + 秒 16 + 日期/星期 20
- * - 点击卡片切换 12 / 24 小时制；长按由 `useHostCardGesture` 上报宿主进入编辑模式。
- *   插件不再自行处理长按 / 右键 / hover（契约 §3.2），设置入口统一走宿主设置页。
+ * 信息预算（docs/components/clock.md）：
+ * - 1×1：只显示 HH:MM，Display XL 48（D-07）；
+ * - 2×1：时间 68 + 秒 16 + 日期 16；
+ * - 3×2：时间 112 + 秒 16 + 日期/星期 20。
  *
- * 文本字号用 Fluent Text 的 size/weight；数字主信息用项目 Display XL（D-07，
- * `_shared/typography.js`），不在组件里裸写任意 px。
+ * 长按 / 右键 / hover 由 CardRoot 内部的 useHostCardGesture 交给宿主；插件不写任何
+ * 长按计时器、不提供设置入口、不在卡片上做 12/24h 切换（设置统一在宿主设置页）。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { plugin } from '/plugin-sdk.js';
-import {
-  useAgentTools,
-  useHostCardGesture,
-  useHostSize,
-  useStoredConfig,
-} from '../../_shared/host.js';
-import { displayXl, TABULAR_NUMS } from '../../_shared/typography.js';
-import { sizeKeyOf } from './sizes.js';
+
+import { requestOverlay, useAgentTools, useHostSize, useStoredConfig } from '../../_shared/host.js';
+import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
+import { CardRoot, useNow } from '../../_shared/ui.jsx';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
-  describeTime,
   formatDate,
   formatTime,
   normalizeSettings,
 } from './settings.js';
+import { CLOCK_TOOLS, createClockToolHandlers } from './tools.js';
+import { useWorldClocks } from './world.js';
+import { sizeKeyOf } from './sizes.js';
 
-const TAP_TOGGLE_HINT = '点击切换 12 / 24 小时制，长按编辑桌面';
+/** 秒级刷新；时间格式由设置决定，刷新频率保持一秒以便切到显示秒时立即对齐。 */
+const TICK_INTERVAL = 1000;
 
 const useStyles = makeStyles({
   root: {
-    boxSizing: 'border-box',
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     padding: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground1,
-    cursor: 'pointer',
+    textAlign: 'center',
     userSelect: 'none',
-    outline: 'none',
-    overflow: 'hidden',
-    ':focus-visible': {
-      outline: `2px solid ${tokens.colorStrokeFocus2}`,
-      outlineOffset: `-${tokens.strokeWidthThick}`,
-    },
+    cursor: 'pointer',
   },
-  /** 1×1：padding 8（DENSITY §2.1 尺寸档） */
+  /** 1×1：padding 8（DENSITY §2.1） */
   rootCompact: {
     padding: tokens.spacingHorizontalS,
     gap: tokens.spacingVerticalXXS,
   },
   /** 2×1：8 纵 / 12 横 */
   rootRow: {
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    paddingBlock: tokens.spacingVerticalS,
+    paddingInline: tokens.spacingHorizontalM,
     gap: tokens.spacingVerticalXS,
   },
-  /** 3×2：12 纵 / 16 横，时间与日期之间 12 */
+  /** 3×2：12 纵 / 16 横，组间距 8 */
   rootLarge: {
-    gap: tokens.spacingVerticalM,
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    paddingBlock: tokens.spacingVerticalM,
+    paddingInline: tokens.spacingHorizontalL,
+    gap: tokens.spacingVerticalS,
   },
   timeRow: {
     display: 'flex',
     alignItems: 'baseline',
-    gap: tokens.spacingHorizontalXXS,
-    lineHeight: 0,
+    justifyContent: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
   },
   numeric: {
     ...TABULAR_NUMS,
+    whiteSpace: 'nowrap',
   },
-  /** 1×1 数字主信息：Display XL 48（D-07） */
-  timeXl48: {
+  time48: {
     ...displayXl(48),
-    fontWeight: 600,
+    fontWeight: DISPLAY_WEIGHT,
     color: tokens.colorNeutralForeground1,
   },
-  /** 3×2 数字主信息：Display XL 112（D-07） */
-  timeXl112: {
-    ...displayXl(112),
-    fontWeight: 600,
-    color: tokens.colorNeutralForeground1,
-  },
-  /** 2×1 用 Fluent Display 68，行高用 token（不再 lineHeight:1） */
   time68: {
     fontSize: tokens.fontSizeHero1000,
     lineHeight: tokens.lineHeightHero1000,
-    fontWeight: 600,
+    fontWeight: DISPLAY_WEIGHT,
+    color: tokens.colorNeutralForeground1,
+  },
+  time112: {
+    ...displayXl(112),
+    fontWeight: DISPLAY_WEIGHT,
     color: tokens.colorNeutralForeground1,
   },
   seconds: {
@@ -103,12 +91,12 @@ const useStyles = makeStyles({
   meridiem: {
     color: tokens.colorNeutralForeground2,
   },
-  meta: {
+  date: {
     color: tokens.colorNeutralForeground2,
-    whiteSpace: 'nowrap',
+    maxWidth: '100%',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    maxWidth: '100%',
+    whiteSpace: 'nowrap',
   },
 });
 
@@ -116,105 +104,81 @@ export default function ClockApp() {
   const styles = useStyles();
   const sizeKey = useHostSize(sizeKeyOf, '2x1');
   const [settings, setSettings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
-  const [now, setNow] = useState(() => new Date());
-  // 卡片手势：SDK 转发 press/hover、长按 500ms 进编辑；返回的 ref 同时给焦点用
-  const gesture = useHostCardGesture();
-  const rootRef = gesture.ref;
+  const world = useWorldClocks();
+  const now = useNow(TICK_INTERVAL);
 
   const compact = sizeKey === '1x1';
   const large = sizeKey === '3x2';
 
-  /* 秒级刷新：对齐到整秒，避免累积漂移 */
-  useEffect(() => {
-    let timer = 0;
-    const tick = () => {
-      setNow(new Date());
-      timer = window.setTimeout(tick, 1000 - (Date.now() % 1000) + 10);
-    };
-    tick();
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  /* 宿主把键盘焦点交进来时，落到卡片根上 */
-  useEffect(() => plugin.onFocus(() => rootRef.current?.focus({ preventScroll: true })), []);
-
-  const time = formatTime(now, settings);
-  const date = formatDate(now, settings);
+  const dateNow = new Date(now);
+  const time = formatTime(dateNow, settings);
+  const date = formatDate(dateNow, settings);
   const showSeconds = settings.showSeconds && !compact;
 
   const ariaLabel = useMemo(() => {
     const spoken = settings.hour12 ? `${time.main} ${time.meridiem}` : time.main;
-    return `当前时间 ${spoken}，${date.inline}，${TAP_TOGGLE_HINT}`;
-  }, [date.inline, settings.hour12, time.main, time.meridiem]);
+    const seconds = showSeconds ? ` ${time.seconds} 秒` : '';
+    const dateText = compact ? '' : `，${date.inline}`;
+    return `当前时间 ${spoken}${seconds}${dateText}，点击打开时钟详情`;
+  }, [compact, date.inline, settings.hour12, showSeconds, time.main, time.meridiem, time.seconds]);
 
-  const toggleHour12 = useCallback(() => {
-    setSettings((previous) => ({ ...previous, hour12: !previous.hour12 }));
-  }, [setSettings]);
-
-  /* 轻点切换小时制；长按由 useHostCardGesture 上报宿主，插件不再自行计时/吞 click */
-  const onClick = useCallback(() => {
-    toggleHour12();
-  }, [toggleHour12]);
-  const onKeyDown = useCallback(
-    (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      toggleHour12();
-    },
-    [toggleHour12],
-  );
-
-  /* Agent 工具：clock.now（只读） */
+  // Agent 对等：卡片 iframe 常驻桌面，工具只在这里注册一次；UI 与工具共用同一数据层。
   useAgentTools(
-    [
-      {
-        name: 'clock.now',
-        description: '读取系统当前时间与日期（只读，不修改任何配置）',
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-      },
-    ],
-    { 'clock.now': () => describeTime(new Date(), settings, sizeKey) },
+    CLOCK_TOOLS,
+    createClockToolHandlers({ settings, setSettings, world }),
   );
 
   return (
-    <div
-      ref={rootRef}
+    <CardRoot
+      ariaLabel={ariaLabel}
+      onActivate={() => requestOverlay('detail', '时钟详情')}
       className={mergeClasses(
         styles.root,
         compact && styles.rootCompact,
-        sizeKey === '2x1' && styles.rootRow,
+        !compact && !large && styles.rootRow,
         large && styles.rootLarge,
       )}
-      role="button"
-      tabIndex={0}
-      aria-label={ariaLabel}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
+      data-clock-root="true"
+      data-clock-size={sizeKey}
     >
       <div className={styles.timeRow}>
-        {compact && (
-          <span className={mergeClasses(styles.numeric, styles.timeXl48)}>{time.main}</span>
-        )}
-        {large && (
-          <span className={mergeClasses(styles.numeric, styles.timeXl112)}>{time.main}</span>
-        )}
-        {!compact && !large && <span className={mergeClasses(styles.numeric, styles.time68)}>{time.main}</span>}
-        {showSeconds && (
-          <Text className={mergeClasses(styles.numeric, styles.seconds)} size={400}>
+        <span
+          data-clock-time="true"
+          className={mergeClasses(
+            styles.numeric,
+            compact ? styles.time48 : large ? styles.time112 : styles.time68,
+          )}
+        >
+          {time.main}
+        </span>
+        {showSeconds ? (
+          <Text
+            data-clock-seconds="true"
+            size={400}
+            className={mergeClasses(styles.numeric, styles.seconds)}
+          >
             {time.seconds}
           </Text>
-        )}
-        {settings.hour12 && (
-          <Text className={styles.meridiem} size={400}>
+        ) : null}
+        {settings.hour12 ? (
+          <Text
+            data-clock-meridiem="true"
+            size={compact ? 200 : 300}
+            className={styles.meridiem}
+          >
             {time.meridiem}
           </Text>
-        )}
+        ) : null}
       </div>
-      {!compact && (
-        <Text className={styles.meta} size={large ? 500 : 400}>
-          {large ? `${date.date} · ${date.weekday}` : date.inline}
+      {!compact ? (
+        <Text
+          data-clock-date="true"
+          size={large ? 500 : 400}
+          className={styles.date}
+        >
+          {large ? `${date.date} ${date.weekday}` : date.date}
         </Text>
-      )}
-    </div>
+      ) : null}
+    </CardRoot>
   );
 }
