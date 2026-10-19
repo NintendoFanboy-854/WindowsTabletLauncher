@@ -1,5 +1,9 @@
 # 插件设置 / 详情浮层重排规格（v1，2026-10-19）
 
+> **⚠️ 历史文档（已被取代）**：本规格里的 `?view=settings` 设置浮层、详情/编辑/全部任务视图的
+> 旧交互与骨架已由 `docs/PLUGIN-CONTRACT.md`（设置宿主化 + L1/L2 页栈）、
+> `docs/DESIGN-ROUND-SUMMARY.md` 与六份 `docs/components/*.md` 取代；仅保留历史参考。
+
 > 范围：六个插件在宿主全窗口 Fluent Dialog 里加载的 **设置 / 详情 / 编辑 / 全部任务** 视图
 > （`?view=settings|detail|edit|all`）。卡片视图已完成 v0.2 重写，本轮只动浮层视图。
 > 依据：`docs/audit2/REPORT-VISUAL.md`、`docs/audit2/REPORT-TYPE.md`、

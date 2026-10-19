@@ -1,125 +1,124 @@
 # 待办（todo）
 
-桌面常驻的待办清单。支持多清单、子任务、优先级、截止日期、提醒、重复任务、标签、搜索、日历视图。
+桌面常驻待办清单。卡片只展示「今日」并提供勾选；完整管理（多视图、搜索、任务编辑、清单管理）在详情页。
 
-> 自然语言输入（“明天下午三点交报告”）由主 Agent 解析后调用下面的结构化工具，**组件本身不做自然语言解析**。
+> 自然语言输入由主 Agent 解析后调用结构化工具，组件本身不做 NLP。
 
 ## 数据模型
 
 ```ts
-type Priority = 0 | 1 | 2 | 3; // 无 / 低 / 中 / 高
+type Priority = 0 | 1 | 2 | 3; // 无/低/中/高
 
-interface TodoList {
-  id: string;
-  name: string;
-  color: string;      // Fluent token 名
-  order: number;
-}
+interface TodoList { id: string; name: string; color: string; order: number }
 
-interface Subtask {
-  id: string;
-  title: string;
-  done: boolean;
-  order: number;
-}
+interface Subtask { id: string; title: string; done: boolean; order: number }
 
 interface Task {
-  id: string;
-  listId: string;
-  title: string;            // 不限长度，列表里按宽度截断
-  note?: string;
-  done: boolean;
-  doneAt?: string;          // ISO
-  createdAt: string;        // ISO
-  updatedAt: string;        // ISO
-  order: number;            // 手动排序用，可插入的浮点序
-  priority: Priority;
-  dueAt?: string;           // ISO；可只有日期（当天 23:59 视为到期）
-  remindAt?: string;        // ISO；由后台 iframe 定时触发通知
+  id: string; listId: string; title: string; note?: string;
+  done: boolean; doneAt?: string; createdAt: string; updatedAt: string;
+  order: number; priority: Priority;
+  dueAt?: string; remindAt?: string;
   recurrence?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  tags: string[];
-  subtasks: Subtask[];
+  tags: string[]; subtasks: Subtask[];
 }
 ```
 
-存储：插件自己持久化（`localStorage` 键 `todo.lists` / `todo.tasks` / `todo.tags` / `todo.settings`），不设数量上限。
+存储：`todo.lists`、`todo.tasks`、`todo.tags`、`todo.settings`；`"background": true` 负责提醒。
 
-## 尺寸与布局
+## 卡片（只做展示 + 勾选）
+
+- **固定「今日」视图**：已逾期 + 今天到期；已完成不上卡片。
+- 行 44：Fluent Checkbox 40（勾选即完成）→ 可选优先级旗标 16（内容色）→ 标题 16 fg1（单行省略）→ 元信息 12 fg3（截止时间 / “已逾期 · 昨天” danger）。
+- 行内只保留一个元信息；不显示备注、标签、子任务数。
+- 点击卡片主体或行 = 打开详情；勾选框 `stopPropagation`，不打开详情。
+- 无 `+`、输入框、菜单、搜索、视图切换、拖拽、长按/右键。
+- 空态：居中「今日没有待办」14 fg3，无按钮（详情里添加）。
 
 | 尺寸 | 内容 |
 |---|---|
-| `1×1` | 未完成总数 + 今日到期数 + 第一条任务标题 |
-| `2×2` | 当前清单的任务列表（约 4–5 条），无输入框 |
-| `3×2` | 列表 + `+` 展开输入框 + 清单名 |
-| `3×3` | 完整视图：工具条（清单切换 / 搜索 / 视图切换）+ 列表 + 输入框 |
-| `4×2` | 宽列表：左列未完成、右列已完成 |
+| `1×1` | 今日未完成数 48 +「今日待办」14 +（有逾期）「已逾期 N」12 danger |
+| `2×2` | 头部「今日 · N」12 fg3 + 4 行 |
+| `3×2` | 头部 + 5 行 |
+| `3×3` | 头部 + 8 行 |
+| `4×2` | 头部 + 5 行单列宽行（不做左右两栏） |
 
-## 自适应
+行预算：2×2=4、3×2=5、3×3=8、4×2=5；超出由详情承载，不静默裁切。
 
-- 字号随卡片缩放，行高用 Fluent 间距 token。
-- `1×1` 只留计数 + 首条；`2×2` 隐藏工具条；`3×3` 才显示清单切换和筛选。
-- 软键盘弹出时卡片内容内部滚动，不带动整个桌面。
+## 详情（L1，`?view=detail`）
 
-## 交互
+**header 56**：清单 Dropdown 140（切换筛选 +「管理清单…」）、搜索 Input（flex）、「添加任务」40 primary。
 
-- 点任务 = 打勾；点已完成任务 = 取消打勾。
-- `+` = 展开输入框（软键盘自动弹），回车提交，Esc 收起。
-- 长按任务 = 菜单：编辑标题、备注、优先级、截止日期、提醒时间、重复规则、标签、加子任务、移动清单、删除。
-- 点击子任务 = 打勾；任务行显示 `2/5` 进度。
-- 拖拽任务 = 手动排序（仅排序方式为“手动”时可用）。
-- 工具条：清单切换、搜索框、视图切换、排序下拉（手动 / 截止 / 优先级 / 创建时间）。
-- 日期分组视图：今天 / 明天 / 以后 / 无日期 / 已完成。
-- 视图共五种（对齐参考产品 Todo清单）：Daytodo（今天 / 明天，Ivy Lee 式安排）、最近待办（近期未完成 + 未来几天）、分类清单（按清单看）、日历+任务（月历与今日待办合一，点日期看当天）、周视图 / 月视图（看整周 / 整月安排，点日期直接建任务）。
-- 已完成默认折叠在底部，点“清空”删除所有已完成。
+**Tabs 40（常显）**：列表 / 日历 / 周视图 / 月视图 / 热力图。
 
-## 配置项
+- **列表**：分组「逾期/今天/明天/以后/无日期/已完成（折叠）」；组头 14 semibold + 计数 12 fg3，高 28；行 44（checkbox 40 + 旗标 16 + 标题 16 + 元信息 12 + 行尾 `⋯` 40）。
+  - 点行 → push L2「任务编辑」；行尾 ⋯ → 编辑/删除（删除行内二次确认）。
+  - 已完成组默认折叠，组头右侧「展开」「清空」40；清空行内确认。
+- **日历**：月头 40（‹ / 2026年10月 / › / 今天）；7 列等宽；日格 44（日期 14 + 任务点/计数 12）；下方列出选中日任务（行 44）。
+- **周视图**：7 列等宽，日期头 28，任务行 44，列间距 8；内容滚动。
+- **月视图**：6×7 日格 44，格内最多 2 个任务点/计数；下方列出选中日任务。
+- **热力图**：16 周网格 + 图例 12 fg3；顶部统计一行（值 20）。
+- 所有视图共用 padding 24、行高 44、字号 12/14/16、无分割线。
 
-- 默认清单（默认第一个）
-- 是否显示已完成（默认显示、折叠）
-- 默认排序（默认手动）
-- 字号（默认 / 大）
-- 一周起始日（默认周一）
+## 详情（L2，任务编辑，push）
 
-## Agent 工具
+- header 56：← 返回 +「编辑任务 / 新建任务」16 semibold。
+- 表单 max-width 720：标题 Input 40、备注 Textarea 3 行、清单 Dropdown 40、优先级 Radio 40、截止/提醒（日期 40 + 时间 40 + 清除 40）、重复 Dropdown 40、标签 chips + input 40/添加 40、子任务行 44 + 添加行 40。
+- footer 固定：编辑时左侧 danger「删除」（行内确认）；右侧「取消」「保存」40。
+- 保存 = 提交并 pop 回 L1；取消/返回 = 放弃并 pop；X/Esc/遮罩 = 关闭整个浮层。
 
-| 工具 | 参数 | 返回 |
-|---|---|---|
-| `todo.lists` | — | 清单数组 |
-| `todo.list` | `{ listId?, done?, dueBefore?, tag?, query? }` | 任务数组（默认未完成） |
-| `todo.add` | `{ title, listId?, priority?, dueAt?, remindAt?, recurrence?, tags?, subtasks? }` | 新任务 |
-| `todo.addList` | `{ name }` | 新清单 |
-| `todo.complete` | `{ id, done? }` | 更新后的任务 |
-| `todo.update` | `{ id, title?, note?, priority?, dueAt?, remindAt?, recurrence?, tags?, listId? }` | 更新后的任务 |
-| `todo.remove` | `{ id }` | 删除结果 |
-| `todo.addSubtask` | `{ taskId, title }` | 更新后的任务 |
-| `todo.completeSubtask` | `{ taskId, subtaskId, done? }` | 更新后的任务 |
-| `todo.search` | `{ query }` | 匹配的任务数组 |
+## 详情（L2，清单管理，push）
+
+- header 56：← 返回 +「清单管理」16 semibold；右侧新清单 Input 40 +「新建」40。
+- 行 44：颜色点 + 名称 14 + 任务数 12 fg3 + 设为默认星标 40 + 重命名 40 + 删除 40。
+- 重命名/删除行内确认；删除提示“同时删除其中的 N 个任务”；默认清单决定详情初始筛选，不影响卡片。
+- 返回 list 保留当前 Tab/筛选。
+
+## 设置 schema
+
+```json
+{
+  "key": "settings",
+  "groups": [{
+    "title": "显示与行为",
+    "fields": [
+      { "key": "showCompleted", "type": "boolean", "label": "显示已完成", "default": true },
+      { "key": "defaultSort", "type": "enum", "label": "默认排序", "default": "manual",
+        "options": [ { "value": "manual", "label": "手动" }, { "value": "due", "label": "截止时间" },
+                     { "value": "priority", "label": "优先级" }, { "value": "created", "label": "创建时间" } ] },
+      { "key": "fontSize", "type": "enum", "label": "字号", "default": "default",
+        "options": [ { "value": "default", "label": "默认" }, { "value": "large", "label": "大" } ] },
+      { "key": "weekStart", "type": "enum", "label": "一周起始日", "default": 1,
+        "options": [ { "value": 1, "label": "周一" }, { "value": 0, "label": "周日" } ] }
+    ]
+  }]
+}
+```
+
+「默认清单」是动态数据，放在详情·清单管理（设为默认），不进 schema。
+
+## Agent 工具（UI 路径 ↔ 工具）
+
+| UI 路径 | 工具 |
+|---|---|
+| 详情·列表/搜索 | `todo.list` / `todo.search` |
+| 卡片/详情·勾选完成 | `todo.complete` |
+| L2·新建 | `todo.add` |
+| L2·编辑 | `todo.update` |
+| 删除任务 | `todo.remove` |
+| 子任务 | `todo.addSubtask` / `todo.completeSubtask` / `todo.removeSubtask` |
+| 清单管理 | `todo.lists` / `todo.addList` / `todo.renameList` / `todo.removeList` |
+| 已完成组·清空 | `todo.clearCompleted` |
+| 复盘统计 | `todo.stats` |
+| 宿主设置页·待办 | `todo.settings.get` / `todo.settings.set` |
 
 ## 边界与异常
 
-- 空清单显示空状态文案；搜索无结果显示“没有匹配”。
-- 标题超长时列表内截断展示。
-- 提醒时间已过：启动时若 `remindAt < now` 且未触发，立即补一条通知，只补一次。
-- 重复任务完成时：按规则生成下一次任务（`dueAt` 往后推一个周期），原任务保留为已完成。
-- 软键盘弹出时列表自动上推，不遮挡输入框。
-
-## 依赖的宿主能力
-
-- 宿主 API：`init(theme)`、`getConfig/setConfig`、`notify(text)`。
-- `"background": true`：保证没有组件挂载时，提醒定时器仍在跑。
+- 提醒：单写者 background iframe + `navigator.locks`（D-12）；本地日期去重。
+- 空清单/搜索无结果：空态一句话 + 主操作。
+- 重复任务完成时生成下一次任务；原任务保留为已完成。
+- 软键盘弹出时详情表单内部滚动，不带动桌面。
+- 标题超长列表省略；时间/数字 tabular。
 
 ## 不做什么
 
-附件、协作者/共享、云同步、外部日历（Outlook/Google）集成、Markdown 富文本、自然语言解析（交给 Agent）。
-
-## 与参考产品（Todo清单）对齐
-
-抄功能，不抄设计（设计按 Fluent 2）：
-
-- 事件列表三种：Daytodo / 最近待办 / 分类清单。
-- 日历+任务、周视图、月视图三种日历类小组件。
-- 工作量热力图：按每天完成的任务量（默认按完成数，也可按优先级加权）渲染热力格。
-- 拖动调整重要性次序（手动排序）。
-- 重复设置（每日/每周/每月/每年）。
-- 数据复盘：昨日小结、周报、统计，数据来自 `stats.range`。
-- 倒数日：**单独插件**，不塞进待办（参考产品里它也是独立小组件）。
+附件、协作者/共享、云同步、外部日历集成、Markdown 富文本、自然语言解析（交给 Agent）。

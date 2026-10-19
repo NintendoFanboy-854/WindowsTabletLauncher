@@ -1,5 +1,9 @@
 # UI 重写规格 v2（2026-10-19）
 
+> **⚠️ 历史文档（2026-10-19 晚已部分被取代）**：卡片点击语义、设置归属、详情 L1/L2 层级、
+> 六插件尺寸内容与视觉规格，以 `docs/DESIGN-ROUND-SUMMARY.md`、`docs/PLUGIN-CONTRACT.md` 与
+> `docs/components/*.md` 为准；本文只保留字号/密度背景与历史验收记录，不再作为实现依据。
+
 > 依据：第二版独立审计 `docs/audit2/REPORT-VISUAL.md`、`docs/audit2/REPORT-TYPE.md` +
 > `docs/DENSITY.md §2.1` 量化门禁 + `docs/DECISIONS.md` D-07（Display XL 例外）。
 > 目标：**每个插件在每个尺寸档都有符合"台面电子设备"场景的信息密度与字号层级**，

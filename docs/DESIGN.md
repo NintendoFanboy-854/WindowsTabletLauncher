@@ -49,16 +49,17 @@
 
 ## 2. 交互
 
-- **点击** = 小组件默认动作（插件定义，可以什么都不做）。
-- **长按 500ms**（`motionTokens` 之外的手势阈值，属于交互参数）进入编辑模式：卡片轻微缩放、右上角出现「删除 / 改尺寸 / 设置」；点空白或 `Esc` 退出。
+- **点击卡片主体 = 打开该组件的详情（L1）**：卡片内只有显式控件（按钮/勾选/开关）做就地操作；卡片主体点击不改变卡片自身显示状态。
+- **长按 500ms**（手势阈值，不属于视觉动效）进入编辑模式：卡片轻微缩放、右上角出现「删除 / 改尺寸 / 设置」；点空白或 `Esc` 退出。触控与鼠标行为一致，不按设备分叉。
+- **触控优先**：hover 只存在于鼠标/笔；触控靠按下/长按反馈。卡片 hover/按下/长按进度按 [MOTION.md](MOTION.md) 执行，由宿主统一驱动。
 - **拖拽**：编辑模式里拖标题条换格，松手吸附；拖到边缘停 0.6 秒翻页。
 - **桌面手势与 Portal**：长按/滑动在 `pointerdown` 时调 `setPointerCapture`。Fluent Dialog/Menu/Toast 通过 Portal 挂到 `body`，React 合成事件仍沿组件树冒泡到卡片/桌面根节点，但 DOM 上 target 并不在 `currentTarget` 内——若此时抢指针，浮层里按钮的 pointerup/click 会被重定向到桌面，按钮永远点不动（浮层 X 关不掉即此因）。所有抢指针的手势入口统一先判断 `event.currentTarget.contains(event.target)`，不满足直接放行；不要用“排除某类 data 属性”的方式打补丁。
-- **浮层内交互**：保存类操作成功后默认关闭浮层（通过 `plugin:request-overlay-close` 请求宿主），校验失败才留在浮层里显示错误；关闭按钮/Esc/遮罩三条路径都保留。
+- **详情层级与保存语义**（D-14）：L0 卡片 → L1 详情 → L2 子页；L2 保存 = 提交并 pop、取消/返回 = 放弃并 pop、X/Esc/点遮罩 = 关闭整个浮层。禁止 L3 与嵌套 Dialog。
+- **设置归属**：插件设置统一在宿主设置页（按 manifest `settings` schema 渲染）；卡片/详情只放「设置…」入口，插件不提供设置浮层。
 - **键盘**：
   - `Tab` 在桌面小组件之间移动焦点（宿主负责 roving focus，焦点环用 Fluent 的 focus indicator）；
   - 焦点进入某个小组件后，宿主通过消息让插件聚焦它内部第一个可聚焦元素；`Esc` 把焦点交还宿主；
-  - 编辑模式下方向键移动、`Delete` 删除、`Enter` 打开该组件的设置。
-- **悬停 / 按下**：小组件统一用 Fluent 的 subtle 背景与边框变化，插件内部自行使用 Fluent 状态样式。
+  - 普通模式 `Enter`/`Space` 打开详情；编辑模式方向键移动、`Delete` 删除、`Enter` 打开插件设置分区。
 
 ## 3. 插件契约
 
@@ -85,6 +86,10 @@
 
 - 加载：宿主读名单 → 读 manifest → 每个小组件挂一个 iframe；当前尺寸由布局决定，通过 `init` 告诉插件。
 - **插件实现**：插件页面**必须是 React + Fluent UI React v9**（`@fluentui/react-components`），入口 `src/main.jsx`，用 Vite 打成自包含 ES module（产物 `app/app.js` 随 `public/` 进 git，运行时不需要构建）。主题用 `FluentProvider` 包裹，从 `host:init/theme` 取亮暗与 token；控件与排版一律用 Fluent 组件/token，不手写原生控件（决策见 `DECISIONS.md` D-02b）。
+- **详情与子页**：插件提供 `?view=detail`（L1）；表单/管理/添加为同一浮层内 push 的 L2 子页；L1/L2 语义见 `PLUGIN-CONTRACT.md` §4 与 D-14。
+- **设置声明**：插件在 `manifest.json` 的 `settings` 中用 schema 声明设置项（boolean/number/enum/text/timeRange），宿主通用渲染；插件不提供设置界面，只保留默认值与 normalize。
+- **卡片交互**：点主体 `requestOverlay('detail')`；快捷控件自己阻止冒泡；长按通过共享 SDK 上报宿主，插件不自行处理长按/右键/hover（契约 §3）。
+- **Agent 对等**：所有用户可执行操作都要有同名工具，文档必须列 UI↔工具对应表（契约 §6）。
 - **后台插件**：`"background": true` 时额外挂一个不可见的常驻 iframe（定时、提醒、轮询）。宿主里**提醒只由后台 iframe 调度**（单写者），卡片/浮层实例只读数据；抢锁用 `navigator.locks`，不可用时回退 localStorage 标记。
 - **桌面层常驻**：切到设置/复盘/插件页时，桌面层保持挂载（CSS 隐藏 + `inert` + `aria-hidden`），不卸载。插件 iframe 与 background 运行时是 `HostBridge` 工具调用的接收方，卸载会让复盘页/Agent 报「插件当前不在桌面」。
 - **热加载**：进入编辑模式时重扫插件目录。
@@ -146,7 +151,10 @@
 ## 8. 宿主页面（同样要自适应）
 
 - **设置页**：全屏 Fluent 页面，宽屏两栏（左侧导航、右侧内容），窄屏单栏堆叠。
-- **复盘页**：独立全屏页 + Agent 面板入口；宽屏四栏卡片网格，窄屏单栏。
+  - 导航新增「插件」：条目从已安装插件动态生成；选中后按 manifest `settings` schema 渲染通用表单
+    （即时生效 +「保存」羡余按钮 +「恢复默认」）。
+  - 「外观」分组提供「编辑桌面布局」「重置布局」两个低频兜底操作（鼠标/键盘用户的编辑入口）。
+- **复盘页**：独立全屏页 + Agent 面板入口；宽屏四栏卡片网格，窄屏单栏；插件展示名来自 manifest，不写死。
 - **插件管理**：列表用 Fluent Table/List，窄屏折叠成卡片。
 - **Agent 面板**：浮层宽度 `min(420px, 92vw)`；常驻侧栏只在大屏（≥1280）作为选项生效，否则退化为浮层；全屏模式覆盖桌面。
 

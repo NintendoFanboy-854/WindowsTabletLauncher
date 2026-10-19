@@ -154,12 +154,14 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 
 ## 8. 交互与信息架构重构（2026-10-19 启动）
 
-> 背景：六个插件的交互/信息架构已逐个定稿，宿主与插件解耦契约见 [PLUGIN-CONTRACT.md](PLUGIN-CONTRACT.md)；
-> 参考 [APPLE-HIG.md](reference/APPLE-HIG.md)。本轮不再按旧阶段表，按下面顺序执行。
+> 背景：六个插件的交互/信息架构/视觉已逐个定稿，宿主与插件解耦契约见 [PLUGIN-CONTRACT.md](PLUGIN-CONTRACT.md)；
+> 汇总见 [DESIGN-ROUND-SUMMARY.md](DESIGN-ROUND-SUMMARY.md)，动效见 [MOTION.md](MOTION.md)，
+> 原则参考 [APPLE-HIG.md](reference/APPLE-HIG.md)。本轮不再按旧阶段表，按下面顺序执行。
+> **E0 已完成（2026-10-19）**：六份组件文档、契约、动效、设计汇总均已写入 `docs/`；代码尚未开始改。
 
 | # | 任务 | 内容 | 验收 |
 |---|---|---|---|
-| E0 | 文档定稿 | 六份 `docs/components/*.md` 按新契约重写（交互/设置/Agent/尺寸）；DECISIONS 记录卡片交互契约、设置宿主化、插件解耦、触控优先 | 文档与定稿一致，无“点击切制式/长按开设置”等旧描述 |
+| E0 | 文档定稿 ✅ | 六份 `docs/components/*.md` 按新契约重写（交互/设置/Agent/尺寸/视觉）；DECISIONS 记录卡片交互、设置宿主化、插件解耦、触控优先、页栈层级、动效、颜色政策 | 已完成（2026-10-19），见 [DESIGN-ROUND-SUMMARY.md](DESIGN-ROUND-SUMMARY.md) |
 | E1 | 宿主通用设置页 | manifest `settings` schema → 通用表单（5 种字段）、插件分区动态生成、即时保存 +「保存」羡余按钮 +「恢复默认」；「外观」分组加「编辑桌面布局」「重置布局」；`plugin:request-host-settings` 导航 | 六插件设置全部由 schema 渲染；插件内不再有设置界面 |
 | E2 | 卡片手势与反馈 | SDK `useHostCardGesture`：转发 hover（鼠标/笔）、pointer down/up/cancel、长按（500ms）→ `plugin:request-edit-mode`、长按后吞 click；宿主统一按压/悬停/长按进度视觉；浮层点遮罩=关闭 | 触控长按进编辑稳定；鼠标/触控都有按压反馈；遮罩点击关闭 |
 | E3 | 六插件重构 | clock（详情+世界时钟+设置迁移）、countdown（整卡详情、表单保存/取消语义）、sedentary（卡片展示+起来了、详情 7 天）、pomodoro（开始/暂停/重置、详情清空）、todo（卡片仅展示+勾选、详情完整管理+删除）、weather（3×2 逐时、4×2 等宽 7 天、详情紧凑化）；每个插件补 Agent 对等工具 | PLUGIN-CONTRACT 验收清单逐项通过；每插件截图 |

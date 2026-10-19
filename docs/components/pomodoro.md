@@ -1,6 +1,6 @@
 # 番茄钟（pomodoro）
 
-桌面上的专注计时器：番茄工作法 + 白噪音 + 专注记录，数据并入复盘。
+桌面专注计时器：番茄工作法 + 白噪音 + 专注记录，数据并入复盘。
 
 ## 数据模型
 
@@ -9,88 +9,115 @@ type Phase = 'focus' | 'shortBreak' | 'longBreak';
 
 interface Session {
   id: string;
-  startedAt: string;      // ISO
-  endedAt?: string;       // ISO，中止时也写
+  startedAt: string;
+  endedAt?: string;
   phase: Phase;
-  durationMin: number;    // 计划时长
-  actualMin: number;      // 实际专注分钟（中止时按 elapsed）
-  completed: boolean;     // 是否跑完
-  taskId?: string;        // 关联的待办任务
+  durationMin: number;
+  actualMin: number;
+  completed: boolean;
+  taskId?: string;
+  taskTitle?: string;
 }
 
 interface Settings {
-  focusMin: number;          // 默认 25
-  shortBreakMin: number;     // 默认 5
-  longBreakMin: number;      // 默认 15
-  roundsBeforeLongBreak: number; // 默认 4
-  autoStartNext: boolean;    // 默认 false
-  sound: boolean;            // 阶段结束提示音，默认 true
-  keepAwake: boolean;        // 专注时阻止息屏，默认 true
-  whiteNoise: 'none' | 'rain' | 'cafe' | 'fan'; // 默认 none
-  whiteNoiseVolume: number;  // 0–100，默认 40
+  focusMin: number;                // 25
+  shortBreakMin: number;           // 5
+  longBreakMin: number;            // 15
+  roundsBeforeLongBreak: number;   // 4
+  autoStartNext: boolean;          // false
+  sound: boolean;                  // true
+  keepAwake: boolean;              // true
+  whiteNoise: 'none' | 'rain' | 'cafe' | 'fan';
+  whiteNoiseVolume: number;        // 0–100
 }
 ```
 
-存储：`pomodoro.sessions`（长期保留）、`pomodoro.settings`、`pomodoro.runtime`（进行中的状态，崩溃恢复用）。
+存储：`pomodoro.sessions`、`pomodoro.settings`、`pomodoro.runtime`（进行中状态，崩溃恢复）。
 
-## 尺寸与布局
+## 卡片
 
 | 尺寸 | 内容 |
 |---|---|
-| `1×1` | 剩余时间 + 环形进度 + 当前阶段 |
-| `2×1` | 时间 + 开始/暂停/跳过按钮 |
-| `2×2` | 时间 + 当前任务标题 + 按钮 + 白噪音开关 |
-| `3×2` | 时间 + 今日统计（完成 N 个 / 专注 M 分钟）+ 设置入口 |
+| `1×1` | 剩余时间 48 + 阶段 + 2px 进度；**不放按钮**，点击进详情 |
+| `2×1` | 时间 68 + 阶段 +「开始/暂停」40 +「重置」40 |
+| `2×2` | 时间 + 阶段 + 当前任务 + 今日统计一行 + 两个按钮 |
+| `3×2` | 时间 96 + 进度 + 阶段 + 任务 + 两条今日统计 + 轮次 + 两个按钮 |
 
-## 自适应
+- 快捷操作只留「开始/暂停」「重置」（高频、单步）；跳过、任务关联、白噪音都在详情/设置。
+- 删除 `⋯` 菜单、沉浸模式、插件长按/右键；点击非按钮区域 = 打开详情。
+- 任务标题显示当前关联任务（未关联显示「未关联任务」）。
 
-- `1×1` 只留环形进度 + 剩余分钟；按钮从 `2×1` 起；统计和任务从 `2×2` 起。
-- 环形进度随卡片短边缩放，SVG 用 viewBox + 100% 尺寸。
+## 详情（L1，`?view=detail`）
 
-## 交互
+- **header 56**：阶段 Badge 14（专注=brand tint，短休/长休=informative tint）+ 剩余时间 40（tabular）+ 轮次提示 12 fg3；右侧「设置…」40。
+- **操作条 48**：「开始/暂停」40 primary /「重置」40 /「跳过阶段」40 /「任务：标题 ▾」40（打开 L2 选择任务）。
+- **今日与趋势**：一行四列统计块（label 12 fg3 + 值 24 semibold + 单位 12）：今日完成 / 今日专注 / 本周完成 / 连续天数。
+- **最近记录**：section 标题 16 semibold；按天分组（组头 12 fg3 高 28）；行 44：时间区间 14 fg2 tabular + 任务/阶段 14 fg1 + 时长 16 semibold + 状态 Badge 12（完成/中断）。
+- **清空记录**：行内展开确认「进行中的一轮不会删除」+「清空今日 / 清空全部 / 取消」40；执行后行内提示已清空 N 条。
+- 空记录：一句话 + primary「开始专注」。
+- 内容区滚动；header/操作条固定。
 
-- 按钮：开始 / 暂停 / 继续 / 跳过本轮 / 重置。
-- 点击时间区域 = 进入沉浸模式（全屏遮罩，只显示大倒计时 + 当前任务 + 结束按钮）。
-- 阶段自动流转：专注 → 短休 → 专注…，每完成 `roundsBeforeLongBreak` 个专注进长休。
-- 白噪音：选择后循环播放，可独立调音量；阶段结束淡出。
-- 关联待办：开始前可选择一项任务（从待办插件读未完成任务）；完成后按配置自动打勾。
+## 详情（L2，选择关联任务）
 
-## 配置项
+- push 子页：header 56（← 返回 +「选择任务」16 semibold）。
+- 搜索 Input 40；置顶「不关联任务」行 44；按今日/以后分组列出待办未完成任务（行 44，checkbox 40 单选）。
+- 选中即关联并 pop；L1「任务 ▾」文案更新；`pomodoro.start(taskId, taskTitle)` 带上参数。
+- 无任务时提示「待办里没有未完成任务」；返回/取消 = pop；X/Esc = 关闭整个浮层。
 
-上面 `Settings` 全部可在设置面板里改，并即时生效（进行中的一轮不改变时长）。
+## 设置 schema
 
-## Agent 工具
+```json
+{
+  "key": "settings",
+  "groups": [
+    { "title": "时长与轮数", "fields": [
+      { "key": "focusMin", "type": "number", "label": "专注", "unit": "分钟", "min": 1, "max": 180, "default": 25 },
+      { "key": "shortBreakMin", "type": "number", "label": "短休", "unit": "分钟", "min": 1, "max": 60, "default": 5 },
+      { "key": "longBreakMin", "type": "number", "label": "长休", "unit": "分钟", "min": 1, "max": 60, "default": 15 },
+      { "key": "roundsBeforeLongBreak", "type": "number", "label": "长休前轮数", "min": 1, "max": 12, "default": 4 }
+    ]},
+    { "title": "行为", "fields": [
+      { "key": "autoStartNext", "type": "boolean", "label": "自动开始下一阶段", "default": false },
+      { "key": "sound", "type": "boolean", "label": "阶段结束提示音", "default": true },
+      { "key": "keepAwake", "type": "boolean", "label": "专注时阻止息屏", "default": true }
+    ]},
+    { "title": "白噪音", "fields": [
+      { "key": "whiteNoise", "type": "enum", "label": "类型", "default": "none", "options": [
+        { "value": "none", "label": "无" },
+        { "value": "rain", "label": "雨声" },
+        { "value": "cafe", "label": "咖啡厅" },
+        { "value": "fan", "label": "风扇" }
+      ]},
+      { "key": "whiteNoiseVolume", "type": "number", "label": "音量", "min": 0, "max": 100, "default": 40 }
+    ]}
+  ]
+}
+```
 
-| 工具 | 参数 | 返回 |
-|---|---|---|
-| `pomodoro.start` | `{ minutes?, taskId? }` | 当前状态 |
-| `pomodoro.pause` | — | 当前状态 |
-| `pomodoro.resume` | — | 当前状态 |
-| `pomodoro.stop` | — | 本次记录 |
-| `pomodoro.skip` | — | 当前状态 |
-| `pomodoro.status` | — | 阶段、剩余秒、任务、今日统计 |
-| `pomodoro.stats` | `{ range: 'today' \| 'week' \| 'month' }` | 完成数、专注分钟、连续天数 |
+## Agent 工具（UI 路径 ↔ 工具）
+
+| UI 路径 | 工具 |
+|---|---|
+| 卡片/详情·开始 | `pomodoro.start`（可带 minutes/taskId/taskTitle） |
+| 卡片/详情·暂停 | `pomodoro.pause` |
+| 继续 | `pomodoro.resume` |
+| 详情·重置 | `pomodoro.reset` |
+| 详情·跳过阶段 | `pomodoro.skip` |
+| 结束本轮 | `pomodoro.stop` |
+| 详情·状态/统计 | `pomodoro.status` / `pomodoro.stats` |
+| 详情·清空记录 | `pomodoro.clearStats`（scope: today/all） |
+| L2·选择任务 | `pomodoro.start(taskId, taskTitle)`；任务列表来自待办工具 |
+| 宿主设置页·番茄钟 | `pomodoro.settings.get` / `pomodoro.settings.set` |
 
 ## 边界与异常
 
-- 应用重启：优先从 `pomodoro.runtime` 恢复进行中的一轮；已过期的按“完成”落库。
-- 中止（stop）也写 Session，`completed=false`，`actualMin` 按实际经过时间取整分钟。
-- 沉浸模式与屏幕常亮：常亮由宿主 API 提供（`host.setKeepAwake(true/false)`），退出时务必关闭。
-- 白噪音：内置音频文件随插件打包，不联网。
-- 阶段切换必须走通知（宿主 `notify`），声音可选。
-
-## 依赖的宿主能力
-
-- `init(theme)`、`getConfig/setConfig`、`notify(text)`。
-- `host.setKeepAwake(bool)`：宿主新增（Tauri 侧停掉息屏）。
-- 读待办任务：通过 Agent 工具调用 `todo.list`，插件不直接跨插件访问。
+- 应用重启优先从 `pomodoro.runtime` 恢复；过期按完成落库。
+- 中止也写 Session（`completed=false`，`actualMin` 按实际经过时间）。
+- keepAwake 只在专注期间开启，结束/退出必须关闭。
+- 阶段切换通知宿主 `notify`；提示音可选。
+- 清空今日只删今天 session；清空全部删除全部历史；进行中的一轮不受影响。
+- 白噪音内置音频随插件打包，不联网。
 
 ## 不做什么
 
-计时器历史编辑、多设备同步、团队番茄钟、排行榜、自动排期。
-
-## 与参考产品（Todo清单）对齐
-
-- 番茄专注小组件：一键开始专注。
-- 番茄工作法 + 白噪音（雨声 / 咖啡厅 / 风扇）。
-- 专注数据进「复盘」：昨日小结、周报、统计。
+计时历史编辑、多设备同步、团队番茄钟、排行榜、自动排期。
