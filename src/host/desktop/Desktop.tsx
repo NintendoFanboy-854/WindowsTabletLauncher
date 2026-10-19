@@ -201,9 +201,12 @@ function reconcileLayout(
   catalog: Catalog,
   columns: number,
   rows: number,
-): LayoutState {
+): LayoutState | null {
+  // 插件目录还没就绪（加载中/扫描结果为空）时保持现状：可能是 null，等目录就绪再 loadLayout。
+  // 这里绝不能返回空布局——否则会被持久化 effect 写进 wtsl.layout，整页 reload 后
+  // 用户的卡片尺寸/摆放会被 manifest 默认值覆盖（E4 发现的 P1）。
   if (catalog.size === 0) {
-    return previous ?? { widgets: [], pages: 1, activePage: 0 };
+    return previous;
   }
 
   let state = previous;
@@ -364,10 +367,13 @@ export default function Desktop({
     );
   }, [catalog, pluginsLoading, manager]);
 
-  // 布局变化即持久化（存的是逻辑坐标，窗口尺寸变了由布局引擎重排）
+  // 布局变化即持久化（存的是逻辑坐标，窗口尺寸变了由布局引擎重排）。
+  // 插件目录未就绪/为空时不写：避免把“加载中”的空布局覆盖掉用户已保存的布局（P1）。
   useEffect(() => {
-    if (layout) saveLayout(layout);
-  }, [layout]);
+    if (!layout) return;
+    if (pluginsLoading || catalog.size === 0) return;
+    saveLayout(layout);
+  }, [layout, pluginsLoading, catalog]);
 
   // ---------- 列数变化：降级重排（DESIGN.md §1.1） ----------
 
@@ -487,8 +493,7 @@ export default function Desktop({
         metricsRef.current.columns,
         metricsRef.current.rows,
       ),
-    );
-  }, [layoutResetRequest]);
+    );  }, [layoutResetRequest]);
 
   const changePage = useCallback((delta: number) => {
     setLayout((previous) =>
