@@ -29,6 +29,11 @@
 | 复盘聚合 | 声明 `*.stats` 工具 | 按工具聚合，展示名从 manifest 取，不写死 |
 | 主题/尺寸 | 监听 `host:init` / `host:theme` / `host:resize` | 注入同一套 Fluent token |
 
+> **初始值时序**：`host:init` 在 iframe `onLoad` 后发出，可能晚于插件 React 首帧。宿主在每次
+> 加载的 `init` 之后会立即补发一次幂等的 `host:resize` / `host:theme`，SDK 也会在插件注册监听时
+> 重放最近一次消息；插件应通过 `useHostSize` / `useHostTheme`（或 `plugin.onInit` / `onResize` /
+> `onTheme`）读取，不要在首帧假设 init 已到达，也不要自己缓存布局/主题。
+
 ## 2. manifest 声明
 
 ```json

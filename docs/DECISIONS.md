@@ -64,6 +64,7 @@
 - 插件侧：`public/plugins/_shared/host.js` 的 `useHostTheme()` 在宿主内完全跟随宿主主题；独立打开（开发/截图）时跟随系统 `prefers-color-scheme` 并监听变化。
 - 旧值兼容：`dark` / `light` 照旧生效；未设置时按 `system`。
 - 插件 SDK：`public/plugin-sdk.js` 记忆最近一次 `host:init/theme/resize` 并在监听注册时补发，避免插件挂载晚于主题消息而停在回退主题（实测出现过亮色系统里部分插件仍深色）。
+- 初始值时序（2026-10-20，P1 回归）：`host:init` 在 iframe `onLoad` 后发出，**可能晚于插件 React 首帧**（reload 后实测插件先按默认尺寸/主题渲染）。因此宿主在每次加载的 `init` 后立即补发一次幂等的 `host:resize` / `host:theme`；共享底座 `useHostSize` / `useHostTheme` 同时消费 `init` 与增量消息，保证 reload 后卡片内容与用户保存的尺寸档位、当前主题一致。
 
 ## D-07 Display XL：数字型主信息的项目字阶例外（新增，2026-10-19）
 

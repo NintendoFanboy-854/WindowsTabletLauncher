@@ -73,7 +73,7 @@ createRoot(document.getElementById('root')).render(<Root />);
    Spinner / Tooltip / Toast / Field / Divider / Text / Card…），不自绘控件。
 2. **样式**：`makeStyles` + `tokens.*`；不写 hex、不写 px 字面量字号/间距/圆角/阴影、
    不自定义动效时长（用 `motionTokens`）。插件根节点尺寸用 `100%` / `vh` / `vw`。
-3. **主题**：根节点 `FluentProvider`，亮暗由宿主 `host:init/theme` 注入（宿主默认跟随系统亮暗，可固定深/浅）；独立打开时跟随 `prefers-color-scheme`。不在组件里判断亮暗或写死颜色。SDK 会记忆最近一次 init/theme，监听注册时自动补发。
+3. **主题**：根节点 `FluentProvider`，亮暗由宿主 `host:init/theme` 注入（宿主默认跟随系统亮暗，可固定深/浅）；独立打开时跟随 `prefers-color-scheme`。不在组件里判断亮暗或写死颜色。SDK 会记忆最近一次 init/theme，监听注册时自动补发；`host:init` 可能晚于首帧，宿主会在 init 后补发一次 `host:theme`，`useHostTheme` 会自动校正回退值。
 4. **触控目标**：所有可点击元素 ≥40×40 CSS px（平板）。
 5. **状态**：hover / pressed / disabled / focus-visible 交给 Fluent 组件，不覆写焦点态。
 6. **设置 / 详情浮层**：不在 iframe 内做 Dialog / Drawer（会被卡片边界裁切）。做成独立视图：
@@ -83,7 +83,8 @@ createRoot(document.getElementById('root')).render(<Root />);
    - 浮层里用 `useStoredConfig` / `plugin.setConfig` 持久化，改完自动生效（卡片视图通过 storage 事件同步）。
 7. **Agent 工具**：`useAgentTools([{ name, description, parameters }], { 'x.y': fn })`。
 8. **尺寸**：`useHostSize(sizeKeyOf, '2x1')`；按档位决定显示层级（信息预算见
-   `docs/DENSITY.md`），小档位优先保主信息。
+   `docs/DENSITY.md`），小档位优先保主信息。`useHostSize` 同时消费 `host:init` 与
+   `host:resize`，所以 reload 后用户保存的非默认档位也会立即对齐。
 9. **等待态**：按 `docs/FLUENT2.md §12`：<1s 不显示；1–3s Spinner；>3s 进度/文案。
 10. **空态**：Fluent 排版 + 一个主操作，不用两套空态文案。
 

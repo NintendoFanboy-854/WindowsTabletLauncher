@@ -87,10 +87,20 @@ export function useHostTheme(fallbackScheme = 'dark') {
   const [standaloneScheme, setStandaloneScheme] = useState(systemScheme);
 
   useEffect(() => {
-    const off = plugin.onTheme((next) => {
+    // init 的 theme 与 theme 消息同源：首帧早于 host:init 时只能先落到 fallback，
+    // 这里补订阅一次，SDK 会重放 init；否则 reload 后插件会停在回退主题。
+    const offInit = plugin.onInit((next) => {
+      if (next && typeof next === 'object' && next.theme && typeof next.theme === 'object') {
+        setPayload(next.theme);
+      }
+    });
+    const offTheme = plugin.onTheme((next) => {
       if (next && typeof next === 'object') setPayload(next);
     });
-    return off;
+    return () => {
+      offInit();
+      offTheme();
+    };
   }, []);
 
   // 独立开发/截图时跟随系统亮暗（宿主内由宿主负责）
@@ -138,10 +148,18 @@ export function useHostSize(sizeKeyOf, defaultSizeKey) {
     return Array.isArray(size) ? keyOfRef.current(size) : defaultSizeKey;
   });
   useEffect(() => {
-    const off = plugin.onResize((size) => {
+    const apply = (size) => {
       if (Array.isArray(size) && size.length === 2) setSizeKey(keyOfRef.current(size));
-    });
-    return off;
+    };
+    // 两个来源缺一不可：init 覆盖“React 首帧早于 host:init”（reload 后 iframe 里
+    // init 在 load 事件后才到，首帧只能拿到默认档），resize 覆盖运行中的尺寸变化。
+    // SDK 会重放最近一次消息，所以即使这里订阅得晚也能补到真实档位。
+    const offInit = plugin.onInit((payload) => apply(payload?.size));
+    const offResize = plugin.onResize(apply);
+    return () => {
+      offInit();
+      offResize();
+    };
   }, []);
   return sizeKey;
 }
@@ -165,7 +183,11 @@ export function useStoredConfig(key, fallback, normalize) {
   const [loaded, setLoaded] = useState(() => initialConfigValue(key) !== undefined);
 
   useEffect(() => {
-    if (initialConfigValue(key) !== undefined) {
+    // init 可能晚于首帧（iframe load 事件晚于 React 挂载）：按“此刻”的 init 再读一次，
+    // 避免首帧拿到 fallback、又因提前 return 而不去 getConfig。
+    const fromInit = initialConfigValue(key);
+    if (fromInit !== undefined) {
+      setValueState(normalizeRef.current ? normalizeRef.current(fromInit) : fromInit);
       setLoaded(true);
       return undefined;
     }

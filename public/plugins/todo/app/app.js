@@ -25099,9 +25099,16 @@ function Sx() {
 }
 function Cx(t = "dark") {
 	let [n, r] = (0, P.useState)(() => yx(t)), [i, a] = (0, P.useState)(Sx);
-	(0, P.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, P.useEffect)(() => {
+	(0, P.useEffect)(() => {
+		let t = e.onInit((e) => {
+			e && typeof e == "object" && e.theme && typeof e.theme == "object" && r(e.theme);
+		}), n = e.onTheme((e) => {
+			e && typeof e == "object" && r(e);
+		});
+		return () => {
+			t(), n();
+		};
+	}, []), (0, P.useEffect)(() => {
 		if (e.inHost || typeof window.matchMedia != "function") return;
 		let t = window.matchMedia(xx), n = () => a(t.matches ? "light" : "dark");
 		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
@@ -25121,9 +25128,14 @@ function wx(t, n) {
 		let e = _x.init?.size;
 		return Array.isArray(e) ? r.current(e) : n;
 	});
-	return (0, P.useEffect)(() => e.onResize((e) => {
-		Array.isArray(e) && e.length === 2 && a(r.current(e));
-	}), []), i;
+	return (0, P.useEffect)(() => {
+		let t = (e) => {
+			Array.isArray(e) && e.length === 2 && a(r.current(e));
+		}, n = e.onInit((e) => t(e?.size)), i = e.onResize(t);
+		return () => {
+			n(), i();
+		};
+	}, []), i;
 }
 function Tx(t, n, r) {
 	let i = (0, P.useRef)(r);
@@ -25133,17 +25145,18 @@ function Tx(t, n, r) {
 		return i.current ? i.current(e) : e ?? n;
 	}), [s, c] = (0, P.useState)(() => bx(t) !== void 0);
 	(0, P.useEffect)(() => {
-		if (bx(t) !== void 0) {
-			c(!0);
+		let r = bx(t);
+		if (r !== void 0) {
+			o(i.current ? i.current(r) : r), c(!0);
 			return;
 		}
-		let r = !0;
+		let a = !0;
 		return e.getConfig(t).then((e) => {
-			r && (o(i.current ? i.current(e) : e ?? n), c(!0));
+			a && (o(i.current ? i.current(e) : e ?? n), c(!0));
 		}).catch(() => {
-			r && c(!0);
+			a && c(!0);
 		}), () => {
-			r = !1;
+			a = !1;
 		};
 	}, [t]);
 	let l = (0, P.useCallback)((n) => {

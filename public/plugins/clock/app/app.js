@@ -20384,9 +20384,16 @@ function l_() {
 }
 function u_(t = "dark") {
 	let [n, r] = (0, M.useState)(() => o_(t)), [i, a] = (0, M.useState)(l_);
-	(0, M.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, M.useEffect)(() => {
+	(0, M.useEffect)(() => {
+		let t = e.onInit((e) => {
+			e && typeof e == "object" && e.theme && typeof e.theme == "object" && r(e.theme);
+		}), n = e.onTheme((e) => {
+			e && typeof e == "object" && r(e);
+		});
+		return () => {
+			t(), n();
+		};
+	}, []), (0, M.useEffect)(() => {
 		if (e.inHost || typeof window.matchMedia != "function") return;
 		let t = window.matchMedia(c_), n = () => a(t.matches ? "light" : "dark");
 		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
@@ -20406,9 +20413,14 @@ function d_(t, n) {
 		let e = i_.init?.size;
 		return Array.isArray(e) ? r.current(e) : n;
 	});
-	return (0, M.useEffect)(() => e.onResize((e) => {
-		Array.isArray(e) && e.length === 2 && a(r.current(e));
-	}), []), i;
+	return (0, M.useEffect)(() => {
+		let t = (e) => {
+			Array.isArray(e) && e.length === 2 && a(r.current(e));
+		}, n = e.onInit((e) => t(e?.size)), i = e.onResize(t);
+		return () => {
+			n(), i();
+		};
+	}, []), i;
 }
 function f_(t, n, r) {
 	let i = (0, M.useRef)(r);
@@ -20418,17 +20430,18 @@ function f_(t, n, r) {
 		return i.current ? i.current(e) : e ?? n;
 	}), [s, c] = (0, M.useState)(() => s_(t) !== void 0);
 	(0, M.useEffect)(() => {
-		if (s_(t) !== void 0) {
-			c(!0);
+		let r = s_(t);
+		if (r !== void 0) {
+			o(i.current ? i.current(r) : r), c(!0);
 			return;
 		}
-		let r = !0;
+		let a = !0;
 		return e.getConfig(t).then((e) => {
-			r && (o(i.current ? i.current(e) : e ?? n), c(!0));
+			a && (o(i.current ? i.current(e) : e ?? n), c(!0));
 		}).catch(() => {
-			r && c(!0);
+			a && c(!0);
 		}), () => {
-			r = !1;
+			a = !1;
 		};
 	}, [t]);
 	let l = (0, M.useCallback)((n) => {

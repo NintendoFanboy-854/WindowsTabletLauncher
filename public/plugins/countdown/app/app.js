@@ -21070,9 +21070,16 @@ function ov() {
 }
 function sv(t = "dark") {
 	let [n, r] = (0, M.useState)(() => rv(t)), [i, a] = (0, M.useState)(ov);
-	(0, M.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, M.useEffect)(() => {
+	(0, M.useEffect)(() => {
+		let t = e.onInit((e) => {
+			e && typeof e == "object" && e.theme && typeof e.theme == "object" && r(e.theme);
+		}), n = e.onTheme((e) => {
+			e && typeof e == "object" && r(e);
+		});
+		return () => {
+			t(), n();
+		};
+	}, []), (0, M.useEffect)(() => {
 		if (e.inHost || typeof window.matchMedia != "function") return;
 		let t = window.matchMedia(av), n = () => a(t.matches ? "light" : "dark");
 		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
@@ -21092,9 +21099,14 @@ function cv(t, n) {
 		let e = ev.init?.size;
 		return Array.isArray(e) ? r.current(e) : n;
 	});
-	return (0, M.useEffect)(() => e.onResize((e) => {
-		Array.isArray(e) && e.length === 2 && a(r.current(e));
-	}), []), i;
+	return (0, M.useEffect)(() => {
+		let t = (e) => {
+			Array.isArray(e) && e.length === 2 && a(r.current(e));
+		}, n = e.onInit((e) => t(e?.size)), i = e.onResize(t);
+		return () => {
+			n(), i();
+		};
+	}, []), i;
 }
 function lv() {
 	let e = new URLSearchParams(location.search);

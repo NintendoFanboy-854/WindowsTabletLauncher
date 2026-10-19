@@ -253,10 +253,15 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       frameRef.current?.contentWindow?.postMessage(message, '*');
     }, []);
 
-    // 每次 iframe 加载完都重新 init（热重载 / 换 src 后同样需要）
+    // 每次 iframe 加载完都重新 init（热重载 / 换 src 后同样需要）。
+    // 插件 React 可能先于 init 挂载（iframe 的 load 事件晚于其脚本执行），首帧只能拿
+    // 默认尺寸/主题；所以 init 后紧跟一条权威 resize/theme，SDK 会在插件注册监听时
+    // 重放，保证 reload 后插件收敛到用户保存的尺寸档位与当前主题（P1 回归）。
     useEffect(() => {
       if (!loadedAt) return;
       const current = latest.current;
+      const nextTheme = current.theme ?? readFluentThemePayload();
+      const nextSize: WidgetSize = [current.size[0], current.size[1]];
       post({
         v: PROTOCOL_VERSION,
         type: 'host:init',
@@ -264,10 +269,14 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           pluginId: current.pluginId,
           widgetId: current.widgetId,
           size: current.size,
-          theme: current.theme ?? readFluentThemePayload(),
+          theme: nextTheme,
           config: current.config ?? {},
         },
       });
+      lastSize.current = nextSize;
+      lastTheme.current = nextTheme;
+      post({ type: 'host:resize', payload: { size: nextSize } });
+      post({ type: 'host:theme', payload: { theme: nextTheme } });
       // 只依赖 loadedAt：尺寸/主题的后续变化走 resize / theme 消息
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loadedAt, post]);
