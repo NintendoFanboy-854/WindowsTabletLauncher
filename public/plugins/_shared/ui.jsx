@@ -751,6 +751,13 @@ export function DetailTabs({ items, value, onChange, ariaLabel, className, style
 }
 
 const useDetailScrollStyles = makeStyles({
+  wrap: {
+    position: 'relative',
+    display: 'flex',
+    flex: 1,
+    flexDirection: 'column',
+    minHeight: 0,
+  },
   scroll: {
     flex: 1,
     minHeight: 0,
@@ -762,19 +769,96 @@ const useDetailScrollStyles = makeStyles({
     overscrollBehavior: 'contain',
     scrollbarWidth: 'thin',
   },
+  /**
+   * 滚动渐隐：内容超过视口时只在底部压一层与宿主 DialogSurface 同色的渐变，
+   * 明确提示「下面还有内容」，避免列表行被静默裁切（DENSITY §2.1 第 7 条）。
+   * 不参与命中（pointerEvents: none），滚到底后自动隐藏。
+   */
+  scrollShadow: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
+    height: tokens.spacingVerticalXXL,
+    pointerEvents: 'none',
+    background: `linear-gradient(to top, ${tokens.colorNeutralBackground1} 0%, color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent) 55%, transparent 100%)`,
+    opacity: 0,
+  },
+  scrollShadowVisible: {
+    opacity: 1,
+  },
 });
 
 /**
+ * 滚动容器是否还有未显示的内容。
+ * 只维护视觉状态（渐隐是否显示），不改变滚动/焦点/点击语义。
+ *
+ * @param {import('react').RefObject<HTMLElement | null>} ref
+ * @returns {boolean}
+ */
+function useMoreBelow(ref) {
+  const [moreBelow, setMoreBelow] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    let frame = 0;
+    const update = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const next = node.scrollHeight - node.scrollTop - node.clientHeight > 2;
+        setMoreBelow((previous) => (previous === next ? previous : next));
+      });
+    };
+
+    update();
+    node.addEventListener('scroll', update, { passive: true });
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(node);
+    // React 切换 Tab / 展开行后内容高度变化，MutationObserver 保证渐隐状态同步。
+    const mutationObserver = new MutationObserver(update);
+    mutationObserver.observe(node, { childList: true, subtree: true });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      node.removeEventListener('scroll', update);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [ref]);
+
+  return moreBelow;
+}
+
+/**
  * L1 内容滚动区：flex:1、内部滚动、24 边距。header/toolbar/tabs 固定，不跟着滚。
+ * 内容超出视口时在底部显示同色渐隐；滚到底自动消失。
  *
  * 用法：
  *   <DetailScroll><ListRow ... /></DetailScroll>
  */
 export function DetailScroll({ children, className, style }) {
   const styles = useDetailScrollStyles();
+  const scrollRef = useRef(null);
+  const moreBelow = useMoreBelow(scrollRef);
+
   return (
-    <div className={mergeClasses(styles.scroll, className)} style={style} data-detail-scroll="true">
-      {children}
+    <div className={styles.wrap} data-scroll-more={moreBelow ? 'true' : 'false'}>
+      <div
+        ref={scrollRef}
+        className={mergeClasses(styles.scroll, className)}
+        style={style}
+        data-detail-scroll="true"
+      >
+        {children}
+      </div>
+      <div
+        aria-hidden="true"
+        data-scroll-shadow={moreBelow ? 'visible' : 'hidden'}
+        className={mergeClasses(styles.scrollShadow, moreBelow && styles.scrollShadowVisible)}
+      />
     </div>
   );
 }
@@ -840,6 +924,13 @@ const useSubpageStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
   },
+  contentWrap: {
+    position: 'relative',
+    display: 'flex',
+    flex: 1,
+    flexDirection: 'column',
+    minHeight: 0,
+  },
   content: {
     flex: 1,
     minHeight: 0,
@@ -850,6 +941,19 @@ const useSubpageStyles = makeStyles({
     boxSizing: 'border-box',
     overscrollBehavior: 'contain',
     scrollbarWidth: 'thin',
+  },
+  scrollShadow: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
+    height: tokens.spacingVerticalXXL,
+    pointerEvents: 'none',
+    background: `linear-gradient(to top, ${tokens.colorNeutralBackground1} 0%, color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent) 55%, transparent 100%)`,
+    opacity: 0,
+  },
+  scrollShadowVisible: {
+    opacity: 1,
   },
   footer: {
     display: 'flex',
@@ -902,6 +1006,8 @@ export function Subpage({
   style,
 }) {
   const styles = useSubpageStyles();
+  const contentRef = useRef(null);
+  const moreContent = useMoreBelow(contentRef);
   const [visible, setVisible] = useState(true);
   const [direction, setDirection] = useState('forward');
   const [mounted, setMounted] = useState(true);
@@ -953,7 +1059,14 @@ export function Subpage({
             </Text>
             {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
           </div>
-          <div className={styles.content}>{children}</div>
+          <div className={styles.contentWrap} data-subpage-scroll-more={moreContent ? 'true' : 'false'}>
+            <div ref={contentRef} className={styles.content}>{children}</div>
+            <div
+              aria-hidden="true"
+              data-subpage-scroll-shadow={moreContent ? 'visible' : 'hidden'}
+              className={mergeClasses(styles.scrollShadow, moreContent && styles.scrollShadowVisible)}
+            />
+          </div>
           {footerContent ? <div className={styles.footer}>{footerContent}</div> : null}
         </div>
       </SlidePage>

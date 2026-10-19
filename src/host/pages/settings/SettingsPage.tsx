@@ -24,7 +24,6 @@ import {
   Tab,
   TabList,
   Text,
-  Title3,
   makeStyles,
   mergeClasses,
   tokens,
@@ -223,7 +222,9 @@ function SettingsGroup({ title, hint, children }: SettingsGroupProps) {
   return (
     <section className={styles.group} aria-label={title}>
       <header className={styles.groupHead}>
-        <Title3>{title}</Title3>
+        <Text size={500} weight="semibold">
+          {title}
+        </Text>
         {hint && (
           <Text size={200} className={styles.groupHint}>
             {hint}

@@ -21088,31 +21088,84 @@ Jn({ toolbar: {
 	},
 	badge: { marginInlineStart: W.spacingHorizontalXS }
 });
-var ev = Jn({ scroll: {
-	flex: 1,
-	minHeight: 0,
-	overflowY: "auto",
-	overflowX: "hidden",
-	paddingBlock: W.spacingVerticalXXL,
-	paddingInline: W.spacingHorizontalXXL,
-	boxSizing: "border-box",
-	overscrollBehavior: "contain",
-	scrollbarWidth: "thin"
-} });
-function tv({ children: e, className: t, style: n }) {
-	let r = ev();
-	return /* @__PURE__ */ (0, N.jsx)("div", {
-		className: D(r.scroll, t),
-		style: n,
-		"data-detail-scroll": "true",
-		children: e
+var ev = Jn({
+	wrap: {
+		position: "relative",
+		display: "flex",
+		flex: 1,
+		flexDirection: "column",
+		minHeight: 0
+	},
+	scroll: {
+		flex: 1,
+		minHeight: 0,
+		overflowY: "auto",
+		overflowX: "hidden",
+		paddingBlock: W.spacingVerticalXXL,
+		paddingInline: W.spacingHorizontalXXL,
+		boxSizing: "border-box",
+		overscrollBehavior: "contain",
+		scrollbarWidth: "thin"
+	},
+	scrollShadow: {
+		position: "absolute",
+		right: 0,
+		bottom: 0,
+		left: 0,
+		height: W.spacingVerticalXXL,
+		pointerEvents: "none",
+		background: `linear-gradient(to top, ${W.colorNeutralBackground1} 0%, color-mix(in srgb, ${W.colorNeutralBackground1} 72%, transparent) 55%, transparent 100%)`,
+		opacity: 0
+	},
+	scrollShadowVisible: { opacity: 1 }
+});
+function tv(e) {
+	let [t, n] = (0, M.useState)(!1);
+	return (0, M.useEffect)(() => {
+		let t = e.current;
+		if (!t) return;
+		let r = 0, i = () => {
+			r ||= window.requestAnimationFrame(() => {
+				r = 0;
+				let e = t.scrollHeight - t.scrollTop - t.clientHeight > 2;
+				n((t) => t === e ? t : e);
+			});
+		};
+		i(), t.addEventListener("scroll", i, { passive: !0 });
+		let a = new ResizeObserver(i);
+		a.observe(t);
+		let o = new MutationObserver(i);
+		return o.observe(t, {
+			childList: !0,
+			subtree: !0
+		}), () => {
+			window.cancelAnimationFrame(r), t.removeEventListener("scroll", i), a.disconnect(), o.disconnect();
+		};
+	}, [e]), t;
+}
+function nv({ children: e, className: t, style: n }) {
+	let r = ev(), i = (0, M.useRef)(null), a = tv(i);
+	return /* @__PURE__ */ (0, N.jsxs)("div", {
+		className: r.wrap,
+		"data-scroll-more": a ? "true" : "false",
+		children: [/* @__PURE__ */ (0, N.jsx)("div", {
+			ref: i,
+			className: D(r.scroll, t),
+			style: n,
+			"data-detail-scroll": "true",
+			children: e
+		}), /* @__PURE__ */ (0, N.jsx)("div", {
+			"aria-hidden": "true",
+			"data-scroll-shadow": a ? "visible" : "hidden",
+			className: D(r.scrollShadow, a && r.scrollShadowVisible)
+		})]
 	});
 }
-var nv = (0, M.createContext)(null);
-function rv() {
-	return (0, M.useContext)(nv);
+var rv = (0, M.createContext)(null);
+function iv() {
+	return (0, M.useContext)(rv);
 }
-var iv = Jn({
+var av = Jn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -21147,6 +21200,13 @@ var iv = Jn({
 		alignItems: "center",
 		gap: W.spacingHorizontalS
 	},
+	contentWrap: {
+		position: "relative",
+		display: "flex",
+		flex: 1,
+		flexDirection: "column",
+		minHeight: 0
+	},
 	content: {
 		flex: 1,
 		minHeight: 0,
@@ -21158,6 +21218,17 @@ var iv = Jn({
 		overscrollBehavior: "contain",
 		scrollbarWidth: "thin"
 	},
+	scrollShadow: {
+		position: "absolute",
+		right: 0,
+		bottom: 0,
+		left: 0,
+		height: W.spacingVerticalXXL,
+		pointerEvents: "none",
+		background: `linear-gradient(to top, ${W.colorNeutralBackground1} 0%, color-mix(in srgb, ${W.colorNeutralBackground1} 72%, transparent) 55%, transparent 100%)`,
+		opacity: 0
+	},
+	scrollShadowVisible: { opacity: 1 },
 	footer: {
 		display: "flex",
 		flexShrink: 0,
@@ -21169,22 +21240,22 @@ var iv = Jn({
 		boxSizing: "border-box"
 	}
 });
-function av({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = iv(), [l, u] = (0, M.useState)(!0), [d, f] = (0, M.useState)("forward"), [p, m] = (0, M.useState)(!0), h = (0, M.useRef)(!1), g = (0, M.useCallback)(() => {
-		h.current || (h.current = !0, f("back"), u(!1));
-	}, []), _ = (0, M.useCallback)((e, t) => {
-		t?.direction === "exit" && (m(!1), i?.());
+function ov({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = av(), l = (0, M.useRef)(null), u = tv(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
+		_.current || (_.current = !0, m("back"), f(!1));
+	}, []), y = (0, M.useCallback)((e, t) => {
+		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
-	if (!p) return null;
-	let v = typeof n == "function" ? n(g) : n;
-	return /* @__PURE__ */ (0, N.jsx)(nv.Provider, {
-		value: g,
+	if (!h) return null;
+	let b = typeof n == "function" ? n(v) : n;
+	return /* @__PURE__ */ (0, N.jsx)(rv.Provider, {
+		value: v,
 		children: /* @__PURE__ */ (0, N.jsx)(M_, {
-			visible: l,
+			visible: d,
 			appear: !0,
-			direction: d,
+			direction: p,
 			unmountOnExit: !0,
-			onMotionFinish: _,
+			onMotionFinish: y,
 			children: /* @__PURE__ */ (0, N.jsxs)("div", {
 				className: D(c.root, o),
 				style: s,
@@ -21200,7 +21271,7 @@ function av({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								icon: /* @__PURE__ */ (0, N.jsx)(ou, {}),
 								"aria-label": a,
 								title: a,
-								onClick: g,
+								onClick: v,
 								style: z_
 							}),
 							/* @__PURE__ */ (0, N.jsx)(Cg, {
@@ -21217,20 +21288,29 @@ function av({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 							}) : null
 						]
 					}),
-					/* @__PURE__ */ (0, N.jsx)("div", {
-						className: c.content,
-						children: r
+					/* @__PURE__ */ (0, N.jsxs)("div", {
+						className: c.contentWrap,
+						"data-subpage-scroll-more": u ? "true" : "false",
+						children: [/* @__PURE__ */ (0, N.jsx)("div", {
+							ref: l,
+							className: c.content,
+							children: r
+						}), /* @__PURE__ */ (0, N.jsx)("div", {
+							"aria-hidden": "true",
+							"data-subpage-scroll-shadow": u ? "visible" : "hidden",
+							className: D(c.scrollShadow, u && c.scrollShadowVisible)
+						})]
 					}),
-					v ? /* @__PURE__ */ (0, N.jsx)("div", {
+					b ? /* @__PURE__ */ (0, N.jsx)("div", {
 						className: c.footer,
-						children: v
+						children: b
 					}) : null
 				]
 			})
 		})
 	});
 }
-function ov(e = 1e3) {
+function sv(e = 1e3) {
 	let [t, n] = (0, M.useState)(() => Date.now()), [r, i] = (0, M.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, M.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -21245,15 +21325,15 @@ function ov(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/clock/src/settings.js
-var sv = "settings", cv = Object.freeze({
+var cv = "settings", lv = Object.freeze({
 	hour12: !1,
 	showSeconds: !0,
 	dateFormat: "zh"
-}), lv = Object.freeze([
+}), uv = Object.freeze([
 	"zh",
 	"iso",
 	"en"
-]), uv = Object.freeze({ cn: "zh" }), dv = [
+]), dv = Object.freeze({ cn: "zh" }), fv = [
 	"星期日",
 	"星期一",
 	"星期二",
@@ -21261,7 +21341,7 @@ var sv = "settings", cv = Object.freeze({
 	"星期四",
 	"星期五",
 	"星期六"
-], fv = [
+], pv = [
 	"Sun",
 	"Mon",
 	"Tue",
@@ -21269,27 +21349,27 @@ var sv = "settings", cv = Object.freeze({
 	"Thu",
 	"Fri",
 	"Sat"
-], pv = ["clock.settings", "plugin.clock.clock.settings"], mv = "plugin.clock.settings", hv = (e) => String(e).padStart(2, "0");
-function gv(e) {
+], mv = ["clock.settings", "plugin.clock.clock.settings"], hv = "plugin.clock.settings", gv = (e) => String(e).padStart(2, "0");
+function _v(e) {
 	return e && typeof e == "object" && !Array.isArray(e) ? e : {};
 }
-function _v(e) {
-	if (typeof e != "string") return null;
-	let t = uv[e] ?? e;
-	return lv.includes(t) ? t : null;
-}
 function vv(e) {
-	let t = gv(e);
+	if (typeof e != "string") return null;
+	let t = dv[e] ?? e;
+	return uv.includes(t) ? t : null;
+}
+function yv(e) {
+	let t = _v(e);
 	return {
-		hour12: typeof t.hour12 == "boolean" ? t.hour12 : cv.hour12,
-		showSeconds: typeof t.showSeconds == "boolean" ? t.showSeconds : cv.showSeconds,
-		dateFormat: _v(t.dateFormat) ?? cv.dateFormat
+		hour12: typeof t.hour12 == "boolean" ? t.hour12 : lv.hour12,
+		showSeconds: typeof t.showSeconds == "boolean" ? t.showSeconds : lv.showSeconds,
+		dateFormat: vv(t.dateFormat) ?? lv.dateFormat
 	};
 }
-function yv() {
+function bv() {
 	try {
-		if (localStorage.getItem(mv) !== null) return !1;
-		for (let e of pv) {
+		if (localStorage.getItem(hv) !== null) return !1;
+		for (let e of mv) {
 			let t = localStorage.getItem(e);
 			if (t === null) continue;
 			let n;
@@ -21298,27 +21378,27 @@ function yv() {
 			} catch {
 				continue;
 			}
-			return localStorage.setItem(mv, JSON.stringify(vv(n))), !0;
+			return localStorage.setItem(hv, JSON.stringify(yv(n))), !0;
 		}
 	} catch {}
 	return !1;
 }
-function bv(e, t) {
+function xv(e, t) {
 	let n = e.getHours(), r = "";
 	t.hour12 && (r = n >= 12 ? "PM" : "AM", n = n % 12 || 12);
-	let i = hv(e.getMinutes()), a = hv(e.getSeconds());
+	let i = gv(e.getMinutes()), a = gv(e.getSeconds());
 	return {
-		main: `${t.hour12 ? n : hv(n)}:${i}`,
+		main: `${t.hour12 ? n : gv(n)}:${i}`,
 		seconds: a,
 		meridiem: r,
-		time24: `${hv(e.getHours())}:${i}:${a}`
+		time24: `${gv(e.getHours())}:${i}:${a}`
 	};
 }
-function xv(e, t) {
-	let n = e.getFullYear(), r = e.getMonth() + 1, i = e.getDate(), a = dv[e.getDay()], o = fv[e.getDay()];
+function Sv(e, t) {
+	let n = e.getFullYear(), r = e.getMonth() + 1, i = e.getDate(), a = fv[e.getDay()], o = pv[e.getDay()];
 	switch (t.dateFormat) {
 		case "iso": {
-			let e = `${n}-${hv(r)}-${hv(i)}`;
+			let e = `${n}-${gv(r)}-${gv(i)}`;
 			return {
 				date: e,
 				weekday: a,
@@ -21343,32 +21423,32 @@ function xv(e, t) {
 		}
 	}
 }
-function Sv() {
+function Cv() {
 	try {
 		return Intl.DateTimeFormat().resolvedOptions().timeZone || "本地时区";
 	} catch {
 		return "本地时区";
 	}
 }
-function Cv(e) {
+function wv(e) {
 	let t = new Date(Date.UTC(e.getFullYear(), e.getMonth(), e.getDate())), n = t.getUTCDay() || 7;
 	t.setUTCDate(t.getUTCDate() + 4 - n);
 	let r = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
 	return Math.ceil(((t.getTime() - r.getTime()) / 864e5 + 1) / 7);
 }
-function wv(e) {
+function Tv(e) {
 	let t = Date.UTC(e.getFullYear(), 0, 1), n = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
 	return Math.round((n - t) / 864e5) + 1;
 }
-function Tv(e) {
+function Ev(e) {
 	return {
-		weekNumber: Cv(e),
-		dayOfYear: wv(e),
-		timeZone: Sv()
+		weekNumber: wv(e),
+		dayOfYear: Tv(e),
+		timeZone: Cv()
 	};
 }
-function Ev(e, t) {
-	let n = bv(e, t), r = xv(e, t), i = Tv(e);
+function Dv(e, t) {
+	let n = xv(e, t), r = Sv(e, t), i = Ev(e);
 	return {
 		iso: e.toISOString(),
 		epochMs: e.getTime(),
@@ -21385,13 +21465,13 @@ function Ev(e, t) {
 		dayOfYear: i.dayOfYear
 	};
 }
-function Dv(e, t) {
+function Ov(e, t) {
 	if (!t || typeof t != "object" || Array.isArray(t)) return { error: "参数必须是对象，例如 { \"hour12\": true }" };
 	let n = Object.keys(t);
 	if (n.length === 0) return { error: "至少提供 hour12、showSeconds、dateFormat 中的一个" };
 	let r = n.filter((e) => e !== "hour12" && e !== "showSeconds" && e !== "dateFormat");
 	if (r.length > 0) return { error: `未知设置字段：${r.join("、")}` };
-	let i = { ...vv(e) };
+	let i = { ...yv(e) };
 	if ("hour12" in t) {
 		if (typeof t.hour12 != "boolean") return { error: "hour12 需要是布尔值" };
 		i.hour12 = t.hour12;
@@ -21401,17 +21481,17 @@ function Dv(e, t) {
 		i.showSeconds = t.showSeconds;
 	}
 	if ("dateFormat" in t) {
-		let e = _v(t.dateFormat);
+		let e = vv(t.dateFormat);
 		if (!e) return { error: "dateFormat 只支持 zh、iso、en" };
 		i.dateFormat = e;
 	}
 	return { settings: i };
 }
-var Ov = "clock.places", kv = [
+var kv = "clock.places", Av = [
 	"plugin.clock.places",
 	"clock.worldClocks",
 	"clock.world"
-], Av = "clock:places-changed", jv = Object.freeze([
+], jv = "clock:places-changed", Mv = Object.freeze([
 	{
 		id: "beijing",
 		name: "北京",
@@ -21742,16 +21822,16 @@ var Ov = "clock.places", kv = [
 		tz: "Pacific/Auckland"
 	}
 ]);
-function Mv(e) {
+function Nv(e) {
 	let t = String(e ?? "").trim().toLowerCase();
-	return t ? jv.filter((e) => [
+	return t ? Mv.filter((e) => [
 		e.name,
 		e.nameEn,
 		e.country,
 		e.tz
-	].some((e) => e.toLowerCase().includes(t))) : jv;
+	].some((e) => e.toLowerCase().includes(t))) : Mv;
 }
-var Nv = [
+var Pv = [
 	"星期日",
 	"星期一",
 	"星期二",
@@ -21759,83 +21839,83 @@ var Nv = [
 	"星期四",
 	"星期五",
 	"星期六"
-], Pv = (e) => String(e).padStart(2, "0"), Fv = /* @__PURE__ */ new Map(), Iv = /* @__PURE__ */ new Map(), Lv = /* @__PURE__ */ new Map(), Rv = /* @__PURE__ */ new Map();
-function zv(e) {
+], Fv = (e) => String(e).padStart(2, "0"), Iv = /* @__PURE__ */ new Map(), Lv = /* @__PURE__ */ new Map(), Rv = /* @__PURE__ */ new Map(), zv = /* @__PURE__ */ new Map();
+function Bv(e) {
 	return typeof e == "object" && !!e && !Array.isArray(e);
 }
-function Bv(...e) {
+function Vv(...e) {
 	for (let t of e) if (typeof t == "string" && t.trim()) return t.trim();
 	return "";
 }
-function Vv(e) {
-	if (Rv.has(e)) return Rv.get(e);
+function Hv(e) {
+	if (zv.has(e)) return zv.get(e);
 	let t = !1;
 	try {
 		new Intl.DateTimeFormat("en-US", { timeZone: e }).format(/* @__PURE__ */ new Date(0)), t = !0;
 	} catch {
 		t = !1;
 	}
-	return Rv.set(e, t), t;
-}
-function Hv(e) {
-	if (!e) return null;
-	let t = String(e).toLowerCase();
-	return jv.find((e) => e.id.toLowerCase() === t) ?? null;
+	return zv.set(e, t), t;
 }
 function Uv(e) {
 	if (!e) return null;
-	let t = String(e).trim().toLowerCase();
-	return jv.find((e) => e.name.toLowerCase() === t || e.nameEn.toLowerCase() === t) ?? null;
+	let t = String(e).toLowerCase();
+	return Mv.find((e) => e.id.toLowerCase() === t) ?? null;
 }
 function Wv(e) {
-	return e ? jv.find((t) => t.tz === e) ?? null : null;
+	if (!e) return null;
+	let t = String(e).trim().toLowerCase();
+	return Mv.find((e) => e.name.toLowerCase() === t || e.nameEn.toLowerCase() === t) ?? null;
 }
 function Gv(e) {
-	return (String(e).split("/").pop() || e).replace(/_/g, " ");
+	return e ? Mv.find((t) => t.tz === e) ?? null : null;
 }
 function Kv(e) {
+	return (String(e).split("/").pop() || e).replace(/_/g, " ");
+}
+function qv(e) {
 	if (typeof e == "string") {
 		let t = e.trim();
 		if (!t) return null;
-		let n = Hv(t);
+		let n = Uv(t);
 		if (n) return { ...n };
-		let r = Uv(t);
+		let r = Wv(t);
 		if (r) return { ...r };
-		if (!Vv(t)) return null;
-		let i = Wv(t);
+		if (!Hv(t)) return null;
+		let i = Gv(t);
 		return i ? { ...i } : {
 			id: `tz:${t}`,
-			name: Gv(t),
+			name: Kv(t),
 			country: "",
 			tz: t
 		};
 	}
-	if (!zv(e)) return null;
-	let t = Hv(Bv(e.id));
+	if (!Bv(e)) return null;
+	let t = Uv(Vv(e.id));
 	if (t) return { ...t };
-	let n = Uv(Bv(e.name, e.city));
+	let n = Wv(Vv(e.name, e.city));
 	if (n) return { ...n };
-	let r = Bv(e.tz, e.timezone, e.timeZone, e.zone);
-	if (!r || !Vv(r)) return null;
-	let i = Wv(r);
-	return i && !Bv(e.name, e.city, e.country) ? { ...i } : {
-		id: Bv(e.id) || i?.id || `tz:${r}`,
-		name: Bv(e.name, e.city) || i?.name || Gv(r),
-		country: Bv(e.country, e.region) || i?.country || "",
+	let r = Vv(e.tz, e.timezone, e.timeZone, e.zone);
+	if (!r || !Hv(r)) return null;
+	let i = Gv(r);
+	return i && !Vv(e.name, e.city, e.country) ? { ...i } : {
+		id: Vv(e.id) || i?.id || `tz:${r}`,
+		name: Vv(e.name, e.city) || i?.name || Kv(r),
+		country: Vv(e.country, e.region) || i?.country || "",
 		tz: r
 	};
 }
-function qv(e) {
+function Jv(e) {
 	let t = [];
-	Array.isArray(e) ? t = e : zv(e) && (t = Array.isArray(e.places) ? e.places : Array.isArray(e.clocks) ? e.clocks : Array.isArray(e.cities) ? e.cities : [e]);
+	Array.isArray(e) ? t = e : Bv(e) && (t = Array.isArray(e.places) ? e.places : Array.isArray(e.clocks) ? e.clocks : Array.isArray(e.cities) ? e.cities : [e]);
 	let n = /* @__PURE__ */ new Set(), r = [];
 	for (let e of t) {
-		let t = Kv(e);
+		let t = qv(e);
 		if (t && !n.has(t.id) && (n.add(t.id), r.push(t), r.length >= 8)) break;
 	}
 	return r;
 }
-function Jv(e) {
+function Yv(e) {
 	let t;
 	try {
 		t = localStorage.getItem(e);
@@ -21844,38 +21924,38 @@ function Jv(e) {
 	}
 	if (t === null) return null;
 	try {
-		return qv(JSON.parse(t));
+		return Jv(JSON.parse(t));
 	} catch {
 		return [];
 	}
 }
-function Yv() {
-	typeof window < "u" && window.dispatchEvent(new Event(Av));
+function Xv() {
+	typeof window < "u" && window.dispatchEvent(new Event(jv));
 }
-function Xv(e, { silent: t = !1 } = {}) {
+function Zv(e, { silent: t = !1 } = {}) {
 	try {
-		localStorage.setItem(Ov, JSON.stringify(e));
+		localStorage.setItem(kv, JSON.stringify(e));
 	} catch {
 		return !1;
 	}
-	return t || Yv(), !0;
+	return t || Xv(), !0;
 }
-function Zv() {
-	let e = Jv(Ov);
+function Qv() {
+	let e = Yv(kv);
 	if (e !== null) return e;
-	for (let e of kv) {
-		let t = Jv(e);
-		if (t && t.length > 0) return Xv(t, { silent: !0 }), t;
+	for (let e of Av) {
+		let t = Yv(e);
+		if (t && t.length > 0) return Zv(t, { silent: !0 }), t;
 	}
 	return [];
 }
-function Qv(e) {
-	let t = Kv(e);
+function $v(e) {
+	let t = qv(e);
 	if (!t) return {
 		ok: !1,
 		error: "无法识别的城市或 IANA 时区"
 	};
-	let n = Zv(), r = n.find((e) => e.id === t.id);
+	let n = Qv(), r = n.find((e) => e.id === t.id);
 	if (r) return {
 		ok: !1,
 		code: "duplicate",
@@ -21889,7 +21969,7 @@ function Qv(e) {
 		places: n
 	};
 	let i = [...n, t];
-	return Xv(i) ? {
+	return Zv(i) ? {
 		ok: !0,
 		place: t,
 		places: i
@@ -21898,35 +21978,35 @@ function Qv(e) {
 		error: "无法保存世界时钟数据（本机存储不可写）"
 	};
 }
-function $v(e, t) {
-	let n = Hv(e.id);
+function ey(e, t) {
+	let n = Uv(e.id);
 	if (typeof t == "string") {
 		let r = t.trim().toLowerCase();
 		return r ? e.id.toLowerCase() === r || e.tz.toLowerCase() === r || e.name.toLowerCase() === r || n?.nameEn.toLowerCase() === r : !1;
 	}
-	if (!zv(t)) return !1;
-	let r = Bv(t.id);
+	if (!Bv(t)) return !1;
+	let r = Vv(t.id);
 	if (r) return e.id.toLowerCase() === r.toLowerCase();
-	let i = Bv(t.tz, t.timezone, t.timeZone, t.zone);
+	let i = Vv(t.tz, t.timezone, t.timeZone, t.zone);
 	if (i) return e.tz.toLowerCase() === i.toLowerCase();
-	let a = Bv(t.name, t.city);
+	let a = Vv(t.name, t.city);
 	if (!a) return !1;
 	let o = a.toLowerCase();
 	return e.name.toLowerCase() === o || n?.nameEn.toLowerCase() === o;
 }
-function ey(e) {
-	let t = Zv();
+function ty(e) {
+	let t = Qv();
 	if (t.length === 0) return {
 		ok: !1,
 		error: "世界时钟里还没有城市"
 	};
-	let n = t.findIndex((t) => $v(t, e));
+	let n = t.findIndex((t) => ey(t, e));
 	if (n < 0) return {
 		ok: !1,
 		error: "没有找到要删除的城市"
 	};
 	let r = t[n], i = t.filter((e, t) => t !== n);
-	return Xv(i) ? {
+	return Zv(i) ? {
 		ok: !0,
 		removed: r,
 		places: i
@@ -21935,8 +22015,8 @@ function ey(e) {
 		error: "无法保存世界时钟数据（本机存储不可写）"
 	};
 }
-function ty(e, t) {
-	let n = `${e}|${t ? "h12" : "h23"}`, r = Fv.get(n);
+function ny(e, t) {
+	let n = `${e}|${t ? "h12" : "h23"}`, r = Iv.get(n);
 	return r || (r = new Intl.DateTimeFormat("en-US", {
 		timeZone: e,
 		hour12: t,
@@ -21944,19 +22024,19 @@ function ty(e, t) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit"
-	}), Fv.set(n, r)), r;
+	}), Iv.set(n, r)), r;
 }
-function ny(e) {
-	let t = Iv.get(e);
+function ry(e) {
+	let t = Lv.get(e);
 	return t || (t = new Intl.DateTimeFormat("en-CA", {
 		timeZone: e,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit"
-	}), Iv.set(e, t)), t;
+	}), Lv.set(e, t)), t;
 }
-function ry(e) {
-	let t = Lv.get(e);
+function iy(e) {
+	let t = Rv.get(e);
 	return t || (t = new Intl.DateTimeFormat("en-US", {
 		timeZone: e,
 		hourCycle: "h23",
@@ -21966,48 +22046,48 @@ function ry(e) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit"
-	}), Lv.set(e, t)), t;
+	}), Rv.set(e, t)), t;
 }
-function iy(e, t) {
+function ay(e, t) {
 	let n = {};
 	for (let r of e.formatToParts(t)) r.type !== "literal" && (n[r.type] = r.value);
 	return n;
 }
-function ay(e, t, n) {
-	let r = iy(ty(t, n.hour12), e);
+function oy(e, t, n) {
+	let r = ay(ny(t, n.hour12), e);
 	return {
 		main: `${n.hour12 ? String(Number(r.hour)) : r.hour}:${r.minute}`,
 		seconds: r.second,
 		meridiem: n.hour12 ? (r.dayPeriod || "").toUpperCase() : ""
 	};
 }
-function oy(e, t) {
-	let n = iy(ny(t), e), r = Number(n.year), i = Number(n.month), a = Number(n.day);
+function sy(e, t) {
+	let n = ay(ry(t), e), r = Number(n.year), i = Number(n.month), a = Number(n.day);
 	return {
 		year: r,
 		month: i,
 		day: a,
-		weekday: Nv[new Date(Date.UTC(r, i - 1, a)).getUTCDay()],
-		dateLabel: `${r}-${Pv(i)}-${Pv(a)}`
+		weekday: Pv[new Date(Date.UTC(r, i - 1, a)).getUTCDay()],
+		dateLabel: `${r}-${Fv(i)}-${Fv(a)}`
 	};
 }
-function sy(e, t) {
-	let n = iy(ry(t), e), r = Date.UTC(Number(n.year), Number(n.month) - 1, Number(n.day), Number(n.hour), Number(n.minute), Number(n.second)), i = Math.floor(e.getTime() / 1e3) * 1e3;
+function cy(e, t) {
+	let n = ay(iy(t), e), r = Date.UTC(Number(n.year), Number(n.month) - 1, Number(n.day), Number(n.hour), Number(n.minute), Number(n.second)), i = Math.floor(e.getTime() / 1e3) * 1e3;
 	return Math.round((r - i) / 6e4);
 }
-function cy(e) {
+function ly(e) {
 	let t = Math.floor(e / 60), n = e % 60;
 	return t > 0 && n > 0 ? `${t} 小时 ${n} 分钟` : t > 0 ? `${t} 小时` : `${n} 分钟`;
 }
-function ly(e) {
-	return e === 0 ? "与本地相同" : `比本地${e > 0 ? "快" : "慢"} ${cy(Math.abs(e))}`;
+function uy(e) {
+	return e === 0 ? "与本地相同" : `比本地${e > 0 ? "快" : "慢"} ${ly(Math.abs(e))}`;
 }
-function uy(e, t) {
+function dy(e, t) {
 	let n = Date.UTC(e.year, e.month - 1, e.day), r = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()), i = Math.round((n - r) / 864e5);
 	return i === 0 ? "今天" : i === 1 ? "明天" : i === -1 ? "昨天" : "";
 }
-function dy(e, t, n) {
-	let r = ay(t, e.tz, n), i = oy(t, e.tz), a = -t.getTimezoneOffset(), o = sy(t, e.tz) - a;
+function fy(e, t, n) {
+	let r = oy(t, e.tz, n), i = sy(t, e.tz), a = -t.getTimezoneOffset(), o = cy(t, e.tz) - a;
 	return {
 		id: e.id,
 		name: e.name,
@@ -22018,47 +22098,47 @@ function dy(e, t, n) {
 		meridiem: r.meridiem,
 		localDate: i.dateLabel,
 		weekday: i.weekday,
-		dayLabel: uy(i, t),
+		dayLabel: dy(i, t),
 		offsetMinutes: o,
-		offsetLabel: ly(o)
+		offsetLabel: uy(o)
 	};
 }
-function fy(e, t, n) {
+function py(e, t, n) {
 	return {
 		limit: 8,
 		count: e.length,
-		systemTimeZone: Sv(),
-		places: e.map((e) => dy(e, t, n))
+		systemTimeZone: Cv(),
+		places: e.map((e) => fy(e, t, n))
 	};
 }
-function py() {
-	let [e, t] = (0, M.useState)(Zv);
+function my() {
+	let [e, t] = (0, M.useState)(Qv);
 	return (0, M.useEffect)(() => {
-		let e = () => t(Zv()), n = (t) => {
-			(t.key === null || t.key === "clock.places" || kv.includes(t.key)) && e();
+		let e = () => t(Qv()), n = (t) => {
+			(t.key === null || t.key === "clock.places" || Av.includes(t.key)) && e();
 		};
-		return window.addEventListener("storage", n), window.addEventListener(Av, e), () => {
-			window.removeEventListener("storage", n), window.removeEventListener(Av, e);
+		return window.addEventListener("storage", n), window.addEventListener(jv, e), () => {
+			window.removeEventListener("storage", n), window.removeEventListener(jv, e);
 		};
 	}, []), {
 		places: e,
 		add: (0, M.useCallback)((e) => {
-			let n = Qv(e);
+			let n = $v(e);
 			return n.ok && t(n.places), n;
 		}, []),
 		remove: (0, M.useCallback)((e) => {
-			let n = ey(e);
+			let n = ty(e);
 			return n.ok && t(n.places), n;
 		}, [])
 	};
 }
 //#endregion
 //#region public/plugins/clock/src/tools.js
-var my = Object.freeze({
+var hy = Object.freeze({
 	type: "object",
 	properties: {},
 	additionalProperties: !1
-}), hy = {
+}), gy = {
 	type: "object",
 	properties: {
 		id: {
@@ -22075,16 +22155,16 @@ var my = Object.freeze({
 		}
 	},
 	additionalProperties: !1
-}, gy = Object.freeze([
+}, _y = Object.freeze([
 	{
 		name: "clock.now",
 		description: "读取系统当前时间、日期、星期、时区与本周/年内天数（只读）。",
-		parameters: my
+		parameters: hy
 	},
 	{
 		name: "clock.settings.get",
 		description: "读取时钟设置：hour12、showSeconds、dateFormat 及默认值（只读）。",
-		parameters: my
+		parameters: hy
 	},
 	{
 		name: "clock.settings.set",
@@ -22116,41 +22196,41 @@ var my = Object.freeze({
 	{
 		name: "clock.world.list",
 		description: "列出已添加的世界时钟城市、当地时间、今天/明天/昨天与时差（只读）。",
-		parameters: my
+		parameters: hy
 	},
 	{
 		name: "clock.world.add",
 		description: "添加一个世界时钟城市；至少提供 id、name、tz 之一，最多 8 个。",
-		parameters: hy
+		parameters: gy
 	},
 	{
 		name: "clock.world.remove",
 		description: "删除一个世界时钟城市；用 id、name 或 tz 指定，匹配第一条。",
-		parameters: hy
+		parameters: gy
 	}
 ]);
-function _y({ settings: e, setSettings: t, world: n }) {
-	let r = (t, n) => fy(t, n, e);
+function vy({ settings: e, setSettings: t, world: n }) {
+	let r = (t, n) => py(t, n, e);
 	return {
-		"clock.now": () => Ev(/* @__PURE__ */ new Date(), e),
+		"clock.now": () => Dv(/* @__PURE__ */ new Date(), e),
 		"clock.settings.get": () => ({
 			settings: { ...e },
-			defaults: { ...cv },
-			schemaKey: sv,
+			defaults: { ...lv },
+			schemaKey: cv,
 			dateFormatOptions: [
 				"zh",
 				"iso",
 				"en"
 			],
-			timeZone: Sv()
+			timeZone: Cv()
 		}),
 		"clock.settings.set": (n) => {
-			let r = Dv(e, n);
+			let r = Ov(e, n);
 			if (r.error) throw Error(r.error);
 			return t(r.settings), {
 				ok: !0,
 				settings: r.settings,
-				defaults: { ...cv }
+				defaults: { ...lv }
 			};
 		},
 		"clock.world.list": () => {
@@ -22163,7 +22243,7 @@ function _y({ settings: e, setSettings: t, world: n }) {
 			let a = /* @__PURE__ */ new Date();
 			return {
 				ok: !0,
-				added: dy(i.place, a, e),
+				added: fy(i.place, a, e),
 				...r(i.places, a)
 			};
 		},
@@ -22173,7 +22253,7 @@ function _y({ settings: e, setSettings: t, world: n }) {
 			let a = /* @__PURE__ */ new Date();
 			return {
 				ok: !0,
-				removed: dy(i.removed, a, e),
+				removed: fy(i.removed, a, e),
 				...r(i.places, a)
 			};
 		}
@@ -22181,19 +22261,19 @@ function _y({ settings: e, setSettings: t, world: n }) {
 }
 //#endregion
 //#region public/plugins/clock/src/sizes.js
-var vy = {
+var yy = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"3x2": [3, 2]
 };
-function yy(e) {
+function by(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return vy[t] ? t : "2x1";
+	return yy[t] ? t : "2x1";
 }
 //#endregion
 //#region public/plugins/clock/src/ClockApp.jsx
-var by = 1e3, xy = Jn({
+var xy = 1e3, Sy = Jn({
 	root: {
 		alignItems: "center",
 		justifyContent: "center",
@@ -22255,8 +22335,8 @@ var by = 1e3, xy = Jn({
 		whiteSpace: "nowrap"
 	}
 });
-function Sy() {
-	let e = xy(), t = d_(yy, "2x1"), [n, r] = f_(sv, cv, vv), i = py(), a = ov(by), o = t === "1x1", s = t === "3x2", c = new Date(a), l = bv(c, n), u = xv(c, n), d = n.showSeconds && !o, f = (0, M.useMemo)(() => `当前时间 ${n.hour12 ? `${l.main} ${l.meridiem}` : l.main}${d ? ` ${l.seconds} 秒` : ""}${o ? "" : `，${u.inline}`}，点击打开时钟详情`, [
+function Cy() {
+	let e = Sy(), t = d_(by, "2x1"), [n, r] = f_(cv, lv, yv), i = my(), a = sv(xy), o = t === "1x1", s = t === "3x2", c = new Date(a), l = xv(c, n), u = Sv(c, n), d = n.showSeconds && !o, f = (0, M.useMemo)(() => `当前时间 ${n.hour12 ? `${l.main} ${l.meridiem}` : l.main}${d ? ` ${l.seconds} 秒` : ""}${o ? "" : `，${u.inline}`}，点击打开时钟详情`, [
 		o,
 		u.inline,
 		n.hour12,
@@ -22265,7 +22345,7 @@ function Sy() {
 		l.meridiem,
 		l.seconds
 	]);
-	return x_(gy, _y({
+	return x_(_y, vy({
 		settings: n,
 		setSettings: r,
 		world: i
@@ -22306,7 +22386,7 @@ function Sy() {
 }
 //#endregion
 //#region public/plugins/clock/src/ClockDetail.jsx
-var Cy = 1e3, wy = Jn({
+var wy = 1e3, Ty = Jn({
 	stack: {
 		display: "flex",
 		flexDirection: "column",
@@ -22415,8 +22495,8 @@ var Cy = 1e3, wy = Jn({
 		minWidth: 0
 	}
 });
-function Ty({ label: e, value: t, testId: n }) {
-	let r = wy();
+function Ey({ label: e, value: t, testId: n }) {
+	let r = Ty();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.infoCell,
 		"data-date-info": n,
@@ -22432,8 +22512,8 @@ function Ty({ label: e, value: t, testId: n }) {
 		})]
 	});
 }
-function Ey({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm: i, onCancelConfirm: a, onRemove: o }) {
-	let s = wy(), [c, l] = (0, M.useState)(!1);
+function Dy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm: i, onCancelConfirm: a, onRemove: o }) {
+	let s = Ty(), [c, l] = (0, M.useState)(!1);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		"data-world-row": e.id,
 		"data-world-confirming": r ? "true" : void 0,
@@ -22537,14 +22617,14 @@ function Ey({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm:
 		})]
 	});
 }
-function Dy() {
-	let e = wy(), t = ov(Cy), [n] = f_(sv, cv, vv), r = py(), [i, a] = (0, M.useState)(!1), [o, s] = (0, M.useState)(null), [c, l] = (0, M.useState)(!1);
+function Oy() {
+	let e = Ty(), t = sv(wy), [n] = f_(cv, lv, yv), r = my(), [i, a] = (0, M.useState)(!1), [o, s] = (0, M.useState)(null), [c, l] = (0, M.useState)(!1);
 	(0, M.useEffect)(() => {
 		l(!0);
 	}, []);
-	let u = new Date(t), d = bv(u, n), f = xv(u, n), p = Tv(u), m = (0, M.useMemo)(() => {
+	let u = new Date(t), d = xv(u, n), f = Sv(u, n), p = Ev(u), m = (0, M.useMemo)(() => {
 		let e = new Date(t);
-		return r.places.map((t) => dy(t, e, n));
+		return r.places.map((t) => fy(t, e, n));
 	}, [
 		t,
 		n,
@@ -22588,7 +22668,7 @@ function Dy() {
 				children: f.inline
 			})]
 		}),
-		/* @__PURE__ */ (0, N.jsx)(tv, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
+		/* @__PURE__ */ (0, N.jsx)(nv, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: e.stack,
 			children: [/* @__PURE__ */ (0, N.jsxs)("section", {
 				className: e.section,
@@ -22624,7 +22704,7 @@ function Dy() {
 				}) : /* @__PURE__ */ (0, N.jsx)("div", {
 					className: e.worldList,
 					"data-world-list": "true",
-					children: m.map((e) => /* @__PURE__ */ (0, N.jsx)(Ey, {
+					children: m.map((e) => /* @__PURE__ */ (0, N.jsx)(Dy, {
 						info: e,
 						settings: n,
 						animate: c,
@@ -22644,17 +22724,17 @@ function Dy() {
 				}), /* @__PURE__ */ (0, N.jsxs)("div", {
 					className: e.infoGrid,
 					children: [
-						/* @__PURE__ */ (0, N.jsx)(Ty, {
+						/* @__PURE__ */ (0, N.jsx)(Ey, {
 							label: "本周",
 							value: `第 ${p.weekNumber} 周`,
 							testId: "week"
 						}),
-						/* @__PURE__ */ (0, N.jsx)(Ty, {
+						/* @__PURE__ */ (0, N.jsx)(Ey, {
 							label: "今年",
 							value: `第 ${p.dayOfYear} 天`,
 							testId: "day-of-year"
 						}),
-						/* @__PURE__ */ (0, N.jsx)(Ty, {
+						/* @__PURE__ */ (0, N.jsx)(Ey, {
 							label: "系统时区",
 							value: p.timeZone,
 							testId: "time-zone"
@@ -22663,26 +22743,26 @@ function Dy() {
 				})]
 			})]
 		}) }),
-		i ? /* @__PURE__ */ (0, N.jsx)(av, {
+		i ? /* @__PURE__ */ (0, N.jsx)(ov, {
 			title: "添加城市",
 			onClosed: () => a(!1),
-			trailing: /* @__PURE__ */ (0, N.jsx)(Oy, {}),
-			children: /* @__PURE__ */ (0, N.jsx)(ky, {
+			trailing: /* @__PURE__ */ (0, N.jsx)(ky, {}),
+			children: /* @__PURE__ */ (0, N.jsx)(Ay, {
 				existing: r.places,
 				onAdd: r.add
 			})
 		}) : null
 	] });
 }
-function Oy() {
-	let e = rv();
+function ky() {
+	let e = iv();
 	return /* @__PURE__ */ (0, N.jsx)(Y_, {
 		onClick: () => e?.(),
 		children: "取消"
 	});
 }
-function ky({ existing: e, onAdd: t }) {
-	let n = wy(), r = rv(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(""), c = (0, M.useMemo)(() => Mv(i), [i]), l = (0, M.useMemo)(() => new Set(e.map((e) => e.id)), [e]), u = e.length >= 8, d = (e) => {
+function Ay({ existing: e, onAdd: t }) {
+	let n = Ty(), r = iv(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(""), c = (0, M.useMemo)(() => Nv(i), [i]), l = (0, M.useMemo)(() => new Set(e.map((e) => e.id)), [e]), u = e.length >= 8, d = (e) => {
 		let n = t(e);
 		n.ok ? (s(""), r?.()) : s(n.error);
 	};
@@ -22750,8 +22830,8 @@ function ky({ existing: e, onAdd: t }) {
 		]
 	});
 }
-a_(), yv();
-function Ay() {
+a_(), bv();
+function jy() {
 	let { theme: e } = u_(), t = p_();
 	return /* @__PURE__ */ (0, N.jsx)(wl, {
 		theme: e,
@@ -22761,9 +22841,9 @@ function Ay() {
 			background: "transparent",
 			colorScheme: "normal"
 		},
-		children: t === "detail" ? /* @__PURE__ */ (0, N.jsx)(Dy, {}) : /* @__PURE__ */ (0, N.jsx)(Sy, {})
+		children: t === "detail" ? /* @__PURE__ */ (0, N.jsx)(Oy, {}) : /* @__PURE__ */ (0, N.jsx)(Cy, {})
 	});
 }
-var jy = document.getElementById("root");
-jy && (0, $g.createRoot)(jy).render(/* @__PURE__ */ (0, N.jsx)(Ay, {}));
+var My = document.getElementById("root");
+My && (0, $g.createRoot)(My).render(/* @__PURE__ */ (0, N.jsx)(jy, {}));
 //#endregion

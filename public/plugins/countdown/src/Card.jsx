@@ -16,7 +16,7 @@ import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-componen
 import { plugin } from '/plugin-sdk.js';
 import { requestOverlay, useAgentTools, useHostSize } from '../../_shared/host.js';
 import { CardRoot, ListRow, Metric, useNow } from '../../_shared/ui.jsx';
-import { TABULAR_NUMS } from '../../_shared/typography.js';
+import { TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import { usePluginConfig } from './data/config.js';
 import {
@@ -190,6 +190,37 @@ const useStyles = makeStyles({
     minHeight: 0,
     overflow: 'hidden',
     flex: '0 1 auto',
+  },
+  /** 列表卡必须有主层（DENSITY §2.1）：事件总数用 Hero700 28px 承担列表头。 */
+  listHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+    minWidth: 0,
+  },
+  countLine: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  countValue: {
+    fontSize: tokens.fontSizeHero700,
+    lineHeight: tokens.lineHeightHero700,
+    fontWeight: tokens.fontWeightSemibold,
+    fontVariantNumeric: 'tabular-nums',
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+  /** 3×2 的列表头主层放大到 Display XL 48（D-07：只用于数字型主信息）。 */
+  countValueWide: {
+    ...displayXl(48),
+  },
+  countLabel: {
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
   },
   daysRow: {
     display: 'inline-flex',
@@ -437,27 +468,36 @@ export default function CountdownCard({ fallbackSizeKey }) {
 
   // 2×2 / 3×2：按 iframe 高度计算能完整放下的行数，避免静默裁切。
   const verticalPadding = 12;
-  // 底部统计/剩余提示放在列表内部，和行共用 4px gap；这里预留 16px 文本高度。
-  const footerHeight = 16;
+  // 列表头主层：2×2 用 28px（36 高），3×2 用 48px（56 高）；剩余高度再按 44 行高 + 4 行距排。
+  const headerHeight = wide ? 56 : 36;
   const available = Math.max(44, viewportHeight - verticalPadding * 2);
-  const maxRows = wide ? 6 : 5;
+  // DENSITY §2：2×2 最多 4 项 Secondary；3×2 多 1–2 行，并保留列表头。
+  const maxRows = wide ? 5 : 4;
   const rowCount = Math.max(
     1,
-    Math.min(maxRows, Math.floor((available - footerHeight) / 48)),
+    Math.min(maxRows, Math.floor((available - headerHeight) / 48)),
   );
   const visibleRows = allEntries.slice(0, rowCount);
   const hiddenCount = allEntries.length - visibleRows.length;
-  const footerText = wide
-    ? hiddenCount > 0
-      ? `共 ${allEntries.length} 项 · 还有 ${hiddenCount} 项`
-      : `共 ${allEntries.length} 项`
-    : hiddenCount > 0
-      ? `还有 ${hiddenCount} 项`
-      : '';
 
   return (
     <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
       <div className={styles.list}>
+        <div className={styles.listHead}>
+          <div className={styles.countLine}>
+            <span className={mergeClasses(styles.countValue, wide && styles.countValueWide)}>
+              {allEntries.length}
+            </span>
+            <Text size={wide ? 400 : 300} className={styles.countLabel}>
+              个事件
+            </Text>
+          </div>
+          {hiddenCount > 0 ? (
+            <Text size={200} className={styles.listFooter}>
+              还有 {hiddenCount} 项
+            </Text>
+          ) : null}
+        </div>
         {visibleRows.map((entry) => (
           <ListRow
             key={entry.item.id}
@@ -466,11 +506,6 @@ export default function CountdownCard({ fallbackSizeKey }) {
             trailing={<CardDays entry={entry} large={wide} />}
           />
         ))}
-        {footerText ? (
-          <Text size={200} className={styles.listFooter}>
-            {footerText}
-          </Text>
-        ) : null}
       </div>
     </CardRoot>
   );

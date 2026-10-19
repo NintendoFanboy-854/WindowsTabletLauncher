@@ -116,7 +116,12 @@ const useStyles = makeStyles({
   },
   aqiValue: { color: tokens.colorNeutralForeground1, fontVariantNumeric: 'tabular-nums' },
   aqiLabel: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
-  aqiCategory: { whiteSpace: 'nowrap' },
+  aqiCategory: {
+    whiteSpace: 'nowrap',
+    // 类别文字走中性层级；AQI 的数据色只用于圆环/圆点。
+    // 直接给文字上数据色会在亮色下出现黄底白字级别的低对比（FLUENT2 §10）。
+    color: tokens.colorNeutralForeground2,
+  },
 });
 
 /** 2×2 底部的逐时 6 列：现在 + 随后 5 小时 */
@@ -233,7 +238,7 @@ export function AirRing({ air, size = 88, className }) {
           </Text>
         </div>
       </div>
-      <Text size={300} weight="semibold" className={styles.aqiCategory} style={{ color }}>
+      <Text size={300} weight="semibold" className={styles.aqiCategory}>
         {air.category || '—'}
       </Text>
     </div>

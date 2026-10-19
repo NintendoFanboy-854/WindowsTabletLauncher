@@ -355,12 +355,12 @@ function CountdownRow({
         <div className={styles.trailing}>
           <div className={styles.badges}>
             {entry.status === 'today' ? (
-              <Badge size="small" appearance="tint" color="brand">
+              <Badge size="medium" appearance="tint" color="brand">
                 今天
               </Badge>
             ) : null}
             {showSoon ? (
-              <Badge size="small" appearance="tint" color="brand">
+              <Badge size="medium" appearance="tint" color="brand">
                 7 天内
               </Badge>
             ) : null}
