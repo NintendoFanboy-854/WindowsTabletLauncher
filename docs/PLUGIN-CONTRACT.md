@@ -207,6 +207,10 @@ plugin → host: { type: 'plugin:request-host-settings' }
 
 宿主根据消息来源的 pluginId，导航到 `设置页 → 插件 → <manifest.name>`。插件不需要知道路由。
 
+- 若消息来自**详情/编辑浮层的 iframe**，宿主必须先关闭该浮层再导航（与 §4.1「设置…」= 跨页导航一致）；
+  否则 Fluent Dialog 的 modal Portal 会继续挡住设置页。
+- 插件只发这一条消息，不要自己再发 `plugin:request-overlay-close` 做兼容；关闭浮层是宿主职责。
+
 ## 6. Agent 工具契约（与用户能力对等）
 
 - **每个用户可执行的操作，都必须有对应工具**；反之每个写操作工具都要有用户可达的 UI 路径。

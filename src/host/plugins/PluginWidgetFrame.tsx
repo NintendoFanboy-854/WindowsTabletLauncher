@@ -293,8 +293,11 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           onOverlayClose?.();
           return;
         }
-        // 插件 → 宿主设置：任意视图都能请求，由 App 选中本插件分区（契约 §5）
+        // 插件 → 宿主设置：任意视图都能请求，由 App 选中本插件分区（契约 §5）。
+        // 若消息来自浮层视图，必须先收起浮层再导航：契约 §4.1 的「设置…」是跨页导航，
+        // Fluent Dialog 的 modal Portal 挂在桌面层外面，不关会一直挡住设置页。
         if (rawType === 'plugin:request-host-settings') {
+          onOverlayClose?.();
           onRequestHostSettings?.();
           return;
         }
