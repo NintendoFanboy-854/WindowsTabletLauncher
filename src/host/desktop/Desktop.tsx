@@ -845,6 +845,11 @@ export default function Desktop({
   // ---------- 键盘：Tab/方向键 roving focus，Enter 进组件/设置，Delete 删除，Esc 退出 ----------
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // 只处理焦点确实在桌面 DOM 内（或焦点还在 body、准备用 Tab 进入桌面）的事件。
+    // Fluent Dialog/Menu 通过 Portal 挂到 body，React 合成事件仍会沿组件树冒泡到这里；
+    // 若不拦，对话框里的 Tab/方向键/Enter/Delete 会被桌面 roving focus / 删除快捷键抢走。
+    const keyTarget = event.target as Node;
+    if (keyTarget !== document.body && !event.currentTarget.contains(keyTarget)) return;
     const state = layoutRef.current;
     if (!state) return;
     const ordered = [...state.widgets].sort(compareReadingOrder);
