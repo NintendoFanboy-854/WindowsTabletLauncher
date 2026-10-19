@@ -11,6 +11,7 @@
 import {
   getIdleSeconds as tauriGetIdleSeconds,
   getLocation as tauriGetLocation,
+  ipLocate as tauriIpLocate,
   isTauriRuntime,
   setKeepAwake as tauriSetKeepAwake,
 } from '../plugins/tauri';
@@ -204,6 +205,16 @@ export class HostBridge {
       case 'getLocation': {
         if (isTauriRuntime()) return tauriGetLocation();
         return null;
+      }
+      case 'ipLocate': {
+        // 浏览器 dev 没有 Rust 后端；命令失败也按“拿不到”处理，插件只认 null
+        if (!isTauriRuntime()) return null;
+        try {
+          return await tauriIpLocate();
+        } catch (error) {
+          console.warn('[bridge] ipLocate 失败', error);
+          return null;
+        }
       }
       default:
         throw new Error(`未知宿主 API: ${String(method)}`);

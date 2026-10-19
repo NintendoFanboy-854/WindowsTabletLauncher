@@ -50,6 +50,8 @@ function fallback(method, params) {
       return { actionId: params?.actions?.[0]?.id };
     case 'getLocation':
       return null;
+    case 'ipLocate':
+      return null;
     default:
       return null;
   }
@@ -151,6 +153,8 @@ export const plugin = {
   getIdleSeconds: () => call('getIdleSeconds', {}),
   showReminder: (params) => call('showReminder', params),
   getLocation: () => call('getLocation', {}),
+  /** ip.cn 网络归属地（D-16）：失败/脱离宿主返回 null */
+  ipLocate: () => call('ipLocate', {}),
 
   get inHost() {
     return isInHost;

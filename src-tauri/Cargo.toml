@@ -38,3 +38,8 @@ windows = { version = "0.62", features = [
   "Win32_UI_Input_KeyboardAndMouse",  # GetLastInputInfo
 ] }
 
+# E2b 网络定位（ip.cn，D-16）：async，在 async command 里直接 await。
+# 只开 native-tls（Windows 走 SChannel，无 OpenSSL/CMake 依赖）+ 系统代理；
+# 不开 reqwest 0.13 默认的 rustls/aws-lc-rs，避免引入 CMake/NASM 工具链。
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "system-proxy"] }
+

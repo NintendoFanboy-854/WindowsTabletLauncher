@@ -167,7 +167,7 @@
   Agent「演示模式」移出主设置。
 - 实现按 `docs/PLAN.md` §8 的 E0–E7 执行。
 
-## D-16 自动定位改用 ip.cn 网络归属地（2026-10-19，方案定稿，待实现）
+## D-16 自动定位改用 ip.cn 网络归属地（2026-10-19，已实现）
 
 - **不再使用高德（Amap）任何能力**，D-10 的高德 API Key 等待作废；天气数据仍是和风天气（QWeather）。
 - **链路**（2026-10-19 实测）：
@@ -185,7 +185,10 @@
 - **自动定位语义（可预期）**：城市列表为空时，定位城市自动加入并设为当前；已有城市时**不自动切换**，
   只在城市菜单显示「当前位置 · X 一键切换」。
 - **隐私**：仅在 `autoLocate` 打开时请求；只暴露公网 IP 与常规 UA，不发送本地数据。
-- **实现位置**：`src-tauri/src/iplocate.rs`（ticket/JSON 解析纯函数 + 单测，HTTP 用轻量 crate）、
-  bridge `HostApiMethod`/`HostApiMap`、`plugin-sdk.js` 的 `ipLocate()`；天气插件在 E3 接入。
+- **实现位置**：`src-tauri/src/iplocate.rs`（`extract_ticket` / `parse_payload` 纯函数 + 单测；
+  reqwest native-tls，8s 总超时 / 4s connect 超时）→ Tauri 命令 `ip_locate` →
+  `src/host/plugins/tauri.ts` 的 `ipLocate()` → bridge `HostApiMethod` / `HostApiMap` →
+  `plugin-sdk.js` 的 `plugin.ipLocate()`；天气插件在 E3 接入。浏览器 dev 没有 Tauri 后端，
+  bridge 与 SDK 都返回 null（插件按“拿不到”降级）。
 - **失败兜底**：ip.cn 改版 / 超时（8s）→ 返回 null；不影响手动搜索城市；日志记录原因，不弹错误。
 - 细节见 [components/weather.md](components/weather.md)「自动定位」一节；任务见 [PLAN.md](PLAN.md) E2b。

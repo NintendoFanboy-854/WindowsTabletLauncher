@@ -56,6 +56,7 @@ export {
   getLocation,
   getIdleSeconds,
   invokeCommand,
+  ipLocate,
   isTauriRuntime,
   pluginEnv,
   pluginInstallZip,

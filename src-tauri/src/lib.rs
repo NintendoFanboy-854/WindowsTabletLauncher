@@ -4,12 +4,14 @@
 //! - 窗口：全屏切换、退出
 //! - 开机自启（HKCU Run）
 //! - 系统定位（Windows Geolocator，失败返回 null）
+//! - ip.cn 网络归属地（失败返回 null，D-16）
 //! - 系统空闲秒数（GetLastInputInfo）
 //! - 防息屏（SetThreadExecutionState）
 //! - 插件目录读写、扫描、zip 安装
 //! - `wtsl://` 自定义协议：把插件目录里的静态文件喂给 iframe
 
 mod autostart;
+mod iplocate;
 mod location;
 mod plugins;
 mod power;
@@ -102,6 +104,13 @@ async fn get_location() -> CmdResult<Option<location::GeoLocation>> {
     tauri::async_runtime::spawn_blocking(location::locate)
         .await
         .map_err(|err| format!("定位任务失败: {err}"))
+}
+
+/// ip.cn 网络归属地（D-16）：失败已经在 `iplocate` 里记日志，命令层返回 null，
+/// 不把网络错误抛给插件（插件契约就是“拿不到返回 null”）。
+#[tauri::command]
+async fn ip_locate() -> CmdResult<Option<iplocate::IpLocation>> {
+    Ok(iplocate::locate().await)
 }
 
 // ---------- 插件目录 ----------
@@ -204,6 +213,7 @@ pub fn run() {
             get_idle_seconds,
             set_keep_awake,
             get_location,
+            ip_locate,
             plugin_env,
             plugin_list,
             plugin_read_manifest,

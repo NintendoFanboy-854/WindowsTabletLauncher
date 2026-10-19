@@ -6,8 +6,10 @@
  */
 
 import type { GeoLocation, PluginEnv, PluginRecord } from './types';
+import type { IpLocation } from '../bridge/types';
 
 export type { GeoLocation } from './types';
+export type { IpLocation } from '../bridge/types';
 
 type InvokeArgs = Record<string, unknown>;
 
@@ -79,3 +81,6 @@ export const setKeepAwake = (on: boolean) => invokeCommand<void>('set_keep_awake
 
 /** 系统定位，失败/未授权返回 null */
 export const getLocation = () => invokeCommand<GeoLocation | null>('get_location');
+
+/** ip.cn 网络归属地（D-16），失败/非 Tauri 返回 null */
+export const ipLocate = () => invokeCommand<IpLocation | null>('ip_locate');

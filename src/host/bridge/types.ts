@@ -95,7 +95,8 @@ export type HostApiMethod =
   | 'setKeepAwake'
   | 'getIdleSeconds'
   | 'showReminder'
-  | 'getLocation';
+  | 'getLocation'
+  | 'ipLocate';
 
 /** 插件调用宿主 API */
 export interface PluginCallMessage {
@@ -177,6 +178,16 @@ export interface GeoLocation {
   city?: string;
 }
 
+/** ip.cn 网络归属地（D-16）：只有行政区/运营商，不含坐标 */
+export interface IpLocation {
+  ip?: string;
+  country?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  isp?: string;
+}
+
 export interface HostApiMap {
   getConfig: { params: { key: string }; result: unknown };
   setConfig: { params: { key: string; value: unknown }; result: void };
@@ -185,6 +196,7 @@ export interface HostApiMap {
   getIdleSeconds: { params: never; result: number };
   showReminder: { params: ShowReminderParams; result: ReminderResult };
   getLocation: { params: never; result: GeoLocation | null };
+  ipLocate: { params: never; result: IpLocation | null };
 }
 
 // ---------- manifest ----------
