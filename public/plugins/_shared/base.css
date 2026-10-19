@@ -1,0 +1,53 @@
+/*
+ * 插件 iframe 统一外壳（共享底座）。
+ *
+ * 只做 iframe 视口重置，不含任何视觉样式：颜色 / 字号 / 间距 / 圆角全部由
+ * Fluent UI React 在 #root 里渲染（DECISIONS D-02b / docs/PLUGIN-REACT.md）。
+ * 插件 index.html 用相对路径引用：
+ *   <link rel="stylesheet" href="../_shared/base.css" />
+ *
+ * 不再在各个插件里复制一份 base.css；本轮 E3.1 起逐个换上来。
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  color-scheme: normal;
+  overscroll-behavior: none;
+  scrollbar-width: thin;
+}
+
+/* 平板触控：Fluent 内建表单控件的命中区统一 >=40（DESIGN 1.2 / AUDIT N-03） */
+.fui-Input,
+.fui-Switch,
+.fui-Checkbox,
+.fui-Radio,
+.fui-Slider,
+.fui-Dropdown {
+  min-height: 40px;
+}
+
+/*
+ * 非 Fluent 自绘元素（列表行、卡片根等）的键盘焦点。
+ * Fluent 组件自己的焦点环由组件内部 `data-fui-focus-visible` 处理，这里排除，
+ * 避免出现双焦点环。颜色只用 Fluent CSS 变量。
+ */
+:focus-visible:not([data-fui-focus-visible]) {
+  outline: 2px solid var(--colorStrokeFocus2, currentColor);
+  /* 插件根节点占满 iframe；向内画焦点环，避免被视口裁掉 */
+  outline-offset: -2px;
+}
