@@ -45,7 +45,7 @@
 | S-01 | P1 | 天气 1×1 卡片 padding 只有 4px，其他插件 1×1 是 8px | `Card.jsx:45` `pad1: spacingVerticalXS`；实测 `4px 4px 4px 4px`，内容框 152×152（1440） | 1×1 统一 `spacingHorizontalS`（8） |
 | S-02 | P1 | 待办所有尺寸固定 8px padding；3×3（504px）也只有 8px，明显过挤 | `TodoApp.jsx:89` `padding: spacingVerticalS`；实测 2×2/3×2/3×3/4×2 均 `8px`，仅 1×1 走 `rootSummary` 的 12px（1440） | 2×2/3×2/4×2 12；3×3 16；1×1 统一 8 |
 | S-03 | P1 | 同一 3×2 档卡片 padding 有 8/12/16 三种 | 实测 3×2：clock 16、countdown 16、pomodoro 16、sedentary 16、todo 8、weather 12/16（1440） | 3×2/4×2 统一 `12 vertical / 16 horizontal` |
-| S-04 | P1 | 同一 3×2 档组间距从 2 到 12px，列表行间距 0–2px，远看会粘连 | 实测 3×2 gap：clock 12、countdown 8、pomodoro 8、sedentary 4、todo 2、weather 4；countdown list gap 0（`CountdownApp.jsx:164`）、todo list gap 2（`TodoApp.jsx:130`） | 组间 8（2×2 起）/4（1×1、2×1）；列表行间 4；禁止 0/2 作为内容行距 |
+| S-04 | P1 | 同一 3×2 档组间距从 2 到 12px，列表行间距 0–2px，远看会粘连 | 实测 3×2 gap：clock 12、countdown 8、pomodoro 8、sedentary 4、todo 2、weather 4；countdown list gap 0（`CountdownApp.jsx:164`）、todo list gap 2（`TodoApp.jsx:130`） | 组间 8（2×2/3×2/4×2）、12（3×3）、4（1×1/2×1）；列表行间 4；禁止 0/2 作为内容行距 |
 | S-05 | P2 | 图标与文字距离不统一：2/8/12px 混用 | weather `heroMeta gap 2`（`Card.jsx:137`）、`currentRow gap 8`（`:110`）、`currentHero gap 12`（`:129`）；pomodoro badge-time 8（`:99`）；sedentary badge-number 8（`:81`） | 20–24px 图标用 8；≥32px 图标用 12 |
 | S-06 | P2 | 统计/分栏组间距：久坐统计 20px、番茄分栏 20px、待办分栏 8px（同语义差 2.5 倍） | `SedentaryApp.jsx:101` `spacingHorizontalXL`；`PomodoroApp.jsx:123` `XL`；`TodoApp.jsx:145` `S`（8） | 统计组间 20；组内 8；分栏列间 12 |
 | S-07 | P3 | 宿主 6px 内衬 + 插件 padding 形成双层内边距，各插件视觉留白被放大且不一致 | `WidgetCard.tsx:167` `padding: spacingHorizontalSNudge`（6）；1×1 总留白 weather 4+6=10，clock 8+6=14（1440） | 保留 6px 宿主内衬；插件 padding 按本报告表执行，统一按 iframe 内沿计 |
@@ -421,7 +421,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 所有卡片文本只用下表 10 个语义角色；`Text size` 是 Fluent UI React v9 的 `size` prop，`token` 是 makeStyles 场景应使用的 token。
 
 | 语义 role | Fluent 角色 | Text size | fontSize token | lineHeight token | px / 行高 | 字重 | 颜色 | 用途 |
-|---|---|---|---:|---|---|---|---|---|---|
+|---|---|---|---:|---|---|---|---|---|
 | `Display` | Display | 1000 | `fontSizeHero1000` | `lineHeightHero1000` | **68 / 92** | 600 | `fg1` | 单值主信息（clock/pomodoro/sedentary/weather 的 3×2 及以上） |
 | `Hero` | Large Title | 900 | `fontSizeHero900` | `lineHeightHero900` | **40 / 52** | 600 | `fg1` | 1×1 主值；2×1 列表型主值；weather 2×1/2×2 |
 | `Title` | Title 1 | 800 | `fontSizeHero800` | `lineHeightHero800` | **32 / 40** | 600 | `fg1` | 2×1 countdown；todo 1×1；weather AQI 值 |
@@ -472,7 +472,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 | 尺寸 | Primary | Secondary | Tertiary | padding | gap |
 |---|---|---|---|---|---|
 | 1×1 | 时间 **Hero 40/52 600 fg1** | — | 阶段 Badge `Caption 12/16 600 brand` | 8 | 4 |
-| 2×1 | 时间 **Display 68/92 600 fg1** | — | 阶段 Badge `Caption 12/16 600 brand` | 8v / 12h | 4（高 <150 时） |
+| 2×1 | 时间 **Display 68/92 600 fg1** | — | 阶段 Badge `Caption 12/16 600 brand` | 8v / 12h | 4（高 <150）/ 8（高 ≥150） |
 | 2×2 | 时间 **Display 68/92 600 fg1** | 任务 `BodyStrong 16/22 400 fg2` | 阶段 Badge `Caption 12/16 600 brand`；主按钮 `BodyStrong 16/22 600` | 12 | 8 |
 | 3×2 | 时间 **Display 68/92 600 fg1** | 任务 `BodyStrong 16/22 400 fg2` | 阶段 Badge `Caption 12/16 600 brand`；主按钮 `BodyStrong 16/22 600` | 12v / 16h | 8 |
 
@@ -527,7 +527,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 - token 对应：**4 = `spacingHorizontalXS`/`spacingVerticalXS`**；**8 = `spacingHorizontalS`/`spacingVerticalS`**；**12 = `spacingHorizontalM`/`spacingVerticalM`**；**16 = `spacingHorizontalL`/`spacingVerticalL`**；**20 = `spacingHorizontalXL`/`spacingVerticalXL`**；**2 = `spacingHorizontalXXS`/`spacingVerticalXXS`**。
 - 所有 padding/gap 只能取 **2/4/8/12/16/20/24**；2 仅用于图标光学对齐，不用于内容分组。
 - 列表行间距不得为 0/2：统一 4；行高 `minHeight: 40px` 保留（触控目标）。
-- 组间距必须大于行间距：组间 8（2×2 起）/4（1×1、2×1），行间 4。
+- 组间距必须大于行间距：组间 8（2×2/3×2/4×2）、12（3×3）、4（1×1、2×1），行间 4。
 - 大卡 padding 不得小于小卡：1×1=8、2×1=8/12、2×2=12、3×2=12/16、3×3=16、4×2=12/16，单调不降。
 - 宿主 6px 内衬（`WidgetCard.tsx:167`）保持不变；上表是 iframe 内沿的 padding，不要叠加计算。
 
@@ -539,6 +539,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
      display:  { size: 1000, weight: 'semibold', color: 'colorNeutralForeground1' },
      hero:     { size: 900,  weight: 'semibold', color: 'colorNeutralForeground1' },
      title:    { size: 800,  weight: 'semibold', color: 'colorNeutralForeground1' },
+     title2:   { size: 700,  weight: 'semibold', color: 'colorNeutralForeground1' },
      subtitle: { size: 600,  weight: 'semibold', color: 'colorNeutralForeground1' },
      subtitle2:{ size: 500,  weight: 'semibold', color: 'colorNeutralForeground1' },
      bodyStrong:{ size: 400, weight: 'semibold', color: 'colorNeutralForeground1' },
@@ -592,7 +593,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 4. 断言所有可见文本 `fontSize >= 12`；卡片正文（任务标题/城市/现象/单位/提示）`fontSize >= 14`。
 5. 断言数字主值 `fontVariantNumeric === 'tabular-nums'`。
 6. 断言卡内 padding/gap 与 §4.3 一致；组间 gap > 行间 gap。
-7. 断言同一尺寸档跨插件的 Primary 只允许两种值：单值卡 68（或 1×1 40），列表卡 16–28；不再出现 12/14。
+7. 断言同一尺寸档跨插件的 Primary 只允许：单值卡 68（1×1 或紧凑 2×1 为 40），列表卡 16–28；禁止 12/14 作为主值（todo 列表型无主值时按其任务标题 16 校验）。
 
 ### 5.3 视觉验收
 
@@ -631,6 +632,7 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 | P1 | `countdown/src/CountdownApp.jsx:265` | `wide ? 500 : 400` → 2×2=16、3×2=20 | 2×2=600（24/32）；3×2=700（28/36）；2×1=900（40/52） |
 | P1 | `countdown/src/CountdownApp.jsx:164` | list `gap: spacingVerticalNone`（0） | `spacingVerticalXS`（4） |
 | P1 | `countdown/src/CountdownApp.jsx:130,134` | 1×1 gap 0、3×2 gap 8 | 1×1 gap 4；3×2 gap 8；2×2 gap 4 |
+| P1 | `clock/ClockApp.jsx:46,62`；`pomodoro/PomodoroApp.jsx:69,89`；`sedentary/SedentaryApp.jsx:64`；`countdown/CountdownApp.jsx:121,134`；`todo/TodoApp.jsx:90`；`weather/Card.jsx:37` | 根 gap 2/4/12 混用（1×1 2、2×2 4、3×2 8–12） | 1×1/2×1=4；2×2/3×2/4×2=8；3×3=12 |
 | P1 | `sedentary/src/SedentaryApp.jsx:216` | `compact ? 900 : wide ? 800 : 700` → 40/32/28/28 | 1×1/2×1/2×2=900（40/52）；3×2=1000（68/92） |
 | P1 | `sedentary/src/SedentaryApp.jsx:219,317,348,387` | 单位/提示 200–300（12/14） | 单位/提示 `size={300}`（14/20）；统计值 `size={400}`（16/22） |
 | P1 | `sedentary/src/SedentaryApp.jsx:87` | `lineHeight: 1` → 40/40、32/32、28/28 | 删除；用 `lineHeightHero*`（52/40/36） |
