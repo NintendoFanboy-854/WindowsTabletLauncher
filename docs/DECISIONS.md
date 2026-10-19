@@ -192,3 +192,26 @@
   bridge 与 SDK 都返回 null（插件按“拿不到”降级）。
 - **失败兜底**：ip.cn 改版 / 超时（8s）→ 返回 null；不影响手动搜索城市；日志记录原因，不弹错误。
 - 细节见 [components/weather.md](components/weather.md)「自动定位」一节；任务见 [PLAN.md](PLAN.md) E2b。
+
+## D-17 插件契约与自包含模板（2026-10-19，E3.0b）
+
+- **契约层 vs 实现层**：换硬件/换 WebView/换 UI 框架时必须继承的是插件契约
+  （manifest、postMessage 协议、L0/L1/L2 层级、settings schema、卡片手势、Agent 对等）；
+  Fluent UI React + Fluent 2 是 WebView 实现的资产，不是契约本身。实现可以替换，
+  但替换方必须提供同一套 manifest/协议/层级/设置/手势/工具语义。
+- 插件继续**自包含**打包 React + Fluent（`app/app.js` 提交进 git，运行时不需要构建或
+  共享运行时）。不引入共享 plugin-runtime：共享模块会把版本、依赖、缓存与升级责任
+  带回宿主，破坏 plug-and-play。若未来确要做，必须是独立任务，先解决版本协商、
+  包管理、缓存与旧插件兼容；不能顺手在 E3.x 里加。
+- **模板插件独立于运行时清单**：`templates/plugin-template/` 自带 vendor 的
+  `_shared` 快照与已构建 `app.js`，不放进 `public/plugins/`、不进 `index.json`、
+  不被 `build-plugin.mjs --all` 发现、不进 `dist`、不出现在桌面/设置/插件管理；
+  删掉它对工程零影响。模板只用于复制到 `public/plugins/<new-id>/` 后开新插件。
+- 模板是自包含的代价：vendored 快照不会自动跟随宿主升级；README 记录快照日期与
+  SHA-256，宿主升级后手动重同步。模板只注册一条只读 `template.summary` 演示工具；
+  复制者必须为每个写操作补 Agent 工具，模板 README 明示了这个缺口。
+- 实现与验证：冷复制到 `public/plugins/template/`（不构建）后通过 `verify-plugin.mjs`
+  三档尺寸 + 宿主冒烟；14 项交互/设置/工具断言通过，console 0 error；截图在
+  `shots/e3-template/`。
+- 本轮同时修复宿主缺口：浮层内发 `plugin:request-host-settings` 时，宿主先关闭浮层再导航
+  （契约 §5），插件只发一条消息；模板与后续六个插件的「设置…」都按这个口径写。

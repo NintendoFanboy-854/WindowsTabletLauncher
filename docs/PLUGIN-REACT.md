@@ -313,6 +313,45 @@ node scripts/verify-plugin.mjs <id> --skip-host      # 只跑静态 + 独立尺�
 脚本内的「插件专属断言扩展点」用注释标出，E3.x subagent 在这里追加本插件行为
 （例如天气 mock、待办勾选、番茄开始/暂停），不要改通用断言。退出码非 0 = 失败。
 
+### 从模板新建插件
+
+`templates/plugin-template/` 是**不在工程运行时**里的自包含 React + Fluent 模板：不在
+`public/plugins/`、不被 `public/plugins/index.json` 引用、不被
+`node scripts/build-plugin.mjs --all` 发现、不进 `dist`，删掉它对工程零影响。
+模板自带已构建的 `app/app.js`，复制到 `public/plugins/<new-id>/` 后不构建也能先打开；
+改源码后必须重新构建。
+
+```powershell
+$id = 'my-plugin'
+Copy-Item -Recurse templates/plugin-template "public/plugins/$id"
+# 在 public/plugins/index.json 数组末尾加入 "my-plugin"
+node scripts/build-plugin.mjs $id
+node scripts/verify-plugin.mjs $id
+```
+
+复制后至少改这些字段：`manifest.json` 的 `id`/`name`（`id` 必须等于目录名和 index.json
+里的字符串）、`widgets[].id`/`title`、`sizes`/`defaultSize`；`src/settings.js` 的
+`DEFAULT_SETTINGS` 与 manifest schema 默认值；`src/Card.jsx` / `src/Detail.jsx` 的可见文案、
+`requestOverlay('detail', '…')` 标题与业务操作；`SUMMARY_TOOL.name` 从 `template.summary`
+改成 `<new-id>.summary`；`src/demo.js` 的 `plugin.template.demoCount` storage key；
+`index.html` 标题。复制后替换或删除模板 README，写自己插件的文档。
+
+模板源码的相对 import 只指向自己目录内的 `./shared/*`，宿主外部模块只有 `/plugin-sdk.js`
+（React 与 Fluent 打进 bundle）；**不能**改回 `../../_shared/*`，否则复制到工程外就坏。
+`base.css` 与 `src/shared/` 是 E3.0 共享底座（2026-10-19）的快照，从
+`public/plugins/_shared/` 整份复制、未改逻辑；宿主升级底座后
+按 README 的 SHA-256 快照表重新复制即可。`app.js` 只把 `/plugin-sdk.js` 留在外部。
+
+模板的演示功能：1×1 / 2×2 / 3×2 卡片、点卡开 L1、两个平级 Tab（CrossFade）、
+push L2 编辑表单（Input + Switch、取消/保存/返回 pop）、manifest schema 设置页、
+`template.summary` Agent 工具和宿主设置页入口。模板只演示只读 Agent 工具；卡片快捷按钮
+是演示写入，复制后必须补对应写工具（`<new-id>.add` 等）并让 UI 与工具共用数据层。
+E3.0 宿主从 L1 点「设置…」只导航、不自动关闭详情浮层；模板的 `openHostSettings()` 先发
+`requestHostSettings()` 再发 `plugin:request-overlay-close`（不能反序），宿主修复后可收敛。
+
+`verify-plugin.mjs` 的静态检查、独立尺寸与宿主冒烟可直接复用；模板自己的尺寸截图与
+交互验证在 `shots/e3-template/`，这些截图和临时验证脚本不进 git（`shots/` 已忽略）。
+
 ### 常见反模式
 
 - 自己写卡片根 `onClick` / 长按计时器 / hover / 右键菜单；应使用 `CardRoot`。

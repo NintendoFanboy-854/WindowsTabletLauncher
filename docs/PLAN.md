@@ -157,7 +157,8 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 > 背景：六个插件的交互/信息架构/视觉已逐个定稿，宿主与插件解耦契约见 [PLUGIN-CONTRACT.md](PLUGIN-CONTRACT.md)；
 > 汇总见 [DESIGN-ROUND-SUMMARY.md](DESIGN-ROUND-SUMMARY.md)，动效见 [MOTION.md](MOTION.md)，
 > 原则参考 [APPLE-HIG.md](reference/APPLE-HIG.md)。本轮不再按旧阶段表，按下面顺序执行。
-> **E0/E1/E2/E2b 已完成（2026-10-19）**：设置页 `bd6a8b8`、卡片手势 `5f65153`、网络定位（D-16）已落地；接下来 **E3.0 共享插件底座 → E3.1–E3.6 六插件（逐个）**。
+> **E0/E1/E2/E2b/E3.0/E3.0b 已完成（2026-10-19）**：设置页 `bd6a8b8`、卡片手势 `5f65153`、
+> 网络定位（D-16）`05fbafd`、共享插件底座 `d2c3ae8`；接下来 **E3.1–E3.6 六插件（逐个）**。
 
 | # | 任务 | 内容 | 验收 |
 |---|---|---|---|
@@ -165,11 +166,13 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 | E1 | 宿主通用设置页 ✅ | manifest `settings` schema → 通用表单（5 种字段）、插件分区动态生成、即时保存 +「保存」羡余按钮 +「恢复默认」；「外观」分组加「编辑桌面布局」「重置布局」；`plugin:request-host-settings` 导航 | 已完成（2026-10-19，commit `bd6a8b8`）；六插件设置全部由 schema 渲染；插件内不再有设置界面 |
 | E2 | 卡片手势与反馈 ✅ | SDK `useHostCardGesture`：转发 hover（鼠标/笔）、pointer down/up/cancel、长按（500ms）→ `plugin:request-edit-mode`、长按后吞 click；宿主统一按压/悬停/长按进度视觉；浮层点遮罩=关闭 | 已完成（2026-10-19，commit `5f65153`）；触控长按进编辑稳定；鼠标/触控都有按压反馈；遮罩点击关闭 |
 | E2b | 网络定位（ip.cn）✅ | Rust `src-tauri/src/iplocate.rs`：GET `ip.cn/` 解析 `_ticket` → GET `my.ip.cn/json/?ticket=…` → `ip/country/province/city/district/isp`（D-16）；8s 超时，改版/失败返回 null；bridge 新增 `ipLocate` API + `plugin-sdk.js` 方法；Rust 单测覆盖 ticket/JSON/异常 | 已完成（2026-10-19）：`cargo test` 12 项通过；`live_ip_cn_chain -- --ignored` 真机返回澳门；`cargo check` 无新增 warning；`npm run typecheck` / `build` 通过；天气插件在 E3 直接调用 `plugin.ipLocate()` |
+| E3.0 | 共享插件底座 ✅ | `_shared` 的 `host.js` / `theme.js` / `typography.js` / `motion.js` / `ui.jsx` / `base.css`；`verify-plugin.mjs` 通用静态 + 独立尺寸 + 宿主冒烟 | 已完成（2026-10-19，commit `d2c3ae8`）；卡片/详情/L2/动效/验收共用一套底座；六个旧插件在 E3.1–E3.6 逐个迁移 |
+| E3.0b | 自包含模板插件 ✅ | `templates/plugin-template/`：自带 vendor 的 E3.0 共享底座快照与预构建 React + Fluent `app/app.js`；1×1/2×2/3×2 卡片、L1 两 Tab、L2 编辑示例、settings schema、`template.summary` 工具；README 写复制/改名/构建/删除 | 已完成（2026-10-19）：不在 index、不进 dist、`--all` 不发现；冷复制到 `public/plugins/template/` **不构建**通过 `verify-plugin.mjs`（3 档 + 宿主冒烟）；14 项交互/设置/工具断言通过、console 0 error；截图 `shots/e3-template/`；删除无影响 |
 | E3 | 六插件重构 | clock（详情+世界时钟+设置迁移）、countdown（整卡详情、表单保存/取消语义）、sedentary（卡片展示+起来了、详情 7 天）、pomodoro（开始/暂停/重置、详情清空）、todo（卡片仅展示+勾选、详情完整管理+删除）、weather（3×2 逐时、4×2 等宽 7 天、详情紧凑化、自动定位接 ip.cn 网络归属地）；每个插件补 Agent 对等工具 | PLUGIN-CONTRACT 验收清单逐项通过；每插件截图 |
 | E4 | 动效 | 按 [MOTION.md](MOTION.md) 实现：hover 1.5%、按下 0.985、长按 500ms 下沉、详情/设置完整 container transform（所有尺寸，内容交叉淡入，关闭 150ms 收回）、插件内容按 Fluent motion；全部 token，尊重 reduced-motion | 1440×960 录屏/截图对比；无自定义时长/曲线 |
 | E5 | 视觉收口 | spacing/分组/层级/字号统一（HIG 分组原则 + Fluent 2 token）；天气右端对齐、卡片内边距、详情首屏密度；亮暗两套 | 1440×960 / 1024×768 截图；审计无 P0/P1 |
 | E6 | 测试脚手架清理 | 删除 `src/host/{shell,agent,plugins}/demo.html` 三套演示宿主与 `bridge-check`，能力收敛到正式 host 的 dev-only 参数或 `tests/`；去掉演示页的“Agent 模块演示 / scenario / 源码路径”测试横幅与假桌面；Agent「演示模式」移出主设置（只保留高级/URL `?mock=1`） | `npm run build` 后 `dist` 无 demo 页面与演示文案；运行时只有一个 host；产品 UI 无“测试/演示”入口 |
 | E7 | 回归与发布 | 更新 `verify-widgets` / `verify-overlays`；做一个最小第三方插件跑 plug-and-play 验收（零宿主改动）；更新 RELEASE/RELEASE-REPORT；截图归档 | 断言全 PASS；契约验收清单全勾 |
 
-> 执行顺序：E0 →（E1/E2 可并行）→ E2b → E3（逐插件）→ E4 → E5 → E6 → E7。
+> 执行顺序：E0 →（E1/E2 可并行）→ E2b → E3.0 → E3.0b → E3.x（逐插件）→ E4 → E5 → E6 → E7。
 > 动效（E4）的具体参数在实现前单独定稿；视觉（E5）不再改交互语义。

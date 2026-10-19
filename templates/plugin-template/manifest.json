@@ -1,0 +1,57 @@
+{
+  "id": "template",
+  "name": "模板",
+  "version": "0.1.0",
+  "background": false,
+  "widgets": [
+    {
+      "id": "template",
+      "title": "模板",
+      "sizes": [[1, 1], [2, 2], [3, 2]],
+      "defaultSize": [2, 2],
+      "cell": [0, 0]
+    }
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "显示与操作",
+        "hint": "设置由宿主按 manifest schema 渲染并即时保存；这里只演示长期偏好。",
+        "fields": [
+          {
+            "key": "showHint",
+            "type": "boolean",
+            "label": "显示快捷提示",
+            "description": "在卡片快捷按钮旁显示“点击卡片查看详情”",
+            "default": true
+          },
+          {
+            "key": "unit",
+            "type": "enum",
+            "label": "计数单位",
+            "default": "项",
+            "options": [
+              { "value": "项", "label": "项" },
+              { "value": "次", "label": "次" },
+              { "value": "条", "label": "条" }
+            ]
+          },
+          {
+            "key": "step",
+            "type": "number",
+            "label": "每次增加",
+            "description": "卡片快捷按钮每次增加的数值",
+            "default": 1,
+            "min": 1,
+            "max": 5,
+            "step": 1,
+            "unit": "个"
+          }
+        ]
+      }
+    ]
+  }
+}
