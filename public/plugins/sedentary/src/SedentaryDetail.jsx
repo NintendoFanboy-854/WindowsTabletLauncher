@@ -1,140 +1,116 @@
 /**
- * 久坐详情视图（宿主全窗口 Fluent Dialog，?view=detail 加载）。
- * 浮层重排 v1（docs/OVERLAY-REWRITE-SPEC.md §1/§3.2）：
- * - 头部：状态一句 16 semibold + 辅助说明 12 fg3
- * - 统计区：两列 statCard（值 24–32 / 标签 12），卡片高 ≥88、背景 colorNeutralBackground2、圆角 8
- * - 操作「我起来了」固定在页脚（40px）；空态给说明 + 主操作
+ * 久坐详情（L1，宿主 ?view=detail 浮层，docs/components/sedentary.md）。
+ *
+ * - header：当前状态 16 semibold + 辅助说明 12 fg3，右侧「设置…」（只发
+ *   `requestHostSettings()`，宿主负责先收起浮层再导航）；
+ * - 操作：「我起来了」primary；到阈值且未稍后时出现「稍后 5 分钟」；
+ * - 今日统计：一行四列（今日累计久坐 / 起身次数 / 最长连续 / 距上次起身）；
+ * - 最近 7 天：44 高列表行（日期 14 fg2 + 久坐分钟 16 semibold + 起身次数 12 fg3）；
+ * - 空态：还没有今天的记录 + primary「我起来了」。
+ *
+ * 该插件没有 L2 子页：没有需要编辑的内容条目，设置统一在宿主设置页。
  */
 
-import { useEffect, useState } from 'react';
-import {
-  Button,
-  Text,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components';
+import { useCallback } from 'react';
+import { Text, makeStyles, tokens } from '@fluentui/react-components';
 import { Checkmark20Regular } from '@fluentui/react-icons';
-import { useStoredConfig } from '../../_shared/host.js';
+import { requestHostSettings, useStoredConfig } from '../../_shared/host.js';
+import { CrossFade } from '../../_shared/motion.js';
+import {
+  ActionButton,
+  DetailHeader,
+  DetailPage,
+  DetailScroll,
+  DetailToolbar,
+  EmptyState,
+  ListRow,
+} from '../../_shared/ui.jsx';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
-  describeState,
   normalizeSettings,
   sendBreakCommand,
+  sendSnoozeCommand,
 } from './data/engine.js';
+import { useSedentaryState } from './useSedentaryState.js';
 
 const useStyles = makeStyles({
-  root: {
-    boxSizing: 'border-box',
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '24px 24px 0',
-    overflow: 'hidden',
-    color: tokens.colorNeutralForeground1,
-    '@media (max-width: 699px)': { padding: '16px 16px 0' },
-  },
-  scrollArea: {
-    flex: '1 1 auto',
-    minHeight: 0,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    paddingBottom: tokens.spacingVerticalXXL,
-  },
-  content: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXL,
-  },
-  header: {
+  headerText: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
   },
-  hint: {
+  muted: {
     color: tokens.colorNeutralForeground3,
+  },
+  content: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXL,
+    minWidth: 0,
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
+    minWidth: 0,
   },
-  grid: {
+  statGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: tokens.spacingHorizontalM,
-    '@media (max-width: 699px)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: tokens.spacingHorizontalL,
+    '@media (max-width: 699px)': {
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    },
   },
-  card: {
-    minHeight: '88px',
-    minWidth: '160px',
-    boxSizing: 'border-box',
+  stat: {
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    padding: tokens.spacingHorizontalM,
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusXLarge,
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
   },
-  cardValue: {
+  statValueRow: {
     display: 'flex',
     alignItems: 'baseline',
     gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  statValue: {
     fontVariantNumeric: 'tabular-nums',
+    color: tokens.colorNeutralForeground1,
   },
-  cardNumber: {
-    fontWeight: tokens.fontWeightSemibold,
-    lineHeight: tokens.lineHeightBase600,
-  },
-  cardUnit: {
-    color: tokens.colorNeutralForeground3,
-  },
-  cardLabel: {
-    color: tokens.colorNeutralForeground3,
-  },
-  empty: {
+  days: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: tokens.spacingVerticalM,
-    padding: tokens.spacingHorizontalL,
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusXLarge,
+    gap: tokens.spacingVerticalXS,
+    minWidth: 0,
   },
-  footer: {
-    flex: '0 0 auto',
-    padding: '12px 0 16px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalM,
+  dayLabel: {
+    color: tokens.colorNeutralForeground2,
   },
-  footerHint: {
-    color: tokens.colorNeutralForeground3,
+  emptyWrap: {
     minWidth: 0,
   },
 });
 
-function StatCard({ label, number, unit }) {
+function Stat({ label, value, unit }) {
   const styles = useStyles();
   return (
-    <div className={styles.card}>
-      <div className={styles.cardValue}>
-        <Text size={600} className={styles.cardNumber}>
-          {number}
-        </Text>
-        {unit && (
-          <Text size={300} className={styles.cardUnit}>
-            {unit}
-          </Text>
-        )}
-      </div>
-      <Text size={200} className={styles.cardLabel}>
+    <div className={styles.stat}>
+      <Text size={200} className={styles.muted}>
         {label}
       </Text>
+      <div className={styles.statValueRow}>
+        <Text size={600} weight="semibold" className={styles.statValue}>
+          {value}
+        </Text>
+        {unit ? (
+          <Text size={200} className={styles.muted}>
+            {unit}
+          </Text>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -142,105 +118,139 @@ function StatCard({ label, number, unit }) {
 export default function SedentaryDetail() {
   const styles = useStyles();
   const [settings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
-  const [snapshot, setSnapshot] = useState(() => describeState(DEFAULT_SETTINGS));
+  const snapshot = useSedentaryState(settings);
 
-  useEffect(() => {
-    const refresh = () => setSnapshot(describeState(settings));
-    refresh();
-    const timer = window.setInterval(refresh, 1000);
-    const onStorage = () => refresh();
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [settings]);
+  const standUp = useCallback(
+    (event) => {
+      event?.stopPropagation?.();
+      if (!settings.enabled) return;
+      sendBreakCommand();
+    },
+    [settings.enabled],
+  );
 
-  const hasData =
-    snapshot.currentMin > 0 ||
-    snapshot.today.sittingMinutes > 0 ||
-    snapshot.today.breaks > 0 ||
-    snapshot.lastBreakText !== '—';
+  const snooze = useCallback(
+    (event) => {
+      event?.stopPropagation?.();
+      sendSnoozeCommand();
+    },
+    [],
+  );
 
-  const breakNow = () => {
-    if (!settings.enabled) return;
-    sendBreakCommand();
-  };
+  const sitting = Boolean(snapshot.runtime.sittingSince);
+  const snoozedUntil = snapshot.runtime.snoozedUntil
+    ? new Date(snapshot.runtime.snoozedUntil)
+    : null;
+  const snoozed = Boolean(snoozedUntil && snoozedUntil.getTime() > Date.now());
+  const title = !settings.enabled
+    ? '久坐提醒已关闭'
+    : sitting
+      ? `已连续久坐 ${snapshot.currentMin} 分钟`
+      : '久坐计时未开始';
 
-  const statusText = settings.enabled ? snapshot.statusLabel : '久坐提醒已关闭';
+  let hint = snapshot.hint;
+  if (!settings.enabled) hint = '在设置里重新启用后，后台会继续计时与提醒';
+  else if (snapshot.status === 'quiet') hint = '免打扰时段，仍在计时；时段结束后补一次提醒';
+  else if (!sitting) hint = '检测到输入后会开始计时；也可以手动记一次起身';
+  else if (snapshot.status === 'danger' && !snoozed) {
+    hint = `已超过提醒阈值 ${settings.thresholdMin} 分钟，起身活动一下`;
+  }
+
+  const standButton = (
+    <ActionButton
+      appearance="primary"
+      icon={<Checkmark20Regular />}
+      onClick={standUp}
+      disabled={!settings.enabled}
+      aria-label="我起来了，记录一次起身"
+    >
+      我起来了
+    </ActionButton>
+  );
 
   return (
-    <div className={styles.root}>
-      <div className={styles.scrollArea}>
-        <div className={styles.content}>
-          <div className={styles.header}>
-            <Text size={400} weight="semibold">
-              {statusText}
-            </Text>
-            <Text className={styles.hint} size={200}>
-              {settings.enabled ? snapshot.hint : '在设置里重新启用后，后台会继续计时与提醒'}
-            </Text>
-          </div>
-
-          {!hasData ? (
-            <section className={styles.empty} aria-label="空态">
-              <Text size={400} weight="semibold">
-                今天还没有久坐记录
-              </Text>
-              <Text className={styles.hint} size={300}>
-                记录会在有输入后自动开始计时；现在可以手动记一次起身，或直接回到桌面查看卡片状态。
-              </Text>
-              <Button
-                appearance="primary"
-                size="large"
-                icon={<Checkmark20Regular />}
-                onClick={breakNow}
-                disabled={!settings.enabled}
-              >
-                我起来了
-              </Button>
-            </section>
-          ) : (
-            <section className={styles.section} aria-label="统计">
-              <Text size={500} weight="semibold">
-                今日统计
-              </Text>
-              <div className={styles.grid}>
-                <StatCard
-                  label="今日累计久坐"
-                  number={Math.round(snapshot.today.sittingMinutes)}
-                  unit="分钟"
-                />
-                <StatCard label="起身次数" number={snapshot.today.breaks} unit="次" />
-                <StatCard
-                  label="最长连续"
-                  number={Math.round(snapshot.today.longestStreakMin)}
-                  unit="分钟"
-                />
-                <StatCard label="距上次起身" number={snapshot.lastBreakText} />
-              </div>
-              <Text className={styles.hint} size={300}>
-                当前连续 {snapshot.currentMin} 分钟 · {snapshot.nextText}
-              </Text>
-            </section>
-          )}
+    <DetailPage>
+      <DetailHeader
+        trailing={
+          <ActionButton onClick={() => requestHostSettings()} aria-label="打开久坐设置">
+            设置…
+          </ActionButton>
+        }
+      >
+        <div className={styles.headerText}>
+          <Text size={400} weight="semibold">
+            {title}
+          </Text>
+          <Text size={200} className={styles.muted}>
+            {hint}
+          </Text>
         </div>
-      </div>
+      </DetailHeader>
 
-      <div className={styles.footer}>
-        <Text className={styles.footerHint} size={200}>
-          记录一次起身会结束当前连续久坐计时。
-        </Text>
-        <Button
-          appearance="primary"
-          size="large"
-          icon={<Checkmark20Regular />}
-          onClick={breakNow}
-          disabled={!settings.enabled}
-        >
-          我起来了
-        </Button>
-      </div>
-    </div>
+      {snapshot.hasData ? (
+        <DetailToolbar>
+          {standButton}
+          {snapshot.snoozable ? <ActionButton onClick={snooze}>稍后 5 分钟</ActionButton> : null}
+        </DetailToolbar>
+      ) : null}
+
+      <DetailScroll>
+        <CrossFade value={snapshot.hasData ? 'data' : 'empty'}>
+          {snapshot.hasData ? (
+            <div className={styles.content}>
+              <section className={styles.section} aria-label="今日统计">
+                <Text size={400} weight="semibold">
+                  今日统计
+                </Text>
+                <div className={styles.statGrid}>
+                  <Stat
+                    label="今日累计久坐"
+                    value={Math.round(snapshot.today.sittingMinutes)}
+                    unit="分钟"
+                  />
+                  <Stat label="起身次数" value={snapshot.today.breaks} unit="次" />
+                  <Stat
+                    label="最长连续"
+                    value={Math.round(snapshot.today.longestStreakMin)}
+                    unit="分钟"
+                  />
+                  <Stat label="距上次起身" value={snapshot.lastBreakText} />
+                </div>
+              </section>
+
+              <section className={styles.section} aria-label="最近 7 天">
+                <Text size={400} weight="semibold">
+                  最近 7 天
+                </Text>
+                <div className={styles.days}>
+                  {snapshot.recentDays.map((day) => (
+                    <ListRow
+                      key={day.date}
+                      title={<span className={styles.dayLabel}>{day.label}</span>}
+                      subtitle={`${day.breaks} 次起身`}
+                      trailing={
+                        <Text size={400} weight="semibold" className={styles.statValue}>
+                          {Math.round(day.sittingMinutes)} 分钟
+                        </Text>
+                      }
+                      aria-label={`${day.label}：久坐 ${Math.round(day.sittingMinutes)} 分钟，起身 ${day.breaks} 次`}
+                    />
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className={styles.emptyWrap}>
+              <EmptyState
+                icon={<Checkmark20Regular />}
+                title="还没有今天的记录"
+                description="检测到输入后会自动开始计时；也可以现在记一次起身"
+                action={standButton}
+              />
+            </div>
+          )}
+        </CrossFade>
+      </DetailScroll>
+    </DetailPage>
   );
 }

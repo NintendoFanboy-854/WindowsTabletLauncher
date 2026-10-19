@@ -1,7 +1,7 @@
 {
   "id": "sedentary",
   "name": "久坐提醒",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "background": true,
   "widgets": [
     {
@@ -11,5 +11,85 @@
       "defaultSize": [2, 1],
       "cell": [0, 2]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "reminders",
+        "title": "提醒",
+        "hint": "后台每 10 秒检查一次系统输入；修改后立即生效。",
+        "fields": [
+          {
+            "key": "enabled",
+            "type": "boolean",
+            "label": "启用久坐提醒",
+            "description": "关闭后不计时也不提醒",
+            "default": true
+          },
+          {
+            "key": "strongReminder",
+            "type": "boolean",
+            "label": "全屏强提醒",
+            "description": "关闭时只发一条通知",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "timing",
+        "title": "计时",
+        "hint": "到提醒阈值先提醒一次；仍未起身时按「未起身再催」的间隔再次提醒。",
+        "fields": [
+          {
+            "key": "thresholdMin",
+            "type": "number",
+            "label": "提醒阈值",
+            "description": "连续久坐多少分钟后提醒",
+            "unit": "分钟",
+            "min": 5,
+            "max": 120,
+            "step": 5,
+            "default": 45
+          },
+          {
+            "key": "remindEveryMin",
+            "type": "number",
+            "label": "未起身再催",
+            "description": "提醒后仍未起身的再催间隔",
+            "unit": "分钟",
+            "min": 1,
+            "max": 60,
+            "step": 1,
+            "default": 10
+          },
+          {
+            "key": "idleResetMin",
+            "type": "number",
+            "label": "空闲判定起身",
+            "description": "无输入超过该时长即视为起身，锁屏与休眠同样处理",
+            "unit": "分钟",
+            "min": 1,
+            "max": 30,
+            "step": 1,
+            "default": 5
+          }
+        ]
+      },
+      {
+        "id": "quiet",
+        "title": "免打扰",
+        "hint": "时段内不提醒但继续计时，时段结束后补一次提醒；两端都清空即关闭。",
+        "fields": [
+          {
+            "key": "quietHours",
+            "type": "timeRange",
+            "label": "免打扰时段",
+            "default": { "start": "22:00", "end": "08:00" }
+          }
+        ]
+      }
+    ]
+  }
 }
