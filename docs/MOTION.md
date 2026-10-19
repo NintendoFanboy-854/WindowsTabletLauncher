@@ -59,7 +59,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 - 改尺寸：width/height 200ms 减速；不缩放内容、不做整体缩放。
 - 翻页：拖动跟手零过渡；松手落位 300ms 减速；越界橡皮筋线性跟手；页码点 100ms 切换。
 
-## 4. 详情 / 设置浮层：完整 container transform（所有卡片尺寸）
+## 4. 详情浮层：完整 container transform（所有卡片尺寸）
 
 **决定的方案**：从被点卡片的矩形**变形展开**到浮层矩形，关闭反向收回同一卡片；1×1 到 4×2 全部启用。
 
@@ -80,6 +80,16 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 - 遮罩：点击 scrim = 关闭，与 X / Esc 同义；scrim 可点击区域始终覆盖全屏。
 - 圆角/阴影：随 rect 一起过渡（圆角从卡片半径到浮层半径；阴影从 `shadow4` 到浮层阴影），不使用布局外元素。
 - 性能：只对一个 surface 做位置/尺寸过渡；内容延迟淡入避免每帧重排；如低端设备掉帧，降级为 scale 0.96→1 + 淡入。
+
+### 4.1 L2 子页 push / pop（同一浮层内）
+
+- **进入 L2（push）**：新页从右侧进入（translateX 48px→0）+ 淡入，250ms `curveDecelerateMid`；
+  旧页保持原样被覆盖（不做反向位移，避免两层同时动导致晕）。
+- **返回/取消（pop）**：当前页 translateX 0→48px + 淡出，200ms `curveAccelerateMid`；回到 L1 原状态（Tab/滚动位置保留）。
+- **保存（pop）**：提交后按 pop 动画返回 L1；L1 列表项用“列表项新增/更新”的 150–200ms 淡入变化。
+- **在 L2 按 X / Esc / 点遮罩**：整个浮层关闭——内容 100ms 淡出后，surface 按第 4 节的反向 container transform 收回来源卡片。
+- **Reduced Motion**：push/pop 改为 100ms 淡入淡出，无横向位移。
+- L2 内不做 Tab（Tab 只在 L1 的平级内容上用），避免“页里还有页”的层级混淆。
 
 ## 5. 页面切换
 
@@ -105,7 +115,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 | 阶段切换（番茄） | 阶段文字颜色/透明度切换，不做整卡动画 | 150ms |
 | 空态 ↔ 有内容 | 交叉淡入淡出 | 200ms / 150ms |
 | 加载 / 骨架 | Fluent Skeleton / Spinner 默认 | — |
-| 保存/关闭浮层 | 由宿主负责，插件内容不要先自行做退场 | — |
+| 保存/关闭浮层 | 由宿主负责；L2 保存按 pop 返回 L1，插件内容不要先自行做退场 | — |
 
 明确不做：stagger 逐项入场、数字滚动、打字机、粒子/爆炸、循环呼吸、视差、回弹超调。
 
@@ -119,6 +129,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 | 长按下沉 | 不做缩放，按下后显示静态描边 |
 | 编辑模式卡片缩放 | 不缩放，直接切换 chrome |
 | 浮层 container transform | 只保留 100ms 淡入淡出，不位移/不缩放 |
+| L2 子页 push/pop | 直接切换或 100ms 淡入淡出，无横向位移 |
 | 页面/列表/Tab 动效 | 直接切换或 ≤100ms 淡入 |
 | 翻页跟手 | 保留（直接操纵） |
 | 进度环/进度条 | 保留 Fluent 默认（属于状态指示，不视为装饰） |
