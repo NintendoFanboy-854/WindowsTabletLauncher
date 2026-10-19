@@ -37,6 +37,7 @@ import {
   tryMoveWidget,
 } from '../layout';
 import type { LayoutState } from '../layout';
+import type { ColorScheme } from '../shell/themeMode';
 import { getPluginManager, readFluentThemePayload, usePlugins } from '../plugins';
 import type { NormalizedPlugin, NormalizedWidget, PluginManager } from '../plugins';
 import { BackgroundFrames } from './BackgroundFrames';
@@ -77,6 +78,12 @@ export interface DesktopProps {
   layoutResetRequest?: number;
   /** 编辑模式「设置」/ Enter：交给 App 导航到设置页对应插件分区 */
   onOpenPluginSettings?: (pluginId: string) => void;
+  /**
+   * 当前生效的亮暗模式（App 解析后的 colorScheme）。FluentProvider 换主题时只更新
+   * CSS 变量、provider 的 className 不变，桌面层必须靠这个值重新读取 token 并下发给
+   * 插件 iframe（P2：同会话切换配色后卡片不跟随，reload 才一致）。
+   */
+  colorScheme?: ColorScheme;
 }
 
 interface SwipeSession {
@@ -247,6 +254,7 @@ export default function Desktop({
   editModeRequest,
   layoutResetRequest,
   onOpenPluginSettings,
+  colorScheme,
 }: DesktopProps) {
   const styles = useStyles();
   const manager = managerProp ?? getPluginManager();
@@ -263,14 +271,14 @@ export default function Desktop({
 
   // 主题注入：从 FluentProvider 实际生效的 CSS 变量读 token，发给每个插件 iframe
   // （必须读 provider 内部的元素；读 body 拿不到 provider 上定义的变量。
-  //  useThemeClassName 随主题切换换值，effect 重新读一次。）
+  //  换主题时 provider 只改 CSS 变量、className 不变，所以还要把 colorScheme 当依赖。）
   const themeClassName = useThemeClassName();
   const [theme, setTheme] = useState<ThemePayload | undefined>(undefined);
   useEffect(() => {
     const element = rootRef.current;
     if (!element) return;
     setTheme(readFluentThemePayload(element));
-  }, [themeClassName]);
+  }, [themeClassName, colorScheme]);
 
   const [layout, setLayout] = useState<LayoutState | null>(null);
   const [editMode, setEditMode] = useState(readInitialEditMode);

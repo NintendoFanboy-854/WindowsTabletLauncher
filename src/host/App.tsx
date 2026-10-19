@@ -82,7 +82,12 @@ export default function App() {
     >
       {seeded && (
         <NotificationsProvider bridge={bridge}>
-          <HostShell bridge={bridge} themeMode={themeMode} onThemeModeChange={changeTheme} />
+          <HostShell
+            bridge={bridge}
+            themeMode={themeMode}
+            colorScheme={colorScheme}
+            onThemeModeChange={changeTheme}
+          />
         </NotificationsProvider>
       )}
     </FluentProvider>
@@ -92,10 +97,12 @@ export default function App() {
 interface HostShellProps {
   bridge: HostBridge;
   themeMode: ThemeMode;
+  /** 解析后的亮暗（system 模式下跟随系统），桌面层据此重新读 token 下发给插件 */
+  colorScheme: ColorScheme;
   onThemeModeChange: (mode: ThemeMode) => void;
 }
 
-function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
+function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostShellProps) {
   const { notify } = useHostNotifications();
   const [page, navigate] = useHostPage();
 
@@ -206,6 +213,7 @@ function HostShell({ bridge, themeMode, onThemeModeChange }: HostShellProps) {
             bridge={bridge}
             notify={notify}
             active={page === 'desktop'}
+            colorScheme={colorScheme}
             editModeRequest={editModeRequest}
             layoutResetRequest={layoutResetRequest}
             onOpenPluginSettings={openSettings}
