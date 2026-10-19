@@ -30,6 +30,7 @@ const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     gap: tokens.spacingHorizontalS,
     color: tokens.colorNeutralForeground1,
+    fontWeight: tokens.fontWeightSemibold,
   },
   cityName: {
     overflow: 'hidden',

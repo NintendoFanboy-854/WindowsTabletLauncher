@@ -1,19 +1,20 @@
 /**
  * 倒数日编辑视图（宿主全窗口 Fluent Dialog，?view=edit 加载）。
- * 新增与编辑共用：卡片长按 / 点击 / 「添加」按钮都会先写 editing target，再请求该视图。
- * 保存 / 删除后写宿主配置；卡片视图通过 storage 事件同步。
+ * 浮层重排 v1（docs/OVERLAY-REWRITE-SPEC.md §1/§3.3）：
+ * - 表单 max-width 720 居中；Field 上下布局，控件 40；Field 间距 16
+ * - 底部固定操作条：左「删除」（danger）+ 右「取消」「保存」（40）
+ * - 保存/删除行为不变；不用 Divider 分组
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
-  Divider,
+  Dropdown,
   Field,
   Input,
   MessageBar,
   MessageBarBody,
-  Radio,
-  RadioGroup,
+  Option,
   Switch,
   Text,
   makeStyles,
@@ -39,24 +40,44 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     width: '100%',
     height: '100%',
-    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL}`,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalL,
-    overflowY: 'auto',
+    padding: '24px 24px 0',
+    overflow: 'hidden',
     color: tokens.colorNeutralForeground1,
+    '@media (max-width: 699px)': { padding: '16px 16px 0' },
+  },
+  scrollArea: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingBottom: tokens.spacingVerticalXL,
+  },
+  content: {
+    width: '100%',
+    maxWidth: '720px',
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXL,
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
   },
+  formStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+  },
   row: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalL,
-    minHeight: '40px',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '48px',
   },
   rowText: {
     display: 'flex',
@@ -67,30 +88,33 @@ const useStyles = makeStyles({
   subtle: {
     color: tokens.colorNeutralForeground3,
   },
-  colorGrid: {
+  switchControl: {
+    flex: '0 0 auto',
+    minHeight: '40px',
+  },
+  footer: {
+    flex: '0 0 auto',
+    padding: '12px 0 16px',
+  },
+  footerInner: {
+    width: '100%',
+    maxWidth: '720px',
+    margin: '0 auto',
     display: 'flex',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: tokens.spacingHorizontalM,
   },
-  colorRadio: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-  },
-  swatch: {
-    width: tokens.spacingHorizontalL,
-    height: tokens.spacingHorizontalL,
-    borderRadius: tokens.borderRadiusCircular,
-    flex: '0 0 auto',
-  },
-  actions: {
+  footerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    marginTop: 'auto',
+    gap: tokens.spacingHorizontalM,
   },
-  spacer: {
-    flex: '1 1 auto',
+  control: {
+    minHeight: '42px',
+  },
+  dangerButton: {
+    color: tokens.colorPaletteRedForeground1,
   },
 });
 
@@ -112,6 +136,11 @@ export default function CountdownEditor() {
     [editingId, items],
   );
 
+  const colorLabel = useMemo(
+    () => (COLOR_OPTIONS.find((option) => option.id === color) ?? COLOR_OPTIONS[0]).label,
+    [color],
+  );
+
   useEffect(() => {
     if (!loaded || initialized) return;
     if (editingItem) {
@@ -123,6 +152,23 @@ export default function CountdownEditor() {
     setInitialized(true);
   }, [editingItem, initialized, loaded]);
 
+  const resetForm = () => {
+    if (editingItem) {
+      setTitle(editingItem.title);
+      setTargetDate(editingItem.targetDate);
+      setRepeatYearly(editingItem.repeatYearly);
+      setColor(editingItem.color);
+    } else {
+      setTitle('');
+      setTargetDate(toDateString(new Date()));
+      setRepeatYearly(false);
+      setColor('accent');
+    }
+    setError('');
+    setSavedMessage('');
+    setConfirmDelete(false);
+  };
+
   const save = () => {
     const validation = validateDraft({ title, targetDate });
     if (!validation.ok) {
@@ -130,6 +176,7 @@ export default function CountdownEditor() {
       return;
     }
     setError('');
+    setConfirmDelete(false);
     if (editingItem) {
       setItems((previous) =>
         previous.map((item) =>
@@ -179,101 +226,111 @@ export default function CountdownEditor() {
 
   return (
     <div className={styles.root} data-countdown-editor>
-      <div className={styles.section} aria-label="事件信息">
-        <Text size={400} weight="semibold">
-          {editingItem ? '编辑倒数日' : '新增倒数日'}
-        </Text>
-        <Field label="标题" required>
-          <Input
-            value={title}
-            placeholder="例如：期末考试"
-            autoFocus
-            onChange={(_, detail) => setTitle(detail.value)}
-          />
-        </Field>
-        <Field label="日期" required hint="生日 / 纪念日选「每年重复」后按「月-日」循环">
-          <Input type="date" value={targetDate} onChange={(_, detail) => setTargetDate(detail.value)} />
-        </Field>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>每年重复</Text>
-            <Text className={styles.subtle} size={200}>
-              生日、纪念日等每年循环的事件
+      <div className={styles.scrollArea}>
+        <div className={styles.content}>
+          <section className={styles.section} aria-label="事件信息">
+            <Text size={500} weight="semibold">
+              {editingItem ? '编辑倒数日' : '新增倒数日'}
             </Text>
-          </div>
-          <Switch
-            checked={repeatYearly}
-            aria-label="每年重复"
-            onChange={(_, detail) => setRepeatYearly(detail.checked)}
-          />
+            <div className={styles.formStack}>
+              <Field label="标题" required>
+                <Input
+                  className={styles.control}
+                  size="large"
+                  value={title}
+                  placeholder="例如：期末考试"
+                  autoFocus
+                  onChange={(_, detail) => setTitle(detail.value)}
+                />
+              </Field>
+              <Field label="日期" required hint="生日 / 纪念日选「每年重复」后按「月-日」循环">
+                <Input
+                  className={styles.control}
+                  size="large"
+                  type="date"
+                  value={targetDate}
+                  onChange={(_, detail) => setTargetDate(detail.value)}
+                />
+              </Field>
+              <Field label="颜色" hint="事件颜色只用于卡片上的状态圆点">
+                <Dropdown
+                  className={styles.control}
+                  size="large"
+                  value={colorLabel}
+                  selectedOptions={[color]}
+                  onOptionSelect={(_, detail) =>
+                    setColor(detail.optionValue ?? COLOR_OPTIONS[0].id)
+                  }
+                >
+                  {COLOR_OPTIONS.map((option) => (
+                    <Option key={option.id} value={option.id}>
+                      {option.label}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+              <div className={styles.row}>
+                <div className={styles.rowText}>
+                  <Text size={300}>每年重复</Text>
+                  <Text className={styles.subtle} size={200}>
+                    生日、纪念日等每年循环的事件
+                  </Text>
+                </div>
+                <Switch
+                  className={styles.switchControl}
+                  checked={repeatYearly}
+                  aria-label="每年重复"
+                  onChange={(_, detail) => setRepeatYearly(detail.checked)}
+                />
+              </div>
+            </div>
+          </section>
+
+          {error && (
+            <MessageBar intent="error">
+              <MessageBarBody>{error}</MessageBarBody>
+            </MessageBar>
+          )}
+          {savedMessage && !error && (
+            <MessageBar intent="success">
+              <MessageBarBody>{savedMessage}</MessageBarBody>
+            </MessageBar>
+          )}
+          {confirmDelete && (
+            <MessageBar intent="warning">
+              <MessageBarBody>再次点击「删除」确认删除这条倒数日。</MessageBarBody>
+            </MessageBar>
+          )}
         </div>
       </div>
 
-      <Divider />
-
-      <div className={styles.section} aria-label="颜色">
-        <Text size={300} weight="semibold">
-          颜色
-        </Text>
-        <RadioGroup
-          value={color}
-          layout="horizontal"
-          className={styles.colorGrid}
-          onChange={(_, detail) => setColor(detail.value)}
-        >
-          {COLOR_OPTIONS.map((option) => (
-            <Radio
-              key={option.id}
-              value={option.id}
-              label={{
-                children: (
-                  <span className={styles.colorRadio}>
-                    <span
-                      className={styles.swatch}
-                      style={{ backgroundColor: tokens[option.token] }}
-                      aria-hidden="true"
-                    />
-                    {option.label}
-                  </span>
-                ),
-              }}
-            />
-          ))}
-        </RadioGroup>
-      </div>
-
-      {error && (
-        <MessageBar intent="error">
-          <MessageBarBody>{error}</MessageBarBody>
-        </MessageBar>
-      )}
-      {savedMessage && !error && (
-        <MessageBar intent="success">
-          <MessageBarBody>{savedMessage}</MessageBarBody>
-        </MessageBar>
-      )}
-      {confirmDelete && (
-        <MessageBar intent="warning">
-          <MessageBarBody>再次点击「删除」确认删除这条倒数日。</MessageBarBody>
-        </MessageBar>
-      )}
-
-      <div className={styles.actions}>
-        {editingItem && (
-          <Button
-            appearance="subtle"
-            size="large"
-            icon={<Delete20Regular />}
-            onClick={remove}
-          >
-            {confirmDelete ? '确认删除' : '删除'}
-          </Button>
-        )}
-        <span className={styles.spacer} />
-        <Button appearance="primary" size="large" icon={<Save20Regular />} onClick={save}>
-          保存
-        </Button>
+      <div className={styles.footer}>
+        <div className={styles.footerInner}>
+          {editingItem ? (
+            <Button
+              className={styles.dangerButton}
+              appearance="subtle"
+              size="large"
+              icon={<Delete20Regular />}
+              onClick={remove}
+            >
+              {confirmDelete ? '确认删除' : '删除'}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className={styles.footerRight}>
+            <Button appearance="secondary" size="large" onClick={resetForm}>
+              取消
+            </Button>
+            <Button appearance="primary" size="large" icon={<Save20Regular />} onClick={save}>
+              保存
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
+

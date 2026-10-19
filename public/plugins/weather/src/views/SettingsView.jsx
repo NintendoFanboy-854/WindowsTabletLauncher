@@ -1,17 +1,15 @@
 /**
  * 天气设置视图（宿主整窗 Fluent Dialog 加载 `?view=settings`）。
  *
- * 不再用 iframe 内的 Dialog：整页排版，Fluent 控件统一 40px 高；
- * 改动即时写入配置（plugin.setConfig('settings')），卡片视图通过 storage 事件同步。
- * 关闭浮层用宿主 Dialog 的 Esc / 点空白处。
+ * 按 OVERLAY-REWRITE-SPEC 重排：单列 720 居中、section 间距 24、行式设置项行高 48、
+ * Field 式输入 40、城市管理行 44；无页面标题/关闭按钮（宿主 Dialog 提供）。
+ * 修改即时写入配置，卡片视图通过 storage 事件同步。
  */
 
 import { useCallback, useState } from 'react';
 import {
   Badge,
   Button,
-  Divider,
-  Field,
   Input,
   MessageBar,
   MessageBarBody,
@@ -20,7 +18,9 @@ import {
   Spinner,
   Switch,
   Text,
+  Tooltip,
   makeStyles,
+  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -44,76 +44,85 @@ import { urlMockOverride } from '../utils.js';
 
 const LOCATION_TIMEOUT_MS = 4000;
 
+// 浮层内控件统一 40px：Fluent Input 的内层 input 默认 38px，显式撑到 40
+const INPUT_SLOT = { style: { height: '40px', boxSizing: 'border-box' } };
+
 const useStyles = makeStyles({
   root: {
-    boxSizing: 'border-box',
     width: '100%',
     height: '100%',
-    overflowY: 'auto',
-    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalXL}`,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
     color: tokens.colorNeutralForeground1,
-    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  scrollArea: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    padding: `${tokens.spacingVerticalXXL} ${tokens.spacingHorizontalXXL} 0`,
+    '@media (max-width: 700px)': {
+      padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL} 0`,
+    },
   },
   page: {
     width: '100%',
-    maxWidth: '760px',
+    maxWidth: '720px',
     margin: '0 auto',
+    paddingBottom: tokens.spacingVerticalXXL,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalL,
+    gap: tokens.spacingVerticalXXL,
   },
-  header: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS },
-  section: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS },
-  row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, minHeight: '40px' },
-  grow: { flex: 1, minWidth: 0 },
-  hint: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
-    lineHeight: tokens.lineHeightBase200,
+  section: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
+  sectionHeader: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS },
+  hint: { color: tokens.colorNeutralForeground3 },
+  rows: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
+  rowItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    minHeight: '48px',
+    width: '100%',
   },
+  rowText: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
+  rowControl: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 },
+  fieldItem: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXS },
+  fullWidth: { width: '100%' },
+  fields: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalL },
   placeList: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXS },
   placeRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '40px',
-    padding: `${tokens.spacingVerticalXXS} ${tokens.spacingHorizontalS}`,
-    borderRadius: tokens.borderRadiusMedium,
+    minHeight: '44px',
+    padding: `0 ${tokens.spacingHorizontalS}`,
+    borderRadius: tokens.borderRadiusXLarge,
     backgroundColor: tokens.colorNeutralBackground2,
     minWidth: 0,
   },
   placeName: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 },
-  resultList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
-    maxHeight: '200px',
-    overflowY: 'auto',
-  },
+  addRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, minHeight: '40px' },
+  grow: { flex: 1, minWidth: 0 },
+  resultList: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXS },
   resultRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '40px',
-    padding: `${tokens.spacingVerticalXXS} ${tokens.spacingHorizontalS}`,
-    borderRadius: tokens.borderRadiusMedium,
+    minHeight: '44px',
+    padding: `0 ${tokens.spacingHorizontalS}`,
+    borderRadius: tokens.borderRadiusXLarge,
     cursor: 'pointer',
     backgroundColor: tokens.colorNeutralBackground2,
     minWidth: 0,
     ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover },
   },
-  resultMeta: { color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200, whiteSpace: 'nowrap' },
+  resultMeta: { color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' },
   radioGroup: { display: 'flex', alignItems: 'center', minHeight: '40px' },
   radio40: { minHeight: '40px' },
   control40: { minHeight: '40px' },
-  switchRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalL,
-    minHeight: '40px',
-  },
-  switchLabel: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXXS, minWidth: 0 },
 });
 
 function withTimeout(promise, ms, fallback) {
@@ -121,6 +130,23 @@ function withTimeout(promise, ms, fallback) {
     Promise.resolve(promise).catch(() => fallback),
     new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
   ]);
+}
+
+function ToggleRow({ label, description, checked, onChange }) {
+  const styles = useStyles();
+  return (
+    <div className={styles.rowItem} data-setting-row>
+      <div className={styles.rowText}>
+        <Text size={300}>{label}</Text>
+        <Text size={200} className={styles.hint}>
+          {description}
+        </Text>
+      </div>
+      <div className={styles.rowControl}>
+        <Switch className={styles.control40} checked={checked} onChange={(_, detail) => onChange(detail.checked)} />
+      </div>
+    </div>
+  );
 }
 
 export default function SettingsView() {
@@ -171,6 +197,7 @@ export default function SettingsView() {
     setCityQuery('');
   };
 
+  // 自动定位：保持既有逻辑不变（DECISIONS D-10）
   const locate = async () => {
     if (locating) return;
     setLocating(true);
@@ -196,223 +223,284 @@ export default function SettingsView() {
 
   return (
     <div className={styles.root} data-weather-settings>
-      <div className={styles.page}>
-        <header className={styles.header}>
-          <Text size={600} weight="semibold">
-            天气设置
-          </Text>
-          <Text className={styles.hint} size={200}>
-            修改会立即生效并保存；按 Esc 或点浮层外部即可关闭。
-          </Text>
-        </header>
-
-        <section className={styles.section} aria-label="天气数据源">
-          <Text size={400} weight="semibold">
-            天气数据
-          </Text>
-          <Field label="API Key" hint="在和风天气控制台创建凭据后粘贴到这里。">
-            <Input
-              type="password"
-              size="large"
-              value={settings.apiKey}
-              placeholder="粘贴 API Key"
-              onChange={(_, detail) => update({ apiKey: detail.value })}
-            />
-          </Field>
-          <Field label="数据地址（API Host，必填）" hint="在和风天气控制台 → 设置里复制你的专属 API Host。">
-            <Input
-              size="large"
-              value={settings.apiHost}
-              placeholder="例如 abcd1234.qweatherapi.com"
-              onChange={(_, detail) => update({ apiHost: detail.value })}
-            />
-          </Field>
-          <div className={styles.row}>
-            <Button appearance="secondary" size="large" icon={<Location20Regular />} onClick={locate} disabled={locating}>
-              {locating ? '定位中…' : '使用系统定位'}
-            </Button>
-            {locating && <Spinner size="tiny" />}
-            {locationError && <Text className={styles.hint}>{locationError}</Text>}
-          </div>
-        </section>
-
-        <Divider />
-
-        <section className={styles.section} aria-label="城市">
-          <Text size={400} weight="semibold">
-            城市
-          </Text>
-          <div className={styles.placeList}>
-            {sorted.length === 0 && <Text className={styles.hint}>还没有城市，先搜索添加一个。</Text>}
-            {sorted.map((place) => (
-              <div className={styles.placeRow} key={place.id}>
-                <span className={styles.placeName}>{placeMenuLabel(place)}</span>
-                {place.isCurrent ? (
-                  <Badge appearance="filled" color="brand" size="small">
-                    当前
-                  </Badge>
-                ) : (
-                  <Button
-                    appearance="subtle"
-                    size="large"
-                    onClick={() =>
-                      update({
-                        places: places.map((item) => ({ ...item, isCurrent: item.id === place.id })),
-                      })
-                    }
-                  >
-                    设为当前
-                  </Button>
-                )}
-                <Button
-                  appearance="subtle"
-                  size="large"
-                  icon={<Delete20Regular />}
-                  aria-label={`删除 ${place.name}`}
-                  onClick={() => setSettings((previous) => removePlaceFromSettings(previous, place.id))}
-                />
-              </div>
-            ))}
-          </div>
-          <div className={styles.row}>
-            <Input
-              size="large"
-              className={styles.grow}
-              value={cityQuery}
-              placeholder="搜索城市，例如 北京 / Tokyo"
-              onChange={(_, detail) => setCityQuery(detail.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') searchCity();
-              }}
-            />
-            <Button appearance="secondary" size="large" icon={<Search20Regular />} onClick={searchCity} disabled={searching}>
-              搜索
-            </Button>
-          </div>
-          {searching && (
-            <div className={styles.row}>
-              <Spinner size="tiny" />
-              <Text className={styles.hint}>正在搜索…</Text>
+      <div className={styles.scrollArea} data-overlay-scroll>
+        <div className={styles.page} data-overlay-page>
+          <section className={styles.section} aria-label="显示">
+            <div className={styles.sectionHeader} data-section-header>
+              <Text size={500} weight="semibold">
+                显示
+              </Text>
+              <Text size={200} className={styles.hint}>
+                卡片展示的内容与刷新频率
+              </Text>
             </div>
-          )}
-          {searchError && (
-            <MessageBar intent="warning">
-              <MessageBarBody>{searchError}</MessageBarBody>
-            </MessageBar>
-          )}
-          {results.length > 0 && (
-            <div className={styles.resultList}>
-              {results.map((place) => (
-                <div
-                  className={styles.resultRow}
-                  key={place.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => addCity(place)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') addCity(place);
-                  }}
-                >
-                  <Location20Regular />
-                  <span className={styles.placeName}>
-                    {place.name} {place.adm1 && place.adm1 !== place.name ? place.adm1 : ''}
-                  </span>
-                  <span className={styles.resultMeta}>添加</span>
-                  <Add20Regular />
+            <div className={styles.rows}>
+              <div className={styles.rowItem} data-setting-row>
+                <div className={styles.rowText}>
+                  <Text size={300}>温度单位</Text>
+                  <Text size={200} className={styles.hint}>
+                    卡片与详情统一使用
+                  </Text>
+                </div>
+                <div className={styles.rowControl}>
+                  <RadioGroup
+                    className={styles.radioGroup}
+                    layout="horizontal"
+                    value={settings.unit}
+                    onChange={(_, detail) => update({ unit: detail.value })}
+                  >
+                    <Radio className={styles.radio40} value="c" label="摄氏 °C" />
+                    <Radio className={styles.radio40} value="f" label="华氏 °F" />
+                  </RadioGroup>
+                </div>
+              </div>
+              <div className={styles.rowItem} data-setting-row>
+                <div className={styles.rowText}>
+                  <Text size={300}>刷新间隔</Text>
+                  <Text size={200} className={styles.hint}>
+                    卡片可见时按此周期更新
+                  </Text>
+                </div>
+                <div className={styles.rowControl}>
+                  <RadioGroup
+                    className={styles.radioGroup}
+                    layout="horizontal"
+                    value={String(settings.refreshMin)}
+                    onChange={(_, detail) => update({ refreshMin: Number(detail.value) })}
+                  >
+                    {REFRESH_OPTIONS.map((minutes) => (
+                      <Radio className={styles.radio40} key={minutes} value={String(minutes)} label={`${minutes} 分钟`} />
+                    ))}
+                  </RadioGroup>
+                </div>
+              </div>
+              <ToggleRow
+                label="显示空气质量"
+                description="4×2 显示 AQI 环，详情增加「空气」页"
+                checked={settings.showAir}
+                onChange={(checked) => update({ showAir: checked })}
+              />
+              <ToggleRow
+                label="显示天气预警"
+                description="有预警时卡片顶部显示预警条，详情默认打开预警页"
+                checked={settings.showWarnings}
+                onChange={(checked) => update({ showWarnings: checked })}
+              />
+              <ToggleRow
+                label="显示分钟级降水"
+                description="在详情里显示未来两小时的降水趋势"
+                checked={settings.showMinutely}
+                onChange={(checked) => update({ showMinutely: checked })}
+              />
+            </div>
+          </section>
+
+          <section className={styles.section} aria-label="行为">
+            <div className={styles.sectionHeader} data-section-header>
+              <Text size={500} weight="semibold">
+                行为
+              </Text>
+            </div>
+            <div className={styles.rows}>
+              <ToggleRow
+                label="自动定位"
+                description="由系统定位确定当前位置，不自动切换城市"
+                checked={settings.autoLocate}
+                onChange={(checked) => update({ autoLocate: checked })}
+              />
+              <ToggleRow
+                label="演示数据"
+                description="不联网预览界面效果，不需要 Key"
+                checked={settings.mock}
+                onChange={(checked) => update({ mock: checked })}
+              />
+            </div>
+          </section>
+
+          <section className={styles.section} aria-label="天气数据">
+            <div className={styles.sectionHeader} data-section-header>
+              <Text size={500} weight="semibold">
+                天气数据
+              </Text>
+              <Text size={200} className={styles.hint}>
+                在和风天气控制台创建凭据，填入下面两项
+              </Text>
+            </div>
+            <div className={styles.fields}>
+              <div className={styles.fieldItem}>
+                <Text size={300}>API Key</Text>
+                <Input
+                  type="password"
+                  size="large"
+                  className={styles.fullWidth}
+                  value={settings.apiKey}
+                  placeholder="粘贴 API Key"
+                  input={INPUT_SLOT}
+                  onChange={(_, detail) => update({ apiKey: detail.value })}
+                />
+                <Text size={200} className={styles.hint}>
+                  在和风天气控制台创建凭据后粘贴到这里。
+                </Text>
+              </div>
+              <div className={styles.fieldItem}>
+                <Text size={300}>数据地址（API Host）</Text>
+                <Input
+                  size="large"
+                  className={styles.fullWidth}
+                  value={settings.apiHost}
+                  placeholder="例如 abcd1234.qweatherapi.com"
+                  input={INPUT_SLOT}
+                  onChange={(_, detail) => update({ apiHost: detail.value })}
+                />
+                <Text size={200} className={styles.hint}>
+                  在和风天气控制台 → 设置里复制你的专属 API Host。
+                </Text>
+              </div>
+              <div className={styles.rowItem} data-setting-row>
+                <div className={styles.rowText}>
+                  <Text size={300}>使用系统定位</Text>
+                  <Text size={200} className={styles.hint}>
+                    由系统定位添加当前位置城市，不改变自动定位设置
+                  </Text>
+                  {locationError && (
+                    <Text size={200} className={styles.hint}>
+                      {locationError}
+                    </Text>
+                  )}
+                </div>
+                <div className={styles.rowControl}>
+                  <Button
+                    appearance="secondary"
+                    size="large"
+                    icon={<Location20Regular />}
+                    onClick={locate}
+                    disabled={locating}
+                  >
+                    {locating ? '定位中…' : '定位'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.section} aria-label="城市">
+            <div className={styles.sectionHeader} data-section-header>
+              <Text size={500} weight="semibold">
+                城市
+              </Text>
+              <Text size={200} className={styles.hint}>
+                当前城市显示在卡片上，可添加多个城市随时切换
+              </Text>
+            </div>
+            <div className={styles.placeList}>
+              {sorted.length === 0 && (
+                <Text size={300} className={styles.hint}>
+                  还没有城市，先搜索添加一个。
+                </Text>
+              )}
+              {sorted.map((place) => (
+                <div className={styles.placeRow} key={place.id} data-place-row>
+                  <div className={styles.rowText}>
+                    <Text size={300} className={styles.placeName}>
+                      {placeMenuLabel(place)}
+                    </Text>
+                    <Text size={200} className={styles.hint}>
+                      {place.adm1 || place.country || ''}
+                    </Text>
+                  </div>
+                  {place.isCurrent ? (
+                    <Badge appearance="filled" color="brand" size="medium">
+                      当前
+                    </Badge>
+                  ) : (
+                    <Button
+                      appearance="subtle"
+                      size="large"
+                      onClick={() =>
+                        update({
+                          places: places.map((item) => ({ ...item, isCurrent: item.id === place.id })),
+                        })
+                      }
+                    >
+                      设为当前
+                    </Button>
+                  )}
+                  <Tooltip content="删除城市" relationship="label">
+                    <Button
+                      appearance="subtle"
+                      size="large"
+                      icon={<Delete20Regular />}
+                      aria-label={`删除 ${place.name}`}
+                      onClick={() => setSettings((previous) => removePlaceFromSettings(previous, place.id))}
+                    />
+                  </Tooltip>
                 </div>
               ))}
             </div>
-          )}
-          {settings.mock && <Text className={styles.hint}>演示模式只能搜索内置的示例城市。</Text>}
-        </section>
-
-        <Divider />
-
-        <section className={styles.section} aria-label="显示">
-          <Text size={400} weight="semibold">
-            显示
-          </Text>
-          <Field label="温度单位">
-            <RadioGroup
-              className={styles.radioGroup}
-              layout="horizontal"
-              value={settings.unit}
-              onChange={(_, detail) => update({ unit: detail.value })}
-            >
-              <Radio className={styles.radio40} value="c" label="摄氏 °C" />
-              <Radio className={styles.radio40} value="f" label="华氏 °F" />
-            </RadioGroup>
-          </Field>
-          <Field label="刷新间隔">
-            <RadioGroup
-              className={styles.radioGroup}
-              layout="horizontal"
-              value={String(settings.refreshMin)}
-              onChange={(_, detail) => update({ refreshMin: Number(detail.value) })}
-            >
-              {REFRESH_OPTIONS.map((minutes) => (
-                <Radio className={styles.radio40} key={minutes} value={String(minutes)} label={`${minutes} 分钟`} />
-              ))}
-            </RadioGroup>
-          </Field>
-          <div className={styles.switchRow}>
-            <div className={styles.switchLabel}>
-              <Text size={300}>显示空气质量</Text>
-              <Text className={styles.hint}>4×2 尺寸显示 AQI 环，详情增加「空气」页</Text>
+            <div className={styles.addRow} data-add-row>
+              <Input
+                size="large"
+                className={styles.grow}
+                value={cityQuery}
+                placeholder="搜索城市，例如 北京 / Tokyo"
+                input={INPUT_SLOT}
+                onChange={(_, detail) => setCityQuery(detail.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') searchCity();
+                }}
+              />
+              <Button appearance="secondary" size="large" icon={<Search20Regular />} onClick={searchCity} disabled={searching}>
+                搜索
+              </Button>
             </div>
-            <Switch
-              className={styles.control40}
-              checked={settings.showAir}
-              onChange={(_, detail) => update({ showAir: detail.checked })}
-            />
-          </div>
-          <div className={styles.switchRow}>
-            <div className={styles.switchLabel}>
-              <Text size={300}>显示天气预警</Text>
-              <Text className={styles.hint}>有预警时卡片顶部显示预警条，详情默认打开预警页</Text>
-            </div>
-            <Switch
-              className={styles.control40}
-              checked={settings.showWarnings}
-              onChange={(_, detail) => update({ showWarnings: detail.checked })}
-            />
-          </div>
-          <div className={styles.switchRow}>
-            <div className={styles.switchLabel}>
-              <Text size={300}>显示分钟级降水</Text>
-              <Text className={styles.hint}>在详情里显示未来两小时的降水趋势</Text>
-            </div>
-            <Switch
-              className={styles.control40}
-              checked={settings.showMinutely}
-              onChange={(_, detail) => update({ showMinutely: detail.checked })}
-            />
-          </div>
-          <div className={styles.switchRow}>
-            <div className={styles.switchLabel}>
-              <Text size={300}>自动定位</Text>
-              <Text className={styles.hint}>启动时用系统定位确定「当前位置」，不会自动切换城市</Text>
-            </div>
-            <Switch
-              className={styles.control40}
-              checked={settings.autoLocate}
-              onChange={(_, detail) => update({ autoLocate: detail.checked })}
-            />
-          </div>
-          <div className={styles.switchRow}>
-            <div className={styles.switchLabel}>
-              <Text size={300}>演示数据</Text>
-              <Text className={styles.hint}>不联网预览界面效果，不需要 Key</Text>
-            </div>
-            <Switch
-              className={styles.control40}
-              checked={settings.mock}
-              onChange={(_, detail) => update({ mock: detail.checked })}
-            />
-          </div>
-        </section>
+            {searching && (
+              <div className={styles.addRow}>
+                <Spinner size="tiny" />
+                <Text size={200} className={styles.hint}>
+                  正在搜索…
+                </Text>
+              </div>
+            )}
+            {searchError && (
+              <MessageBar intent="warning">
+                <MessageBarBody>{searchError}</MessageBarBody>
+              </MessageBar>
+            )}
+            {results.length > 0 && (
+              <div className={styles.resultList}>
+                {results.map((place) => (
+                  <div
+                    className={styles.resultRow}
+                    key={place.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => addCity(place)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') addCity(place);
+                    }}
+                  >
+                    <Location20Regular />
+                    <span className={styles.placeName}>
+                      <Text size={300}>
+                        {place.name} {place.adm1 && place.adm1 !== place.name ? place.adm1 : ''}
+                      </Text>
+                    </span>
+                    <Text size={200} className={styles.resultMeta}>
+                      添加
+                    </Text>
+                    <Add20Regular />
+                  </div>
+                ))}
+              </div>
+            )}
+            {settings.mock && (
+              <Text size={200} className={styles.hint}>
+                演示模式只能搜索内置的示例城市。
+              </Text>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
-

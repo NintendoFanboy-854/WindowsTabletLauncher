@@ -1,10 +1,12 @@
 /**
  * 倒数日设置视图（宿主全窗口 Fluent Dialog，?view=settings 加载）。
- * 只放两张开关；列表/编辑在卡片与编辑视图里。
+ * 浮层重排 v1（docs/OVERLAY-REWRITE-SPEC.md §1/§2）：
+ * - 单列 max-width 720 居中，视图 padding 24，section 间距 24，组内行距 12
+ * - 行式开关项：label 14 + 说明 12 fg3 + 控件 40，行高 48
+ * - 即时保存（不放大号保存按钮），不用 Divider 分组
  */
 
 import {
-  Divider,
   Switch,
   Text,
   makeStyles,
@@ -18,24 +20,42 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     width: '100%',
     height: '100%',
-    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL}`,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalL,
-    overflowY: 'auto',
+    padding: '24px 24px 0',
+    overflow: 'hidden',
     color: tokens.colorNeutralForeground1,
+    '@media (max-width: 699px)': { padding: '16px 16px 0' },
+  },
+  scrollArea: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingBottom: tokens.spacingVerticalXXL,
+  },
+  content: {
+    width: '100%',
+    maxWidth: '720px',
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXL,
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
   },
+  sectionHint: {
+    color: tokens.colorNeutralForeground3,
+  },
   row: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalL,
-    minHeight: '40px',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '48px',
   },
   rowText: {
     display: 'flex',
@@ -45,6 +65,10 @@ const useStyles = makeStyles({
   },
   subtle: {
     color: tokens.colorNeutralForeground3,
+  },
+  switchControl: {
+    flex: '0 0 auto',
+    minHeight: '40px',
   },
 });
 
@@ -58,47 +82,58 @@ export default function CountdownSettings() {
 
   return (
     <div className={styles.root}>
-      <section className={styles.section} aria-label="显示设置">
-        <Text size={400} weight="semibold">
-          显示设置
-        </Text>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>显示已过去的事件</Text>
-            <Text className={styles.subtle} size={200}>
-              关闭后只显示今天与未来的事件
+      <div className={styles.scrollArea}>
+        <div className={styles.content}>
+          <section className={styles.section} aria-label="显示">
+            <Text size={500} weight="semibold">
+              显示
             </Text>
-          </div>
-          <Switch
-            checked={settings.showPast}
-            disabled={!loaded}
-            aria-label="显示已过去的事件"
-            onChange={(_, detail) => setSettings((previous) => ({ ...previous, showPast: detail.checked }))}
-          />
-        </div>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>强调 7 天内的事件</Text>
-            <Text className={styles.subtle} size={200}>
-              不足 7 天的天数用事件颜色强调
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <Text size={300}>显示已过去的事件</Text>
+                <Text className={styles.subtle} size={200}>
+                  关闭后只显示今天与未来的事件
+                </Text>
+              </div>
+              <Switch
+                className={styles.switchControl}
+                checked={settings.showPast}
+                disabled={!loaded}
+                aria-label="显示已过去的事件"
+                onChange={(_, detail) =>
+                  setSettings((previous) => ({ ...previous, showPast: detail.checked }))
+                }
+              />
+            </div>
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <Text size={300}>强调 7 天内的事件</Text>
+                <Text className={styles.subtle} size={200}>
+                  不足 7 天的天数用事件颜色强调
+                </Text>
+              </div>
+              <Switch
+                className={styles.switchControl}
+                checked={settings.highlightSoon}
+                disabled={!loaded}
+                aria-label="强调 7 天内的事件"
+                onChange={(_, detail) =>
+                  setSettings((previous) => ({ ...previous, highlightSoon: detail.checked }))
+                }
+              />
+            </div>
+          </section>
+
+          <section className={styles.section} aria-label="使用提示">
+            <Text size={500} weight="semibold">
+              使用提示
             </Text>
-          </div>
-          <Switch
-            checked={settings.highlightSoon}
-            disabled={!loaded}
-            aria-label="强调 7 天内的事件"
-            onChange={(_, detail) =>
-              setSettings((previous) => ({ ...previous, highlightSoon: detail.checked }))
-            }
-          />
+            <Text className={styles.sectionHint} size={300}>
+              长按事件行可以编辑或删除；点击「添加倒数日」新增一条事件。事件颜色只用于状态圆点，不再染主数字。
+            </Text>
+          </section>
         </div>
-      </section>
-
-      <Divider />
-
-      <Text className={styles.subtle} size={200}>
-        长按事件行可以编辑或删除；点击「添加倒数日」新增一条事件。
-      </Text>
+      </div>
     </div>
   );
 }

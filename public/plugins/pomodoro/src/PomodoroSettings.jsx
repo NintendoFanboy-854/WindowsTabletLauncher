@@ -1,15 +1,16 @@
 /**
  * 番茄钟设置视图（宿主全窗口 Fluent Dialog，?view=settings 加载）。
- * 时长 / 轮数 / 自动开始 / 提示音 / keepAwake / 白噪音都在这里；改动即时写宿主配置，
- * 卡片视图通过 storage 事件同步给引擎。
+ * 浮层重排 v1（docs/OVERLAY-REWRITE-SPEC.md §1/§2）：
+ * - 分组顺序：常用（时长）→ 行为（自动开始/提示音/keepAwake）→ 高级（白噪音）
+ * - 单列 max-width 720 居中；Field 上下布局控件 40；开关行 48；不用 Divider
+ * - 即时保存到宿主配置，卡片通过 storage 事件同步
  */
 
 import {
-  Divider,
+  Dropdown,
   Field,
   Input,
-  Radio,
-  RadioGroup,
+  Option,
   Slider,
   Switch,
   Text,
@@ -25,34 +26,45 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     width: '100%',
     height: '100%',
-    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL}`,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalL,
-    overflowY: 'auto',
+    padding: '24px 24px 0',
+    overflow: 'hidden',
     color: tokens.colorNeutralForeground1,
+    '@media (max-width: 699px)': { padding: '16px 16px 0' },
+  },
+  scrollArea: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingBottom: tokens.spacingVerticalXXL,
+  },
+  content: {
+    width: '100%',
+    maxWidth: '720px',
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXL,
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
   },
-  numbers: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalL,
-    alignItems: 'flex-end',
-  },
-  field: {
-    minWidth: '140px',
-    flex: '1 1 140px',
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: tokens.spacingVerticalL,
+    '@media (max-width: 559px)': { gridTemplateColumns: 'minmax(0, 1fr)' },
   },
   row: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalL,
-    minHeight: '40px',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '48px',
   },
   rowText: {
     display: 'flex',
@@ -60,15 +72,29 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
   },
-  noiseRow: {
+  sliderRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalL,
-    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalM,
+    minHeight: '40px',
   },
   slider: {
-    flex: '1 1 220px',
-    minWidth: '180px',
+    flex: '1 1 auto',
+    minWidth: 0,
+    minHeight: '40px',
+  },
+  value: {
+    fontVariantNumeric: 'tabular-nums',
+    minWidth: '40px',
+    textAlign: 'right',
+    color: tokens.colorNeutralForeground2,
+  },
+  control: {
+    minHeight: '42px',
+  },
+  switchControl: {
+    flex: '0 0 auto',
+    minHeight: '40px',
   },
   subtle: {
     color: tokens.colorNeutralForeground3,
@@ -89,132 +115,161 @@ export default function PomodoroSettings() {
     const next = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : fallback;
     patch({ [key]: next });
   };
+  const noiseLabel = (NOISE_KINDS.find((kind) => kind.id === settings.whiteNoise) ?? NOISE_KINDS[0])
+    .label;
 
   return (
     <div className={styles.root}>
-      <section className={styles.section} aria-label="时长">
-        <Text size={400} weight="semibold">
-          时长与轮数
-        </Text>
-        <div className={styles.numbers}>
-          <Field label="专注（分钟）" className={styles.field}>
-            <Input
-              type="number"
-              min={1}
-              value={String(settings.focusMin)}
-              disabled={!loaded}
-              onChange={setNumber('focusMin', DEFAULT_SETTINGS.focusMin)}
-            />
-          </Field>
-          <Field label="短休（分钟）" className={styles.field}>
-            <Input
-              type="number"
-              min={1}
-              value={String(settings.shortBreakMin)}
-              disabled={!loaded}
-              onChange={setNumber('shortBreakMin', DEFAULT_SETTINGS.shortBreakMin)}
-            />
-          </Field>
-          <Field label="长休（分钟）" className={styles.field}>
-            <Input
-              type="number"
-              min={1}
-              value={String(settings.longBreakMin)}
-              disabled={!loaded}
-              onChange={setNumber('longBreakMin', DEFAULT_SETTINGS.longBreakMin)}
-            />
-          </Field>
-          <Field label="长休前轮数" className={styles.field}>
-            <Input
-              type="number"
-              min={1}
-              value={String(settings.roundsBeforeLongBreak)}
-              disabled={!loaded}
-              onChange={setNumber('roundsBeforeLongBreak', DEFAULT_SETTINGS.roundsBeforeLongBreak)}
-            />
-          </Field>
-        </div>
-      </section>
-
-      <Divider />
-
-      <section className={styles.section} aria-label="行为">
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>自动开始下一阶段</Text>
-            <Text className={styles.subtle} size={200}>
-              关闭时阶段结束停在「待开始」
+      <div className={styles.scrollArea}>
+        <div className={styles.content}>
+          <section className={styles.section} aria-label="时长与轮数">
+            <Text size={500} weight="semibold">
+              时长与轮数
             </Text>
-          </div>
-          <Switch
-            checked={settings.autoStartNext}
-            disabled={!loaded}
-            aria-label="自动开始下一阶段"
-            onChange={(_, detail) => patch({ autoStartNext: detail.checked })}
-          />
-        </div>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>阶段结束提示音</Text>
-            <Text className={styles.subtle} size={200}>
-              由系统合成，不占用网络
-            </Text>
-          </div>
-          <Switch
-            checked={settings.sound}
-            disabled={!loaded}
-            aria-label="阶段结束提示音"
-            onChange={(_, detail) => patch({ sound: detail.checked })}
-          />
-        </div>
-        <div className={styles.row}>
-          <div className={styles.rowText}>
-            <Text size={300}>专注时阻止息屏</Text>
-            <Text className={styles.subtle} size={200}>
-              专注期间不锁屏，结束后自动恢复
-            </Text>
-          </div>
-          <Switch
-            checked={settings.keepAwake}
-            disabled={!loaded}
-            aria-label="专注时阻止息屏"
-            onChange={(_, detail) => patch({ keepAwake: detail.checked })}
-          />
-        </div>
-      </section>
+            <div className={styles.grid}>
+              <Field label="专注" hint="一轮专注的分钟数">
+                <Input
+                  className={styles.control}
+                  size="large"
+                  type="number"
+                  min={1}
+                  value={String(settings.focusMin)}
+                  disabled={!loaded}
+                  onChange={setNumber('focusMin', DEFAULT_SETTINGS.focusMin)}
+                />
+              </Field>
+              <Field label="短休" hint="专注后的短休息分钟数">
+                <Input
+                  className={styles.control}
+                  size="large"
+                  type="number"
+                  min={1}
+                  value={String(settings.shortBreakMin)}
+                  disabled={!loaded}
+                  onChange={setNumber('shortBreakMin', DEFAULT_SETTINGS.shortBreakMin)}
+                />
+              </Field>
+              <Field label="长休" hint="连续多轮后的长休息分钟数">
+                <Input
+                  className={styles.control}
+                  size="large"
+                  type="number"
+                  min={1}
+                  value={String(settings.longBreakMin)}
+                  disabled={!loaded}
+                  onChange={setNumber('longBreakMin', DEFAULT_SETTINGS.longBreakMin)}
+                />
+              </Field>
+              <Field label="长休前轮数" hint="完成几轮专注后进入长休">
+                <Input
+                  className={styles.control}
+                  size="large"
+                  type="number"
+                  min={1}
+                  value={String(settings.roundsBeforeLongBreak)}
+                  disabled={!loaded}
+                  onChange={setNumber('roundsBeforeLongBreak', DEFAULT_SETTINGS.roundsBeforeLongBreak)}
+                />
+              </Field>
+            </div>
+          </section>
 
-      <Divider />
+          <section className={styles.section} aria-label="行为">
+            <Text size={500} weight="semibold">
+              行为
+            </Text>
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <Text size={300}>自动开始下一阶段</Text>
+                <Text className={styles.subtle} size={200}>
+                  关闭时阶段结束停在「待开始」
+                </Text>
+              </div>
+              <Switch
+                className={styles.switchControl}
+                checked={settings.autoStartNext}
+                disabled={!loaded}
+                aria-label="自动开始下一阶段"
+                onChange={(_, detail) => patch({ autoStartNext: detail.checked })}
+              />
+            </div>
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <Text size={300}>阶段结束提示音</Text>
+                <Text className={styles.subtle} size={200}>
+                  由系统合成，不占用网络
+                </Text>
+              </div>
+              <Switch
+                className={styles.switchControl}
+                checked={settings.sound}
+                disabled={!loaded}
+                aria-label="阶段结束提示音"
+                onChange={(_, detail) => patch({ sound: detail.checked })}
+              />
+            </div>
+            <div className={styles.row}>
+              <div className={styles.rowText}>
+                <Text size={300}>专注时阻止息屏</Text>
+                <Text className={styles.subtle} size={200}>
+                  专注期间不锁屏，结束后自动恢复
+                </Text>
+              </div>
+              <Switch
+                className={styles.switchControl}
+                checked={settings.keepAwake}
+                disabled={!loaded}
+                aria-label="专注时阻止息屏"
+                onChange={(_, detail) => patch({ keepAwake: detail.checked })}
+              />
+            </div>
+          </section>
 
-      <section className={styles.section} aria-label="白噪音">
-        <Text size={400} weight="semibold">
-          白噪音
-        </Text>
-        <RadioGroup
-          value={settings.whiteNoise}
-          layout="horizontal"
-          onChange={(_, detail) => patch({ whiteNoise: detail.value })}
-        >
-          {NOISE_KINDS.map((kind) => (
-            <Radio key={kind.id} value={kind.id} label={kind.label} />
-          ))}
-        </RadioGroup>
-        <div className={styles.noiseRow}>
-          <Text size={300} className={styles.subtle}>
-            音量 {settings.whiteNoiseVolume}
-          </Text>
-          <Slider
-            className={styles.slider}
-            min={0}
-            max={100}
-            value={settings.whiteNoiseVolume}
-            aria-label="白噪音音量"
-            onChange={(_, detail) => patch({ whiteNoiseVolume: detail.value })}
-          />
+          <section className={styles.section} aria-label="白噪音">
+            <Text size={500} weight="semibold">
+              白噪音
+            </Text>
+            <Field label="类型" hint="只在本轮专注进行时播放；阶段结束自动淡出">
+              <Dropdown
+                className={styles.control}
+                size="large"
+                value={noiseLabel}
+                selectedOptions={[settings.whiteNoise]}
+                onOptionSelect={(_, detail) =>
+                  patch({ whiteNoise: detail.optionValue ?? 'none' })
+                }
+              >
+                {NOISE_KINDS.map((kind) => (
+                  <Option key={kind.id} value={kind.id}>
+                    {kind.label}
+                  </Option>
+                ))}
+              </Dropdown>
+            </Field>
+            <div className={styles.sliderRow}>
+              <Text size={300}>音量</Text>
+              <Slider
+                className={styles.slider}
+                className={styles.slider}
+                min={0}
+                max={100}
+                value={settings.whiteNoiseVolume}
+                aria-label="白噪音音量"
+                onChange={(_, detail) => patch({ whiteNoiseVolume: detail.value })}
+              />
+              <Text size={300} className={styles.value}>
+                {settings.whiteNoiseVolume}
+              </Text>
+            </div>
+            <Text className={styles.subtle} size={200}>
+              浏览器要求用户手势后才能播放声音；改动后回到卡片点一次开始即可生效。
+            </Text>
+          </section>
         </div>
-        <Text className={styles.subtle} size={200}>
-          白噪音随阶段结束淡出；浏览器要求用户手势后才能播放，改动后回到卡片点一次开始即可生效。
-        </Text>
-      </section>
+      </div>
     </div>
   );
 }
+
+
+

@@ -30,7 +30,7 @@ interface Settings {
 
 - 和风天气：GeoAPI（城市搜索/反查）、实时天气、24h 逐时、7 天预报、空气质量、预警、生活指数、分钟级降水。
 - API Key 存在 `weather.settings`（本地），不进 git。
-- 自动定位：`host.getLocation()`（Windows 系统定位）；失败则回退到“上次城市”，再失败提示手动选择。
+- 自动定位：`host.getLocation()`（Windows 系统定位）优先；失败回退“上次城市”，再失败提示手动选择。高德 IP 归属地兜底**暂缓**（等需求方提供高德 API Key，见 DECISIONS D-10），本轮实现不变。
 
 ## 尺寸与布局
 

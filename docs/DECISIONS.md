@@ -84,3 +84,20 @@
   的 `displayXl(size)` / `DISPLAY_XL`，不在组件里裸写数字；行高用该表值，不做 `lineHeight: 1`。
 - **文档口径**：`FLUENT2.md §14` 记录为项目偏离项；`DENSITY.md §2.1` 的量化门禁按此执行；
   审计中"超过 68px 即非严格 Fluent 字阶"的结论仍然成立——这是**明确的项目例外**，不是 Fluent 合规范畴。
+
+## D-10 自动定位暂缓（2026-10-19）
+
+- 现状：卡片已有「自动定位」开关与「使用系统定位」入口，但 Windows Geolocator 在目标环境/大陆网络下不可靠，当前实现常返回空；本轮不改代码，等需求方提供**高德（Amap）API Key** 后再做。
+- 方案预定：Windows Geolocator 优先 → 高德 IP 归属地（大陆可用）兜底 → 失败保留上次城市并提示手动搜索；同时让「自动定位」在启动时真正选中定位城市（当前只做位置标记）。
+- 本轮 UI 重写（设置/详情浮层）保持自动定位 UI 原样，不做功能改动。
+
+## D-11 设置/详情浮层统一骨架（2026-10-19，已落地）
+
+- 插件浮层视图（`?view=settings|detail|edit|all`）统一按 `docs/OVERLAY-REWRITE-SPEC.md`：
+  视图根 padding 24、内容 max-width 720 居中、section 间距 24、设置行 48 / 列表行 44、
+  控件 40（Input/Dropdown/Button `size="large"` + Switch/Radio/Slider `min-height: 40`）、
+  辅助文字 12、表单正文 14、section 标题 20、无 `Divider` 分组、无 10/11px 与 clamp 字号。
+- 浮层标题与关闭按钮只由宿主 Dialog 提供，插件视图内不再画标题栏/关闭按钮。
+- 回归入口：`node scripts/verify-overlays.mjs`（12 视图断言）+ `node scripts/shot-host-overlays.mjs`
+  （宿主内联调截图）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
+- 后续新增任何插件浮层视图都按此骨架执行；不再逐页另立规格。

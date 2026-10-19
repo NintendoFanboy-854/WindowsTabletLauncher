@@ -10,6 +10,8 @@
 - [ ] `npx tauri build --debug --no-bundle` 通过（真窗口可运行）
 - [ ] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建并通过 `git status` 确认 `app/app.js` 已提交（N-05）
 - [ ] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1 的 8 类断言，25/25 通过）
+- [ ] 插件浮层 UI 断言通过：`node scripts/verify-overlays.mjs --screenshots`（12 个设置/详情视图，暗色；再跑 `--scheme light` 抽查）
+- [ ] 宿主内浮层联调：`node scripts/shot-host-overlays.mjs` 7/7 PASS（截图 `shots/rewrite/overlays/host-*`）
 - [ ] 亮暗两套主题的宿主整屏 + 插件代表尺寸截图（亮色跟随系统）
 
 ## 2. 运行时冒烟（Tauri 真窗口）
@@ -33,7 +35,7 @@
 - [ ] `design-auditor` 复检通过：P0 = 0，P1 已修复或明确记录
 - [ ] 六个插件全部是 React + Fluent UI React（`src/main.jsx` + `FluentProvider`），无自绘控件（DECISIONS D-02b）
 - [ ] 插件设置/详情走宿主全窗口浮层（`?view=settings|detail`），卡片 iframe 内无被裁切的 Dialog/Drawer
-- [ ] 三分辨率截图：1440×960 / 1024×768 / 960×1440（深色 + 亮色各一套，亮色验证跟随系统）
+- [ ] 双分辨率截图：1440×960 / 1024×768（深色 + 亮色各一套，亮色验证跟随系统；竖屏产品不要求）
 - [ ] 普通模式卡片无 chrome；编辑模式才出现操作
 - [ ] 每个组件每个尺寸的信息预算内（见 DENSITY.md 第 2 节）
 - [ ] 无手写 hex、无非 token 圆角/阴影/间距/字号/动效时长（样式相关；已记录例外：天气图标对比度算法常量、项目材质 token 声明、内容图形尺寸 clamp）
@@ -56,6 +58,8 @@
 - [ ] docs/PLAN.md（开发计划）
 - [ ] docs/components/*.md（6 插件 + Agent）
 - [ ] docs/audit/AUDIT.md（设计审计报告）
+- [ ] docs/audit2/REPORT-VISUAL.md、REPORT-TYPE.md（第二版独立审计）
+- [ ] docs/OVERLAY-REWRITE-SPEC.md、OVERLAY-REWRITE-RESULT.md（设置/详情浮层规格与结果）
 
 ## 6. 已知限制（发布说明里写明）
 

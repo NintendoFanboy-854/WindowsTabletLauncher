@@ -1,14 +1,17 @@
 /**
  * 任务详情浮层视图（宿主 ?view=detail 全窗口 Fluent Dialog 里加载）。
- * 覆盖旧版长按菜单的全部字段：标题 / 备注 / 优先级 / 清单 / 截止 / 提醒 / 重复 / 标签 / 子任务 / 删除。
+ *
+ * 排版遵循 docs/OVERLAY-REWRITE-SPEC.md §3.3：
+ * - 不画页面标题/关闭按钮（宿主 Dialog 提供）；
+ * - 表单 max-width 720 居中，Field 上下布局（label 14 / 控件 40 / 间距 16）；
+ * - 子任务/标签行高 44，40 图标操作；新增行 input 40 + 按钮 40；
+ * - 底部固定操作条：删除 danger（左）+ 取消/保存 40（右）。
  */
 
 import { useMemo, useState } from 'react';
 import {
-  Badge,
   Button,
   Checkbox,
-  Divider,
   Dropdown,
   Field,
   Input,
@@ -40,50 +43,73 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     overflow: 'hidden',
     color: tokens.colorNeutralForeground1,
+    padding: `${tokens.spacingVerticalXL} ${tokens.spacingHorizontalXL} 0`,
+    '& .fui-Input__input': { minHeight: '40px' },
+    '& .fui-Dropdown__button': { minHeight: '40px' },
+    '@media (max-width: 700px)': {
+      padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL} 0`,
+    },
   },
-  body: {
+  scroll: {
     flex: 1,
     minHeight: 0,
     overflowY: 'auto',
-    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalL}`,
+    paddingBottom: tokens.spacingVerticalM,
+  },
+  form: {
+    width: '100%',
+    maxWidth: '720px',
+    marginInline: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalM,
+    gap: tokens.spacingVerticalL,
+    minWidth: 0,
   },
-  footer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
-    flexShrink: 0,
-  },
-  row: {
+  inputRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
     minHeight: '40px',
   },
-  grow: { flex: 1, minWidth: 0 },
-  dateInput: { flex: 1, minWidth: '140px' },
+  dateInput: { flex: 1, minWidth: '160px' },
   timeInput: { width: '120px' },
+  grow: { flex: 1, minWidth: 0 },
   tagRow: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS, flexWrap: 'wrap' },
-  tag: { minHeight: '32px' },
   subRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '40px',
+    minHeight: '44px',
+    minWidth: 0,
   },
-  subTitle: { flex: 1, minWidth: 0 },
+  subTitle: { flex: 1, minWidth: 0, color: tokens.colorNeutralForeground2 },
+  subDone: { textDecorationLine: 'line-through', color: tokens.colorNeutralForeground3 },
+  iconButton: { minWidth: '40px', minHeight: '40px' },
   subtle: { color: tokens.colorNeutralForeground3 },
   spacer: { flex: 1 },
+  footer: {
+    width: '100%',
+    maxWidth: '720px',
+    marginInline: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    padding: `${tokens.spacingVerticalM} 0 ${tokens.spacingVerticalL}`,
+    flexShrink: 0,
+  },
+  dangerButton: { color: tokens.colorPaletteRedForeground1 },
+  progress: { marginBottom: tokens.spacingVerticalXS },
 });
 
 function splitLocal(iso, dateOnly = false) {
   const local = toLocalInput(iso) || '';
   const [date, time] = local.split('T');
   return { date: date || '', time: dateOnly && time === '23:59' ? '' : time || '' };
+}
+
+function closeOverlay() {
+  window.parent.postMessage({ type: 'plugin:request-overlay-close' }, '*');
 }
 
 export default function TodoDetail() {
@@ -122,6 +148,8 @@ export default function TodoDetail() {
     setTagInput('');
   };
 
+  const removeTag = (tag) => setTags((previous) => previous.filter((item) => item !== tag));
+
   const addSubtask = () => {
     const value = subInput.trim();
     if (!value) return;
@@ -154,6 +182,7 @@ export default function TodoDetail() {
           subtasks: subtasks.map((sub) => sub.title),
         });
         setMessage({ intent: 'success', text: `已创建「${created.title}」` });
+        closeOverlay();
       } else {
         const updated = store.updateTask(task.id, base);
         applySubtaskDiff(updated.id, subtasks);
@@ -164,13 +193,25 @@ export default function TodoDetail() {
     }
   };
 
+  const removeTask = () => {
+    try {
+      store.removeTask(task.id);
+      setConfirmDelete(false);
+      closeOverlay();
+    } catch (error) {
+      setMessage({ intent: 'error', text: error instanceof Error ? error.message : String(error) });
+    }
+  };
+
   if (!isNew && taskId && !task) {
     return (
       <div className={styles.root}>
-        <div className={styles.body}>
-          <MessageBar intent="error">
-            <MessageBarBody>任务不存在或已被删除</MessageBarBody>
-          </MessageBar>
+        <div className={styles.scroll}>
+          <div className={styles.form}>
+            <MessageBar intent="error">
+              <MessageBarBody>任务不存在或已被删除</MessageBarBody>
+            </MessageBar>
+          </div>
         </div>
       </div>
     );
@@ -178,213 +219,216 @@ export default function TodoDetail() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.body}>
-        <Text size={500} weight="semibold">
-          {isNew ? '新建任务' : '任务详情'}
-        </Text>
-        {message ? (
-          <MessageBar intent={message.intent} onDismiss={() => setMessage(null)}>
-            <MessageBarBody>{message.text}</MessageBarBody>
-          </MessageBar>
-        ) : null}
+      <div className={styles.scroll}>
+        <div className={styles.form}>
+          {message ? (
+            <MessageBar intent={message.intent} onDismiss={() => setMessage(null)}>
+              <MessageBarBody>{message.text}</MessageBarBody>
+            </MessageBar>
+          ) : null}
 
-        <Field label="标题" required>
-          <Input size="large" value={title} onChange={(_, data) => setTitle(data.value)} placeholder="要做什么" />
-        </Field>
-        <Field label="备注">
-          <Textarea value={note} onChange={(_, data) => setNote(data.value)} rows={2} resize="vertical" />
-        </Field>
+          <Field label="标题" required>
+            <Input size="large" value={title} onChange={(_, data) => setTitle(data.value)} placeholder="要做什么" />
+          </Field>
 
-        <Field label="优先级">
-          <RadioGroup layout="horizontal" value={priority} onChange={(_, data) => setPriority(data.value)}>
-            {PRIORITY_LABELS.map((label, value) => (
-              <Radio key={value} value={String(value)} label={label} />
-            ))}
-          </RadioGroup>
-        </Field>
+          <Field label="备注" hint="可留空">
+            <Textarea value={note} onChange={(_, data) => setNote(data.value)} rows={3} resize="vertical" />
+          </Field>
 
-        <Field label="清单">
-          <Dropdown
-            value={list?.name || ''}
-            selectedOptions={listId ? [listId] : []}
-            onOptionSelect={(_, data) => setListId(data.optionValue)}
-          >
-            {store.lists.map((item) => (
-              <Option key={item.id} value={item.id}>
-                {item.name}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
+          <Field label="清单">
+            <Dropdown
+              size="large"
+              value={list?.name || ''}
+              selectedOptions={listId ? [listId] : []}
+              onOptionSelect={(_, data) => setListId(data.optionValue)}
+            >
+              {store.lists.map((item) => (
+                <Option key={item.id} value={item.id}>
+                  {item.name}
+                </Option>
+              ))}
+            </Dropdown>
+          </Field>
 
-        <Field label="截止日期（只选日期时按当天 23:59 到期）">
-          <div className={styles.row}>
-            <Input
-              type="date"
-              className={styles.dateInput}
-              value={due.date}
-              onChange={(_, data) => setDue((previous) => ({ ...previous, date: data.value }))}
-            />
-            <Input
-              type="time"
-              className={styles.timeInput}
-              value={due.time}
-              onChange={(_, data) => setDue((previous) => ({ ...previous, time: data.value }))}
-            />
-            <Button size="large" appearance="subtle" onClick={() => setDue({ date: '', time: '' })}>
-              清除
-            </Button>
-          </div>
-        </Field>
+          <Field label="优先级">
+            <RadioGroup layout="horizontal" value={priority} onChange={(_, data) => setPriority(data.value)}>
+              {PRIORITY_LABELS.map((label, value) => (
+                <Radio key={value} value={String(value)} label={label} />
+              ))}
+            </RadioGroup>
+          </Field>
 
-        <Field label="提醒">
-          <div className={styles.row}>
-            <Input
-              type="date"
-              className={styles.dateInput}
-              value={remind.date}
-              onChange={(_, data) => setRemind((previous) => ({ ...previous, date: data.value }))}
-            />
-            <Input
-              type="time"
-              className={styles.timeInput}
-              value={remind.time}
-              onChange={(_, data) => setRemind((previous) => ({ ...previous, time: data.value }))}
-            />
-            <Button size="large" appearance="subtle" onClick={() => setRemind({ date: '', time: '' })}>
-              清除
-            </Button>
-          </div>
-        </Field>
-
-        <Field label="重复">
-          <Dropdown
-            value={RECURRENCE_OPTIONS.find((option) => option.value === recurrence)?.label || '不重复'}
-            selectedOptions={[recurrence]}
-            onOptionSelect={(_, data) => setRecurrence(data.optionValue)}
-          >
-            {RECURRENCE_OPTIONS.map((option) => (
-              <Option key={option.value} value={option.value}>
-                {option.label}
-              </Option>
-            ))}
-          </Dropdown>
-        </Field>
-
-        <Divider />
-
-        <Field label="标签">
-          <div className={styles.tagRow}>
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                className={styles.tag}
-                appearance="tint"
-                color="brand"
-                icon={
-                  <Button
-                    appearance="transparent"
-                    size="small"
-                    icon={<Dismiss20Regular />}
-                    aria-label={`移除标签 ${tag}`}
-                    onClick={() => setTags((previous) => previous.filter((item) => item !== tag))}
-                  />
-                }
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-          <div className={styles.row}>
-            <Input
-              className={styles.grow}
-              value={tagInput}
-              placeholder="输入标签后回车"
-              onChange={(_, data) => setTagInput(data.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  addTag();
-                }
-              }}
-            />
-            <Button size="large" appearance="secondary" icon={<Add20Regular />} onClick={addTag}>
-              添加标签
-            </Button>
-          </div>
-        </Field>
-
-        <Field label={`子任务${subtasks.length ? `（${doneCount}/${subtasks.length}）` : ''}`}>
-          {subtasks.length > 0 ? <ProgressBar value={progress} aria-label="子任务完成度" /> : null}
-          {subtasks.map((sub, index) => (
-            <div key={`${sub.id || 'new'}-${index}`} className={styles.subRow}>
-              <Checkbox
-                checked={sub.done}
-                aria-label={sub.title}
-                onChange={() =>
-                  setSubtasks((previous) =>
-                    previous.map((item, itemIndex) =>
-                      itemIndex === index ? { ...item, done: !item.done } : item,
-                    ),
-                  )
-                }
+          <Field label="截止时间" hint="只选日期时按当天 23:59 到期">
+            <div className={styles.inputRow}>
+              <Input
+                type="date"
+                size="large"
+                className={styles.dateInput}
+                value={due.date}
+                onChange={(_, data) => setDue((previous) => ({ ...previous, date: data.value }))}
               />
-              <Text size={300} className={styles.subTitle}>
-                {sub.title}
-              </Text>
-              <Button
-                appearance="subtle"
-                icon={<Delete20Regular />}
-                aria-label={`删除子任务 ${sub.title}`}
-                onClick={() => setSubtasks((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+              <Input
+                type="time"
+                size="large"
+                className={styles.timeInput}
+                value={due.time}
+                onChange={(_, data) => setDue((previous) => ({ ...previous, time: data.value }))}
               />
+              <Button size="large" appearance="secondary" onClick={() => setDue({ date: '', time: '' })}>
+                清除
+              </Button>
             </div>
-          ))}
-          <div className={styles.row}>
-            <Input
-              className={styles.grow}
-              value={subInput}
-              placeholder="输入子任务后回车"
-              onChange={(_, data) => setSubInput(data.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  addSubtask();
-                }
-              }}
-            />
-            <Button size="large" appearance="secondary" icon={<Add20Regular />} onClick={addSubtask}>
-              添加子任务
-            </Button>
-          </div>
-        </Field>
+          </Field>
 
-        {confirmDelete ? (
-          <MessageBar intent="warning">
-            <MessageBarBody>删除后不可恢复，确定删除这个任务？</MessageBarBody>
-            <Button size="large" appearance="primary" onClick={() => {
-              try {
-                store.removeTask(task.id);
-                setConfirmDelete(false);
-                setMessage({ intent: 'success', text: '已删除任务' });
-              } catch (error) {
-                setMessage({ intent: 'error', text: error instanceof Error ? error.message : String(error) });
-              }
-            }}>
-              确认删除
-            </Button>
-            <Button size="large" appearance="subtle" onClick={() => setConfirmDelete(false)}>
-              取消
-            </Button>
-          </MessageBar>
-        ) : null}
+          <Field label="提醒" hint="到点后在桌面提示">
+            <div className={styles.inputRow}>
+              <Input
+                type="date"
+                size="large"
+                className={styles.dateInput}
+                value={remind.date}
+                onChange={(_, data) => setRemind((previous) => ({ ...previous, date: data.value }))}
+              />
+              <Input
+                type="time"
+                size="large"
+                className={styles.timeInput}
+                value={remind.time}
+                onChange={(_, data) => setRemind((previous) => ({ ...previous, time: data.value }))}
+              />
+              <Button size="large" appearance="secondary" onClick={() => setRemind({ date: '', time: '' })}>
+                清除
+              </Button>
+            </div>
+          </Field>
+
+          <Field label="重复">
+            <Dropdown
+              size="large"
+              value={RECURRENCE_OPTIONS.find((option) => option.value === recurrence)?.label || '不重复'}
+              selectedOptions={[recurrence]}
+              onOptionSelect={(_, data) => setRecurrence(data.optionValue)}
+            >
+              {RECURRENCE_OPTIONS.map((option) => (
+                <Option key={option.value} value={option.value}>
+                  {option.label}
+                </Option>
+              ))}
+            </Dropdown>
+          </Field>
+
+          <Field label="标签">
+            <div className={styles.tagRow}>
+              {tags.map((tag) => (
+                <Button
+                  key={tag}
+                  size="large"
+                  appearance="outline"
+                  icon={<Dismiss20Regular />}
+                  iconPosition="after"
+                  aria-label={`移除标签 ${tag}`}
+                  onClick={() => removeTag(tag)}
+                >
+                  {tag}
+                </Button>
+              ))}
+            </div>
+            <div className={styles.inputRow}>
+              <Input
+                className={styles.grow}
+                size="large"
+                value={tagInput}
+                placeholder="输入标签后回车"
+                onChange={(_, data) => setTagInput(data.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addTag();
+                  }
+                }}
+              />
+              <Button size="large" appearance="secondary" icon={<Add20Regular />} onClick={addTag}>
+                添加标签
+              </Button>
+            </div>
+          </Field>
+
+          <Field label={`子任务${subtasks.length ? `（${doneCount}/${subtasks.length}）` : ''}`}>
+            {subtasks.length > 0 ? (
+              <ProgressBar className={styles.progress} value={progress} aria-label="子任务完成度" />
+            ) : null}
+            {subtasks.map((sub, index) => (
+              <div key={`${sub.id || 'new'}-${index}`} className={styles.subRow}>
+                <Checkbox
+                  checked={sub.done}
+                  aria-label={sub.title}
+                  onChange={() =>
+                    setSubtasks((previous) =>
+                      previous.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, done: !item.done } : item,
+                      ),
+                    )
+                  }
+                />
+                <Text
+                  size={400}
+                  className={sub.done ? `${styles.subTitle} ${styles.subDone}` : styles.subTitle}
+                  truncate
+                  title={sub.title}
+                >
+                  {sub.title}
+                </Text>
+                <Button
+                  size="large"
+                  appearance="subtle"
+                  className={styles.iconButton}
+                  icon={<Delete20Regular />}
+                  aria-label={`删除子任务 ${sub.title}`}
+                  onClick={() => setSubtasks((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
+                />
+              </div>
+            ))}
+            <div className={styles.inputRow}>
+              <Input
+                className={styles.grow}
+                size="large"
+                value={subInput}
+                placeholder="输入子任务后回车"
+                onChange={(_, data) => setSubInput(data.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addSubtask();
+                  }
+                }}
+              />
+              <Button size="large" appearance="secondary" icon={<Add20Regular />} onClick={addSubtask}>
+                添加子任务
+              </Button>
+            </div>
+          </Field>
+
+          {confirmDelete ? (
+            <MessageBar intent="warning">
+              <MessageBarBody>删除后不可恢复，确定删除这个任务？</MessageBarBody>
+              <Button size="large" appearance="primary" className={styles.dangerButton} onClick={removeTask}>
+                确认删除
+              </Button>
+              <Button size="large" appearance="secondary" onClick={() => setConfirmDelete(false)}>
+                取消
+              </Button>
+            </MessageBar>
+          ) : null}
+        </div>
       </div>
 
       <div className={styles.footer}>
         {!isNew && task ? (
           <Button
+            size="large"
             appearance="subtle"
             icon={<Delete20Regular />}
+            className={styles.dangerButton}
             onClick={() => setConfirmDelete(true)}
             disabled={confirmDelete}
           >
@@ -395,6 +439,9 @@ export default function TodoDetail() {
         <Text size={200} className={styles.subtle}>
           Esc 关闭
         </Text>
+        <Button size="large" appearance="secondary" onClick={closeOverlay}>
+          取消
+        </Button>
         <Button size="large" appearance="primary" onClick={save}>
           {isNew ? '创建任务' : '保存'}
         </Button>
