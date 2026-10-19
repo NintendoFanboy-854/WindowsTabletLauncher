@@ -1,7 +1,7 @@
 {
   "id": "countdown",
   "name": "倒数日",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "widgets": [
     {
       "id": "countdown",
@@ -10,5 +10,32 @@
       "defaultSize": [2, 1],
       "cell": [5, 0]
     }
-  ]
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "显示",
+        "hint": "只影响列表里事件的状态提示，不改动已保存的事件。",
+        "fields": [
+          {
+            "key": "showPast",
+            "type": "boolean",
+            "label": "显示已过去的事件",
+            "description": "关闭后只显示今天与未来的事件",
+            "default": true
+          },
+          {
+            "key": "highlightSoon",
+            "type": "boolean",
+            "label": "强调 7 天内的事件",
+            "description": "在详情列表里给 7 天内的事件加「7 天内」标记",
+            "default": true
+          }
+        ]
+      }
+    ]
+  }
 }

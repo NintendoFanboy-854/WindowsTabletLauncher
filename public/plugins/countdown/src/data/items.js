@@ -1,51 +1,74 @@
 /**
- * 倒数日数据层（纯 JS，不依赖 React）：
- * - 事件模型、日期换算（每年重复 / 今天 / 已过）、排序、校验
- * - 持久化走宿主配置（plugin.getConfig/setConfig，宿主写 plugin.<id>.<key>），
- *   卡片视图与设置/编辑浮层视图通过 storage 事件自动同步
- * - 到日提醒由卡片视图的 useDueReminder 触发（plugin.notify）
+ * 倒数日数据层（纯 JS，不依赖 React）。
+ *
+ * - 事件模型、日期换算（每年重复 / 今天 / 已过）、排序、校验、增删改；
+ * - 持久化沿用宿主配置键 `items` / `settings`（宿主写 `plugin.countdown.*`），
+ *   卡片、详情与 Agent 工具共用同一份数据；
+ * - `normalizeItems` 只做读取侧迁移（补默认字段、过滤坏记录），不在加载时回写，
+ *   已经保存的事件内容保持原样；
+ * - Agent 工具与 UI 操作调用同一组 `addItem / updateItem / removeItem`。
  */
 
 import { plugin } from '/plugin-sdk.js';
 
 export const ITEMS_KEY = 'items';
 export const SETTINGS_KEY = 'settings';
-export const EDITING_KEY = 'countdown.editing';
-export const MAX_ITEMS = 50; // docs/components/countdown.md：数量达 50 时 add 返回错误
+/** docs/components/countdown.md：数量上限沿用现有实现（50 条时 add 返回错误） */
+export const MAX_ITEMS = 50;
 
-export const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = Object.freeze({
   showPast: true,
   highlightSoon: true,
-};
+});
 
 /** 颜色只存 Fluent token 名；渲染时用 tokens[tokenName] 取实际颜色 */
-export const COLOR_OPTIONS = [
+export const COLOR_OPTIONS = Object.freeze([
   { id: 'accent', label: '主题色', token: 'colorBrandForeground1' },
   { id: 'blue', label: '蓝色', token: 'colorPaletteBlueForeground2' },
   { id: 'green', label: '绿色', token: 'colorPaletteGreenForeground1' },
-  { id: 'orange', label: '橙色', token: 'colorPaletteOrangeForeground2' },
+  { id: 'orange', label: '橙色', token: 'colorPaletteDarkOrangeForeground2' },
   { id: 'red', label: '红色', token: 'colorPaletteRedForeground1' },
   { id: 'purple', label: '紫色', token: 'colorPalettePurpleForeground2' },
   { id: 'teal', label: '青色', token: 'colorPaletteTealForeground2' },
-];
+]);
 
 const COLOR_BY_ID = new Map(COLOR_OPTIONS.map((color) => [color.id, color]));
+const DEFAULT_COLOR = COLOR_OPTIONS[0];
+
+export function normalizeColor(color) {
+  return COLOR_BY_ID.has(color) ? color : DEFAULT_COLOR.id;
+}
 
 export function colorTokenOf(colorId) {
-  return (COLOR_BY_ID.get(colorId) ?? COLOR_OPTIONS[0]).token;
+  return (COLOR_BY_ID.get(colorId) ?? DEFAULT_COLOR).token;
+}
+
+export function colorLabelOf(colorId) {
+  return (COLOR_BY_ID.get(colorId) ?? DEFAULT_COLOR).label;
 }
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
+/* ------------------------------------------------------------------ */
+/* normalize                                                           */
+/* ------------------------------------------------------------------ */
+
 export function normalizeSettings(raw) {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
-    showPast: typeof source.showPast === 'boolean' ? source.showPast : DEFAULT_SETTINGS.showPast,
+    showPast:
+      typeof source.showPast === 'boolean' ? source.showPast : DEFAULT_SETTINGS.showPast,
     highlightSoon:
-      typeof source.highlightSoon === 'boolean' ? source.highlightSoon : DEFAULT_SETTINGS.highlightSoon,
+      typeof source.highlightSoon === 'boolean'
+        ? source.highlightSoon
+        : DEFAULT_SETTINGS.highlightSoon,
   };
 }
 
+/**
+ * 读取侧迁移：未知颜色回落到主题色，缺失的布尔/创建时间补默认值。
+ * 合法事件的 title / targetDate 不改写；加载时不回写宿主配置。
+ */
 export function normalizeItems(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -61,8 +84,8 @@ export function normalizeItems(raw) {
       title: item.title,
       targetDate: item.targetDate,
       repeatYearly: Boolean(item.repeatYearly),
-      color: COLOR_BY_ID.has(item.color) ? item.color : 'accent',
-      createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+      color: normalizeColor(item.color),
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
     }));
 }
 
@@ -82,7 +105,13 @@ export function parseDateString(value) {
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
   return date;
 }
 
@@ -100,64 +129,112 @@ function daysBetween(from, to) {
   return Math.round((startOfDay(to) - startOfDay(from)) / 86400000);
 }
 
-/** 把一条记录换算成“今天视角”的展示数据 */
+const monthDayFormatter = new Intl.DateTimeFormat('zh-CN', {
+  month: 'long',
+  day: 'numeric',
+});
+const weekdayFormatter = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' });
+
+function formatMonthDay(date) {
+  return monthDayFormatter.format(date);
+}
+
+function formatWeekday(date) {
+  return weekdayFormatter.format(date);
+}
+
+/* ------------------------------------------------------------------ */
+/* 展示数据                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 把一条记录换算成“今天视角”的展示数据：
+ * days > 0 未来、0 今天、< 0 已过去；每年重复换算到下一个周年日。
+ */
 export function decorate(item, today = new Date()) {
   const base = parseDateString(item.targetDate);
   if (!base) return null;
+
   const todayStart = startOfDay(today);
   let target = base;
   if (item.repeatYearly) {
     const thisYear = anniversaryInYear(base, todayStart.getFullYear());
-    target = thisYear >= todayStart ? thisYear : anniversaryInYear(base, todayStart.getFullYear() + 1);
+    target =
+      thisYear >= todayStart
+        ? thisYear
+        : anniversaryInYear(base, todayStart.getFullYear() + 1);
   }
+
   const days = daysBetween(todayStart, target);
-  const color = COLOR_BY_ID.get(item.color) ?? COLOR_OPTIONS[0];
-  const sub = item.repeatYearly
-    ? `每年 ${base.getMonth() + 1}月${base.getDate()}日`
-    : toDateString(target);
   let status = 'future';
   if (days === 0) status = 'today';
   else if (days < 0) status = 'past';
+
+  const color = COLOR_BY_ID.get(item.color) ?? DEFAULT_COLOR;
+  const dateLabel = formatMonthDay(target);
+  const weekdayLabel = formatWeekday(target);
+  const subtitle = item.repeatYearly
+    ? `每年 ${dateLabel} · ${weekdayLabel}`
+    : `${dateLabel} · ${weekdayLabel}`;
+
   return {
     item,
+    target,
     targetDate: toDateString(target),
     days,
+    status,
     color,
     colorToken: color.token,
-    sub,
-    status,
+    dateLabel,
+    weekdayLabel,
+    subtitle,
   };
 }
 
+/** 卡片与工具用的口语化天数 */
 export function displayText(entry) {
   if (entry.days === 0) return '就是今天';
   if (entry.days > 0) return `还有 ${entry.days} 天`;
   return `已过 ${Math.abs(entry.days)} 天`;
 }
 
-/** 未来升序在前、过去按最近在前；过去事件可被设置过滤 */
+/**
+ * 按展示顺序排序：未来升序在前（今天算未来段），过去按最近的在前后置；
+ * 同一天多条按创建时间升序（countdown.md「同一天多条」）。
+ */
 export function sortEntries(entries) {
   entries.sort((a, b) => {
     const aPast = a.days < 0;
     const bPast = b.days < 0;
-    if (aPast && bPast) return b.days - a.days;
-    if (aPast) return 1;
-    if (bPast) return -1;
-    return a.days - b.days;
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    if (a.days !== b.days) return aPast ? b.days - a.days : a.days - b.days;
+    const aCreated = a.item.createdAt || '';
+    const bCreated = b.item.createdAt || '';
+    if (aCreated !== bCreated) return aCreated < bCreated ? -1 : 1;
+    return 0;
   });
   return entries;
 }
 
-export function visibleEntries(items, settings, today = new Date()) {
+/** 不过滤显示设置的全部可见记录（详情分组用） */
+export function listEntries(items, today = new Date()) {
   const entries = [];
   for (const item of items) {
     const entry = decorate(item, today);
-    if (!entry) continue;
-    if (entry.days < 0 && !settings.showPast) continue;
-    entries.push(entry);
+    if (entry) entries.push(entry);
   }
   return sortEntries(entries);
 }
+
+/** 应用 `showPast` 设置后的记录（卡片用） */
+export function visibleEntries(items, settings, today = new Date()) {
+  const entries = listEntries(items, today);
+  return settings.showPast ? entries : entries.filter((entry) => entry.days >= 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* 写操作：UI 与 Agent 工具共用                                         */
+/* ------------------------------------------------------------------ */
 
 export function nextId() {
   return `cd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -166,100 +243,147 @@ export function nextId() {
 export function validateDraft(draft) {
   const title = typeof draft?.title === 'string' ? draft.title.trim() : '';
   if (!title) return { ok: false, error: '请填写标题' };
-  if (!parseDateString(draft.targetDate)) return { ok: false, error: '请选择合法日期' };
+  if (!parseDateString(draft?.targetDate)) return { ok: false, error: '请选择合法日期' };
   return { ok: true, title };
 }
 
-/** 写一条“待编辑”信息给浮层视图（宿主 ?view=edit 是不同 iframe 文档） */
-export function setEditingTarget(id) {
-  try {
-    localStorage.setItem(EDITING_KEY, JSON.stringify({ id: id ?? null, at: Date.now() }));
-  } catch {
-    /* ignore */
-  }
+/**
+ * 新增一条：返回新的 items 数组与写入后的记录。
+ * 数量上限与字段校验失败时抛错（UI 显示在表单里，工具返回 ok=false）。
+ */
+export function addItem(items, draft) {
+  const validation = validateDraft(draft);
+  if (!validation.ok) throw new Error(validation.error);
+  if (items.length >= MAX_ITEMS) throw new Error(`最多 ${MAX_ITEMS} 条倒数日`);
+
+  const item = {
+    id: nextId(),
+    title: validation.title,
+    targetDate: draft.targetDate,
+    repeatYearly: Boolean(draft.repeatYearly),
+    color: normalizeColor(draft.color),
+    createdAt: new Date().toISOString(),
+  };
+  return { items: [...items, item], item };
 }
 
-export function readEditingTarget() {
-  try {
-    const raw = localStorage.getItem(EDITING_KEY);
-    if (!raw) return { id: null };
-    const parsed = JSON.parse(raw);
-    return { id: typeof parsed?.id === 'string' ? parsed.id : null };
-  } catch {
-    return { id: null };
+/** 更新一条：只改传入的字段，保留 id / createdAt 与未传字段 */
+export function updateItem(items, patch) {
+  const id = typeof patch?.id === 'string' ? patch.id : '';
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 0) throw new Error(`找不到 id 为 ${id} 的倒数日`);
+
+  const current = items[index];
+  const title =
+    patch.title === undefined
+      ? current.title
+      : typeof patch.title === 'string'
+        ? patch.title.trim()
+        : '';
+  if (!title) throw new Error('请填写标题');
+
+  const targetDate = patch.targetDate === undefined ? current.targetDate : patch.targetDate;
+  if (!parseDateString(targetDate)) throw new Error('请选择合法日期');
+
+  const nextItem = {
+    ...current,
+    title,
+    targetDate,
+    repeatYearly:
+      patch.repeatYearly === undefined ? current.repeatYearly : Boolean(patch.repeatYearly),
+    color: patch.color === undefined ? current.color : normalizeColor(patch.color),
+  };
+  return {
+    items: items.map((item) => (item.id === id ? nextItem : item)),
+    item: nextItem,
+  };
+}
+
+export function removeItem(items, id) {
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`找不到 id 为 ${id} 的倒数日`);
+  return { items: items.filter((candidate) => candidate.id !== id), item };
+}
+
+/** 设置 patch：至少提供一个已知字段，值必须是布尔 */
+export function applySettingsPatch(settings, patch) {
+  const source = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
+  const hasShowPast = Object.prototype.hasOwnProperty.call(source, 'showPast');
+  const hasHighlightSoon = Object.prototype.hasOwnProperty.call(source, 'highlightSoon');
+  if (!hasShowPast && !hasHighlightSoon) {
+    throw new Error('至少提供 showPast 或 highlightSoon');
   }
+  if (hasShowPast && typeof source.showPast !== 'boolean') {
+    throw new Error('showPast 必须是布尔值');
+  }
+  if (hasHighlightSoon && typeof source.highlightSoon !== 'boolean') {
+    throw new Error('highlightSoon 必须是布尔值');
+  }
+  return normalizeSettings({
+    ...settings,
+    ...(hasShowPast ? { showPast: source.showPast } : null),
+    ...(hasHighlightSoon ? { highlightSoon: source.highlightSoon } : null),
+  });
 }
 
 /* ------------------------------------------------------------------ */
-/* Agent 工具共用（卡片视图与浮层视图都可调用）                          */
+/* Agent 工具（与 UI 共用同一组写操作）                                 */
 /* ------------------------------------------------------------------ */
+
+function itemPayload(item, today = new Date()) {
+  const entry = decorate(item, today);
+  return {
+    id: item.id,
+    title: item.title,
+    targetDate: entry ? entry.targetDate : item.targetDate,
+    repeatYearly: item.repeatYearly,
+    color: item.color,
+    days: entry ? entry.days : null,
+    status: entry ? entry.status : 'future',
+    display: entry ? displayText(entry) : '',
+  };
+}
 
 export function toolList(items, args) {
   const includePast = args?.includePast !== false;
   const today = new Date();
-  const entries = [];
-  for (const item of items) {
-    const entry = decorate(item, today);
-    if (!entry) continue;
-    if (!includePast && entry.days < 0) continue;
-    entries.push(entry);
-  }
-  sortEntries(entries);
+  const entries = listEntries(items, today).filter(
+    (entry) => includePast || entry.days >= 0,
+  );
   return {
     today: toDateString(today),
-    items: entries.map((entry) => ({
-      id: entry.item.id,
-      title: entry.item.title,
-      targetDate: entry.targetDate,
-      repeatYearly: entry.item.repeatYearly,
-      color: entry.item.color,
-      days: entry.days,
-      status: entry.status,
-      display: displayText(entry),
-    })),
+    count: entries.length,
+    items: entries.map((entry) => itemPayload(entry.item, today)),
   };
 }
 
 export function toolAdd(items, args) {
-  const title = typeof args?.title === 'string' ? args.title.trim() : '';
-  const targetDate = typeof args?.targetDate === 'string' ? args.targetDate : '';
-  if (!title) throw new Error('title 不能为空');
-  if (!parseDateString(targetDate)) throw new Error('targetDate 必须是合法的 YYYY-MM-DD');
-  if (items.length >= MAX_ITEMS) throw new Error(`最多 ${MAX_ITEMS} 条倒数日`);
-  const color = COLOR_BY_ID.has(args?.color) ? args.color : 'accent';
-  const item = {
-    id: nextId(),
-    title,
-    targetDate,
-    repeatYearly: Boolean(args?.repeatYearly),
-    color,
-    createdAt: new Date().toISOString(),
-  };
-  overwriteItems([...items, item]);
-  const entry = decorate(item, new Date());
-  return {
-    id: item.id,
-    title: item.title,
-    targetDate: item.targetDate,
-    repeatYearly: item.repeatYearly,
-    color: item.color,
-    days: entry ? entry.days : null,
-    display: entry ? displayText(entry) : '',
-  };
+  const { items: nextItems, item } = addItem(items, args);
+  return { nextItems, result: itemPayload(item) };
+}
+
+export function toolUpdate(items, args) {
+  const { items: nextItems, item } = updateItem(items, args);
+  return { nextItems, result: itemPayload(item) };
 }
 
 export function toolRemove(items, args) {
   const id = typeof args?.id === 'string' ? args.id : '';
   if (!id) throw new Error('id 不能为空');
-  const item = items.find((candidate) => candidate.id === id);
-  if (!item) throw new Error(`找不到 id 为 ${id} 的倒数日`);
-  overwriteItems(items.filter((candidate) => candidate.id !== id));
-  return { removed: true, id, title: item.title };
+  const { items: nextItems, item } = removeItem(items, id);
+  return {
+    nextItems,
+    result: { removed: true, id: item.id, title: item.title },
+  };
 }
 
-/** 工具处理里没有 React state，直接写宿主配置 */
-function overwriteItems(next) {
-  plugin.setConfig(ITEMS_KEY, next).catch(() => {});
+export function toolSettingsGet(settings) {
+  return { ...normalizeSettings(settings) };
+}
+
+export function toolSettingsSet(settings, args) {
+  const nextSettings = applySettingsPatch(settings, args);
+  return { nextSettings, result: { ...nextSettings } };
 }
 
 /* ------------------------------------------------------------------ */
@@ -269,6 +393,7 @@ function overwriteItems(next) {
 export async function seedDemoData() {
   const existing = await plugin.getConfig(ITEMS_KEY).catch(() => null);
   if (Array.isArray(existing) && existing.length > 0) return;
+
   const offset = (days) => {
     const date = new Date();
     date.setDate(date.getDate() + days);
@@ -277,7 +402,38 @@ export async function seedDemoData() {
   const nowIso = new Date().toISOString();
   const year = new Date().getFullYear();
   const items = [
-    { id: 'demo-1', title: '项目截止', targetDate: offset(3), repeatYearly: false, color: 'orange', createdAt: nowIso },
+    {
+      id: 'demo-today',
+      title: '产品发布',
+      targetDate: offset(0),
+      repeatYearly: false,
+      color: 'teal',
+      createdAt: nowIso,
+    },
+    {
+      id: 'demo-1',
+      title: '项目截止',
+      targetDate: offset(3),
+      repeatYearly: false,
+      color: 'orange',
+      createdAt: nowIso,
+    },
+    {
+      id: 'demo-6',
+      title: '体检',
+      targetDate: offset(10),
+      repeatYearly: false,
+      color: 'blue',
+      createdAt: nowIso,
+    },
+    {
+      id: 'demo-3',
+      title: '期末考试',
+      targetDate: offset(45),
+      repeatYearly: false,
+      color: 'purple',
+      createdAt: nowIso,
+    },
     {
       id: 'demo-2',
       title: '结婚纪念日',
@@ -286,14 +442,20 @@ export async function seedDemoData() {
       color: 'red',
       createdAt: nowIso,
     },
-    { id: 'demo-3', title: '期末考试', targetDate: offset(45), repeatYearly: false, color: 'purple', createdAt: nowIso },
-    { id: 'demo-4', title: '搬家', targetDate: offset(-20), repeatYearly: false, color: 'blue', createdAt: nowIso },
     {
       id: 'demo-5',
       title: '妈妈生日',
       targetDate: '1968-04-12',
       repeatYearly: true,
       color: 'green',
+      createdAt: nowIso,
+    },
+    {
+      id: 'demo-4',
+      title: '搬家',
+      targetDate: offset(-20),
+      repeatYearly: false,
+      color: 'blue',
       createdAt: nowIso,
     },
   ];
