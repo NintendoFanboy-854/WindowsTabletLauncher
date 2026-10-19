@@ -328,7 +328,7 @@ export function SettingsPage({
 
   const autostartDescription =
     autostart === 'unsupported'
-      ? '浏览器演示模式不可用，Tauri 运行时生效'
+      ? '浏览器环境不可用，Tauri 运行时生效'
       : autostart === 'error'
         ? '读取失败，可能注册表权限受限'
         : '写入当前用户的注册表启动项，开机直接进入桌面';

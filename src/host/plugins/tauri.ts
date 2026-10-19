@@ -1,7 +1,7 @@
 /**
  * Tauri 命令的前端调用面（A1 的 Rust command 一一对应）。
  *
- * 所有 `@tauri-apps/api` 都是动态 import：浏览器里跑演示页时这些模块不会被求值，
+ * 所有 `@tauri-apps/api` 都是动态 import：浏览器运行时这些模块不会被求值，
  * 也不影响 vite 打包。命令名与 `src-tauri/src/lib.rs` 的 `invoke_handler` 对应。
  */
 

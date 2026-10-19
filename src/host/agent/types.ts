@@ -160,8 +160,6 @@ export interface AgentSettings {
     apiKey: string;
     baseUrl: string;
   };
-  /** 离线 Mock 演示（没有真实 Key 时用来证明 UI/工具/语音流程） */
-  mock: boolean;
 }
 
 export const MIMO_BASE_URL = 'https://api.xiaomimimo.com/v1';
@@ -193,7 +191,6 @@ export const DEFAULT_SETTINGS: AgentSettings = {
     apiKey: '',
     baseUrl: MIMO_BASE_URL,
   },
-  mock: false,
 };
 
 // ---------- 模型请求 / 流式事件 ----------
@@ -261,7 +258,7 @@ export interface ToolRunOptions {
 
 /**
  * Agent 的模型/工具/语音/搜索传输层。
- * 真实实现走 MiMo（含原生 web_search）；`MockTransport` 提供离线演示。
+ * 真实实现走 MiMo（含原生 web_search）；`MockTransport` 提供离线示例数据。
  */
 export interface AgentTransport {
   readonly kind: 'mimo' | 'mock';

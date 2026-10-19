@@ -36,7 +36,6 @@ export {
   readSettings,
   updateSettings,
   subscribeSettings,
-  isMockMode,
   isMockRequestedByUrl,
   normalizeSettings,
   SETTINGS_STORAGE_KEY,

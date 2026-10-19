@@ -40,7 +40,7 @@ export type HostNotifications = BridgeServices;
 const NotificationsContext = createContext<HostNotifications | null>(null);
 
 export interface NotificationsProviderProps {
-  /** 传入后会接管通知/强提醒；不传只对子树生效（演示页用） */
+  /** 传入后会接管通知/强提醒；不传只对子树生效（独立预览用） */
   bridge?: HostBridge;
   children: ReactNode;
 }

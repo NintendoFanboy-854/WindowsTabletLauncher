@@ -100,7 +100,7 @@ export function Composer({
         <MessageBar intent="warning" className={styles.banner}>
           <MessageBarBody>
             <MessageBarTitle>还没有填写 MiMo API Key</MessageBarTitle>
-            现在还不能回答问题。可以去设置里填好 Key，或者先打开演示模式体验完整流程。
+            现在还不能回答问题。请先到设置里填写 MiMo API Key。
           </MessageBarBody>
           <MessageBarActions
             containerAction={
@@ -108,15 +108,7 @@ export function Composer({
                 打开设置
               </Button>
             }
-          >
-            <Button
-              size="large"
-              appearance="outline"
-              onClick={() => session.updateSettings({ mock: true })}
-            >
-              开启演示模式
-            </Button>
-          </MessageBarActions>
+          />
         </MessageBar>
       ) : null}
 

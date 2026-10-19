@@ -15,7 +15,7 @@
  *   finally { await cdp.close(); }
  */
 
-import { spawn, execFile } from 'node:child_process';
+import { spawn, execFile, execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -23,6 +23,10 @@ import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+
+/** 本进程启动且尚未完成清理的 Edge；正常 close 之外的退出路径由同步兜底处理。 */
+const activeLaunches = new Set();
+let lifecycleHandlersInstalled = false;
 
 export const DEFAULT_BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 export const EDGE_PATH =
@@ -54,25 +58,119 @@ function psQuote(value) {
 }
 
 /** 只按“本次唯一 profile 路径”查自己的 msedge 进程 PID */
-async function findProfileProcessIds(profile) {
-  const command = [
+function profileProcessQuery(profile) {
+  return [
     `$profile = ${psQuote(profile)};`,
     'Get-CimInstance Win32_Process -Filter "Name=\'msedge.exe\'"',
     '| Where-Object { $_.CommandLine -and $_.CommandLine.Contains($profile) }',
     '| Select-Object -ExpandProperty ProcessId',
   ].join(' ');
+}
+
+function parsePidList(stdout) {
+  return String(stdout)
+    .split(/\s+/)
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isFinite(value) && value > 0);
+}
+
+async function findProfileProcessIds(profile) {
   try {
     const { stdout } = await execFileAsync(
       'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', command],
+      ['-NoProfile', '-NonInteractive', '-Command', profileProcessQuery(profile)],
       { windowsHide: true, timeout: 15000, encoding: 'utf8' },
     );
-    return stdout
-      .split(/\s+/)
-      .map((value) => Number.parseInt(value, 10))
-      .filter((value) => Number.isFinite(value) && value > 0);
+    return parsePidList(stdout);
   } catch {
     return [];
+  }
+}
+
+/** 退出/信号路径没有 await 机会，用同步方式查同一 profile 的进程。 */
+function findProfileProcessIdsSync(profile) {
+  try {
+    const stdout = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', profileProcessQuery(profile)],
+      { windowsHide: true, timeout: 15000, encoding: 'utf8' },
+    );
+    return parsePidList(stdout);
+  } catch {
+    return [];
+  }
+}
+
+function killPidsSync(pids) {
+  for (const pid of pids) {
+    try {
+      spawnSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: 15000,
+      });
+    } catch {
+      /* 已被父进程带走 */
+    }
+  }
+}
+
+/** 进程顶层兜底：只杀本次 child / 本次唯一 profile 匹配到的进程，再删本次 profile。 */
+function cleanupOwnedSync(record) {
+  if (!record) return;
+  if (record.child?.pid) killPidsSync([record.child.pid]);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const pids = findProfileProcessIdsSync(record.profile);
+    if (pids.length === 0) break;
+    killPidsSync(pids);
+  }
+  let removed = false;
+  try {
+    rmSync(record.profile, {
+      recursive: true,
+      force: true,
+      maxRetries: 4,
+      retryDelay: 150,
+    });
+    removed = !existsSync(record.profile);
+  } catch {
+    removed = false;
+  }
+  activeLaunches.delete(record);
+  if (!removed) {
+    process.stderr.write(`[cdp] 临时 profile 未能删除：${record.profile}\n`);
+  }
+  const remaining = findProfileProcessIdsSync(record.profile);
+  if (remaining.length > 0) {
+    process.stderr.write(`[cdp] 仍有本次 Edge 进程未退出：${remaining.join(', ')}\n`);
+  }
+}
+
+function cleanupActiveLaunchesSync() {
+  for (const record of [...activeLaunches]) cleanupOwnedSync(record);
+}
+
+function installLifecycleHandlers() {
+  if (lifecycleHandlersInstalled) return;
+  lifecycleHandlersInstalled = true;
+  // 正常 main 结束、未捕获异常、外部 Ctrl+C / 终止都会走到这里；
+  // 已 close 的实例会从 activeLaunches 移除，因此不会重复清理别的进程。
+  process.once('exit', cleanupActiveLaunchesSync);
+  const signals = [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+    ['SIGHUP', 129],
+    ...(process.platform === 'win32' ? [['SIGBREAK', 149]] : []),
+  ];
+  for (const [signal, code] of signals) {
+    try {
+      process.once(signal, () => {
+        cleanupActiveLaunchesSync();
+        process.exit(code);
+      });
+    } catch {
+      /* 平台不支持该信号 */
+    }
   }
 }
 
@@ -90,7 +188,7 @@ async function killOwnedEdge(child, profile) {
   }
   // Edge 启动器在 Windows 上会先退出、再拉起真正 browser 进程；多扫几轮，
   // 避免清理时真正的 msedge 还没出现在进程列表里。
-  for (let pass = 0; pass < 4; pass += 1) {
+  for (let pass = 0; pass < 5; pass += 1) {
     const pids = await findProfileProcessIds(profile);
     if (pids.length === 0) {
       await sleep(250);
@@ -108,6 +206,8 @@ async function killOwnedEdge(child, profile) {
     }
     await sleep(250);
   }
+  // 返回最终状态，让 close() 在仍有残留时报错，而不是静默 PASS。
+  return findProfileProcessIds(profile);
 }
 
 async function removeProfile(profile) {
@@ -161,7 +261,7 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
   const port = await getFreePort();
   const profile = join(
     tmpdir(),
-    `wtsl-cdp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    `wtsl-verify-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
   mkdirSync(profile, { recursive: true });
 
@@ -182,6 +282,9 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
   ];
 
   const child = spawn(EDGE_PATH, args, { stdio: 'ignore', windowsHide: true });
+  const owned = { child, profile };
+  activeLaunches.add(owned);
+  installLifecycleHandlers();
 
   let wsUrl = null;
   for (let attempt = 0; attempt < 160; attempt += 1) {
@@ -205,12 +308,16 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
   }
 
   if (!wsUrl) {
-    await killOwnedEdge(child, profile);
-    await removeProfile(profile);
+    const remaining = await killOwnedEdge(child, profile);
+    const removed = await removeProfile(profile);
+    if (remaining.length === 0 && removed) activeLaunches.delete(owned);
     throw new Error(`Edge CDP 没有就绪（profile=${profile}）`);
   }
 
-  const ws = await openWebSocket(wsUrl);
+  let ws = null;
+  // 从这里开始的任何初始化失败都要关掉本次实例；catch 覆盖 ws 已建立/未建立两种状态。
+  try {
+  ws = await openWebSocket(wsUrl);
   let seq = 0;
   let closed = false;
   const pending = new Map();
@@ -524,19 +631,29 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
     return filePath;
   }
 
+  let closePromise = null;
   async function close() {
-    if (closed) return;
+    if (closePromise) return closePromise;
     closed = true;
-    cleanupTimers();
-    try {
-      ws.close();
-    } catch {
-      /* ignore */
-    }
-    await sleep(150);
-    await killOwnedEdge(child, profile);
-    await sleep(400);
-    await removeProfile(profile);
+    closePromise = (async () => {
+      cleanupTimers();
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+      await sleep(150);
+      const remaining = await killOwnedEdge(child, profile);
+      await sleep(300);
+      const removed = await removeProfile(profile);
+      if (remaining.length > 0 || !removed) {
+        throw new Error(
+          `Edge 清理未完成：剩余 PID [${remaining.join(', ')}]，profileRemoved=${removed}（${profile}）`,
+        );
+      }
+      activeLaunches.delete(owned);
+    })();
+    return closePromise;
   }
 
   await send('Page.enable');
@@ -574,4 +691,20 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
     },
     close,
   };
+  } catch (error) {
+    try {
+      ws?.close();
+    } catch {
+      /* ignore */
+    }
+    const remaining = await killOwnedEdge(child, profile);
+    const removed = await removeProfile(profile);
+    if (remaining.length === 0 && removed) activeLaunches.delete(owned);
+    else {
+      process.stderr.write(
+        `[cdp] 启动失败后的清理未完成：剩余 PID [${remaining.join(', ')}]，profileRemoved=${removed}（${profile}）\n`,
+      );
+    }
+    throw error;
+  }
 }

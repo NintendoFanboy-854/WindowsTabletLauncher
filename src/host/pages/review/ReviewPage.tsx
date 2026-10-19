@@ -42,7 +42,7 @@ export interface ReviewPageProps {
   bridge: ReviewBridge;
   onBack: () => void;
   onOpenAgent?: () => void;
-  /** 演示/调试时标注数据来源（例如 mock bridge） */
+  /** 预览或调试时标注数据来源 */
   sourceLabel?: string;
 }
 

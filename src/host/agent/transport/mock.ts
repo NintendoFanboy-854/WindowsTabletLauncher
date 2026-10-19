@@ -1,5 +1,5 @@
 /**
- * 离线 Mock 传输层：没有 MiMo Key 时用来验证完整 UI 流程
+ * 离线 Mock 传输层：`?mock=1` 时用示例数据验证完整 UI 流程
  * （流式回复、原生联网搜索来源 chips、工具调用卡片、语音状态机、连续朗读）。
  *
  * 它只模拟传输层：插件工具走 mock 的 listPluginTools/callPluginTool；
@@ -231,7 +231,7 @@ export class MockTransport implements AgentTransport {
       return;
     }
 
-    const fallback = `我是 Mock 演示模式下的桌面 Agent。你刚才说的是「${userText.slice(0, 40)}」。在真实模式里，我会先判断要不要调用插件工具或联网搜索，再用 MiMo V2.6 流式回答。现在可以在设置里填 MiMo API Key 切到真实模型。`;
+    const fallback = `我是运行在示例数据模式下的桌面 Agent。你刚才说的是「${userText.slice(0, 40)}」。在真实模式里，我会先判断要不要调用插件工具或联网搜索，再用 MiMo V2.6 流式回答。现在可以在设置里填 MiMo API Key 切到真实模型。`;
     for (const chunk of chunkText(fallback)) {
       await sleep(14, signal);
       onEvent({ type: 'content', text: chunk });

@@ -14,7 +14,7 @@ import type { AgentToolDecl } from '../../bridge/types';
 
 export type ReviewRange = 'yesterday' | 'week' | 'month';
 
-/** 复盘页只需要桥接层的两个能力，方便测试替换（demo 用 mock） */
+/** 复盘页只需要桥接层的两个能力，方便测试或预览时替换数据源 */
 export interface ReviewBridge {
   listTools(): AgentToolDecl[];
   callTool(name: string, args: unknown, options?: { signal?: AbortSignal }): Promise<unknown>;

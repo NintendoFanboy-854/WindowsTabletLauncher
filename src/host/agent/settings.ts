@@ -99,7 +99,6 @@ export function normalizeSettings(raw: unknown): AgentSettings {
           ? mimo.baseUrl.trim().replace(/\/+$/, '')
           : MIMO_BASE_URL,
     },
-    mock: typeof source.mock === 'boolean' ? source.mock : DEFAULT_SETTINGS.mock,
   };
 }
 
@@ -153,14 +152,9 @@ export function subscribeSettings(listener: () => void): () => void {
   };
 }
 
-/** `?mock=1` 的临时演示开关（不写进设置） */
+/** dev-only：`?mock=1` 使用示例数据（不写进设置，产品 UI 不提供入口） */
 export function isMockRequestedByUrl(): boolean {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
   return params.get('mock') === '1' || params.get('mock') === 'true';
-}
-
-/** 有效 Mock 状态 = 设置里开关 或 URL 参数 */
-export function isMockMode(settings: AgentSettings): boolean {
-  return settings.mock || isMockRequestedByUrl();
 }

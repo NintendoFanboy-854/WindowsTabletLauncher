@@ -31,9 +31,9 @@ const useStyles = makeStyles({
 });
 
 export interface AgentSurfaceProps {
-  /** 注入传输层（Mock 演示/测试）；不传按设置创建 */
+  /** 注入传输层（测试或截图用）；不传按 URL 参数创建 */
   transport?: AgentTransport;
-  /** 演示/截图用的初始会话 */
+  /** 测试或截图用的初始会话 */
   seed?: AgentSeed;
   /** 受控：面板是否打开 */
   open?: boolean;
@@ -43,7 +43,7 @@ export interface AgentSurfaceProps {
   onModeChange?: (mode: PanelMode) => void;
   /** 隐藏右下角入口按钮（宿主自建入口时） */
   hideFab?: boolean;
-  /** 演示/截图：初始打开设置对话框 */
+  /** 测试或截图：初始打开设置对话框 */
   defaultSettingsOpen?: boolean;
 }
 

@@ -88,7 +88,7 @@ const useStyles = makeStyles({
 });
 
 function modelLabel(session: AgentSession): string {
-  if (session.isMock) return '演示模式';
+  if (session.isMock) return '示例数据';
   const model = MIMO_MODELS.find((item) => item.value === session.settings.model);
   return model?.label.replace('MiMo V2.6 ', 'V2.6 ') ?? session.settings.model;
 }

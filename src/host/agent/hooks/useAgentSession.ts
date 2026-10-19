@@ -4,7 +4,11 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isMockMode, readSettings, updateSettings as persistSettings, type SettingsPatch } from '../settings';
+import {
+  isMockRequestedByUrl,
+  updateSettings as persistSettings,
+  type SettingsPatch,
+} from '../settings';
 import { MimoTransport } from '../transport/real';
 import { MockTransport } from '../transport/mock';
 import {
@@ -74,9 +78,9 @@ export interface AgentSeed {
 }
 
 export interface UseAgentSessionOptions {
-  /** 注入传输层（Mock/测试用）；不传按设置创建 */
+  /** 注入传输层（测试或截图用）；不传按 URL 参数创建 */
   transport?: AgentTransport;
-  /** 演示/测试用的初始会话 */
+  /** 测试或截图用的初始会话 */
   seed?: AgentSeed;
 }
 
@@ -117,7 +121,7 @@ interface ConversationStore {
 function initStore(seed?: AgentSeed): ConversationStore {
   if (seed?.messages?.length) {
     const conversation: Conversation = {
-      ...createConversation(seed.title ?? '演示会话'),
+      ...createConversation(seed.title ?? '示例会话'),
       messages: seed.messages,
     };
     return { conversations: [conversation], activeId: conversation.id };
@@ -190,9 +194,9 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
 
   const transport = useMemo<AgentTransport>(() => {
     if (options.transport) return options.transport;
-    if (isMockMode(readSettings())) return new MockTransport();
+    if (isMockRequestedByUrl()) return new MockTransport();
     return new MimoTransport(() => settingsRef.current);
-  }, [options.transport, storedSettings.mock]);
+  }, [options.transport]);
 
   const toolBindings = useMemo(() => buildToolBindings(transport.listPluginTools()), [transport]);
 
@@ -533,8 +537,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     if (!text || statusRef.current !== 'idle') return;
     if (!transport.isConfigured()) {
       setError({
-        message:
-          '还没有配置 MiMo API Key。请到设置 → 模型里填写，或打开「Mock 演示模式」先体验界面。',
+        message: '还没有配置 MiMo API Key。请到设置 → 模型里填写后再试。',
         retryable: false,
       });
       return;

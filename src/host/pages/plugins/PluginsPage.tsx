@@ -47,7 +47,7 @@ import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
 import { setPluginEnabled, usePluginPreferences } from './preferences';
 
 export interface PluginsPageProps {
-  /** 默认用全局单例，测试/演示可注入 */
+  /** 默认用全局单例，测试或预览可注入 */
   manager?: PluginManager;
   onBack: () => void;
   notify: (text: string) => void;
@@ -215,7 +215,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
   }, [pluginManager]);
 
   const sourceLabel = useMemo(() => {
-    const runtime = tauri ? 'Tauri 运行时' : '浏览器演示模式';
+    const runtime = tauri ? 'Tauri 运行时' : '浏览器预览';
     return `${runtime} · ${pluginManager.sourceKind ?? '探测中'} 源`;
   }, [tauri, pluginManager]);
 
@@ -265,7 +265,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
   };
 
   const removeButton = (plugin: NormalizedPlugin) => {
-    // 浏览器演示模式没有可执行的删除动作：整列不渲染禁用按钮（V-21）
+    // 浏览器预览没有可执行的删除动作：整列不渲染禁用按钮（V-21）
     if (!tauri) return null;
     return (
       <Button
@@ -324,7 +324,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
           </div>
         ) : (
           <Text size={200} className={styles.hint}>
-            浏览器演示模式只能查看：安装 / 删除 / 拖放需要在 Tauri 运行时里用。
+            浏览器预览只能查看：安装 / 删除 / 拖放需要在 Tauri 运行时里用。
           </Text>
         )}
 

@@ -202,14 +202,6 @@ export function SettingsDialog({
                   label="深度思考（回答更严谨，但会慢一些）"
                 />
               </div>
-              <div className={styles.toggleRow}>
-                <Switch
-                  className={styles.control40}
-                  checked={settings.mock}
-                  onChange={(_, data) => session.updateSettings({ mock: data.checked })}
-                  label="演示模式（用示例数据回答，不发送真实请求）"
-                />
-              </div>
             </div>
 
             {/* ---------- 面板 ---------- */}
