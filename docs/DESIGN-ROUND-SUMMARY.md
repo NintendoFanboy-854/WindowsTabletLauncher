@@ -95,7 +95,7 @@
 ### 5.6 天气（[weather.md](components/weather.md)）
 - 卡片：1×1 图标+温度；2×1 +现象+高低温；2×2 当前+逐时 6 列；3×2 当前+逐时 6 行（不放 7 天）；4×2 当前+AQI+等宽 7 天底栏；预警仅 3×2/4×2 紧凑 Badge；点击=详情；去掉城市菜单/刷新/设置/长按。
 - 详情 L1：城市/更新时间/刷新/设置 56；紧凑摘要（温度 48、AQI Badge）；单行 6 项环境信息；Tabs（逐时/7天/空气/生活指数/预警）；列表行 44；有预警默认进预警 Tab。
-- L2：管理城市（搜索添加/删除/设为当前/使用系统定位）。
+- L2：管理城市（搜索添加/删除/设为当前/系统定位或 ip.cn 网络定位）。
 - 设置：单位、刷新间隔、自动定位、显示 AQI/预警/分钟级降水、API Key/Host。
 - Agent：原有 current/hourly/daily/air/warning/queryPlace/places/addPlace/removePlace，补 `setCurrentPlace/locate/refresh/settings.get/set`。
 
@@ -115,7 +115,7 @@
 
 - E6 测试脚手架清理：删除三套 demo host（shell/agent/plugins）与 bridge-check，收敛到正式 host 的 dev-only 参数或 `tests/`；去掉演示横幅/假桌面/源码水印；Agent「演示模式」移出主设置；生产 `dist` 不得包含 demo 页面与文案。
 - 后续优化：设置页返回详情（第三层返回栈）、插件个性色、HIG 之外的视觉“感觉”、Tauri 真机验收。
-- 高德定位等待 API Key（D-10）。
+- 自动定位方案已定：Windows 定位优先，失败用 ip.cn 网络归属地（D-16，待实现）；不再使用高德。
 
 ## 10. 状态
 

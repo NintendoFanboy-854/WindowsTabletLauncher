@@ -24,6 +24,7 @@
 | 设置入口 | 任意视图发 `plugin:request-host-settings` | 导航到设置页对应插件分区（按消息来源 pluginId） |
 | Agent 工具 | `plugin.ready(tools)` 声明 + `onToolCall` 处理 | 注册、路由、交给 Agent；不解释工具语义 |
 | 通知/强提醒 | 调桥接 API `notify` / `showReminder` | 宿主统一 Toaster / 遮罩 |
+| 定位 | 调桥接 API `getLocation`（系统坐标）/ `ipLocate`（ip.cn 网络归属地，D-16） | 宿主提供能力；失败返回 null，插件自己降级 |
 | 后台常驻 | `"background": true` | 宿主挂隐藏 iframe，路由工具调用 |
 | 复盘聚合 | 声明 `*.stats` 工具 | 按工具聚合，展示名从 manifest 取，不写死 |
 | 主题/尺寸 | 监听 `host:init` / `host:theme` / `host:resize` | 注入同一套 Fluent token |

@@ -87,6 +87,8 @@
 
 ## D-10 自动定位暂缓（2026-10-19）
 
+> **已被 D-16 取代**：不再使用高德；自动定位改走 ip.cn 网络归属地。
+
 - 现状：卡片已有「自动定位」开关与「使用系统定位」入口，但 Windows Geolocator 在目标环境/大陆网络下不可靠，当前实现常返回空；本轮不改代码，等需求方提供**高德（Amap）API Key** 后再做。
 - 方案预定：Windows Geolocator 优先 → 高德 IP 归属地（大陆可用）兜底 → 失败保留上次城市并提示手动搜索；同时让「自动定位」在启动时真正选中定位城市（当前只做位置标记）。
 - 本轮 UI 重写（设置/详情浮层）保持自动定位 UI 原样，不做功能改动。
@@ -164,3 +166,26 @@
 - 测试脚手架清理（E6）：删除三套 demo host 与 bridge-check，生产 `dist` 不得包含 demo 页面/文案；
   Agent「演示模式」移出主设置。
 - 实现按 `docs/PLAN.md` §8 的 E0–E7 执行。
+
+## D-16 自动定位改用 ip.cn 网络归属地（2026-10-19，方案定稿，待实现）
+
+- **不再使用高德（Amap）任何能力**，D-10 的高德 API Key 等待作废；天气数据仍是和风天气（QWeather）。
+- **链路**（2026-10-19 实测）：
+  1. `GET https://ip.cn/`（桌面 UA）→ 首页 HTML 内联 `var _ticket = "…"`；
+  2. `GET https://my.ip.cn/json/?ticket=<ticket>`（UA + `Referer: https://ip.cn/`）→
+     `{"status":true,"data":{"ip","country","province","city","district","isp"}}`；
+     缺/过期 ticket 分别返回 `auth error` / `ticket expire`。
+  3. 首页 HTML 没有 CORS 头（JSON 接口有 `Access-Control-Allow-Origin: *`，但 ticket 只能从首页拿），
+     所以整条链路放在 **Tauri Rust 后端**；WebView 里直接 `fetch` 会被 CORS 拦。
+- **宿主 API**：新增 `ipLocate()` → `IpLocation | null`（`ip/country/province/city/district/isp`，
+  **不含坐标**）；`getLocation()` 保持系统定位（坐标）语义不变。
+- **天气优先级**：Windows Geolocator（有坐标）→ 失败用 `ipLocate` 城市名 → 和风 GeoAPI
+  `geoLookup(城市名)` 换 `id/经纬度`（需要 Weather API Key）→ 全失败保留上次城市并提示手动搜索。
+  无 API Key 时自动定位直接跳过（与现有 `hasKeyOrMock` 门禁一致）。
+- **自动定位语义（可预期）**：城市列表为空时，定位城市自动加入并设为当前；已有城市时**不自动切换**，
+  只在城市菜单显示「当前位置 · X 一键切换」。
+- **隐私**：仅在 `autoLocate` 打开时请求；只暴露公网 IP 与常规 UA，不发送本地数据。
+- **实现位置**：`src-tauri/src/iplocate.rs`（ticket/JSON 解析纯函数 + 单测，HTTP 用轻量 crate）、
+  bridge `HostApiMethod`/`HostApiMap`、`plugin-sdk.js` 的 `ipLocate()`；天气插件在 E3 接入。
+- **失败兜底**：ip.cn 改版 / 超时（8s）→ 返回 null；不影响手动搜索城市；日志记录原因，不弹错误。
+- 细节见 [components/weather.md](components/weather.md)「自动定位」一节；任务见 [PLAN.md](PLAN.md) E2b。

@@ -113,7 +113,8 @@
 - `setKeepAwake(bool)`：阻止息屏。
 - `getIdleSeconds()`：系统级空闲秒数。
 - `showReminder({ title, message, actions, autoDismissSec })`：全屏强提醒。
-- `getLocation()`：系统定位。
+- `getLocation()`：系统定位（坐标，可能为 null）。
+- `ipLocate()`：ip.cn 网络归属地（省/市/区/运营商，不含坐标；天气自动定位兜底，D-16）。
 
 新 API 只在真有组件需要时加，不预埋。通信走 `postMessage`。
 

@@ -90,3 +90,6 @@ shots/
 public/secrets.json
 secrets.json
 
+
+# 临时抓取/调试输出（不要提交）
+.tmp/
