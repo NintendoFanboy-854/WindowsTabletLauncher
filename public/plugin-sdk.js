@@ -55,6 +55,16 @@ function fallback(method, params) {
   }
 }
 
+/**
+ * 最近一次 init / theme / resize。
+ *
+ * 宿主在 iframe onLoad 后立刻发 host:init，主题变化也可能早于 React 的
+ * useEffect 注册监听；如果只把消息转发给“当前已注册的 handler”，后注册的
+ * 插件会永远拿不到这次更新（实测会出现插件停在深色、宿主已切亮色）。
+ * 所以 SDK 记忆最后一次值，并在注册监听时立即补发一次。
+ */
+const last = { init: null, theme: null, resize: null };
+
 window.addEventListener('message', (event) => {
   if (event.source !== window.parent) return;
   const data = event.data;
@@ -62,6 +72,7 @@ window.addEventListener('message', (event) => {
 
   switch (data.type) {
     case 'host:init':
+      last.init = data.payload;
       handlers.init.forEach((fn) => fn(data.payload));
       break;
     case 'host:reply': {
@@ -73,9 +84,11 @@ window.addEventListener('message', (event) => {
       break;
     }
     case 'host:theme':
+      last.theme = data.payload.theme;
       handlers.theme.forEach((fn) => fn(data.payload.theme));
       break;
     case 'host:resize':
+      last.resize = data.payload.size;
       handlers.resize.forEach((fn) => fn(data.payload.size));
       break;
     case 'host:focus':
@@ -95,11 +108,18 @@ function on(list, fn) {
   };
 }
 
+/** 注册时立即补发一次最近的值（插件挂载晚于消息到达的情况） */
+function onWithReplay(list, fn, lastValue) {
+  const off = on(list, fn);
+  if (lastValue !== null && lastValue !== undefined) fn(lastValue);
+  return off;
+}
+
 export const plugin = {
   /** 宿主初始化完成，拿到尺寸/主题/配置 */
-  onInit: (fn) => on(handlers.init, fn),
-  onTheme: (fn) => on(handlers.theme, fn),
-  onResize: (fn) => on(handlers.resize, fn),
+  onInit: (fn) => onWithReplay(handlers.init, fn, last.init),
+  onTheme: (fn) => onWithReplay(handlers.theme, fn, last.theme),
+  onResize: (fn) => onWithReplay(handlers.resize, fn, last.resize),
   /** 宿主把键盘焦点交进来了 */
   onFocus: (fn) => on(handlers.focus, fn),
   /** Agent 调用本插件的工具 */

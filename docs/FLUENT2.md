@@ -25,7 +25,7 @@
 - 只允许用 Fluent token：`colorNeutralBackground*`（表面）、`colorNeutralForeground1/2/3`（文字层级）、`colorNeutralStroke*`（轮廓）、`colorBrandBackground*`（主操作）、`colorStatus*`（semantic）。
 - **不手写 hex**；需要新语义色先找 token。
 - 层级表达顺序：字号 → foreground 层级 → 间距。颜色最后用。
-- 深色/浅色主题都由 `FluentProvider` 切换，组件不硬编码主题。
+- 深色/浅色主题都由 `FluentProvider` 切换，组件不硬编码主题；**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定为深色/亮色（DECISIONS D-06）。插件由宿主注入同一主题，独立打开时跟随系统。
 
 ## 3. 字体与字阶（官方 type ramp，Web）
 

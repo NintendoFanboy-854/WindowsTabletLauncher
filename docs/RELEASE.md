@@ -31,7 +31,7 @@
 - [ ] `design-auditor` 复检通过：P0 = 0，P1 已修复或明确记录
 - [ ] 六个插件全部是 React + Fluent UI React（`src/main.jsx` + `FluentProvider`），无自绘控件（DECISIONS D-02b）
 - [ ] 插件设置/详情走宿主全窗口浮层（`?view=settings|detail`），卡片 iframe 内无被裁切的 Dialog/Drawer
-- [ ] 三分辨率截图：1440×960 / 1024×768 / 960×1440
+- [ ] 三分辨率截图：1440×960 / 1024×768 / 960×1440（深色 + 亮色各一套，亮色验证跟随系统）
 - [ ] 普通模式卡片无 chrome；编辑模式才出现操作
 - [ ] 每个组件每个尺寸的信息预算内（见 DENSITY.md 第 2 节）
 - [ ] 无手写 hex、无非 token 圆角/阴影/间距/字号/动效时长（样式相关；已记录例外：天气图标对比度算法常量、项目材质 token 声明、内容图形尺寸 clamp）

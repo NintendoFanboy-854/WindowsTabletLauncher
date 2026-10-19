@@ -22209,13 +22209,28 @@ function Kv(e) {
 	let t = Hv.init?.config;
 	if (t && typeof t == "object") return t[e];
 }
-function qv(t = "dark") {
-	let [n, r] = (0, N.useState)(() => Gv(t));
-	return (0, N.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, N.useMemo)(() => Bv(n), [n]);
+var qv = "(prefers-color-scheme: light)";
+function Jv() {
+	return typeof window > "u" || typeof window.matchMedia != "function" ? "dark" : window.matchMedia(qv).matches ? "light" : "dark";
 }
-function Jv(t, n) {
+function Yv(t = "dark") {
+	let [n, r] = (0, N.useState)(() => Gv(t)), [i, a] = (0, N.useState)(Jv);
+	(0, N.useEffect)(() => e.onTheme((e) => {
+		e && typeof e == "object" && r(e);
+	}), []), (0, N.useEffect)(() => {
+		if (e.inHost || typeof window.matchMedia != "function") return;
+		let t = window.matchMedia(qv), n = () => a(t.matches ? "light" : "dark");
+		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
+	}, []);
+	let o = e.inHost ? n : {
+		...n,
+		colorScheme: i
+	}, s = (0, N.useMemo)(() => Bv(o), [o]);
+	return (0, N.useEffect)(() => {
+		typeof document < "u" && (document.documentElement.style.colorScheme = s.scheme, document.body && (document.body.style.colorScheme = s.scheme));
+	}, [s.scheme]), s;
+}
+function Xv(t, n) {
 	let r = (0, N.useRef)(t);
 	r.current = t;
 	let [i, a] = (0, N.useState)(() => {
@@ -22226,7 +22241,7 @@ function Jv(t, n) {
 		Array.isArray(e) && e.length === 2 && a(r.current(e));
 	}), []), i;
 }
-function Yv(t, n, r) {
+function Zv(t, n, r) {
 	let i = (0, N.useRef)(r);
 	i.current = r;
 	let [a, o] = (0, N.useState)(() => {
@@ -22266,11 +22281,11 @@ function Yv(t, n, r) {
 		s
 	];
 }
-function Xv() {
+function Qv() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function Zv(e, t) {
+function $v(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -22279,13 +22294,13 @@ function Zv(e, t) {
 		}
 	}, "*");
 }
-function Qv(e = "设置") {
-	Zv("settings", e);
+function ey(e = "设置") {
+	$v("settings", e);
 }
-typeof window < "u" && Xv() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && Qv() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function $v(e) {
+function ty(e) {
 	let t = (0, N.useRef)(e);
 	t.current = e, (0, N.useEffect)(() => {
 		let e = (e) => {
@@ -22296,7 +22311,7 @@ function $v(e) {
 		return window.addEventListener("message", e), () => window.removeEventListener("message", e);
 	}, []);
 }
-function ey(t, n) {
+function ny(t, n) {
 	let r = (0, N.useRef)(n);
 	r.current = n;
 	let i = (0, N.useRef)(t);
@@ -22317,26 +22332,26 @@ function ey(t, n) {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/sizes.js
-var ty = {
+var ry = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function ny(e) {
+function iy(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return ty[t] ? t : "2x1";
+	return ry[t] ? t : "2x1";
 }
-function ry() {
+function ay() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return ty[n] ? n : null;
+	return ry[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/pomodoro/src/data/audio.js
-var iy = .3, ay = .25, oy = [
+var oy = .3, sy = .25, cy = [
 	{
 		id: "none",
 		label: "无"
@@ -22353,28 +22368,28 @@ var iy = .3, ay = .25, oy = [
 		id: "fan",
 		label: "风扇"
 	}
-], sy = {
+], ly = {
 	ctx: null,
 	gain: null,
 	nodes: [],
 	kind: "none"
 };
-function cy() {
+function uy() {
 	try {
-		if (!sy.ctx) {
+		if (!ly.ctx) {
 			let e = window.AudioContext || window.webkitAudioContext;
 			if (!e) return null;
-			sy.ctx = new e();
+			ly.ctx = new e();
 		}
-		return sy.ctx.state === "suspended" && sy.ctx.resume().catch(() => {}), sy.ctx;
+		return ly.ctx.state === "suspended" && ly.ctx.resume().catch(() => {}), ly.ctx;
 	} catch {
 		return null;
 	}
 }
-function ly() {
-	cy();
+function dy() {
+	uy();
 }
-function uy(e, t) {
+function fy(e, t) {
 	let n = Math.floor(e.sampleRate * 2), r = e.createBuffer(1, n, e.sampleRate), i = r.getChannelData(0), a = 0;
 	for (let e = 0; e < n; e += 1) {
 		let n = Math.random() * 2 - 1;
@@ -22382,27 +22397,27 @@ function uy(e, t) {
 	}
 	return r;
 }
-function dy(e = !1) {
-	if (!sy.gain || !sy.ctx) return;
-	let t = sy.ctx, n = sy.gain, r = sy.nodes, i = e ? .02 : ay;
+function py(e = !1) {
+	if (!ly.gain || !ly.ctx) return;
+	let t = ly.ctx, n = ly.gain, r = ly.nodes, i = e ? .02 : sy;
 	try {
 		let e = t.currentTime;
 		n.gain.cancelScheduledValues(e), n.gain.setValueAtTime(Math.max(n.gain.value, 1e-4), e), n.gain.linearRampToValueAtTime(1e-4, e + i);
 	} catch {}
-	sy.gain = null, sy.nodes = [], sy.kind = "none", window.setTimeout(() => {
+	ly.gain = null, ly.nodes = [], ly.kind = "none", window.setTimeout(() => {
 		for (let e of r) try {
 			e.stop?.(), e.disconnect?.();
 		} catch {}
 	}, e ? 60 : 330);
 }
-function fy(e, t) {
+function my(e, t) {
 	if (e === "none") return;
-	let n = cy();
+	let n = uy();
 	if (n) {
-		dy(!0);
+		py(!0);
 		try {
 			let r = n.createBufferSource();
-			r.buffer = uy(n, e), r.loop = !0;
+			r.buffer = fy(n, e), r.loop = !0;
 			let i = n.createGain();
 			i.gain.value = 1e-4;
 			let a = r;
@@ -22420,23 +22435,23 @@ function fy(e, t) {
 			}
 			a.connect(i), i.connect(n.destination);
 			let o = n.currentTime;
-			i.gain.setValueAtTime(1e-4, o), i.gain.linearRampToValueAtTime(t / 100 * .25, o + iy), r.start(), sy.nodes = [r], sy.gain = i, sy.kind = e;
+			i.gain.setValueAtTime(1e-4, o), i.gain.linearRampToValueAtTime(t / 100 * .25, o + oy), r.start(), ly.nodes = [r], ly.gain = i, ly.kind = e;
 		} catch {
-			dy(!0);
+			py(!0);
 		}
 	}
 }
-function py() {
-	dy(!1);
+function hy() {
+	py(!1);
 }
-function my(e) {
-	if (sy.gain && sy.ctx) try {
-		let t = sy.ctx.currentTime;
-		sy.gain.gain.cancelScheduledValues(t), sy.gain.gain.setTargetAtTime(e / 100 * .25, t, .12);
+function gy(e) {
+	if (ly.gain && ly.ctx) try {
+		let t = ly.ctx.currentTime;
+		ly.gain.gain.cancelScheduledValues(t), ly.gain.gain.setTargetAtTime(e / 100 * .25, t, .12);
 	} catch {}
 }
-function hy() {
-	let e = cy();
+function _y() {
+	let e = uy();
 	if (e) try {
 		let t = e.currentTime;
 		for (let n of [{
@@ -22455,7 +22470,7 @@ function hy() {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/data/timer.js
-var gy = "settings", _y = "pomodoro.sessions", vy = "pomodoro.runtime", yy = 250, by = 5e3, xy = {
+var vy = "settings", yy = "pomodoro.sessions", by = "pomodoro.runtime", xy = 250, Sy = 5e3, Cy = {
 	focus: {
 		label: "专注",
 		minutesKey: "focusMin"
@@ -22468,7 +22483,7 @@ var gy = "settings", _y = "pomodoro.sessions", vy = "pomodoro.runtime", yy = 250
 		label: "长休",
 		minutesKey: "longBreakMin"
 	}
-}, Sy = {
+}, wy = {
 	focusMin: 25,
 	shortBreakMin: 5,
 	longBreakMin: 15,
@@ -22478,8 +22493,8 @@ var gy = "settings", _y = "pomodoro.sessions", vy = "pomodoro.runtime", yy = 250
 	keepAwake: !0,
 	whiteNoise: "none",
 	whiteNoiseVolume: 40
-}, Cy = new Map(oy.map((e) => [e.id, e])), wy = (e) => String(e).padStart(2, "0");
-function Ty(e, t) {
+}, Ty = new Map(cy.map((e) => [e.id, e])), Ey = (e) => String(e).padStart(2, "0");
+function Dy(e, t) {
 	try {
 		let n = localStorage.getItem(e);
 		return n == null ? t : JSON.parse(n);
@@ -22487,18 +22502,18 @@ function Ty(e, t) {
 		return t;
 	}
 }
-function Ey(e, t) {
+function Oy(e, t) {
 	try {
 		localStorage.setItem(e, JSON.stringify(t));
 	} catch {}
 }
-function Dy(e, t) {
+function ky(e, t) {
 	let n = Math.round(Number(e));
 	return !Number.isFinite(n) || n <= 0 ? t : n;
 }
-function Oy(e) {
+function Ay(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {
-		...Sy,
+		...wy,
 		...t
 	};
 	for (let e of [
@@ -22506,27 +22521,27 @@ function Oy(e) {
 		"shortBreakMin",
 		"longBreakMin",
 		"roundsBeforeLongBreak"
-	]) n[e] = Dy(n[e], Sy[e]);
-	return n.autoStartNext = !!n.autoStartNext, n.sound = !!n.sound, n.keepAwake = !!n.keepAwake, n.whiteNoiseVolume = Math.min(100, Math.max(0, Math.round(Number(n.whiteNoiseVolume) || Sy.whiteNoiseVolume))), Cy.has(n.whiteNoise) || (n.whiteNoise = "none"), n;
-}
-function ky(e) {
-	let t = Math.max(0, Math.ceil(e / 1e3)), n = Math.floor(t / 3600), r = Math.floor(t % 3600 / 60), i = t % 60;
-	return n > 0 ? `${n}:${wy(r)}:${wy(i)}` : `${wy(r)}:${wy(i)}`;
-}
-function Ay(e) {
-	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
+	]) n[e] = ky(n[e], wy[e]);
+	return n.autoStartNext = !!n.autoStartNext, n.sound = !!n.sound, n.keepAwake = !!n.keepAwake, n.whiteNoiseVolume = Math.min(100, Math.max(0, Math.round(Number(n.whiteNoiseVolume) || wy.whiteNoiseVolume))), Ty.has(n.whiteNoise) || (n.whiteNoise = "none"), n;
 }
 function jy(e) {
-	return `${e.getFullYear()}-${wy(e.getMonth() + 1)}-${wy(e.getDate())}`;
+	let t = Math.max(0, Math.ceil(e / 1e3)), n = Math.floor(t / 3600), r = Math.floor(t % 3600 / 60), i = t % 60;
+	return n > 0 ? `${n}:${Ey(r)}:${Ey(i)}` : `${Ey(r)}:${Ey(i)}`;
 }
-function My() {
-	let e = Ty(_y, []);
-	return Array.isArray(e) ? e.filter((e) => e && typeof e.id == "string" && xy[e.phase] && typeof e.startedAt == "string" && Number.isFinite(Number(e.durationMin))) : [];
+function My(e) {
+	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
 }
 function Ny(e) {
-	Ey(_y, e);
+	return `${e.getFullYear()}-${Ey(e.getMonth() + 1)}-${Ey(e.getDate())}`;
 }
-function Py(e, t) {
+function Py() {
+	let e = Dy(yy, []);
+	return Array.isArray(e) ? e.filter((e) => e && typeof e.id == "string" && Cy[e.phase] && typeof e.startedAt == "string" && Number.isFinite(Number(e.durationMin))) : [];
+}
+function Fy(e) {
+	Oy(yy, e);
+}
+function Iy(e, t) {
 	return {
 		id: `ps-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 		startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -22537,7 +22552,7 @@ function Py(e, t) {
 		taskTitle: null
 	};
 }
-function Fy(e) {
+function Ly(e) {
 	return {
 		phase: "focus",
 		running: !1,
@@ -22549,8 +22564,8 @@ function Fy(e) {
 		session: null
 	};
 }
-function Iy(e, t = "today") {
-	let n = Ay(/* @__PURE__ */ new Date()), r = n;
+function Ry(e, t = "today") {
+	let n = My(/* @__PURE__ */ new Date()), r = n;
 	t === "week" ? r = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 6) : t === "month" && (r = new Date(n.getFullYear(), n.getMonth(), 1));
 	let i = e.filter((e) => {
 		if (e.phase !== "focus" || !e.endedAt) return !1;
@@ -22563,40 +22578,40 @@ function Iy(e, t = "today") {
 		focusMinutes: i.reduce((e, t) => e + (Number(t.actualMin) || 0), 0)
 	};
 }
-function Ly(e) {
-	let t = new Set(e.filter((e) => e.phase === "focus" && e.completed && e.endedAt).map((e) => jy(new Date(e.endedAt))).filter(Boolean)), n = Ay(/* @__PURE__ */ new Date());
-	t.has(jy(n)) || n.setDate(n.getDate() - 1);
+function zy(e) {
+	let t = new Set(e.filter((e) => e.phase === "focus" && e.completed && e.endedAt).map((e) => Ny(new Date(e.endedAt))).filter(Boolean)), n = My(/* @__PURE__ */ new Date());
+	t.has(Ny(n)) || n.setDate(n.getDate() - 1);
 	let r = 0;
-	for (; t.has(jy(n));) r += 1, n.setDate(n.getDate() - 1);
+	for (; t.has(Ny(n));) r += 1, n.setDate(n.getDate() - 1);
 	return r;
 }
-var Ry = class {
+var By = class {
 	constructor() {
-		this.settings = Oy(null), this.sessions = My(), this.runtime = this.#a(), this.listeners = /* @__PURE__ */ new Set(), this.snapshot = null, this.ticker = 0, this.started = !1, this.lastPersistAt = 0, this.lastKeepAwake = null, this.ticking = !1, this.#l();
+		this.settings = Ay(null), this.sessions = Py(), this.runtime = this.#a(), this.listeners = /* @__PURE__ */ new Set(), this.snapshot = null, this.ticker = 0, this.started = !1, this.lastPersistAt = 0, this.lastKeepAwake = null, this.ticking = !1, this.#l();
 	}
 	subscribe = (e) => (this.listeners.add(e), () => this.listeners.delete(e));
 	getSnapshot = () => this.snapshot;
 	startEngine() {
-		this.started || (this.started = !0, this.ticker = window.setInterval(() => this.#e(), yy), this.#u());
+		this.started || (this.started = !0, this.ticker = window.setInterval(() => this.#e(), xy), this.#u());
 	}
 	stopEngine() {
 		this.started = !1, window.clearInterval(this.ticker), this.ticker = 0, this.#s(!1);
 	}
 	setSettings(e) {
-		let t = Oy(e), n = this.settings;
+		let t = Ay(e), n = this.settings;
 		this.settings = t;
 		let r = this.runtime;
-		!r.running && !r.session && (r.totalMs = t[xy[r.phase].minutesKey] * 6e4, r.remainingMs = r.totalMs), r.running && n.whiteNoise !== t.whiteNoise && (t.whiteNoise === "none" ? py() : fy(t.whiteNoise, t.whiteNoiseVolume)), n.whiteNoiseVolume !== t.whiteNoiseVolume && my(t.whiteNoiseVolume), this.#s(), this.#u();
+		!r.running && !r.session && (r.totalMs = t[Cy[r.phase].minutesKey] * 6e4, r.remainingMs = r.totalMs), r.running && n.whiteNoise !== t.whiteNoise && (t.whiteNoise === "none" ? hy() : my(t.whiteNoise, t.whiteNoiseVolume)), n.whiteNoiseVolume !== t.whiteNoiseVolume && gy(t.whiteNoiseVolume), this.#s(), this.#u();
 	}
 	remainingMs() {
 		let e = this.runtime;
 		return e.running ? Math.max(0, e.endsAt - Date.now()) : Math.max(0, e.remainingMs);
 	}
 	status() {
-		let e = this.runtime, t = Iy(this.sessions, "today");
+		let e = this.runtime, t = Ry(this.sessions, "today");
 		return {
 			phase: e.phase,
-			phaseLabel: xy[e.phase].label,
+			phaseLabel: Cy[e.phase].label,
 			running: e.running,
 			remainingSec: Math.ceil(this.remainingMs() / 1e3),
 			totalSec: Math.round(e.totalMs / 1e3),
@@ -22610,35 +22625,35 @@ var Ry = class {
 	}
 	stats(e = "today") {
 		return {
-			...Iy(this.sessions, e),
-			streakDays: Ly(this.sessions)
+			...Ry(this.sessions, e),
+			streakDays: zy(this.sessions)
 		};
 	}
 	toggle() {
-		ly(), this.runtime.running ? this.pause() : this.remainingMs() <= 0 ? this.#r() : this.#t();
+		dy(), this.runtime.running ? this.pause() : this.remainingMs() <= 0 ? this.#r() : this.#t();
 	}
 	start(e = {}) {
-		ly();
+		dy();
 		let t = this.runtime;
-		return t.running || (!t.session && t.phase === "focus" && e.minutes && (t.totalMs = Dy(e.minutes, this.settings.focusMin) * 6e4, t.remainingMs = t.totalMs), t.session || (t.session = Py(t.phase, Math.round(t.totalMs / 6e4)), t.session.taskId = e.taskId ?? null, t.session.taskTitle = e.taskTitle ?? null), this.#t()), this.status();
+		return t.running || (!t.session && t.phase === "focus" && e.minutes && (t.totalMs = ky(e.minutes, this.settings.focusMin) * 6e4, t.remainingMs = t.totalMs), t.session || (t.session = Iy(t.phase, Math.round(t.totalMs / 6e4)), t.session.taskId = e.taskId ?? null, t.session.taskTitle = e.taskTitle ?? null), this.#t()), this.status();
 	}
 	pause() {
 		let e = this.runtime;
 		if (!e.running) return;
 		let t = Date.now();
-		e.remainingMs = Math.max(0, e.endsAt - t), e.session && e.segmentStartedAt && (e.session.actualMs += Math.max(0, t - e.segmentStartedAt)), e.running = !1, e.endsAt = 0, e.segmentStartedAt = 0, py(), this.#s(), this.#o(), this.#u();
+		e.remainingMs = Math.max(0, e.endsAt - t), e.session && e.segmentStartedAt && (e.session.actualMs += Math.max(0, t - e.segmentStartedAt)), e.running = !1, e.endsAt = 0, e.segmentStartedAt = 0, hy(), this.#s(), this.#o(), this.#u();
 	}
 	skip() {
 		let e = this.runtime, t = e.phase;
-		py(), this.#i(!1);
+		hy(), this.#i(!1);
 		let n = "focus";
 		t === "focus" ? (n = "shortBreak", this.#c("已跳过专注，进入短休")) : (n = "focus", t === "longBreak" && (e.focusRound = 0), this.#c("已跳过休息，回到专注")), this.#n(n, this.settings.autoStartNext);
 	}
 	reset() {
-		py(), this.#i(!1), this.runtime.focusRound = 0, this.#c("已重置番茄钟"), this.#n("focus", !1);
+		hy(), this.#i(!1), this.runtime.focusRound = 0, this.#c("已重置番茄钟"), this.#n("focus", !1);
 	}
 	stop() {
-		py();
+		hy();
 		let e = this.#i(!1), t = this.runtime.phase;
 		return this.#c("已停止本轮"), this.#n(t, !1), e;
 	}
@@ -22651,7 +22666,7 @@ var Ry = class {
 					this.#r();
 					return;
 				}
-				e - this.lastPersistAt >= by && this.#o(), this.#u();
+				e - this.lastPersistAt >= Sy && this.#o(), this.#u();
 			} finally {
 				this.ticking = !1;
 			}
@@ -22659,21 +22674,21 @@ var Ry = class {
 	}
 	#t() {
 		let e = this.runtime;
-		e.session ||= Py(e.phase, Math.round(e.totalMs / 6e4));
+		e.session ||= Iy(e.phase, Math.round(e.totalMs / 6e4));
 		let t = Date.now();
-		e.running = !0, e.segmentStartedAt = t, e.endsAt = t + Math.max(0, e.remainingMs), this.settings.whiteNoise !== "none" && fy(this.settings.whiteNoise, this.settings.whiteNoiseVolume), this.#s(), this.#o(), this.#u();
+		e.running = !0, e.segmentStartedAt = t, e.endsAt = t + Math.max(0, e.remainingMs), this.settings.whiteNoise !== "none" && my(this.settings.whiteNoise, this.settings.whiteNoiseVolume), this.#s(), this.#o(), this.#u();
 	}
 	#n(e, t) {
-		let n = this.runtime, r = this.settings[xy[e].minutesKey];
-		n.phase = e, n.totalMs = r * 6e4, n.remainingMs = n.totalMs, n.running = !1, n.endsAt = 0, n.segmentStartedAt = 0, n.session = null, py(), this.#s(), this.#o(), this.#u(), t && this.#t();
+		let n = this.runtime, r = this.settings[Cy[e].minutesKey];
+		n.phase = e, n.totalMs = r * 6e4, n.remainingMs = n.totalMs, n.running = !1, n.endsAt = 0, n.segmentStartedAt = 0, n.session = null, hy(), this.#s(), this.#o(), this.#u(), t && this.#t();
 	}
 	#r() {
 		let e = this.runtime, t = e.phase;
-		py(), this.#i(!0, !0);
+		hy(), this.#i(!0, !0);
 		let n = "focus";
 		t === "focus" ? (e.focusRound += 1, e.focusRound >= this.settings.roundsBeforeLongBreak ? (n = "longBreak", e.focusRound = 0) : n = "shortBreak") : (t === "longBreak" && (e.focusRound = 0), n = "focus");
-		let r = this.settings[xy[n].minutesKey];
-		this.#c(t === "focus" ? `专注完成，${xy[n].label} ${r} 分钟` : `${xy[t].label}结束，开始专注 ${r} 分钟`), this.settings.sound && hy(), this.#n(n, this.settings.autoStartNext);
+		let r = this.settings[Cy[n].minutesKey];
+		this.#c(t === "focus" ? `专注完成，${Cy[n].label} ${r} 分钟` : `${Cy[t].label}结束，开始专注 ${r} 分钟`), this.settings.sound && _y(), this.#n(n, this.settings.autoStartNext);
 	}
 	#i(e, t = !0) {
 		let n = this.runtime, r = n.session;
@@ -22690,12 +22705,12 @@ var Ry = class {
 			completed: !!e,
 			taskId: r.taskId ?? void 0
 		};
-		return this.sessions.push(s), Ny(this.sessions), s;
+		return this.sessions.push(s), Fy(this.sessions), s;
 	}
 	#a() {
-		let e = Ty(vy, null);
-		if (!e || !xy[e.phase]) return Fy(this.settings);
-		let t = e.phase, n = Number(e.totalMs) > 0 ? Number(e.totalMs) : this.settings[xy[t].minutesKey] * 6e4, r = e.session && typeof e.session == "object" ? e.session : null, i = {
+		let e = Dy(by, null);
+		if (!e || !Cy[e.phase]) return Ly(this.settings);
+		let t = e.phase, n = Number(e.totalMs) > 0 ? Number(e.totalMs) : this.settings[Cy[t].minutesKey] * 6e4, r = e.session && typeof e.session == "object" ? e.session : null, i = {
 			phase: t,
 			running: !!e.running,
 			totalMs: n,
@@ -22723,7 +22738,7 @@ var Ry = class {
 	#o() {
 		this.lastPersistAt = Date.now();
 		let e = this.runtime;
-		Ey(vy, {
+		Oy(by, {
 			phase: e.phase,
 			running: e.running,
 			totalMs: e.totalMs,
@@ -22742,13 +22757,13 @@ var Ry = class {
 		t && e.notify(t);
 	}
 	#l() {
-		let e = this.runtime, t = this.remainingMs(), n = Iy(this.sessions, "today"), r = e.session;
+		let e = this.runtime, t = this.remainingMs(), n = Ry(this.sessions, "today"), r = e.session;
 		this.snapshot = {
 			phase: e.phase,
-			phaseLabel: xy[e.phase].label,
+			phaseLabel: Cy[e.phase].label,
 			running: e.running,
 			remainingMs: t,
-			remainingText: ky(t),
+			remainingText: jy(t),
 			totalMs: e.totalMs,
 			progress: e.totalMs > 0 ? 1 - Math.min(1, t / e.totalMs) : 0,
 			taskTitle: r?.taskTitle ?? (r?.taskId ? `任务 ${r.taskId}` : null),
@@ -22765,12 +22780,12 @@ var Ry = class {
 		this.#l();
 		for (let e of this.listeners) e();
 	}
-}, zy = null;
-function By() {
-	return zy ??= new Ry(), zy;
+}, Vy = null;
+function Hy() {
+	return Vy ??= new By(), Vy;
 }
-async function Vy() {
-	let e = Ty(_y, null);
+async function Uy() {
+	let e = Dy(yy, null);
 	if (Array.isArray(e) && e.length) return;
 	let t = /* @__PURE__ */ new Date(), n = [];
 	for (let e = 0; e < 3; e += 1) {
@@ -22785,9 +22800,9 @@ async function Vy() {
 			completed: !0
 		});
 	}
-	Ny(n);
+	Fy(n);
 	let r = Date.now() - 72e4;
-	Ey(vy, {
+	Oy(by, {
 		phase: "focus",
 		running: !0,
 		totalMs: 15e5,
@@ -22808,11 +22823,11 @@ async function Vy() {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/PomodoroApp.jsx
-var Hy = 500, Uy = {
+var Wy = 500, Gy = {
 	focus: G.colorBrandForeground1,
 	shortBreak: G.colorStatusSuccessForeground1,
 	longBreak: G.colorStatusInfoForeground1
-}, Wy = qn({
+}, Ky = qn({
 	root: {
 		position: "relative",
 		boxSizing: "border-box",
@@ -22923,7 +22938,7 @@ var Hy = 500, Uy = {
 		right: G.spacingHorizontalS
 	}
 });
-function Gy(e) {
+function qy(e) {
 	let t = (0, N.useRef)({
 		timer: 0,
 		origin: null
@@ -22935,7 +22950,7 @@ function Gy(e) {
 			n.button === 0 && (t.current.origin = {
 				x: n.clientX,
 				y: n.clientY
-			}, t.current.timer = window.setTimeout(() => e(), Hy));
+			}, t.current.timer = window.setTimeout(() => e(), Wy));
 		}, [e]),
 		onPointerMove: (0, N.useCallback)((e) => {
 			let r = t.current.origin;
@@ -22946,15 +22961,15 @@ function Gy(e) {
 		onPointerLeave: n
 	};
 }
-function Ky({ fallbackSizeKey: e }) {
-	let t = Wy(), n = Jv(ny, e || "2x1"), [r] = Yv(gy, Sy, Oy), i = By(), a = (0, N.useSyncExternalStore)(i.subscribe, i.getSnapshot), [o, s] = (0, N.useState)(() => new URLSearchParams(location.search).get("immersive") === "1"), c = (0, N.useRef)(i);
+function Jy({ fallbackSizeKey: e }) {
+	let t = Ky(), n = Xv(iy, e || "2x1"), [r] = Zv(vy, wy, Ay), i = Hy(), a = (0, N.useSyncExternalStore)(i.subscribe, i.getSnapshot), [o, s] = (0, N.useState)(() => new URLSearchParams(location.search).get("immersive") === "1"), c = (0, N.useRef)(i);
 	c.current = i;
 	let l = n === "1x1", u = n === "2x1", d = n === "3x2";
 	(0, N.useEffect)(() => (i.startEngine(), () => i.stopEngine()), [i]), (0, N.useEffect)(() => {
 		i.setSettings(r);
-	}, [i, r]), $v(() => Qv("番茄钟设置"));
-	let f = (0, N.useCallback)(() => i.toggle(), [i]), p = (0, N.useCallback)(() => Zv("detail", "专注详情"), []), m = (0, N.useCallback)(() => Qv("番茄钟设置"), []), h = Gy(m);
-	ey([
+	}, [i, r]), ty(() => ey("番茄钟设置"));
+	let f = (0, N.useCallback)(() => i.toggle(), [i]), p = (0, N.useCallback)(() => $v("detail", "专注详情"), []), m = (0, N.useCallback)(() => ey("番茄钟设置"), []), h = qy(m);
+	ny([
 		{
 			name: "pomodoro.start",
 			description: "开始或继续一轮专注",
@@ -23101,7 +23116,7 @@ function Ky({ fallbackSizeKey: e }) {
 	] }) })] }), y = /* @__PURE__ */ (0, P.jsx)(J, {
 		appearance: "tint",
 		size: "large",
-		style: { color: Uy[a.phase] },
+		style: { color: Gy[a.phase] },
 		children: a.phaseLabel
 	}), b = o && /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: t.immersive,
@@ -23119,7 +23134,7 @@ function Ky({ fallbackSizeKey: e }) {
 			}),
 			/* @__PURE__ */ (0, P.jsx)(wv, {
 				size: 400,
-				style: { color: Uy[a.phase] },
+				style: { color: Gy[a.phase] },
 				weight: "semibold",
 				children: a.phaseLabel
 			}),
@@ -23313,7 +23328,7 @@ function Ky({ fallbackSizeKey: e }) {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/PomodoroDetail.jsx
-var qy = qn({
+var Yy = qn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -23350,8 +23365,8 @@ var qy = qn({
 		whiteSpace: "nowrap"
 	}
 });
-function Jy() {
-	let e = qy(), t = By(), [n, r] = (0, N.useState)(() => t.status()), [i, a] = (0, N.useState)(() => t.stats("today")), [o, s] = (0, N.useState)(() => t.stats("week"));
+function Xy() {
+	let e = Yy(), t = Hy(), [n, r] = (0, N.useState)(() => t.status()), [i, a] = (0, N.useState)(() => t.stats("today")), [o, s] = (0, N.useState)(() => t.stats("week"));
 	(0, N.useEffect)(() => {
 		let e = () => {
 			r(t.status()), a(t.stats("today")), s(t.stats("week"));
@@ -23413,7 +23428,7 @@ function Jy() {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/PomodoroSettings.jsx
-var Yy = qn({
+var Zy = qn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -23465,8 +23480,8 @@ var Yy = qn({
 	},
 	subtle: { color: G.colorNeutralForeground3 }
 });
-function Xy() {
-	let e = Yy(), [t, n, r] = Yv(gy, Sy, Oy), i = (e) => n((t) => ({
+function Qy() {
+	let e = Zy(), [t, n, r] = Zv(vy, wy, Ay), i = (e) => n((t) => ({
 		...t,
 		...e
 	})), a = (e, t) => (n) => {
@@ -23494,7 +23509,7 @@ function Xy() {
 								min: 1,
 								value: String(t.focusMin),
 								disabled: !r,
-								onChange: a("focusMin", Sy.focusMin)
+								onChange: a("focusMin", wy.focusMin)
 							})
 						}),
 						/* @__PURE__ */ (0, P.jsx)(gh, {
@@ -23505,7 +23520,7 @@ function Xy() {
 								min: 1,
 								value: String(t.shortBreakMin),
 								disabled: !r,
-								onChange: a("shortBreakMin", Sy.shortBreakMin)
+								onChange: a("shortBreakMin", wy.shortBreakMin)
 							})
 						}),
 						/* @__PURE__ */ (0, P.jsx)(gh, {
@@ -23516,7 +23531,7 @@ function Xy() {
 								min: 1,
 								value: String(t.longBreakMin),
 								disabled: !r,
-								onChange: a("longBreakMin", Sy.longBreakMin)
+								onChange: a("longBreakMin", wy.longBreakMin)
 							})
 						}),
 						/* @__PURE__ */ (0, P.jsx)(gh, {
@@ -23527,7 +23542,7 @@ function Xy() {
 								min: 1,
 								value: String(t.roundsBeforeLongBreak),
 								disabled: !r,
-								onChange: a("roundsBeforeLongBreak", Sy.roundsBeforeLongBreak)
+								onChange: a("roundsBeforeLongBreak", wy.roundsBeforeLongBreak)
 							})
 						})
 					]
@@ -23611,7 +23626,7 @@ function Xy() {
 						value: t.whiteNoise,
 						layout: "horizontal",
 						onChange: (e, t) => i({ whiteNoise: t.value }),
-						children: oy.map((e) => /* @__PURE__ */ (0, P.jsx)(P_, {
+						children: cy.map((e) => /* @__PURE__ */ (0, P.jsx)(P_, {
 							value: e.id,
 							label: e.label
 						}, e.id))
@@ -23644,16 +23659,16 @@ function Xy() {
 //#endregion
 //#region public/plugins/pomodoro/src/main.jsx
 Uv();
-var Zy = new URLSearchParams(location.search), Qy = Xv(), $y = ry();
-function eb(t = 2500) {
+var $y = new URLSearchParams(location.search), eb = Qv(), tb = ay();
+function nb(t = 2500) {
 	return !e.inHost || Wv() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(Wv() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function tb() {
-	let { theme: t } = qv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
+function rb() {
+	let { theme: t } = Yv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
 	return /* @__PURE__ */ (0, P.jsx)(Ol, {
 		theme: t,
 		style: {
@@ -23662,12 +23677,12 @@ function tb() {
 			background: n,
 			colorScheme: "normal"
 		},
-		children: Qy === "settings" ? /* @__PURE__ */ (0, P.jsx)(Xy, {}) : Qy === "detail" ? /* @__PURE__ */ (0, P.jsx)(Jy, {}) : /* @__PURE__ */ (0, P.jsx)(Ky, { fallbackSizeKey: $y })
+		children: eb === "settings" ? /* @__PURE__ */ (0, P.jsx)(Qy, {}) : eb === "detail" ? /* @__PURE__ */ (0, P.jsx)(Xy, {}) : /* @__PURE__ */ (0, P.jsx)(Jy, { fallbackSizeKey: tb })
 	});
 }
-async function nb() {
+async function ib() {
 	let e = document.getElementById("root");
-	e && (await eb(), Zy.get("demo") === "1" && await Vy(), (0, Lv.createRoot)(e).render(/* @__PURE__ */ (0, P.jsx)(tb, {})));
+	e && (await nb(), $y.get("demo") === "1" && await Uy(), (0, Lv.createRoot)(e).render(/* @__PURE__ */ (0, P.jsx)(rb, {})));
 }
-nb();
+ib();
 //#endregion

@@ -21303,13 +21303,28 @@ function M_(e) {
 	let t = O_.init?.config;
 	if (t && typeof t == "object") return t[e];
 }
-function N_(t = "dark") {
-	let [n, r] = (0, N.useState)(() => j_(t));
-	return (0, N.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, N.useMemo)(() => E_(n), [n]);
+var N_ = "(prefers-color-scheme: light)";
+function P_() {
+	return typeof window > "u" || typeof window.matchMedia != "function" ? "dark" : window.matchMedia(N_).matches ? "light" : "dark";
 }
-function P_(t, n) {
+function F_(t = "dark") {
+	let [n, r] = (0, N.useState)(() => j_(t)), [i, a] = (0, N.useState)(P_);
+	(0, N.useEffect)(() => e.onTheme((e) => {
+		e && typeof e == "object" && r(e);
+	}), []), (0, N.useEffect)(() => {
+		if (e.inHost || typeof window.matchMedia != "function") return;
+		let t = window.matchMedia(N_), n = () => a(t.matches ? "light" : "dark");
+		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
+	}, []);
+	let o = e.inHost ? n : {
+		...n,
+		colorScheme: i
+	}, s = (0, N.useMemo)(() => E_(o), [o]);
+	return (0, N.useEffect)(() => {
+		typeof document < "u" && (document.documentElement.style.colorScheme = s.scheme, document.body && (document.body.style.colorScheme = s.scheme));
+	}, [s.scheme]), s;
+}
+function I_(t, n) {
 	let r = (0, N.useRef)(t);
 	r.current = t;
 	let [i, a] = (0, N.useState)(() => {
@@ -21320,7 +21335,7 @@ function P_(t, n) {
 		Array.isArray(e) && e.length === 2 && a(r.current(e));
 	}), []), i;
 }
-function F_(t, n, r) {
+function L_(t, n, r) {
 	let i = (0, N.useRef)(r);
 	i.current = r;
 	let [a, o] = (0, N.useState)(() => {
@@ -21360,11 +21375,11 @@ function F_(t, n, r) {
 		s
 	];
 }
-function I_() {
+function R_() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function L_(e, t) {
+function z_(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -21373,13 +21388,13 @@ function L_(e, t) {
 		}
 	}, "*");
 }
-function R_(e = "设置") {
-	L_("settings", e);
+function B_(e = "设置") {
+	z_("settings", e);
 }
-typeof window < "u" && I_() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && R_() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function z_(e) {
+function V_(e) {
 	let t = (0, N.useRef)(e);
 	t.current = e, (0, N.useEffect)(() => {
 		let e = (e) => {
@@ -21390,7 +21405,7 @@ function z_(e) {
 		return window.addEventListener("message", e), () => window.removeEventListener("message", e);
 	}, []);
 }
-function B_(t, n) {
+function H_(t, n) {
 	let r = (0, N.useRef)(n);
 	r.current = n;
 	let i = (0, N.useRef)(t);
@@ -21411,54 +21426,54 @@ function B_(t, n) {
 }
 //#endregion
 //#region public/plugins/sedentary/src/sizes.js
-var V_ = {
+var U_ = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function H_(e) {
+function W_(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return V_[t] ? t : "2x1";
+	return U_[t] ? t : "2x1";
 }
-function U_() {
+function G_() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return V_[n] ? n : null;
+	return U_[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/sedentary/src/data/engine.js
-var W_ = "settings", G_ = "sedentary.days", K_ = "sedentary.runtime", q_ = "sedentary.command", J_ = 1e4, Y_ = 60, X_ = 5, Z_ = "sedentary:command", Q_ = 400, $_ = {
+var K_ = "settings", q_ = "sedentary.days", J_ = "sedentary.runtime", Y_ = "sedentary.command", X_ = 1e4, Z_ = 60, Q_ = 5, $_ = "sedentary:command", ev = 400, tv = {
 	enabled: !0,
 	thresholdMin: 45,
 	remindEveryMin: 10,
 	idleResetMin: 5,
 	strongReminder: !0,
 	quietHours: null
-}, ev = {
+}, nv = {
 	start: "22:00",
 	end: "08:00"
-}, tv = {
+}, rv = {
 	success: "正常",
 	warning: "接近阈值",
 	danger: "已超阈值",
 	quiet: "免打扰",
 	off: "已关闭"
-}, nv = (e) => String(e).padStart(2, "0");
-function rv(e) {
-	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${nv(e.getHours())}:${nv(e.getMinutes())}`;
-}
-function iv(e) {
-	return `${e.getFullYear()}-${nv(e.getMonth() + 1)}-${nv(e.getDate())}`;
-}
+}, iv = (e) => String(e).padStart(2, "0");
 function av(e) {
+	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${iv(e.getHours())}:${iv(e.getMinutes())}`;
+}
+function ov(e) {
+	return `${e.getFullYear()}-${iv(e.getMonth() + 1)}-${iv(e.getDate())}`;
+}
+function sv(e) {
 	if (typeof e != "string") return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function ov(e, t) {
+function cv(e, t) {
 	try {
 		let n = localStorage.getItem(e);
 		return n == null ? t : JSON.parse(n);
@@ -21466,34 +21481,34 @@ function ov(e, t) {
 		return t;
 	}
 }
-function sv(e, t) {
+function lv(e, t) {
 	try {
 		localStorage.setItem(e, JSON.stringify(t));
 	} catch {}
 }
-function cv(e, t) {
+function uv(e, t) {
 	let n = Math.round(Number(e));
 	return !Number.isFinite(n) || n <= 0 ? t : n;
 }
-function lv(e) {
+function dv(e) {
 	return !e || typeof e != "object" || !/^\d{2}:\d{2}$/.test(e.start) || !/^\d{2}:\d{2}$/.test(e.end) ? null : {
 		start: e.start,
 		end: e.end
 	};
 }
-function uv(e) {
+function fv(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		enabled: typeof t.enabled == "boolean" ? t.enabled : $_.enabled,
-		thresholdMin: cv(t.thresholdMin, $_.thresholdMin),
-		remindEveryMin: cv(t.remindEveryMin, $_.remindEveryMin),
-		idleResetMin: cv(t.idleResetMin, $_.idleResetMin),
-		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : $_.strongReminder,
-		quietHours: lv(t.quietHours)
+		enabled: typeof t.enabled == "boolean" ? t.enabled : tv.enabled,
+		thresholdMin: uv(t.thresholdMin, tv.thresholdMin),
+		remindEveryMin: uv(t.remindEveryMin, tv.remindEveryMin),
+		idleResetMin: uv(t.idleResetMin, tv.idleResetMin),
+		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : tv.strongReminder,
+		quietHours: dv(t.quietHours)
 	};
 }
-function dv() {
-	let e = ov(K_, null), t = e && typeof e == "object" ? e : {};
+function pv() {
+	let e = cv(J_, null), t = e && typeof e == "object" ? e : {};
 	return {
 		sittingSince: typeof t.sittingSince == "string" ? t.sittingSince : null,
 		lastInputAt: typeof t.lastInputAt == "string" ? t.lastInputAt : null,
@@ -21505,17 +21520,17 @@ function dv() {
 		commandId: typeof t.commandId == "string" ? t.commandId : null
 	};
 }
-function fv(e) {
-	sv(K_, e);
+function mv(e) {
+	lv(J_, e);
 }
-function pv() {
-	let e = ov(G_, null);
+function hv() {
+	let e = cv(q_, null);
 	return e && typeof e == "object" && !Array.isArray(e) ? e : {};
 }
-function mv(e) {
-	sv(G_, e);
+function gv(e) {
+	lv(q_, e);
 }
-function hv(e) {
+function _v(e) {
 	return {
 		date: e,
 		sittingMinutes: 0,
@@ -21523,77 +21538,77 @@ function hv(e) {
 		breaks: 0
 	};
 }
-function gv(e = /* @__PURE__ */ new Date()) {
-	return pv()[iv(e)] ?? hv(iv(e));
+function vv(e = /* @__PURE__ */ new Date()) {
+	return hv()[ov(e)] ?? _v(ov(e));
 }
-function _v(e, t = Date.now()) {
-	let n = av(e.sittingSince);
+function yv(e, t = Date.now()) {
+	let n = sv(e.sittingSince);
 	return n ? Math.max(0, (t - n.getTime()) / 6e4) : 0;
 }
-function vv(e, t) {
+function bv(e, t) {
 	if (!t) return !1;
 	let n = e.getHours() * 60 + e.getMinutes(), [r, i] = t.start.split(":").map(Number), [a, o] = t.end.split(":").map(Number), s = r * 60 + i, c = a * 60 + o;
 	return s === c ? !1 : s < c ? n >= s && n < c : n >= s || n < c;
 }
-function yv(e, t, n = /* @__PURE__ */ new Date()) {
+function xv(e, t, n = /* @__PURE__ */ new Date()) {
 	if (!e.enabled) return "off";
-	if (vv(n, e.quietHours)) return "quiet";
-	let r = _v(t, n.getTime());
+	if (bv(n, e.quietHours)) return "quiet";
+	let r = yv(t, n.getTime());
 	return r >= e.thresholdMin ? "danger" : r >= e.thresholdMin * .6 ? "warning" : "success";
 }
-function bv(e, t, n = /* @__PURE__ */ new Date()) {
-	let r = yv(e, t, n);
+function Sv(e, t, n = /* @__PURE__ */ new Date()) {
+	let r = xv(e, t, n);
 	if (r === "off") return "久坐提醒已关闭";
 	if (r === "quiet") return "免打扰时段，仍在计时";
-	let i = av(t.snoozedUntil);
+	let i = sv(t.snoozedUntil);
 	if (i && i > n) return "提醒已推迟，稍后再说";
 	if (!t.sittingSince) return "刚起身，久坐计时还没开始";
-	let a = _v(t, n.getTime()), o = e.thresholdMin - a;
+	let a = yv(t, n.getTime()), o = e.thresholdMin - a;
 	return r === "danger" ? "已超过提醒阈值，起来活动一下" : r === "warning" ? `距提醒还有 ${Math.max(1, Math.ceil(o))} 分钟，准备起身` : `距提醒还有 ${Math.max(1, Math.ceil(o))} 分钟`;
 }
-function xv(e) {
-	return tv[e] ?? "正常";
+function Cv(e) {
+	return rv[e] ?? "正常";
 }
-function Sv(e, t, n = /* @__PURE__ */ new Date()) {
+function wv(e, t, n = /* @__PURE__ */ new Date()) {
 	if (!e.enabled) return "—";
-	if (vv(n, e.quietHours)) return "免打扰中";
-	let r = av(t.snoozedUntil);
+	if (bv(n, e.quietHours)) return "免打扰中";
+	let r = sv(t.snoozedUntil);
 	if (r && r > n) return `稍后 ${Math.ceil((r.getTime() - n.getTime()) / 6e4)} 分钟`;
 	if (!t.sittingSince) return "—";
-	let i = _v(t, n.getTime()), a = e.thresholdMin - i;
+	let i = yv(t, n.getTime()), a = e.thresholdMin - i;
 	return a <= 0 ? "已到提醒点" : `约 ${Math.max(1, Math.ceil(a))} 分钟`;
 }
-function Cv(e, t = /* @__PURE__ */ new Date()) {
-	let n = dv(), r = pv()[iv(t)] ?? hv(iv(t)), i = yv(e, n, t), a = Math.floor(_v(n, t.getTime())), o = av(n.lastBreakAt);
+function Tv(e, t = /* @__PURE__ */ new Date()) {
+	let n = pv(), r = hv()[ov(t)] ?? _v(ov(t)), i = xv(e, n, t), a = Math.floor(yv(n, t.getTime())), o = sv(n.lastBreakAt);
 	return {
 		runtime: n,
 		today: r,
 		status: i,
-		statusLabel: xv(i),
+		statusLabel: Cv(i),
 		currentMin: a,
-		hint: bv(e, n, t),
-		nextText: Sv(e, n, t),
-		lastBreakText: o ? rv(o) : "—"
+		hint: Sv(e, n, t),
+		nextText: wv(e, n, t),
+		lastBreakText: o ? av(o) : "—"
 	};
 }
-function wv() {
+function Ev() {
 	let e = {
 		id: `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 		type: "break",
 		at: (/* @__PURE__ */ new Date()).toISOString()
 	};
-	return sv(q_, e), window.dispatchEvent(new CustomEvent(Z_, { detail: e })), e;
+	return lv(Y_, e), window.dispatchEvent(new CustomEvent($_, { detail: e })), e;
 }
-function Tv(e) {
+function Dv(e) {
 	let t = (t) => e(t.detail);
-	return window.addEventListener(Z_, t), () => window.removeEventListener(Z_, t);
+	return window.addEventListener($_, t), () => window.removeEventListener($_, t);
 }
-var Ev = class {
+var Ov = class {
 	constructor() {
 		this.running = !1, this.timer = 0, this.firstTimer = 0, this.disposers = [], this.logs = [];
 	}
 	start() {
-		this.running || (this.running = !0, this.disposers.push(this.#t()), this.firstTimer = window.setTimeout(() => void this.tick(), 500), this.timer = window.setInterval(() => void this.tick(), J_), this.#e("后台引擎启动（每 10 秒轮询 getIdleSeconds）"));
+		this.running || (this.running = !0, this.disposers.push(this.#t()), this.firstTimer = window.setTimeout(() => void this.tick(), 500), this.timer = window.setInterval(() => void this.tick(), X_), this.#e("后台引擎启动（每 10 秒轮询 getIdleSeconds）"));
 	}
 	stop() {
 		this.running = !1, window.clearTimeout(this.firstTimer), window.clearInterval(this.timer);
@@ -21603,33 +21618,33 @@ var Ev = class {
 		return [...this.logs];
 	}
 	#e(e) {
-		this.logs.push(`${rv(/* @__PURE__ */ new Date())}  ${e}`), this.logs.length > 30 && this.logs.shift();
+		this.logs.push(`${av(/* @__PURE__ */ new Date())}  ${e}`), this.logs.length > 30 && this.logs.shift();
 	}
 	#t() {
 		let e = (e) => {
 			if (e.key === "sedentary.command") {
-				let e = ov(q_, null);
+				let e = cv(Y_, null);
 				e && this.handleCommand(e);
 			}
 		};
 		window.addEventListener("storage", e);
-		let t = Tv((e) => this.handleCommand(e));
+		let t = Dv((e) => this.handleCommand(e));
 		return () => {
 			window.removeEventListener("storage", e), t();
 		};
 	}
 	handleCommand(e) {
 		if (!e || e.type !== "break") return;
-		let t = dv();
-		t.commandId !== e.id && (t.commandId = e.id, fv(t), this.takeBreak("manual"));
+		let t = pv();
+		t.commandId !== e.id && (t.commandId = e.id, mv(t), this.takeBreak("manual"));
 	}
 	async tick() {
 		if (!this.running) return;
-		let t = /* @__PURE__ */ new Date(), n = uv(await e.getConfig(W_).catch(() => null)), r = pv(), i = iv(t), a = r[i] ?? hv(i);
+		let t = /* @__PURE__ */ new Date(), n = fv(await e.getConfig(K_).catch(() => null)), r = hv(), i = ov(t), a = r[i] ?? _v(i);
 		r[i] = a;
-		let o = dv();
+		let o = pv();
 		if (!n.enabled) {
-			o.sittingSince = null, o.lastRemindAt = null, o.snoozedUntil = null, o.lastTickAt = t.toISOString(), fv(o), mv(this.#n(r));
+			o.sittingSince = null, o.lastRemindAt = null, o.snoozedUntil = null, o.lastTickAt = t.toISOString(), mv(o), gv(this.#n(r));
 			return;
 		}
 		let s = 0;
@@ -21638,41 +21653,41 @@ var Ev = class {
 		} catch {
 			s = 0;
 		}
-		let c = s < Y_, l = Math.max(1, n.idleResetMin) * 60, u = av(o.lastTickAt), d = u ? Math.max(0, (t - u) / 6e4) : 0;
+		let c = s < Z_, l = Math.max(1, n.idleResetMin) * 60, u = sv(o.lastTickAt), d = u ? Math.max(0, (t - u) / 6e4) : 0;
 		if (c) {
 			o.sittingSince || (o.sittingSince = t.toISOString(), this.#e("开始新一轮久坐计时")), a.sittingMinutes += d;
-			let e = _v(o, t.getTime());
-			e > a.longestStreakMin && (a.longestStreakMin = Math.round(e)), o.lastInputAt = t.toISOString(), o.lastTickAt = t.toISOString(), fv(o), mv(this.#n(r)), await this.#r(t, e, n);
+			let e = yv(o, t.getTime());
+			e > a.longestStreakMin && (a.longestStreakMin = Math.round(e)), o.lastInputAt = t.toISOString(), o.lastTickAt = t.toISOString(), mv(o), gv(this.#n(r)), await this.#r(t, e, n);
 		} else if (s >= l) {
 			if (o.sittingSince) {
-				let e = _v(o, t.getTime());
+				let e = yv(o, t.getTime());
 				e > a.longestStreakMin && (a.longestStreakMin = Math.round(e)), a.breaks += 1, o.lastBreakAt = t.toISOString(), o.sittingSince = null, o.lastRemindAt = null, o.snoozedUntil = null, o.quietSkip = !1, this.#e(`检测到起身（空闲 ${Math.round(s / 60)} 分钟），今日第 ${a.breaks} 次`);
 			}
-			o.lastTickAt = t.toISOString(), fv(o), mv(this.#n(r));
-		} else o.lastTickAt = t.toISOString(), fv(o);
+			o.lastTickAt = t.toISOString(), mv(o), gv(this.#n(r));
+		} else o.lastTickAt = t.toISOString(), mv(o);
 	}
 	#n(e) {
 		let t = Object.keys(e).sort();
-		if (t.length <= Q_) return e;
+		if (t.length <= ev) return e;
 		let n = new Set(t.slice(-400)), r = {};
 		for (let i of t) n.has(i) && (r[i] = e[i]);
 		return r;
 	}
 	async #r(e, t, n) {
 		if (t < n.thresholdMin) {
-			let e = dv();
-			e.quietSkip && (e.quietSkip = !1, fv(e));
+			let e = pv();
+			e.quietSkip && (e.quietSkip = !1, mv(e));
 			return;
 		}
-		let r = dv();
-		if (vv(e, n.quietHours)) {
-			r.quietSkip || (r.quietSkip = !0, fv(r));
+		let r = pv();
+		if (bv(e, n.quietHours)) {
+			r.quietSkip || (r.quietSkip = !0, mv(r));
 			return;
 		}
-		let i = av(r.snoozedUntil);
+		let i = sv(r.snoozedUntil);
 		if (i && i > e) return;
-		let a = av(r.lastRemindAt);
-		(!a || e.getTime() - a.getTime() >= Math.max(1, n.remindEveryMin) * 6e4 || r.quietSkip) && (r.quietSkip = !1, r.lastRemindAt = e.toISOString(), r.snoozedUntil = null, fv(r), await this.#i(Math.round(t), n));
+		let a = sv(r.lastRemindAt);
+		(!a || e.getTime() - a.getTime() >= Math.max(1, n.remindEveryMin) * 6e4 || r.quietSkip) && (r.quietSkip = !1, r.lastRemindAt = e.toISOString(), r.snoozedUntil = null, mv(r), await this.#i(Math.round(t), n));
 	}
 	async #i(t, n) {
 		if (this.#e(`触发提醒（已连续 ${t} 分钟）`), !n.strongReminder) {
@@ -21699,52 +21714,52 @@ var Ev = class {
 		}
 		if (r?.actionId === "stand") this.takeBreak("reminder");
 		else if (r?.actionId === "snooze") {
-			let e = dv();
-			e.snoozedUntil = new Date(Date.now() + X_ * 6e4).toISOString(), fv(e), this.#e(`${X_} 分钟后再提醒`);
+			let e = pv();
+			e.snoozedUntil = new Date(Date.now() + Q_ * 6e4).toISOString(), mv(e), this.#e(`${Q_} 分钟后再提醒`);
 		} else this.#e("提醒 30 秒无操作，自动收起");
 	}
 	takeBreak(t = "manual") {
-		let n = /* @__PURE__ */ new Date(), r = pv(), i = iv(n), a = r[i] ?? hv(i);
+		let n = /* @__PURE__ */ new Date(), r = hv(), i = ov(n), a = r[i] ?? _v(i);
 		r[i] = a;
-		let o = dv();
+		let o = pv();
 		if (o.sittingSince) {
-			let e = _v(o, n.getTime());
+			let e = yv(o, n.getTime());
 			e > a.longestStreakMin && (a.longestStreakMin = Math.round(e)), a.breaks += 1, this.#e(`记录起身（${t}，本轮已坐 ${Math.round(e)} 分钟）`);
 		} else this.#e(`记录起身（${t}）`);
-		return o.sittingSince = null, o.lastRemindAt = null, o.snoozedUntil = null, o.quietSkip = !1, o.lastBreakAt = n.toISOString(), o.lastTickAt = n.toISOString(), fv(o), mv(this.#n(r)), e.notify(`已记录起身，今日共 ${a.breaks} 次`), a;
+		return o.sittingSince = null, o.lastRemindAt = null, o.snoozedUntil = null, o.quietSkip = !1, o.lastBreakAt = n.toISOString(), o.lastTickAt = n.toISOString(), mv(o), gv(this.#n(r)), e.notify(`已记录起身，今日共 ${a.breaks} 次`), a;
 	}
 };
-function Dv(e) {
-	let t = /* @__PURE__ */ new Date(), n = dv(), r = Math.round(_v(n, t.getTime()));
+function kv(e) {
+	let t = /* @__PURE__ */ new Date(), n = pv(), r = Math.round(yv(n, t.getTime()));
 	return {
 		enabled: e.enabled,
 		sitting: !!n.sittingSince,
 		currentStreakMin: r,
 		thresholdMin: e.thresholdMin,
 		nextReminderMin: n.sittingSince ? Math.max(0, e.thresholdMin - r) : null,
-		quiet: vv(t, e.quietHours),
+		quiet: bv(t, e.quietHours),
 		snoozedUntil: n.snoozedUntil,
-		status: yv(e, n, t)
+		status: xv(e, n, t)
 	};
 }
-async function Ov() {
-	let e = ov(G_, null);
+async function Av() {
+	let e = cv(q_, null);
 	if (e && Object.keys(e).length) return;
 	let t = /* @__PURE__ */ new Date(), n = /* @__PURE__ */ new Date(t.getTime() - 864e5);
-	mv({
-		[iv(t)]: {
-			date: iv(t),
+	gv({
+		[ov(t)]: {
+			date: ov(t),
 			sittingMinutes: 187,
 			longestStreakMin: 52,
 			breaks: 3
 		},
-		[iv(n)]: {
-			date: iv(n),
+		[ov(n)]: {
+			date: ov(n),
 			sittingMinutes: 312,
 			longestStreakMin: 96,
 			breaks: 5
 		}
-	}), fv({
+	}), mv({
 		sittingSince: (/* @__PURE__ */ new Date(t.getTime() - 312e4)).toISOString(),
 		lastInputAt: t.toISOString(),
 		lastRemindAt: t.toISOString(),
@@ -21755,19 +21770,19 @@ async function Ov() {
 		commandId: null
 	});
 }
-var kv = null;
-function Av() {
-	return kv ??= new Ev(), kv;
+var jv = null;
+function Mv() {
+	return jv ??= new Ov(), jv;
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryApp.jsx
-var jv = 500, Mv = 8, Nv = {
+var Nv = 500, Pv = 8, Fv = {
 	success: "success",
 	warning: "warning",
 	danger: "danger",
 	quiet: "informative",
 	off: "subtle"
-}, Pv = qn({
+}, Iv = qn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -21844,7 +21859,7 @@ var jv = 500, Mv = 8, Nv = {
 		minWidth: 0
 	}
 });
-function Fv(e) {
+function Lv(e) {
 	let t = (0, N.useRef)({
 		timer: 0,
 		origin: null
@@ -21856,25 +21871,25 @@ function Fv(e) {
 			n.button === 0 && (t.current.origin = {
 				x: n.clientX,
 				y: n.clientY
-			}, t.current.timer = window.setTimeout(() => e(), jv));
+			}, t.current.timer = window.setTimeout(() => e(), Nv));
 		}, [e]),
 		onPointerMove: (0, N.useCallback)((e) => {
 			let r = t.current.origin;
-			r && Math.hypot(e.clientX - r.x, e.clientY - r.y) > Mv && n();
+			r && Math.hypot(e.clientX - r.x, e.clientY - r.y) > Pv && n();
 		}, [n]),
 		onPointerUp: n,
 		onPointerCancel: n,
 		onPointerLeave: n
 	};
 }
-function Iv({ fallbackSizeKey: t }) {
-	let n = Pv(), r = P_(H_, t || "2x1"), [i] = F_(W_, $_, uv), [a, o] = (0, N.useState)(() => Cv($_)), s = r === "1x1", c = r === "3x2", l = r === "2x2" || c, u = r !== "1x1" && r !== "2x1";
+function Rv({ fallbackSizeKey: t }) {
+	let n = Iv(), r = I_(W_, t || "2x1"), [i] = L_(K_, tv, fv), [a, o] = (0, N.useState)(() => Tv(tv)), s = r === "1x1", c = r === "3x2", l = r === "2x2" || c, u = r !== "1x1" && r !== "2x1";
 	(0, N.useEffect)(() => {
 		if (e.inHost) return;
-		let t = Av();
+		let t = Mv();
 		return t.start(), () => t.stop();
 	}, []), (0, N.useEffect)(() => {
-		let e = () => o(Cv(i));
+		let e = () => o(Tv(i));
 		e();
 		let t = window.setInterval(e, 1e3), n = (t) => {
 			(t.key === "sedentary.days" || t.key === "sedentary.runtime" || t.key === null) && e();
@@ -21882,9 +21897,9 @@ function Iv({ fallbackSizeKey: t }) {
 		return window.addEventListener("storage", n), () => {
 			window.clearInterval(t), window.removeEventListener("storage", n);
 		};
-	}, [i]), z_(() => R_("久坐提醒设置"));
-	let d = (0, N.useCallback)(() => L_("detail", "久坐详情"), []), f = Fv(d), p = (0, N.useCallback)(() => {
-		i.enabled && wv();
+	}, [i]), V_(() => B_("久坐提醒设置"));
+	let d = (0, N.useCallback)(() => z_("detail", "久坐详情"), []), f = Lv(d), p = (0, N.useCallback)(() => {
+		i.enabled && Ev();
 	}, [i.enabled]), m = `${a.hint}，点击记录我起来了`, h = /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: n.headline,
 		children: [/* @__PURE__ */ (0, P.jsx)(S_, {
@@ -21899,7 +21914,7 @@ function Iv({ fallbackSizeKey: t }) {
 		})]
 	}), g = /* @__PURE__ */ (0, P.jsx)(Ku, {
 		appearance: "tint",
-		color: Nv[a.status] ?? "informative",
+		color: Fv[a.status] ?? "informative",
 		size: "large",
 		"aria-label": `状态：${a.statusLabel}`,
 		children: a.statusLabel
@@ -21941,7 +21956,7 @@ function Iv({ fallbackSizeKey: t }) {
 		}) : /* @__PURE__ */ (0, P.jsx)(Im, {
 			appearance: "primary",
 			size: "large",
-			onClick: () => R_("久坐提醒设置"),
+			onClick: () => B_("久坐提醒设置"),
 			children: "启用久坐提醒"
 		}), /* @__PURE__ */ (0, P.jsxs)(_g, { children: [/* @__PURE__ */ (0, P.jsx)(r_, {
 			disableButtonEnhancement: !0,
@@ -21961,7 +21976,7 @@ function Iv({ fallbackSizeKey: t }) {
 				children: "详情与统计"
 			}),
 			/* @__PURE__ */ (0, P.jsx)(jg, {
-				onClick: () => R_("久坐提醒设置"),
+				onClick: () => B_("久坐提醒设置"),
 				children: "设置"
 			}),
 			i.enabled && /* @__PURE__ */ (0, P.jsx)(jg, {
@@ -21980,7 +21995,7 @@ function Iv({ fallbackSizeKey: t }) {
 		onPointerCancel: f.onPointerCancel,
 		onPointerLeave: f.onPointerLeave,
 		onContextMenu: (e) => {
-			e.preventDefault(), R_("久坐提醒设置");
+			e.preventDefault(), B_("久坐提醒设置");
 		},
 		children: /* @__PURE__ */ (0, P.jsxs)("div", {
 			className: n.wide,
@@ -22014,7 +22029,7 @@ function Iv({ fallbackSizeKey: t }) {
 		onPointerCancel: f.onPointerCancel,
 		onPointerLeave: f.onPointerLeave,
 		onContextMenu: (e) => {
-			e.preventDefault(), R_("久坐提醒设置");
+			e.preventDefault(), B_("久坐提醒设置");
 		},
 		children: [
 			/* @__PURE__ */ (0, P.jsxs)("div", {
@@ -22039,10 +22054,10 @@ function Iv({ fallbackSizeKey: t }) {
 		tabIndex: 0,
 		"aria-label": m,
 		onClick: () => {
-			i.enabled ? p() : R_("久坐提醒设置");
+			i.enabled ? p() : B_("久坐提醒设置");
 		},
 		onKeyDown: (e) => {
-			(e.key === "Enter" || e.key === " ") && (e.preventDefault(), i.enabled ? p() : R_("久坐提醒设置"));
+			(e.key === "Enter" || e.key === " ") && (e.preventDefault(), i.enabled ? p() : B_("久坐提醒设置"));
 		},
 		onPointerDown: f.onPointerDown,
 		onPointerMove: f.onPointerMove,
@@ -22050,7 +22065,7 @@ function Iv({ fallbackSizeKey: t }) {
 		onPointerCancel: f.onPointerCancel,
 		onPointerLeave: f.onPointerLeave,
 		onContextMenu: (e) => {
-			e.preventDefault(), R_("久坐提醒设置");
+			e.preventDefault(), B_("久坐提醒设置");
 		},
 		children: [
 			g,
@@ -22065,7 +22080,7 @@ function Iv({ fallbackSizeKey: t }) {
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryDetail.jsx
-var Lv = qn({
+var zv = qn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -22108,10 +22123,10 @@ var Lv = qn({
 		marginTop: "auto"
 	}
 });
-function Rv() {
-	let e = Lv(), [t] = F_(W_, $_, uv), [n, r] = (0, N.useState)(() => Cv($_));
+function Bv() {
+	let e = zv(), [t] = L_(K_, tv, fv), [n, r] = (0, N.useState)(() => Tv(tv));
 	(0, N.useEffect)(() => {
-		let e = () => r(Cv(t));
+		let e = () => r(Tv(t));
 		e();
 		let n = window.setInterval(e, 1e3), i = () => e();
 		return window.addEventListener("storage", i), () => {
@@ -22119,7 +22134,7 @@ function Rv() {
 		};
 	}, [t]);
 	let i = () => {
-		t.enabled && wv();
+		t.enabled && Ev();
 	}, a = [
 		["今日累计久坐", `${Math.round(n.today.sittingMinutes)} 分钟`],
 		["最长连续", `${Math.round(n.today.longestStreakMin)} 分钟`],
@@ -22185,7 +22200,7 @@ function Rv() {
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentarySettings.jsx
-var zv = qn({
+var Vv = qn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -22233,8 +22248,8 @@ var zv = qn({
 	},
 	subtle: { color: K.colorNeutralForeground3 }
 });
-function Bv() {
-	let e = zv(), [t, n, r] = F_(W_, $_, uv), i = (e) => n((t) => ({
+function Hv() {
+	let e = Vv(), [t, n, r] = L_(K_, tv, fv), i = (e) => n((t) => ({
 		...t,
 		...e
 	})), a = (e, t) => (n) => {
@@ -22304,7 +22319,7 @@ function Bv() {
 								min: 1,
 								value: String(t.thresholdMin),
 								disabled: !r,
-								onChange: a("thresholdMin", $_.thresholdMin)
+								onChange: a("thresholdMin", tv.thresholdMin)
 							})
 						}),
 						/* @__PURE__ */ (0, P.jsx)(ch, {
@@ -22315,7 +22330,7 @@ function Bv() {
 								min: 1,
 								value: String(t.remindEveryMin),
 								disabled: !r,
-								onChange: a("remindEveryMin", $_.remindEveryMin)
+								onChange: a("remindEveryMin", tv.remindEveryMin)
 							})
 						}),
 						/* @__PURE__ */ (0, P.jsx)(ch, {
@@ -22326,7 +22341,7 @@ function Bv() {
 								min: 1,
 								value: String(t.idleResetMin),
 								disabled: !r,
-								onChange: a("idleResetMin", $_.idleResetMin)
+								onChange: a("idleResetMin", tv.idleResetMin)
 							})
 						})
 					]
@@ -22352,7 +22367,7 @@ function Bv() {
 						checked: !!o,
 						disabled: !r,
 						"aria-label": "免打扰时段",
-						onChange: (e, t) => i({ quietHours: t.checked ? { ...ev } : null })
+						onChange: (e, t) => i({ quietHours: t.checked ? { ...nv } : null })
 					})]
 				}), o && /* @__PURE__ */ (0, P.jsxs)("div", {
 					className: e.quiet,
@@ -22365,7 +22380,7 @@ function Bv() {
 							disabled: !r,
 							onChange: (e, t) => i({ quietHours: {
 								...o,
-								start: t.value || ev.start
+								start: t.value || nv.start
 							} })
 						})
 					}), /* @__PURE__ */ (0, P.jsx)(ch, {
@@ -22377,7 +22392,7 @@ function Bv() {
 							disabled: !r,
 							onChange: (e, t) => i({ quietHours: {
 								...o,
-								end: t.value || ev.end
+								end: t.value || nv.end
 							} })
 						})
 					})]
@@ -22394,20 +22409,20 @@ function Bv() {
 //#endregion
 //#region public/plugins/sedentary/src/main.jsx
 k_();
-var Vv = new URLSearchParams(location.search), Hv = I_(), Uv = Vv.get("background") === "1", Wv = U_();
-function Gv(t = 2500) {
+var Uv = new URLSearchParams(location.search), Wv = R_(), Gv = Uv.get("background") === "1", Kv = G_();
+function qv(t = 2500) {
 	return !e.inHost || A_() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(A_() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function Kv() {
-	let [e] = F_(W_, $_, uv);
+function Jv() {
+	let [e] = L_(K_, tv, fv);
 	return (0, N.useEffect)(() => {
-		let e = Av();
+		let e = Mv();
 		return e.start(), () => e.stop();
-	}, []), B_([
+	}, []), H_([
 		{
 			name: "sedentary.status",
 			description: "读取久坐状态：是否在久坐、当前连续分钟、阈值、距提醒还有多久",
@@ -22436,17 +22451,17 @@ function Kv() {
 			}
 		}
 	], {
-		"sedentary.status": () => Dv(e),
-		"sedentary.today": () => gv(/* @__PURE__ */ new Date()),
+		"sedentary.status": () => kv(e),
+		"sedentary.today": () => vv(/* @__PURE__ */ new Date()),
 		"sedentary.takeBreak": () => ({
-			today: Av().takeBreak("agent"),
-			status: Dv(e)
+			today: Mv().takeBreak("agent"),
+			status: kv(e)
 		})
 	}), null;
 }
-function qv() {
-	let { theme: t } = N_(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, P.jsx)(Iv, { fallbackSizeKey: Wv });
-	return Uv ? r = /* @__PURE__ */ (0, P.jsx)(Kv, {}) : Hv === "settings" ? r = /* @__PURE__ */ (0, P.jsx)(Bv, {}) : Hv === "detail" && (r = /* @__PURE__ */ (0, P.jsx)(Rv, {})), /* @__PURE__ */ (0, P.jsx)(El, {
+function Yv() {
+	let { theme: t } = F_(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, P.jsx)(Rv, { fallbackSizeKey: Kv });
+	return Gv ? r = /* @__PURE__ */ (0, P.jsx)(Jv, {}) : Wv === "settings" ? r = /* @__PURE__ */ (0, P.jsx)(Hv, {}) : Wv === "detail" && (r = /* @__PURE__ */ (0, P.jsx)(Bv, {})), /* @__PURE__ */ (0, P.jsx)(El, {
 		theme: t,
 		style: {
 			width: "100%",
@@ -22457,9 +22472,9 @@ function qv() {
 		children: r
 	});
 }
-async function Jv() {
+async function Xv() {
 	let e = document.getElementById("root");
-	e && (await Gv(), Vv.get("demo") === "1" && await Ov(), (0, C_.createRoot)(e).render(/* @__PURE__ */ (0, P.jsx)(qv, {})));
+	e && (await qv(), Uv.get("demo") === "1" && await Av(), (0, C_.createRoot)(e).render(/* @__PURE__ */ (0, P.jsx)(Yv, {})));
 }
-Jv();
+Xv();
 //#endregion

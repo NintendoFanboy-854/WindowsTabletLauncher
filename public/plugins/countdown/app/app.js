@@ -21055,13 +21055,28 @@ function pv(e) {
 	let t = lv.init?.config;
 	if (t && typeof t == "object") return t[e];
 }
-function mv(t = "dark") {
-	let [n, r] = (0, M.useState)(() => fv(t));
-	return (0, M.useEffect)(() => e.onTheme((e) => {
-		e && typeof e == "object" && r(e);
-	}), []), (0, M.useMemo)(() => sv(n), [n]);
+var mv = "(prefers-color-scheme: light)";
+function hv() {
+	return typeof window > "u" || typeof window.matchMedia != "function" ? "dark" : window.matchMedia(mv).matches ? "light" : "dark";
 }
-function hv(t, n) {
+function gv(t = "dark") {
+	let [n, r] = (0, M.useState)(() => fv(t)), [i, a] = (0, M.useState)(hv);
+	(0, M.useEffect)(() => e.onTheme((e) => {
+		e && typeof e == "object" && r(e);
+	}), []), (0, M.useEffect)(() => {
+		if (e.inHost || typeof window.matchMedia != "function") return;
+		let t = window.matchMedia(mv), n = () => a(t.matches ? "light" : "dark");
+		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
+	}, []);
+	let o = e.inHost ? n : {
+		...n,
+		colorScheme: i
+	}, s = (0, M.useMemo)(() => sv(o), [o]);
+	return (0, M.useEffect)(() => {
+		typeof document < "u" && (document.documentElement.style.colorScheme = s.scheme, document.body && (document.body.style.colorScheme = s.scheme));
+	}, [s.scheme]), s;
+}
+function _v(t, n) {
 	let r = (0, M.useRef)(t);
 	r.current = t;
 	let [i, a] = (0, M.useState)(() => {
@@ -21072,7 +21087,7 @@ function hv(t, n) {
 		Array.isArray(e) && e.length === 2 && a(r.current(e));
 	}), []), i;
 }
-function gv(t, n, r) {
+function vv(t, n, r) {
 	let i = (0, M.useRef)(r);
 	i.current = r;
 	let [a, o] = (0, M.useState)(() => {
@@ -21112,11 +21127,11 @@ function gv(t, n, r) {
 		s
 	];
 }
-function _v() {
+function yv() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function vv(e, t) {
+function bv(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -21125,13 +21140,13 @@ function vv(e, t) {
 		}
 	}, "*");
 }
-function yv(e = "设置") {
-	vv("settings", e);
+function xv(e = "设置") {
+	bv("settings", e);
 }
-typeof window < "u" && _v() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && yv() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function bv(e) {
+function Sv(e) {
 	let t = (0, M.useRef)(e);
 	t.current = e, (0, M.useEffect)(() => {
 		let e = (e) => {
@@ -21142,7 +21157,7 @@ function bv(e) {
 		return window.addEventListener("message", e), () => window.removeEventListener("message", e);
 	}, []);
 }
-function xv(t, n) {
+function Cv(t, n) {
 	let r = (0, M.useRef)(n);
 	r.current = n;
 	let i = (0, M.useRef)(t);
@@ -21163,29 +21178,29 @@ function xv(t, n) {
 }
 //#endregion
 //#region public/plugins/countdown/src/sizes.js
-var Sv = {
+var wv = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function Cv(e) {
+function Tv(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return Sv[t] ? t : "2x1";
+	return wv[t] ? t : "2x1";
 }
-function wv() {
+function Ev() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return Sv[n] ? n : null;
+	return wv[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/countdown/src/data/items.js
-var Tv = "items", Ev = "settings", Dv = "countdown.editing", Ov = {
+var Dv = "items", Ov = "settings", kv = "countdown.editing", Av = {
 	showPast: !0,
 	highlightSoon: !0
-}, kv = [
+}, jv = [
 	{
 		id: "accent",
 		label: "主题色",
@@ -21221,60 +21236,60 @@ var Tv = "items", Ev = "settings", Dv = "countdown.editing", Ov = {
 		label: "青色",
 		token: "colorPaletteTealForeground2"
 	}
-], Av = new Map(kv.map((e) => [e.id, e]));
-function jv(e) {
-	return (Av.get(e) ?? kv[0]).token;
-}
-var Mv = (e) => String(e).padStart(2, "0");
+], Mv = new Map(jv.map((e) => [e.id, e]));
 function Nv(e) {
+	return (Mv.get(e) ?? jv[0]).token;
+}
+var Pv = (e) => String(e).padStart(2, "0");
+function Fv(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		showPast: typeof t.showPast == "boolean" ? t.showPast : Ov.showPast,
-		highlightSoon: typeof t.highlightSoon == "boolean" ? t.highlightSoon : Ov.highlightSoon
+		showPast: typeof t.showPast == "boolean" ? t.showPast : Av.showPast,
+		highlightSoon: typeof t.highlightSoon == "boolean" ? t.highlightSoon : Av.highlightSoon
 	};
 }
-function Pv(e) {
+function Iv(e) {
 	return Array.isArray(e) ? e.filter((e) => e && typeof e.id == "string" && typeof e.title == "string" && typeof e.targetDate == "string").map((e) => ({
 		id: e.id,
 		title: e.title,
 		targetDate: e.targetDate,
 		repeatYearly: !!e.repeatYearly,
-		color: Av.has(e.color) ? e.color : "accent",
+		color: Mv.has(e.color) ? e.color : "accent",
 		createdAt: typeof e.createdAt == "string" ? e.createdAt : (/* @__PURE__ */ new Date()).toISOString()
 	})) : [];
 }
-function Fv(e) {
+function Lv(e) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
 }
-function Iv(e) {
+function Rv(e) {
 	if (typeof e != "string") return null;
 	let t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e);
 	if (!t) return null;
 	let n = Number(t[1]), r = Number(t[2]), i = Number(t[3]), a = new Date(n, r - 1, i);
 	return a.getFullYear() !== n || a.getMonth() !== r - 1 || a.getDate() !== i ? null : a;
 }
-function Lv(e) {
-	return `${e.getFullYear()}-${Mv(e.getMonth() + 1)}-${Mv(e.getDate())}`;
+function zv(e) {
+	return `${e.getFullYear()}-${Pv(e.getMonth() + 1)}-${Pv(e.getDate())}`;
 }
-function Rv(e, t) {
+function Bv(e, t) {
 	let n = new Date(t, e.getMonth() + 1, 0).getDate();
 	return new Date(t, e.getMonth(), Math.min(e.getDate(), n));
 }
-function zv(e, t) {
-	return Math.round((Fv(t) - Fv(e)) / 864e5);
+function Vv(e, t) {
+	return Math.round((Lv(t) - Lv(e)) / 864e5);
 }
-function Bv(e, t = /* @__PURE__ */ new Date()) {
-	let n = Iv(e.targetDate);
+function Hv(e, t = /* @__PURE__ */ new Date()) {
+	let n = Rv(e.targetDate);
 	if (!n) return null;
-	let r = Fv(t), i = n;
+	let r = Lv(t), i = n;
 	if (e.repeatYearly) {
-		let e = Rv(n, r.getFullYear());
-		i = e >= r ? e : Rv(n, r.getFullYear() + 1);
+		let e = Bv(n, r.getFullYear());
+		i = e >= r ? e : Bv(n, r.getFullYear() + 1);
 	}
-	let a = zv(r, i), o = Av.get(e.color) ?? kv[0], s = e.repeatYearly ? `每年 ${n.getMonth() + 1}月${n.getDate()}日` : Lv(i), c = "future";
+	let a = Vv(r, i), o = Mv.get(e.color) ?? jv[0], s = e.repeatYearly ? `每年 ${n.getMonth() + 1}月${n.getDate()}日` : zv(i), c = "future";
 	return a === 0 ? c = "today" : a < 0 && (c = "past"), {
 		item: e,
-		targetDate: Lv(i),
+		targetDate: zv(i),
 		days: a,
 		color: o,
 		colorToken: o.token,
@@ -21282,29 +21297,29 @@ function Bv(e, t = /* @__PURE__ */ new Date()) {
 		status: c
 	};
 }
-function Vv(e) {
+function Uv(e) {
 	return e.days === 0 ? "就是今天" : e.days > 0 ? `还有 ${e.days} 天` : `已过 ${Math.abs(e.days)} 天`;
 }
-function Hv(e) {
+function Wv(e) {
 	return e.sort((e, t) => {
 		let n = e.days < 0, r = t.days < 0;
 		return n && r ? t.days - e.days : n ? 1 : r ? -1 : e.days - t.days;
 	}), e;
 }
-function Uv(e, t, n = /* @__PURE__ */ new Date()) {
+function Gv(e, t, n = /* @__PURE__ */ new Date()) {
 	let r = [];
 	for (let i of e) {
-		let e = Bv(i, n);
+		let e = Hv(i, n);
 		e && (e.days < 0 && !t.showPast || r.push(e));
 	}
-	return Hv(r);
+	return Wv(r);
 }
-function Wv() {
+function Kv() {
 	return `cd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
-function Gv(e) {
+function qv(e) {
 	let t = typeof e?.title == "string" ? e.title.trim() : "";
-	return t ? Iv(e.targetDate) ? {
+	return t ? Rv(e.targetDate) ? {
 		ok: !0,
 		title: t
 	} : {
@@ -21315,17 +21330,17 @@ function Gv(e) {
 		error: "请填写标题"
 	};
 }
-function Kv(e) {
+function Jv(e) {
 	try {
-		localStorage.setItem(Dv, JSON.stringify({
+		localStorage.setItem(kv, JSON.stringify({
 			id: e ?? null,
 			at: Date.now()
 		}));
 	} catch {}
 }
-function qv() {
+function Yv() {
 	try {
-		let e = localStorage.getItem(Dv);
+		let e = localStorage.getItem(kv);
 		if (!e) return { id: null };
 		let t = JSON.parse(e);
 		return { id: typeof t?.id == "string" ? t.id : null };
@@ -21333,14 +21348,14 @@ function qv() {
 		return { id: null };
 	}
 }
-function Jv(e, t) {
+function Xv(e, t) {
 	let n = t?.includePast !== !1, r = /* @__PURE__ */ new Date(), i = [];
 	for (let t of e) {
-		let e = Bv(t, r);
+		let e = Hv(t, r);
 		e && (!n && e.days < 0 || i.push(e));
 	}
-	return Hv(i), {
-		today: Lv(r),
+	return Wv(i), {
+		today: zv(r),
 		items: i.map((e) => ({
 			id: e.item.id,
 			title: e.item.title,
@@ -21349,25 +21364,25 @@ function Jv(e, t) {
 			color: e.item.color,
 			days: e.days,
 			status: e.status,
-			display: Vv(e)
+			display: Uv(e)
 		}))
 	};
 }
-function Yv(e, t) {
+function Zv(e, t) {
 	let n = typeof t?.title == "string" ? t.title.trim() : "", r = typeof t?.targetDate == "string" ? t.targetDate : "";
 	if (!n) throw Error("title 不能为空");
-	if (!Iv(r)) throw Error("targetDate 必须是合法的 YYYY-MM-DD");
+	if (!Rv(r)) throw Error("targetDate 必须是合法的 YYYY-MM-DD");
 	if (e.length >= 50) throw Error("最多 50 条倒数日");
-	let i = Av.has(t?.color) ? t.color : "accent", a = {
-		id: Wv(),
+	let i = Mv.has(t?.color) ? t.color : "accent", a = {
+		id: Kv(),
 		title: n,
 		targetDate: r,
 		repeatYearly: !!t?.repeatYearly,
 		color: i,
 		createdAt: (/* @__PURE__ */ new Date()).toISOString()
 	};
-	Zv([...e, a]);
-	let o = Bv(a, /* @__PURE__ */ new Date());
+	$v([...e, a]);
+	let o = Hv(a, /* @__PURE__ */ new Date());
 	return {
 		id: a.id,
 		title: a.title,
@@ -21375,29 +21390,29 @@ function Yv(e, t) {
 		repeatYearly: a.repeatYearly,
 		color: a.color,
 		days: o ? o.days : null,
-		display: o ? Vv(o) : ""
+		display: o ? Uv(o) : ""
 	};
 }
-function Xv(e, t) {
+function Qv(e, t) {
 	let n = typeof t?.id == "string" ? t.id : "";
 	if (!n) throw Error("id 不能为空");
 	let r = e.find((e) => e.id === n);
 	if (!r) throw Error(`找不到 id 为 ${n} 的倒数日`);
-	return Zv(e.filter((e) => e.id !== n)), {
+	return $v(e.filter((e) => e.id !== n)), {
 		removed: !0,
 		id: n,
 		title: r.title
 	};
 }
-function Zv(t) {
-	e.setConfig(Tv, t).catch(() => {});
+function $v(t) {
+	e.setConfig(Dv, t).catch(() => {});
 }
-async function Qv() {
-	let t = await e.getConfig(Tv).catch(() => null);
+async function ey() {
+	let t = await e.getConfig(Dv).catch(() => null);
 	if (Array.isArray(t) && t.length > 0) return;
 	let n = (e) => {
 		let t = /* @__PURE__ */ new Date();
-		return t.setDate(t.getDate() + e), Lv(t);
+		return t.setDate(t.getDate() + e), zv(t);
 	}, r = (/* @__PURE__ */ new Date()).toISOString(), i = (/* @__PURE__ */ new Date()).getFullYear(), a = [
 		{
 			id: "demo-1",
@@ -21440,12 +21455,12 @@ async function Qv() {
 			createdAt: r
 		}
 	];
-	await e.setConfig(Tv, a).catch(() => {});
+	await e.setConfig(Dv, a).catch(() => {});
 }
 //#endregion
 //#region public/plugins/countdown/src/CountdownApp.jsx
-var $v = 500, ey = 8;
-function ty(e) {
+var ty = 500, ny = 8;
+function ry(e) {
 	let t = (0, M.useRef)({
 		timer: 0,
 		origin: null,
@@ -21460,11 +21475,11 @@ function ty(e) {
 				y: r.clientY
 			}, t.current.timer = window.setTimeout(() => {
 				t.current.suppressClick = !0, e();
-			}, $v));
+			}, ty));
 		}, [n, e]),
 		onPointerMove: (0, M.useCallback)((e) => {
 			let r = t.current.origin;
-			r && Math.hypot(e.clientX - r.x, e.clientY - r.y) > ey && n();
+			r && Math.hypot(e.clientX - r.x, e.clientY - r.y) > ny && n();
 		}, [n]),
 		onPointerUp: n,
 		onPointerCancel: n,
@@ -21472,10 +21487,10 @@ function ty(e) {
 		consumeSuppressedClick: (0, M.useCallback)(() => t.current.suppressClick ? (t.current.suppressClick = !1, !0) : !1, [])
 	};
 }
-function ny(e) {
+function iy(e) {
 	return e.status === "today" ? "今天" : e.status === "past" ? `已过 ${Math.abs(e.days)} 天` : `还有 ${e.days} 天`;
 }
-var ry = Jn({
+var ay = Jn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -21590,8 +21605,8 @@ var ry = Jn({
 		display: "flex"
 	}
 });
-function iy({ entry: e, sizeKey: t, onOpen: n }) {
-	let r = ry(), i = ty(() => n(e.item.id)), a = t === "3x2";
+function oy({ entry: e, sizeKey: t, onOpen: n }) {
+	let r = ay(), i = ry(() => n(e.item.id)), a = t === "3x2";
 	return /* @__PURE__ */ (0, N.jsxs)(vm, {
 		appearance: "subtle",
 		size: "large",
@@ -21608,7 +21623,7 @@ function iy({ entry: e, sizeKey: t, onOpen: n }) {
 		onPointerUp: i.onPointerUp,
 		onPointerCancel: i.onPointerCancel,
 		onPointerLeave: i.onPointerLeave,
-		"aria-label": `${e.item.title}，${Vv(e)}，长按编辑`,
+		"aria-label": `${e.item.title}，${Uv(e)}，长按编辑`,
 		children: [/* @__PURE__ */ (0, N.jsx)(O_, {
 			className: r.rowTitle,
 			size: a ? 400 : 300,
@@ -21617,28 +21632,28 @@ function iy({ entry: e, sizeKey: t, onOpen: n }) {
 			className: r.rowDays,
 			size: a ? 500 : 400,
 			weight: "semibold",
-			style: { color: G[jv(e.item.color)] },
-			children: ny(e)
+			style: { color: G[Nv(e.item.color)] },
+			children: iy(e)
 		})]
 	});
 }
-function ay({ fallbackSizeKey: t }) {
-	let n = ry(), r = hv(Cv, t || "2x1"), [i, a, o] = gv(Tv, [], Pv), [s] = gv(Ev, Ov, Nv), [c, l] = (0, M.useState)(() => /* @__PURE__ */ new Date()), u = (0, M.useRef)(i);
+function sy({ fallbackSizeKey: t }) {
+	let n = ay(), r = _v(Tv, t || "2x1"), [i, a, o] = vv(Dv, [], Iv), [s] = vv(Ov, Av, Fv), [c, l] = (0, M.useState)(() => /* @__PURE__ */ new Date()), u = (0, M.useRef)(i);
 	u.current = i;
 	let d = r === "1x1", f = r === "3x2", p = r === "2x2" || f, m = f ? 5 : 4;
 	(0, M.useEffect)(() => {
 		let e = window.setInterval(() => l(/* @__PURE__ */ new Date()), 6e4);
 		return () => window.clearInterval(e);
 	}, []);
-	let h = (0, M.useMemo)(() => o ? Uv(i, s, c) : [], [
+	let h = (0, M.useMemo)(() => o ? Gv(i, s, c) : [], [
 		i,
 		o,
 		c,
 		s
 	]), g = h.slice(0, p ? m : 1), _ = (0, M.useCallback)((e) => {
-		Kv(e ?? null), vv("edit", e ? "编辑倒数日" : "新增倒数日");
+		Jv(e ?? null), bv("edit", e ? "编辑倒数日" : "新增倒数日");
 	}, []);
-	bv(() => yv("倒数日设置")), (0, M.useEffect)(() => {
+	Sv(() => xv("倒数日设置")), (0, M.useEffect)(() => {
 		let t = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 		for (let n of h) {
 			if (n.status !== "today") continue;
@@ -21649,7 +21664,7 @@ function ay({ fallbackSizeKey: t }) {
 			} catch {}
 			e.notify(`今天是「${n.item.title}」`);
 		}
-	}, [h]), xv([
+	}, [h]), Cv([
 		{
 			name: "countdown.list",
 			description: "列出倒数日事件（含剩余天数）",
@@ -21703,11 +21718,11 @@ function ay({ fallbackSizeKey: t }) {
 			}
 		}
 	], {
-		"countdown.list": (e) => Jv(u.current, e),
-		"countdown.add": (e) => Yv(u.current, e),
-		"countdown.remove": (e) => Xv(u.current, e)
+		"countdown.list": (e) => Xv(u.current, e),
+		"countdown.add": (e) => Zv(u.current, e),
+		"countdown.remove": (e) => Qv(u.current, e)
 	});
-	let v = ty(() => yv("倒数日设置"));
+	let v = ry(() => xv("倒数日设置"));
 	if (!o) return /* @__PURE__ */ (0, N.jsx)("div", { className: n.root });
 	if (!h.length) return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: n.root,
@@ -21747,7 +21762,7 @@ function ay({ fallbackSizeKey: t }) {
 		onPointerCancel: v.onPointerCancel,
 		onPointerLeave: v.onPointerLeave,
 		onContextMenu: (e) => {
-			e.preventDefault(), yv("倒数日设置");
+			e.preventDefault(), xv("倒数日设置");
 		},
 		children: [f && /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: n.header,
@@ -21778,14 +21793,14 @@ function ay({ fallbackSizeKey: t }) {
 					children: "新增倒数日"
 				}), /* @__PURE__ */ (0, N.jsx)(mg, {
 					icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
-					onClick: () => yv("倒数日设置"),
+					onClick: () => xv("倒数日设置"),
 					children: "设置"
 				})] }) })] })
 			})]
 		}), p ? /* @__PURE__ */ (0, N.jsx)("div", {
 			className: n.list,
 			role: "list",
-			children: g.map((e) => /* @__PURE__ */ (0, N.jsx)(iy, {
+			children: g.map((e) => /* @__PURE__ */ (0, N.jsx)(oy, {
 				entry: e,
 				sizeKey: r,
 				onOpen: _
@@ -21794,7 +21809,7 @@ function ay({ fallbackSizeKey: t }) {
 			className: n.single,
 			role: "button",
 			tabIndex: 0,
-			"aria-label": `${y.item.title}，${Vv(y)}`,
+			"aria-label": `${y.item.title}，${Uv(y)}`,
 			children: [
 				/* @__PURE__ */ (0, N.jsx)(O_, {
 					className: n.singleLabel,
@@ -21805,7 +21820,7 @@ function ay({ fallbackSizeKey: t }) {
 					className: n.singleDays,
 					size: 900,
 					weight: "semibold",
-					style: { color: G[jv(y.item.color)] },
+					style: { color: G[Nv(y.item.color)] },
 					children: Math.abs(y.days)
 				}),
 				y.status !== "today" && /* @__PURE__ */ (0, N.jsx)(O_, {
@@ -21827,7 +21842,7 @@ function ay({ fallbackSizeKey: t }) {
 			onContextMenu: (e) => {
 				e.preventDefault(), _(y.item.id);
 			},
-			"aria-label": `${y.item.title}，${Vv(y)}，点击编辑`,
+			"aria-label": `${y.item.title}，${Uv(y)}，点击编辑`,
 			children: [/* @__PURE__ */ (0, N.jsx)(O_, {
 				className: n.rowTitle,
 				size: 400,
@@ -21836,15 +21851,15 @@ function ay({ fallbackSizeKey: t }) {
 				className: n.rowDays,
 				size: 800,
 				weight: "semibold",
-				style: { color: G[jv(y.item.color)] },
-				children: ny(y)
+				style: { color: G[Nv(y.item.color)] },
+				children: iy(y)
 			})]
 		})]
 	});
 }
 //#endregion
 //#region public/plugins/countdown/src/CountdownSettings.jsx
-var oy = Jn({
+var cy = Jn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -21876,8 +21891,8 @@ var oy = Jn({
 	},
 	subtle: { color: G.colorNeutralForeground3 }
 });
-function sy() {
-	let e = oy(), [t, n, r] = gv(Ev, Ov, Nv);
+function ly() {
+	let e = cy(), [t, n, r] = vv(Ov, Av, Fv);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: e.root,
 		children: [
@@ -21947,7 +21962,7 @@ function sy() {
 }
 //#endregion
 //#region public/plugins/countdown/src/CountdownEditor.jsx
-var cy = Jn({
+var uy = Jn({
 	root: {
 		boxSizing: "border-box",
 		width: "100%",
@@ -22002,8 +22017,8 @@ var cy = Jn({
 	},
 	spacer: { flex: "1 1 auto" }
 });
-function ly() {
-	let t = cy(), [n, r, i] = gv(Tv, [], Pv), [a, o] = (0, M.useState)(() => qv().id), [s, c] = (0, M.useState)(""), [l, u] = (0, M.useState)(() => Lv(/* @__PURE__ */ new Date())), [d, f] = (0, M.useState)(!1), [p, m] = (0, M.useState)("accent"), [h, g] = (0, M.useState)(""), [_, v] = (0, M.useState)(""), [y, b] = (0, M.useState)(!1), [x, S] = (0, M.useState)(!1), C = (0, M.useMemo)(() => a ? n.find((e) => e.id === a) : null, [a, n]);
+function dy() {
+	let t = uy(), [n, r, i] = vv(Dv, [], Iv), [a, o] = (0, M.useState)(() => Yv().id), [s, c] = (0, M.useState)(""), [l, u] = (0, M.useState)(() => zv(/* @__PURE__ */ new Date())), [d, f] = (0, M.useState)(!1), [p, m] = (0, M.useState)("accent"), [h, g] = (0, M.useState)(""), [_, v] = (0, M.useState)(""), [y, b] = (0, M.useState)(!1), [x, S] = (0, M.useState)(!1), C = (0, M.useMemo)(() => a ? n.find((e) => e.id === a) : null, [a, n]);
 	return (0, M.useEffect)(() => {
 		i && !x && (C && (c(C.title), u(C.targetDate), f(C.repeatYearly), m(C.color)), S(!0));
 	}, [
@@ -22076,7 +22091,7 @@ function ly() {
 					layout: "horizontal",
 					className: t.colorGrid,
 					onChange: (e, t) => m(t.value),
-					children: kv.map((e) => /* @__PURE__ */ (0, N.jsx)(l_, {
+					children: jv.map((e) => /* @__PURE__ */ (0, N.jsx)(l_, {
 						value: e.id,
 						label: { children: /* @__PURE__ */ (0, N.jsxs)("span", {
 							className: t.colorRadio,
@@ -22109,7 +22124,7 @@ function ly() {
 						size: "large",
 						icon: /* @__PURE__ */ (0, N.jsx)(lu, {}),
 						onClick: () => {
-							C && (y ? (r((e) => e.filter((e) => e.id !== C.id)), e.notify(`已删除「${C.title}」`), v("已删除；关闭此窗口后卡片会同步更新。"), o(null), b(!1), c(""), u(Lv(/* @__PURE__ */ new Date())), f(!1), m("accent")) : b(!0));
+							C && (y ? (r((e) => e.filter((e) => e.id !== C.id)), e.notify(`已删除「${C.title}」`), v("已删除；关闭此窗口后卡片会同步更新。"), o(null), b(!1), c(""), u(zv(/* @__PURE__ */ new Date())), f(!1), m("accent")) : b(!0));
 						},
 						children: y ? "确认删除" : "删除"
 					}),
@@ -22119,7 +22134,7 @@ function ly() {
 						size: "large",
 						icon: /* @__PURE__ */ (0, N.jsx)(ou, {}),
 						onClick: () => {
-							let t = Gv({
+							let t = qv({
 								title: s,
 								targetDate: l
 							});
@@ -22138,14 +22153,14 @@ function ly() {
 										return;
 									}
 									let i = {
-										id: Wv(),
+										id: Kv(),
 										title: t.title,
 										targetDate: l,
 										repeatYearly: d,
 										color: p,
 										createdAt: (/* @__PURE__ */ new Date()).toISOString()
 									};
-									r((e) => [...e, i]), Kv(i.id), o(i.id), e.notify(`已添加「${t.title}」`);
+									r((e) => [...e, i]), Jv(i.id), o(i.id), e.notify(`已添加「${t.title}」`);
 								}
 								v("已保存；关闭此窗口后卡片会同步更新。");
 							}
@@ -22160,16 +22175,16 @@ function ly() {
 //#endregion
 //#region public/plugins/countdown/src/main.jsx
 uv();
-var uy = new URLSearchParams(location.search), dy = _v(), fy = wv();
-function py(t = 2500) {
+var fy = new URLSearchParams(location.search), py = yv(), my = Ev();
+function hy(t = 2500) {
 	return !e.inHost || dv() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(dv() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function my() {
-	let { theme: t } = mv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
+function gy() {
+	let { theme: t } = gv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
 	return /* @__PURE__ */ (0, N.jsx)(Cl, {
 		theme: t,
 		style: {
@@ -22178,12 +22193,12 @@ function my() {
 			background: n,
 			colorScheme: "normal"
 		},
-		children: dy === "settings" ? /* @__PURE__ */ (0, N.jsx)(sy, {}) : dy === "edit" ? /* @__PURE__ */ (0, N.jsx)(ly, {}) : /* @__PURE__ */ (0, N.jsx)(ay, { fallbackSizeKey: fy })
+		children: py === "settings" ? /* @__PURE__ */ (0, N.jsx)(ly, {}) : py === "edit" ? /* @__PURE__ */ (0, N.jsx)(dy, {}) : /* @__PURE__ */ (0, N.jsx)(sy, { fallbackSizeKey: my })
 	});
 }
-async function hy() {
+async function _y() {
 	let e = document.getElementById("root");
-	e && (await py(), uy.get("demo") === "1" && await Qv(), (0, iv.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(my, {})));
+	e && (await hy(), fy.get("demo") === "1" && await ey(), (0, iv.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(gy, {})));
 }
-hy();
+_y();
 //#endregion

@@ -120,7 +120,7 @@
 > 官方设计语言的完整落地规则（颜色/字阶/间距/圆角/阴影/材质/动效/图标/无障碍/文案/等待）见 **[FLUENT2.md](FLUENT2.md)**。本节只保留工程约定；冲突时以 FLUENT2.md 为准。
 
 - **组件**：一律用 Fluent UI React v9（`@fluentui/react-components`）的 Button、Card、Dialog、Drawer、TabList、Menu、Toast、Skeleton、MessageBar、Spinner、Input、Switch、Slider…；不自己画控件。
-- **主题**：`FluentProvider` + 深色主题，亮色作为可选项；颜色全部取 `tokens.*`，不手写 hex。
+- **主题**：`FluentProvider` 深色 / 亮色两套，**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定（见 DECISIONS D-06）；插件由宿主 `host:init/theme` 注入同一套主题。颜色全部取 `tokens.*`，不手写 hex。
 - **字体**：Fluent 字体 token（`fontFamilyBase` → Segoe UI Variable），字阶用 `fontSizeBase*` 档位。
 - **圆角 / 间距 / 阴影**：`borderRadius*`、`spacing*`、`shadow*` token。
 - **材质**：Fluent 的 web 端没有 Acrylic/Mica 的官方实现，也不做系统级窗口材质（已决定）。卡片用 `colorNeutralBackground*` 的半透明色 + 统一的 `backdrop-filter` 模糊（模糊值定义成项目 token `--wtsl-material-blur`，只此一处例外）。未来若升 Windows 11 再考虑 Mica。

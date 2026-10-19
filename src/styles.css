@@ -2,7 +2,7 @@
   /*
    * 项目 token 声明（DESIGN §6 允许的唯一非 Fluent 来源：Acrylic / 壁纸）。
    * - 壁纸：Fluent web 没有 Acrylic 背景，桌面壁纸是产品决定，颜色在此集中声明，
-   *   页面内不散落 hex。
+   *   页面内不散落 hex。壁纸有深色 / 亮色两套，跟随系统或设置页的主题偏好。
    * - 卡片圆角：FLUENT2 §5 的卡片圆角为 12px；Fluent v9 的 borderRadiusXLarge
    *   实际是 8px，这里用项目 token 统一页面卡片圆角（V-02）。
    */
@@ -13,6 +13,17 @@
     #0e0f13;
   --wtsl-desktop-foreground: #f3f3f3;
   --wtsl-desktop-font: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+/* 亮色模式：壁纸改成浅色低饱和渐变，前景/滚动条/原生控件跟随 */
+:root[data-theme='light'] {
+  --wtsl-desktop-backdrop:
+    radial-gradient(1200px 800px at 12% -10%, rgba(120, 165, 235, 0.45), transparent 62%),
+    radial-gradient(900px 700px at 110% 108%, rgba(190, 150, 235, 0.32), transparent 58%),
+    #eef0f4;
+  --wtsl-desktop-foreground: #1a1a1a;
+  color-scheme: light;
 }
 
 * {

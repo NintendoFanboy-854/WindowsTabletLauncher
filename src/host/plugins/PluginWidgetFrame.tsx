@@ -268,7 +268,12 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           return;
         }
 
-        if (data.type === 'plugin:ready') readyRef.current = true;
+        if (data.type === 'plugin:ready') {
+          readyRef.current = true;
+          // 插件可能比主题状态更晚完成初始化：就绪时补发一次当前主题，避免停在回退主题
+          const currentTheme = latest.current.theme;
+          if (currentTheme) post({ type: 'host:theme', payload: { theme: currentTheme } });
+        }
         onMessage?.(data);
         if (data.type !== 'plugin:call') return;
 

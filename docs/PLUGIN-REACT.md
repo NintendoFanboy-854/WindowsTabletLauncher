@@ -67,7 +67,7 @@ createRoot(document.getElementById('root')).render(<Root />);
    Spinner / Tooltip / Toast / Field / Divider / Text / Card…），不自绘控件。
 2. **样式**：`makeStyles` + `tokens.*`；不写 hex、不写 px 字面量字号/间距/圆角/阴影、
    不自定义动效时长（用 `motionTokens`）。插件根节点尺寸用 `100%` / `vh` / `vw`。
-3. **主题**：根节点 `FluentProvider`，亮暗由宿主注入；不在组件里判断亮暗写死颜色。
+3. **主题**：根节点 `FluentProvider`，亮暗由宿主 `host:init/theme` 注入（宿主默认跟随系统亮暗，可固定深/浅）；独立打开时跟随 `prefers-color-scheme`。不在组件里判断亮暗或写死颜色。SDK 会记忆最近一次 init/theme，监听注册时自动补发。
 4. **触控目标**：所有可点击元素 ≥40×40 CSS px（平板）。
 5. **状态**：hover / pressed / disabled / focus-visible 交给 Fluent 组件，不覆写焦点态。
 6. **设置 / 详情浮层**：不在 iframe 内做 Dialog / Drawer（会被卡片边界裁切）。做成独立视图：

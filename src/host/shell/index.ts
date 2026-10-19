@@ -20,3 +20,14 @@ export {
 } from './useGlobalShortcuts';
 export { syncAutostartOnStartup, type AutostartSyncResult } from './autostart';
 export { PageTransition } from './PageTransition';
+export {
+  THEME_KEY,
+  applyColorSchemeToDocument,
+  onSystemColorSchemeChange,
+  readThemeMode,
+  resolveThemeMode,
+  systemColorScheme,
+  writeThemeMode,
+  type ColorScheme,
+  type ThemeMode,
+} from './themeMode';

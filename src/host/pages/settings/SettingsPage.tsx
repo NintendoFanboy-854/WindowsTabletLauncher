@@ -35,6 +35,7 @@ import {
   isTauriRuntime,
 } from '../../plugins/tauri';
 import type { HostPage } from '../../shell/routes';
+import type { ThemeMode } from '../../shell/themeMode';
 import { quitApplication } from '../../shell/useGlobalShortcuts';
 import { PageScaffold } from '../shared/PageScaffold';
 import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
@@ -51,9 +52,9 @@ export interface SettingsPageProps {
   onBack: () => void;
   onNavigate: (page: HostPage) => void;
   notify: (text: string) => void;
-  /** 当前主题；不传表示 App 层还没接管主题 */
-  themeMode?: 'dark' | 'light';
-  onThemeModeChange?: (mode: 'dark' | 'light') => void;
+  /** 当前主题偏好（跟随系统 / 深色 / 亮色）；不传表示 App 层还没接管主题 */
+  themeMode?: ThemeMode;
+  onThemeModeChange?: (mode: ThemeMode) => void;
   /** Agent 面板入口；不传则显示“D 阶段接入” */
   onOpenAgent?: () => void;
 }
@@ -252,7 +253,7 @@ export function SettingsPage({
     }
   };
 
-  const themeValue = themeMode ?? 'dark';
+  const themeValue = themeMode ?? 'system';
   const themeEditable = typeof onThemeModeChange === 'function';
 
   const autostartDescription =
@@ -305,7 +306,7 @@ export function SettingsPage({
       title="主题"
       hint={
         themeEditable
-          ? 'Fluent 2 深色 / 亮色主题，颜色全部来自 token。'
+          ? '默认跟随 Windows 的亮暗模式自动切换；也可以固定为深色或亮色。颜色全部来自 Fluent token。'
           : '主题由 App 层的 FluentProvider 控制，接线传入回调后可切换。'
       }
     >
@@ -315,10 +316,13 @@ export function SettingsPage({
           layout="horizontal"
           disabled={!themeEditable}
           onChange={(_event, data) => {
-            if (data.value === 'dark' || data.value === 'light') onThemeModeChange?.(data.value);
+            if (data.value === 'dark' || data.value === 'light' || data.value === 'system') {
+              onThemeModeChange?.(data.value);
+            }
           }}
         >
-          <Radio value="dark" label="深色（默认）" />
+          <Radio value="system" label="跟随系统（默认）" />
+          <Radio value="dark" label="深色" />
           <Radio value="light" label="亮色" />
         </RadioGroup>
       </SettingsRow>

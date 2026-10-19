@@ -19,19 +19,18 @@ import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
 import { ReviewPage } from './pages/review/ReviewPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
-import { PageTransition, syncAutostartOnStartup, useGlobalShortcuts, useHostPage } from './shell';
-import type { HostPage } from './shell';
-
-const THEME_KEY = 'wtsl.themeMode';
-type ThemeMode = 'dark' | 'light';
-
-function readThemeMode(): ThemeMode {
-  try {
-    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
-  } catch {
-    return 'dark';
-  }
-}
+import {
+  PageTransition,
+  applyColorSchemeToDocument,
+  onSystemColorSchemeChange,
+  readThemeMode,
+  resolveThemeMode,
+  syncAutostartOnStartup,
+  useGlobalShortcuts,
+  useHostPage,
+  writeThemeMode,
+} from './shell';
+import type { ColorScheme, HostPage, ThemeMode } from './shell';
 
 /** 截图/调试用：`?agent=1` 直接打开 Agent 面板 */
 function readAgentParam(): boolean {
@@ -44,8 +43,20 @@ function readAgentParam(): boolean {
 
 export default function App() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(readThemeMode);
+  /** 跟随系统时 systemScheme 变化 → 重新渲染；固定模式忽略 */
+  const [systemScheme, setSystemScheme] = useState<ColorScheme>(() => resolveThemeMode('system'));
   const [seeded, setSeeded] = useState(false);
   const bridge = useMemo(() => getHostBridge(), []);
+
+  // 跟随系统：订阅 Windows 亮暗模式变化
+  useEffect(() => onSystemColorSchemeChange(setSystemScheme), []);
+
+  const colorScheme: ColorScheme = themeMode === 'system' ? systemScheme : themeMode;
+
+  // 壁纸 / 滚动条 / 原生控件跟随当前生效的亮暗（CSP 下的内联样式不受限）
+  useEffect(() => {
+    applyColorSchemeToDocument(colorScheme);
+  }, [colorScheme]);
 
   // 先把 public/secrets.json 里的本地密钥写进 localStorage，再渲染界面，
   // 避免插件 iframe 用空配置初始化。
@@ -61,16 +72,12 @@ export default function App() {
 
   const changeTheme = useCallback((mode: ThemeMode) => {
     setThemeMode(mode);
-    try {
-      localStorage.setItem(THEME_KEY, mode);
-    } catch {
-      /* 隐私模式忽略 */
-    }
+    writeThemeMode(mode);
   }, []);
 
   return (
     <FluentProvider
-      theme={themeMode === 'light' ? webLightTheme : webDarkTheme}
+      theme={colorScheme === 'light' ? webLightTheme : webDarkTheme}
       style={{ height: '100%' }}
     >
       {seeded && (

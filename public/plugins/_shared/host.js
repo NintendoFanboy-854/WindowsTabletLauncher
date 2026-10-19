@@ -67,19 +67,58 @@ export function initialConfigValue(key) {
 /* 主题                                                                */
 /* ------------------------------------------------------------------ */
 
+const SYSTEM_LIGHT_QUERY = '(prefers-color-scheme: light)';
+
+function systemScheme() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'dark';
+  return window.matchMedia(SYSTEM_LIGHT_QUERY).matches ? 'light' : 'dark';
+}
+
 /**
  * 宿主注入的亮暗 + token 颜色 → Fluent Theme。
  * 插件根节点用 `<FluentProvider theme={theme}>` 包住全部内容。
+ *
+ * - 在宿主里：颜色/亮暗全部由 `host:init` / `host:theme` 驱动（宿主已跟随系统）；
+ * - 独立打开（开发/截图）：跟随 `prefers-color-scheme`，并在系统切换时重渲染；
+ * - 同时把 `color-scheme` 写到 html/body，让滚动条、原生控件与插件主题一致。
  */
 export function useHostTheme(fallbackScheme = 'dark') {
   const [payload, setPayload] = useState(() => initialThemePayload(fallbackScheme));
+  const [standaloneScheme, setStandaloneScheme] = useState(systemScheme);
+
   useEffect(() => {
     const off = plugin.onTheme((next) => {
       if (next && typeof next === 'object') setPayload(next);
     });
     return off;
   }, []);
-  return useMemo(() => resolveTheme(payload), [payload]);
+
+  // 独立开发/截图时跟随系统亮暗（宿主内由宿主负责）
+  useEffect(() => {
+    if (plugin.inHost || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia(SYSTEM_LIGHT_QUERY);
+    const onChange = () => setStandaloneScheme(media.matches ? 'light' : 'dark');
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    }
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
+
+  const resolvedPayload = plugin.inHost
+    ? payload
+    : { ...payload, colorScheme: standaloneScheme };
+
+  const result = useMemo(() => resolveTheme(resolvedPayload), [resolvedPayload]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.style.colorScheme = result.scheme;
+    if (document.body) document.body.style.colorScheme = result.scheme;
+  }, [result.scheme]);
+
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
