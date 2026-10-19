@@ -1,0 +1,180 @@
+# 插件契约（Host ⇄ Plugin Contract）
+
+> **目的**：插件与宿主**完全解耦**，实现 plug-and-play——把插件 zip 拖进窗口，宿主一行代码都不用改，
+> 卡片、设置、详情、Agent 工具、复盘统计就全部自动生效。
+>
+> **两条铁律**：
+> 1. **宿主不认识任何具体插件**：宿主代码里不能出现某个插件 id 的 if/else、它的设置字段名、
+>    它的详情页特殊处理、它写死的展示名。
+> 2. **插件不依赖宿主内部**：插件只允许使用 `public/plugin-sdk.js` 和 `public/plugins/_shared/**`；
+>    不 import `src/host/**`，不假设宿主的路由/状态结构。
+>
+> 相关文档：`docs/PLUGIN-REACT.md`（插件工程与构建）、`docs/FLUENT2.md`（视觉规范）、
+> `docs/DENSITY.md`（信息预算）、`docs/components/*.md`（逐插件设计）。冲突时以本契约为交互/能力边界，
+> 视觉仍以 Fluent 2 规范为准。
+
+## 1. 职责划分
+
+| 能力 | 插件提供（声明/实现） | 宿主通用处理（不认插件 id） |
+|---|---|---|
+| 卡片 | `manifest.json`：widgets、尺寸档位、默认尺寸、cell、`background` | 按 manifest 摆卡、挂 iframe、长按编辑、拖拽改尺寸 |
+| 卡片内交互 | 插件在 iframe 内实现：主体点击 → `requestOverlay('detail', title)`；快捷控件自己 `stopPropagation` | 只负责卡片手势层（长按进编辑、拖拽）与浮层容器 |
+| 详情 | 同一插件页面的 `?view=detail` | 收到 `plugin:request-overlay` 后开宿主全窗口 Fluent Dialog，标题由插件给 |
+| 设置 | `manifest.json` 的 `settings` schema（分组 + 字段 + 默认值） | 通用表单渲染器生成设置页，读写走 `getConfig/setConfig` |
+| 设置入口 | 任意视图发 `plugin:request-host-settings` | 导航到设置页对应插件分区（按消息来源 pluginId） |
+| Agent 工具 | `plugin.ready(tools)` 声明 + `onToolCall` 处理 | 注册、路由、交给 Agent；不解释工具语义 |
+| 通知/强提醒 | 调桥接 API `notify` / `showReminder` | 宿主统一 Toaster / 遮罩 |
+| 后台常驻 | `"background": true` | 宿主挂隐藏 iframe，路由工具调用 |
+| 复盘聚合 | 声明 `*.stats` 工具 | 按工具聚合，展示名从 manifest 取，不写死 |
+| 主题/尺寸 | 监听 `host:init` / `host:theme` / `host:resize` | 注入同一套 Fluent token |
+
+## 2. manifest 声明
+
+```json
+{
+  "id": "clock",
+  "name": "时钟",
+  "version": "0.2.0",
+  "background": false,
+  "widgets": [
+    {
+      "id": "clock",
+      "title": "时钟",
+      "sizes": [[1, 1], [2, 1], [3, 2]],
+      "defaultSize": [2, 1],
+      "cell": [0, 0]
+    }
+  ],
+  "settings": {
+    "key": "settings",
+    "version": 1,
+    "groups": [
+      {
+        "id": "display",
+        "title": "时间显示",
+        "hint": "只影响卡片的显示方式",
+        "fields": [
+          { "key": "hour12", "type": "boolean", "label": "12 小时制", "default": false },
+          { "key": "showSeconds", "type": "boolean", "label": "显示秒", "default": true },
+          {
+            "key": "dateFormat",
+            "type": "enum",
+            "label": "日期格式",
+            "default": "cn",
+            "options": [
+              { "value": "cn", "label": "10月18日 星期日" },
+              { "value": "iso", "label": "2026-10-18" },
+              { "value": "en", "label": "10/18 Sun" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 2.1 settings schema 字段类型（v1）
+
+| type | 宿主渲染 | 额外属性 |
+|---|---|---|
+| `boolean` | Switch 行（行高 48） | — |
+| `number` | Input（数字，40 高） | `min`、`max`、`step`、`unit`（如“分钟”，显示在后缀） |
+| `enum` | 选项 ≤4 用横向 RadioGroup，>4 用 Dropdown | `options: [{ value, label }]` |
+| `text` | Input（失焦/回车写入） | `placeholder`、`secret`（密码态 + 显示/隐藏）、`maxLength` |
+| `timeRange` | 两个 `type=time` Input（起/止） | 值形如 `{ "start": "22:00", "end": "08:00" }` |
+
+规则：
+
+- schema 只放**长期偏好**；列表/城市/条目这类内容管理放详情里，不进设置。
+- 宿主即时生效（自动保存）；底部固定「保存」按钮是羡余：再提交一次并关闭浮层，幂等。
+  × / Esc / 点外部与「保存」同义（都不会丢改动）。
+- 每插件分区提供「恢复默认」（取 schema 的 `default`）。
+- 未知字段类型：宿主跳过并显示“该设置项暂不支持”，不写坏配置。
+- 校验（类型/范围/枚举）由宿主做，插件读配置时再做一次 normalize 兜底。
+- 配置存储：`plugin.<pluginId>.<settings.key>`，由宿主 `setConfig` 写入；插件用 `useStoredConfig`
+  监听 storage 事件即时同步。
+
+## 3. 卡片交互契约
+
+1. **卡片主体点击 = 打开详情**：插件在 iframe 内实现，点击根区域时
+   `requestOverlay('detail', '标题')`；键盘 Enter/Space 同样打开详情。
+2. **卡片内快捷控件 = 就地操作**：按钮/勾选/开关必须 `stopPropagation`，不得触发详情。
+3. **快捷操作只允许高频、单步、可逆、低风险、不需要上下文**的选择题
+   （如番茄开始/暂停/重置、久坐“起来了”、待办勾选完成）。
+   多步表单、不可逆、需要看全量数据的操作一律进详情。
+4. **插件不监听长按/右键**：长按归宿主的编辑模式；ContextMenu 由宿主统一处理。
+5. 卡片内容遵守 DENSITY 信息预算；详情级操作不出现在卡片上（含 `+`、齿轮、⋯菜单）。
+
+## 4. 详情视图契约
+
+- 插件提供 `?view=detail`（宿主自动附加，URL 上还有 `plugin`/`widget` 参数）。
+- 内容 = **更多信息 + 具体操作**，不是把卡片放大；近距阅读（0.5–0.8m）用紧凑字号与更高密度。
+- 头部不放“页面标题栏/关闭按钮”（宿主 Dialog 提供）；可以放“设置…”入口。
+- 「设置…」按钮调 `plugin:request-host-settings`，由宿主导航到设置页对应分区。
+- 关闭语义由宿主统一：X / Esc / 点外部 = 关闭；插件不得自造关闭按钮与关闭消息
+  （编辑类表单的「取消」与 X 同义，属于正面羡余）。
+- 详情内的编辑表单：保存 = 提交并关闭浮层；取消 = 放弃改动并关闭；失败留在浮层显示错误。
+
+## 5. 设置入口协议
+
+```
+plugin → host: { type: 'plugin:request-host-settings' }
+```
+
+宿主根据消息来源的 pluginId，导航到 `设置页 → 插件 → <manifest.name>`。插件不需要知道路由。
+
+## 6. Agent 工具契约（与用户能力对等）
+
+- **每个用户可执行的操作，都必须有对应工具**；反之每个写操作工具都要有用户可达的 UI 路径。
+- 命名：`<pluginId>.<verb>`，如 `clock.settings.get`、`countdown.update`。只读工具加 `.get/.list/.status` 后缀，
+  写操作明确动词。
+- 工具必须返回结构化结果（对象），错误用 `{ error }` 或 SDK 的 `toolResult(ok=false)`。
+- 插件文档的「Agent 工具」表必须同时列出 **UI 路径 ↔ 工具** 的对应关系。
+- 宿主不校验对等性（无法通用校验），由插件验收清单与文档负责。
+
+## 7. 验收清单（插件进入本项目的硬门槛）
+
+- [ ] 卡片主体点击 = `requestOverlay('detail')`；所有卡片内控件阻止冒泡。
+- [ ] 设置只通过 manifest `settings` schema 声明，没有自带设置界面。
+- [ ] 每个用户操作都有对应 Agent 工具（含设置读写）。
+- [ ] 提供 `?view=detail`，内容为“更多 + 操作”。
+- [ ] 不监听长按/右键，不阻塞宿主手势；不自己画关闭按钮。
+- [ ] 关闭语义遵循第 4 节；编辑表单保存/取消语义一致。
+- [ ] 每个尺寸符合 DENSITY 信息预算，无详情级操作。
+- [ ] 只使用 `plugin-sdk.js` + `_shared/**`，未 import `src/host/**`。
+- [ ] `node scripts/build-plugin.mjs <id>` 产物提交；`node scripts/verify-widgets.mjs --plugin <id>` 通过。
+
+## 8. Plug-and-play 验收方式
+
+> 目标：新增插件零宿主改动。
+
+1. 准备一个最小第三方插件（manifest + 卡片 + `?view=detail` + settings schema + 一个 `*.stats` 工具）；
+2. zip 拖入/放入 `plugins/<id>/`，重扫；
+3. 断言（无需改宿主代码）：
+   - 桌面出现卡片，编辑模式可改尺寸/删除；
+   - 点卡片进入详情；
+   - 宿主设置页出现该插件分区，字段按 schema 渲染、修改即时生效；
+   - 详情里的「设置…」跳转到该分区；
+   - Agent 工具列表出现该插件工具，可调用；
+   - 复盘页出现该插件的统计块（名称来自 manifest）。
+4. 该验收将来落成 `scripts/verify-plug-and-play.mjs`（本轮先作为人工清单）。
+
+## 9. 反模式（出现即不通过）
+
+- 宿主里写 `if (pluginId === 'clock')`、按插件名写死设置字段/展示名。
+- 插件自带设置页面/关闭按钮/长按菜单；插件读取宿主内部路由或模块。
+- 卡片上出现 `+`、齿轮、详情级菜单；卡片主体点击改变自身展示状态。
+- 用户能做但 Agent 做不到（或 Agent 能做但用户无路径）。
+- 设置项需要“保存才生效”（必须即时生效；保存按钮只是羡余）。
+
+## 10. 落地清单（宿主侧待实现）
+
+1. 设置页新增“插件”导航：从 PluginManager 动态列出插件 → 按 manifest `settings` 渲染通用表单
+   （字段类型 v1、即时保存、保存按钮、恢复默认）。
+2. `plugin:request-host-settings` 消息处理 + 编辑模式「设置」跳转。
+3. 复盘页 provider 展示名改为从 manifest 取，删除写死的 `todo/pomodoro` 标签。
+4. 六个插件：删除 `?view=settings` 界面；交互改为第 3 节；补 detail 视图；补 Agent 工具对等；
+   把设置项迁入 manifest schema；内容管理搬进详情。
+5. 文档：六个 `docs/components/*.md` 按本契约重写交互/设置/Agent 部分；
+   `docs/DECISIONS.md` 记录“卡片交互契约 / 设置宿主化 / 插件解耦”决策。
