@@ -38,6 +38,7 @@ import {
 } from '../layout';
 import type { LayoutState } from '../layout';
 import type { ColorScheme } from '../shell/themeMode';
+import { usePluginPreferences } from '../pages/plugins/preferences';
 import { getPluginManager, readFluentThemePayload, usePlugins } from '../plugins';
 import type { NormalizedPlugin, NormalizedWidget, PluginManager } from '../plugins';
 import { BackgroundFrames } from './BackgroundFrames';
@@ -265,6 +266,15 @@ export default function Desktop({
 
   // 插件列表：manager.init() + 热重载订阅（zip 安装 / 手动放目录都会触发）
   const { plugins, loading: pluginsLoading, error: pluginsError, reload: reloadPlugins } = usePlugins(manager);
+  /**
+   * 插件管理页的启用/禁用偏好（B4）。此前只写 localStorage、桌面层没有读取，
+   * 开关无实际效果（E7 回归发现）。这里按偏好过滤渲染，但**不删布局条目**：
+   * 重新启用后卡片回到原来的位置与尺寸。
+   */
+  const preferences = usePluginPreferences();
+  const disabledPlugins = useMemo(() => new Set(preferences.disabled), [preferences.disabled]);
+  const disabledPluginsRef = useRef(disabledPlugins);
+  disabledPluginsRef.current = disabledPlugins;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const { viewport, metrics, origin } = useViewportMetrics(rootRef);
@@ -410,8 +420,9 @@ export default function Desktop({
   useEffect(() => {
     if (!layout) return;
     const current = focusedUid ? layout.widgets.find((widget) => widget.uid === focusedUid) : null;
-    if (current && current.page === layout.activePage) return;
-    const onPage = [...layout.widgets]
+    if (current && current.page === layout.activePage && !disabledPlugins.has(current.pluginId)) return;
+    const onPage = layout.widgets
+      .filter((widget) => !disabledPlugins.has(widget.pluginId))
       .sort(compareReadingOrder)
       .find((widget) => widget.page === layout.activePage);
     if (onPage) {
@@ -419,7 +430,7 @@ export default function Desktop({
     } else if (focusedUid) {
       setFocusedUid(null);
     }
-  }, [layout, focusedUid]);
+  }, [layout, focusedUid, disabledPlugins]);
 
   // 截图回归入口：?edit=1 在布局加载完后直接进编辑模式
   useEffect(() => {
@@ -446,7 +457,10 @@ export default function Desktop({
       if (!state) return;
       const target =
         widget ??
-        [...state.widgets].sort(compareReadingOrder).find((item) => item.page === state.activePage);
+        state.widgets
+          .filter((item) => !disabledPluginsRef.current.has(item.pluginId))
+          .sort(compareReadingOrder)
+          .find((item) => item.page === state.activePage);
       if (target) {
         setFocusedUid(target.uid);
         focusCardNode(target.uid);
@@ -583,7 +597,9 @@ export default function Desktop({
     (delta: number) => {
       const state = layoutRef.current;
       if (!state || state.widgets.length === 0) return;
-      const ordered = [...state.widgets].sort(compareReadingOrder);
+      const ordered = state.widgets
+        .filter((widget) => !disabledPluginsRef.current.has(widget.pluginId))
+        .sort(compareReadingOrder);
       const fromUid = focusedUidRef.current;
       const index = fromUid ? ordered.findIndex((widget) => widget.uid === fromUid) : -1;
       const next = ordered[(index + delta + ordered.length) % ordered.length];
@@ -920,10 +936,12 @@ export default function Desktop({
     if (keyTarget !== document.body && !event.currentTarget.contains(keyTarget)) return;
     const state = layoutRef.current;
     if (!state) return;
-    const ordered = [...state.widgets].sort(compareReadingOrder);
+    const ordered = state.widgets
+      .filter((widget) => !disabledPluginsRef.current.has(widget.pluginId))
+      .sort(compareReadingOrder);
     if (ordered.length === 0) return;
     const focusedWidget = focusedUidRef.current
-      ? state.widgets.find((widget) => widget.uid === focusedUidRef.current) ?? null
+      ? ordered.find((widget) => widget.uid === focusedUidRef.current) ?? null
       : null;
 
     switch (event.key) {
@@ -978,11 +996,14 @@ export default function Desktop({
     width: `${pages * 100}%`,
     transform: `translateX(calc(${(-activePage * 100) / pages}% + ${swipeOffset ?? 0}px))`,
   };
-  const widgets = layout?.widgets ?? [];
+  const widgets = (layout?.widgets ?? []).filter(
+    (widget) => !disabledPlugins.has(widget.pluginId),
+  );
   const draggedWidget = dragView ? widgets.find((widget) => widget.uid === dragView.uid) : null;
   const backgroundPlugins = useMemo(
-    () => plugins.filter((plugin) => plugin.background),
-    [plugins],
+    () =>
+      plugins.filter((plugin) => plugin.background && !disabledPlugins.has(plugin.id)),
+    [plugins, disabledPlugins],
   );
   const showLoading = pluginsLoading || (!layout && !pluginsError);
   const showPluginError = Boolean(pluginsError) || (!pluginsLoading && plugins.length === 0);

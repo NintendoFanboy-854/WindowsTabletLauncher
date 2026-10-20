@@ -1,237 +1,270 @@
 /**
- * 插件设置/详情浮层回归断言（OVERLAY-REWRITE-SPEC §6）。
+ * 插件详情浮层回归断言（E7 重写；E1 起插件只有 `?view=detail`）。
+ *
+ * 历史：E1 之前的 12 个 `?view=settings|edit|all` 用例已随插件设置宿主化而失效
+ * （设置只由 manifest.settings 在宿主设置页渲染，countdown 编辑改为详情内 L2）。
+ * 本轮按当前规格重写为「六插件 × detail」矩阵，不再保留失效视图。
  *
  * 用法（仓库根目录，dev server 需在 http://localhost:5173 运行）：
- *   node scripts/verify-overlays.mjs                     # 全部插件全部浮层视图
+ *   node scripts/verify-overlays.mjs                     # 六插件 detail（默认暗色）
+ *   node scripts/verify-overlays.mjs --scheme light      # 亮色同一套断言
  *   node scripts/verify-overlays.mjs --plugin weather    # 只测一个插件
- *   node scripts/verify-overlays.mjs --scheme light      # 亮色抽查（默认 dark）
- *   node scripts/verify-overlays.mjs --screenshots       # 截图写到 shots/rewrite/overlays/verify/
+ *   node scripts/verify-overlays.mjs --screenshots       # 截图到 shots/e7/overlays/
+ *   node scripts/verify-overlays.mjs --json shots/e7/logs/overlays.json
  *
- * 实现：宿主浮层 iframe 实测尺寸 834×582（1440×960 下 Dialog 880×680 − 标题/边距）。
- * 每个视图直接以 standalone 页面 + `?view=` 打开，串行单 Edge，结束清理进程。
+ * 视口：宿主浮层 iframe 实测 834×582（1440×960 下 Dialog 880×680 − 标题/边距）。
+ * 断言（不随主题放宽）：
+ *   - 详情骨架渲染（`[data-detail-page]` 存在且有文字）；
+ *   - 视口 834×582；
+ *   - 根内边距 24（详情 header/toolbar/tabs 的 computed padding-inline，Fluent spacingHorizontalXXL）；
+ *   - 页面级无横向溢出（documentElement / body），详情根不越出视口；
+ *   - 可交互控件根（Fluent `.fui-*` 根，不是内部 input）宽高均 ≥40；
+ *   - 可见文字最小字号 ≥12px；
+ *   - console error = 0。
+ *
+ * 实现：复用 `scripts/lib/cdp.mjs`（串行单 Edge、唯一 `%TEMP%\wtsl-verify-*` profile、
+ * 结束按本次 profile 清理，不用 `taskkill /F /IM msedge.exe`）。
  */
-import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
-const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const BASE_URL = 'http://localhost:5173';
+import { launch, sleep } from './lib/cdp.mjs';
+
+const BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 const VIEW_WIDTH = 834;
 const VIEW_HEIGHT = 582;
+/** 详情骨架左右内边距：tokens.spacingHorizontalXXL = 24（_shared/ui.jsx 的 header/toolbar/tabs） */
+const ROOT_PADDING = 24;
+const MIN_FONT = 12;
+const MIN_CONTROL = 40;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** 每个插件的浮层视图；detail/edit/all 需要演示数据时自动加 &demo=1 */
+/**
+ * 六插件 detail 用例。demo 参数按插件现状：
+ * - clock：默认数据（无事件，世界时钟空态 + 日期信息）；
+ * - countdown / pomodoro / sedentary / todo：`&demo=1` 注入演示数据（各自 main.jsx 的 seedDemoData）；
+ * - weather：`?mock=1` 走内置演示数据（无 API Key 也能出全部分区）。
+ */
 const CASES = [
-  { plugin: 'clock', widget: 'clock', view: 'settings', demo: false },
-  { plugin: 'weather', widget: 'weather-card', view: 'settings', demo: false },
-  { plugin: 'weather', widget: 'weather-card', view: 'detail', demo: false },
-  { plugin: 'countdown', widget: 'countdown', view: 'settings', demo: true },
-  { plugin: 'countdown', widget: 'countdown', view: 'edit', demo: true },
-  { plugin: 'pomodoro', widget: 'pomodoro', view: 'settings', demo: true },
-  { plugin: 'pomodoro', widget: 'pomodoro', view: 'detail', demo: true },
-  { plugin: 'sedentary', widget: 'sedentary', view: 'settings', demo: true },
-  { plugin: 'sedentary', widget: 'sedentary', view: 'detail', demo: true },
-  { plugin: 'todo', widget: 'todo-list', view: 'settings', demo: true },
-  { plugin: 'todo', widget: 'todo-list', view: 'detail', demo: true },
-  { plugin: 'todo', widget: 'todo-list', view: 'all', demo: true },
+  { plugin: 'clock', widget: 'clock', demo: null },
+  { plugin: 'countdown', widget: 'countdown', demo: 'demo' },
+  { plugin: 'pomodoro', widget: 'pomodoro', demo: 'demo' },
+  { plugin: 'sedentary', widget: 'sedentary', demo: 'demo' },
+  { plugin: 'todo', widget: 'todo-list', demo: 'demo' },
+  { plugin: 'weather', widget: 'weather-card', demo: 'mock' },
 ];
 
-const WEATHER_SETTINGS = {
-  apiKey: '',
-  apiHost: '',
-  unit: 'c',
-  refreshMin: 30,
-  autoLocate: false,
-  showAir: true,
-  showWarnings: true,
-  showMinutely: false,
-  mock: true,
-  places: [
-    {
-      id: '101010100',
-      name: '北京',
-      adm1: '北京市',
-      adm2: '北京',
-      lat: 39.92,
-      lon: 116.41,
-      country: '中国',
-      tz: 'Asia/Shanghai',
-      isCurrent: true,
-    },
-  ],
-};
-
 const MEASURE = `(() => {
-  const W = innerWidth, H = innerHeight;
+  const W = innerWidth;
+  const H = innerHeight;
+  const num = (value) => Number.parseFloat(value) || 0;
   const visible = (el) => {
-    const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) return false;
+    if (!el || el.nodeType !== 1) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return false;
     const cs = getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false;
-    return r.bottom > 0 && r.top < H + 200 && r.right > 0 && r.left < W;
+    if (cs.display === 'none' || cs.visibility === 'hidden' || num(cs.opacity) === 0) return false;
+    return rect.bottom > 0 && rect.top < H + 200 && rect.right > 0 && rect.left < W;
   };
+
+  // ---- 可见文字字号 ----
   const fonts = [];
+  const smallTexts = [];
   for (const el of document.querySelectorAll('body *')) {
     if (el.closest('script,style')) continue;
-    const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => (n.textContent || '').trim()).filter(Boolean).join(' ');
+    const own = [...el.childNodes]
+      .filter((node) => node.nodeType === 3)
+      .map((node) => (node.textContent || '').trim())
+      .filter(Boolean)
+      .join(' ');
     if (!own || !visible(el)) continue;
-    const fs = Number.parseFloat(getComputedStyle(el).fontSize) || 0;
-    if (fs) fonts.push(fs);
+    const fontSize = num(getComputedStyle(el).fontSize);
+    if (!fontSize) continue;
+    fonts.push(fontSize);
+    if (fontSize < ${MIN_FONT}) smallTexts.push({ text: own.slice(0, 32), fontSize });
   }
+
+  // ---- 控件根尺寸：Fluent 内建控件量根节点，不是内部的 input/checkbox ----
+  const ROOT_SELECTOR = [
+    '.fui-Button',
+    '.fui-Input',
+    '.fui-Textarea',
+    '.fui-Dropdown',
+    '.fui-Combobox',
+    '.fui-Tab',
+    '.fui-Switch',
+    '.fui-Checkbox',
+    '.fui-Radio',
+    '.fui-Slider',
+    '.fui-SpinButton',
+    '.fui-SearchBox',
+    '.fui-Select',
+  ].join(',');
+  const INTERACTIVE =
+    'button, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="slider"], input, select, textarea, a[href]';
   const controls = [];
-  const push = (el, kind) => {
-    if (!visible(el)) return;
-    const r = el.getBoundingClientRect();
-    controls.push({ kind, w: Math.round(r.width), h: Math.round(r.height) });
-  };
-  document.querySelectorAll('button, [role="button"], [role="tab"], input, select, textarea, .fui-Switch, .fui-Checkbox, .fui-Radio, .fui-Slider, .fui-Dropdown, .fui-Input').forEach((el) => push(el, el.className.split(' ').find((c) => c.startsWith('fui-')) || el.tagName.toLowerCase()));
-  const below12 = fonts.filter((f) => f < 12).length;
-  const below40 = controls.filter((c) => c.h < 40).length;
+  for (const el of document.querySelectorAll(INTERACTIVE)) {
+    if (!visible(el)) continue;
+    const root = el.closest(ROOT_SELECTOR) || el;
+    if (!visible(root)) continue;
+    const rect = root.getBoundingClientRect();
+    const className = typeof root.className === 'string' ? root.className : '';
+    controls.push({
+      kind: className.split(' ').find((part) => part.startsWith('fui-')) || el.tagName.toLowerCase(),
+      tag: el.tagName.toLowerCase(),
+      role: el.getAttribute('role') || null,
+      label: (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 48),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+  }
+
+  // ---- 详情骨架内边距 ----
+  const pads = ['[data-detail-header]', '[data-detail-toolbar]', '[data-detail-tabs]']
+    .map((selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const cs = getComputedStyle(node);
+      return {
+        selector,
+        left: num(cs.paddingLeft),
+        right: num(cs.paddingRight),
+      };
+    })
+    .filter(Boolean);
+
+  const page = document.querySelector('[data-detail-page]');
+  const pageRect = page ? page.getBoundingClientRect() : null;
+
   return {
     width: W,
     height: H,
-    bodyText: (document.body.innerText || '').trim().slice(0, 120),
+    bodyText: (document.body.innerText || '').trim().slice(0, 160),
     textLength: (document.body.innerText || '').trim().length,
+    fontCount: fonts.length,
     minFont: fonts.length ? Math.min(...fonts) : 0,
     maxFont: fonts.length ? Math.max(...fonts) : 0,
-    fontCount: fonts.length,
-    below12,
+    smallTexts: smallTexts.slice(0, 10),
+    smallTextCount: smallTexts.length,
     controlCount: controls.length,
-    below40,
-    smallControls: controls.filter((c) => c.h < 40).slice(0, 10),
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
+    smallControls: controls.filter((c) => c.width < ${MIN_CONTROL} || c.height < ${MIN_CONTROL}).slice(0, 12),
+    smallControlCount: controls.filter((c) => c.width < ${MIN_CONTROL} || c.height < ${MIN_CONTROL}).length,
+    pads,
+    hasDetailPage: Boolean(page),
+    pageRect: pageRect
+      ? { left: Math.round(pageRect.left), top: Math.round(pageRect.top), right: Math.round(pageRect.right), bottom: Math.round(pageRect.bottom) }
+      : null,
+    docScrollWidth: document.documentElement.scrollWidth,
+    docClientWidth: document.documentElement.clientWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+    bodyClientWidth: document.body.clientWidth,
   };
 })()`;
 
-async function launch(port) {
-  const profile = join(process.env.TEMP, `wtsl-overlays-${Date.now()}`);
-  const child = spawn(
-    EDGE,
-    [
-      '--headless=new',
-      `--remote-debugging-port=${port}`,
-      `--user-data-dir=${profile}`,
-      '--disable-gpu',
-      '--hide-scrollbars',
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--window-size=834,582',
-      'about:blank',
-    ],
-    { stdio: 'ignore' },
-  );
-  let wsUrl = null;
-  for (let i = 0; i < 160; i += 1) {
-    try {
-      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-      const page = list.find((t) => t.type === 'page' && !t.url.startsWith('edge://') && !t.url.startsWith('devtools://'));
-      if (page?.webSocketDebuggerUrl) {
-        wsUrl = page.webSocketDebuggerUrl;
-        break;
-      }
-    } catch {
-      /* wait */
-    }
-    await sleep(250);
-  }
-  if (!wsUrl) throw new Error('Edge CDP 没起来');
-  const ws = new WebSocket(wsUrl);
-  await new Promise((res, rej) => {
-    ws.onopen = res;
-    ws.onerror = rej;
+function caseUrl(entry) {
+  const params = new URLSearchParams({
+    plugin: entry.plugin,
+    widget: entry.widget,
+    view: 'detail',
   });
-  let seq = 0;
-  const pending = new Map();
-  const errors = [];
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.id && pending.has(msg.id)) {
-      const { resolve: ok, reject } = pending.get(msg.id);
-      pending.delete(msg.id);
-      if (msg.error) reject(new Error(JSON.stringify(msg.error)));
-      else ok(msg.result);
-    } else if (msg.method === 'Runtime.exceptionThrown') {
-      errors.push('EXC ' + JSON.stringify(msg.params.exceptionDetails).slice(0, 200));
-    } else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
-      errors.push('ERR ' + msg.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 200));
-    }
-  };
-  const send = (method, params = {}, timeoutMs = 60000) =>
-    new Promise((resolveP, reject) => {
-      const id = ++seq;
-      pending.set(id, { resolve: resolveP, reject });
-      ws.send(JSON.stringify({ id, method, params }));
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          reject(new Error(`CDP timeout ${method}`));
-        }
-      }, timeoutMs);
-    });
-  await send('Page.enable');
-  await send('Runtime.enable');
-  return { send, ws, child, profile, errors, close: async () => {
-    try { ws.close(); } catch { /* ignore */ }
-    child.kill();
-    await sleep(600);
-    try {
-      const { execSync } = await import('node:child_process');
-      execSync(
-        `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='msedge.exe'\\" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('wtsl-overlays-') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`,
-        { stdio: 'ignore' },
-      );
-    } catch { /* ignore */ }
-    try { rmSync(profile, { recursive: true, force: true }); } catch { /* ignore */ }
-  } };
+  if (entry.demo === 'demo') params.set('demo', '1');
+  if (entry.demo === 'mock') params.set('mock', '1');
+  return `${BASE_URL}/plugins/${entry.plugin}/index.html?${params.toString()}`;
+}
+
+async function waitForRender(cdp, timeoutMs = 40000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const state = await cdp.evaluate(`(() => {
+      const root = document.getElementById('root');
+      const text = (root?.innerText || '').trim();
+      return {
+        textLength: text.length,
+        detail: Boolean(document.querySelector('[data-detail-page]')),
+        spinner: Boolean(document.querySelector('.fui-Spinner')),
+      };
+    })()`);
+    if (state && state.detail && state.textLength > 40 && !state.spinner) return true;
+    await sleep(400);
+  }
+  return false;
 }
 
 async function verifyCase(cdp, entry, options) {
-  cdp.errors.length = 0;
-  const params = new URLSearchParams({ plugin: entry.plugin, widget: entry.widget, view: entry.view });
-  if (entry.demo) params.set('demo', '1');
-  const url = `${BASE_URL}/plugins/${entry.plugin}/index.html?${params.toString()}`;
-  await cdp.send('Page.navigate', { url });
-  let ready = false;
-  for (let i = 0; i < 120; i += 1) {
-    const length = await cdp.send('Runtime.evaluate', {
-      expression: `((document.getElementById('root')?.innerText) || '').trim().length`,
-      returnByValue: true,
-    });
-    if ((length.result?.value || 0) > 30) {
-      ready = true;
-      break;
-    }
-    await sleep(1000);
-  }
-  await sleep(2000);
-  await cdp.send('Runtime.evaluate', {
-    expression: `(() => {
-      document.documentElement.style.background = '${options.scheme === 'light' ? '#ffffff' : '#0e0f13'}';
-      document.body.style.background = '${options.scheme === 'light' ? '#ffffff' : '#0e0f13'}';
+  cdp.clearConsoleErrors();
+  await cdp.navigate(caseUrl(entry));
+  const ready = await waitForRender(cdp);
+  // 详情内异步数据（天气 mock / 演示种子）收尾，避免量到骨架半成品
+  await sleep(1800);
+  if (options.scheme === 'light') {
+    await cdp.evaluate(`(() => {
+      document.documentElement.style.background = '#ffffff';
+      document.body.style.background = '#ffffff';
       return 'ok';
-    })()`,
-  });
-  await sleep(300);
-  const result = await cdp.send('Runtime.evaluate', { expression: MEASURE, returnByValue: true });
-  const measure = result.result?.value || {};
-  if (options.screenshots) {
-    const dir = join('shots', 'rewrite', 'overlays');
-    mkdirSync(dir, { recursive: true });
-    const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-    const suffix = options.scheme === 'light' ? '-light' : '';
-    writeFileSync(join(dir, `${entry.plugin}-${entry.view}${suffix}.png`), Buffer.from(shot.data, 'base64'));
+    })()`);
   }
+  const measure = await cdp.evaluate(MEASURE);
   const fails = [];
-  if (!ready) fails.push('视图未渲染（body 文本为空）');
-  if ((measure.below12 || 0) > 0) fails.push(`<12px 文本 ${measure.below12} 处`);
-  if ((measure.minFont || 0) > 0 && measure.minFont < 12) fails.push(`最小字号 ${measure.minFont}px`);
-  if ((measure.below40 || 0) > 0) fails.push(`高度 <40 的控件 ${measure.below40} 个`);
-  if ((measure.scrollWidth || 0) > (measure.clientWidth || 0) + 1) {
-    fails.push(`横向溢出 ${measure.scrollWidth} > ${measure.clientWidth}`);
+
+  if (!ready) fails.push('详情未渲染（无 [data-detail-page] 或文字不足）');
+  if (!measure.hasDetailPage) fails.push('缺少详情骨架 [data-detail-page]');
+  if (measure.width !== VIEW_WIDTH || measure.height !== VIEW_HEIGHT) {
+    fails.push(`视口 ${measure.width}×${measure.height} ≠ ${VIEW_WIDTH}×${VIEW_HEIGHT}`);
   }
-  if (cdp.errors.length > 0) fails.push(`控制台错误 ${cdp.errors.length} 条`);
+  if (measure.pads.length === 0) {
+    fails.push('详情骨架没有 header/toolbar/tabs，无法核对根内边距');
+  } else {
+    const wrong = measure.pads.filter(
+      (pad) => pad.left !== ROOT_PADDING || pad.right !== ROOT_PADDING,
+    );
+    if (wrong.length > 0) {
+      fails.push(
+        `根内边距不是 ${ROOT_PADDING}：${wrong
+          .map((pad) => `${pad.selector} ${pad.left}/${pad.right}`)
+          .join('、')}`,
+      );
+    }
+  }
+  if (measure.smallControlCount > 0) {
+    fails.push(
+      `可交互控件根 <${MIN_CONTROL}：${measure.smallControlCount} 个（${measure.smallControls
+        .map((c) => `${c.kind}:${c.label}@${c.width}×${c.height}`)
+        .join('、')}）`,
+    );
+  }
+  if (measure.smallTextCount > 0) {
+    fails.push(
+      `可见文字 <${MIN_FONT}px：${measure.smallTextCount} 处（${measure.smallTexts
+        .map((t) => `${t.fontSize}px「${t.text}」`)
+        .join('、')}）`,
+    );
+  }
+  if (measure.docScrollWidth > measure.docClientWidth + 1) {
+    fails.push(`页面横向溢出 ${measure.docScrollWidth} > ${measure.docClientWidth}`);
+  }
+  if (measure.bodyScrollWidth > measure.bodyClientWidth + 1) {
+    fails.push(`body 横向溢出 ${measure.bodyScrollWidth} > ${measure.bodyClientWidth}`);
+  }
+  if (measure.pageRect && (measure.pageRect.left < -1 || measure.pageRect.right > VIEW_WIDTH + 1)) {
+    fails.push(
+      `详情根越出视口 left=${measure.pageRect.left} right=${measure.pageRect.right}`,
+    );
+  }
+  if (cdp.consoleErrors.length > 0) {
+    fails.push(
+      `console error ${cdp.consoleErrors.length} 条：${cdp.consoleErrors
+        .map((error) => `${error.type}:${error.text}`)
+        .join(' | ')
+        .slice(0, 400)}`,
+    );
+  }
+
+  if (options.screenshots) {
+    const dir = join('shots', 'e7', 'overlays');
+    mkdirSync(dir, { recursive: true });
+    const suffix = options.scheme === 'light' ? '-light' : '-dark';
+    await cdp.screenshot(join(dir, `${entry.plugin}-detail${suffix}.png`));
+  }
+
   return { entry, measure, fails, ready };
 }
 
@@ -240,60 +273,82 @@ async function main() {
   const only = args.includes('--plugin') ? args[args.indexOf('--plugin') + 1] : null;
   const scheme = args.includes('--scheme') ? args[args.indexOf('--scheme') + 1] : 'dark';
   const screenshots = args.includes('--screenshots');
-  const cases = CASES.filter((c) => !only || c.plugin === only);
-  if (cases.length === 0) throw new Error(`没有匹配的视图：${only}`);
+  const jsonPath = args.includes('--json') ? args[args.indexOf('--json') + 1] : null;
 
-  const port = 9440 + Math.floor(Math.random() * 20);
-  const cdp = await launch(port);
+  if (scheme !== 'dark' && scheme !== 'light') {
+    throw new Error(`非法 scheme：${scheme}（只支持 dark / light）`);
+  }
+  const cases = CASES.filter((entry) => !only || entry.plugin === only);
+  if (cases.length === 0) throw new Error(`没有匹配的插件：${only}`);
+
+  const cdp = await launch({ width: VIEW_WIDTH, height: VIEW_HEIGHT, scheme });
+  const results = [];
   let failures = 0;
   try {
-    await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: VIEW_WIDTH,
-      height: VIEW_HEIGHT,
-      deviceScaleFactor: 1,
-      mobile: false,
-    });
-    await cdp.send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-color-scheme', value: scheme === 'light' ? 'light' : 'dark' }],
-    });
-    // 先在宿主页写天气 mock 配置（standalone 设置/详情会读 localStorage）
-    await cdp.send('Page.navigate', { url: BASE_URL });
-    await sleep(4000);
-    await cdp.send('Runtime.evaluate', {
-      expression: `(() => {
-        try { localStorage.setItem('plugin.weather.settings', JSON.stringify(${JSON.stringify(WEATHER_SETTINGS)})); } catch (e) {}
-        return 'ok';
-      })()`,
-    });
-
-    const results = [];
     for (const entry of cases) {
       const result = await verifyCase(cdp, entry, { scheme, screenshots });
       results.push(result);
-      const m = result.measure;
+      const { measure } = result;
       console.log(
-        `  ${entry.plugin.padEnd(9)} ${entry.view.padEnd(8)} 字号 ${String(m.minFont).padStart(4)}–${String(m.maxFont).padStart(4)}px  ` +
-          `文本 ${String(m.textLength).padStart(4)}  控件 ${String(m.controlCount).padStart(2)}（<40 ${m.below40}）  ` +
+        `  ${entry.plugin.padEnd(9)} detail  字号 ${String(measure.minFont).padStart(3)}–${String(
+          measure.maxFont,
+        ).padStart(4)}px  文本 ${String(measure.textLength).padStart(4)}  控件 ${String(
+          measure.controlCount,
+        ).padStart(2)}（<${MIN_CONTROL} ${measure.smallControlCount}）  ` +
           `${result.fails.length === 0 ? 'PASS' : 'FAIL'}`,
       );
-      if (result.fails.length > 0) {
-        failures += 1;
-        for (const fail of result.fails) console.log(`      - ${fail}`);
-      }
-    }
-
-    console.log(`\n=== 汇总（${scheme}）===`);
-    for (const result of results) {
-      console.log(`${result.fails.length === 0 ? 'PASS' : 'FAIL'}  ${result.entry.plugin} ${result.entry.view}`);
+      for (const fail of result.fails) console.log(`      - ${fail}`);
+      if (result.fails.length > 0) failures += 1;
     }
   } finally {
     await cdp.close();
   }
+
+  if (jsonPath) {
+    mkdirSync(dirname(jsonPath), { recursive: true });
+    writeFileSync(
+      jsonPath,
+      `${JSON.stringify(
+        {
+          scheme,
+          viewport: { width: VIEW_WIDTH, height: VIEW_HEIGHT },
+          assertions: {
+            viewport: `${VIEW_WIDTH}×${VIEW_HEIGHT}`,
+            rootPadding: ROOT_PADDING,
+            minControl: MIN_CONTROL,
+            minFont: MIN_FONT,
+            consoleErrors: 0,
+          },
+          generatedAt: new Date().toISOString(),
+          results: results.map((result) => ({
+            plugin: result.entry.plugin,
+            widget: result.entry.widget,
+            url: caseUrl(result.entry),
+            ready: result.ready,
+            fails: result.fails,
+            measure: result.measure,
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    console.log(`  JSON → ${jsonPath}`);
+  }
+
+  console.log(`\n=== 汇总（${scheme}，${VIEW_WIDTH}×${VIEW_HEIGHT}）===`);
+  for (const result of results) {
+    console.log(
+      `${result.fails.length === 0 ? 'PASS' : 'FAIL'}  ${result.entry.plugin} detail  (${caseUrl(
+        result.entry,
+      )})`,
+    );
+  }
   if (failures > 0) {
-    console.log(`\n${failures} 个浮层视图未通过`);
+    console.log(`\n${failures} 个详情视图未通过断言`);
     process.exitCode = 1;
   } else {
-    console.log('\n全部浮层视图通过断言');
+    console.log(`\n全部 ${results.length} 个详情视图通过断言`);
   }
 }
 

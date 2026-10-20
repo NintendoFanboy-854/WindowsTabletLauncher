@@ -157,11 +157,14 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 > 背景：六个插件的交互/信息架构/视觉已逐个定稿，宿主与插件解耦契约见 [PLUGIN-CONTRACT.md](PLUGIN-CONTRACT.md)；
 > 汇总见 [DESIGN-ROUND-SUMMARY.md](DESIGN-ROUND-SUMMARY.md)，动效见 [MOTION.md](MOTION.md)，
 > 原则参考 [APPLE-HIG.md](reference/APPLE-HIG.md)。本轮不再按旧阶段表，按下面顺序执行。
-> **E0–E6 已完成（2026-10-20）**：设置页 `bd6a8b8`、卡片手势 `5f65153`、网络定位（D-16）`05fbafd`、
+> **E0–E7 已完成（2026-10-20），版本 0.2.0**：设置页 `bd6a8b8`、卡片手势 `5f65153`、网络定位（D-16）`05fbafd`、
 > 共享插件底座 `d2c3ae8`、模板 `27ef06c`、六插件 `15bb70d`…`03be1e6`、B5 设置隔离 `b970287`、
 > E4 动效 `4a6ac2a`、E5 视觉 `f568c86`、E6 清理 `14fd1e7`；附带修掉 P1/P2 回归：
 > 布局 reload 覆盖 `8c43d0b`、reload 后插件尺寸/主题不同步 `0bca3ab`、同会话换配色不跟随 `a467830`。
-> 接下来只剩 **E7 回归与发布**。
+> E7（`1e2b44f` 之后本轮变更，未提交，由 Lead 统一提交）：重写 `verify-overlays` / `shot-host-overlays`、
+> 修正 `verify-widgets`、最小插件 plug-and-play（19/19）、四套视口×亮暗宿主 E2E（53/53 ×4）、
+> P1 修复「插件启用/禁用偏好未被桌面读取」；结论见 [shots/e7/REPORT.md](../shots/e7/REPORT.md)、
+> 发布报告 [RELEASE-REPORT.md](RELEASE-REPORT.md)。
 
 | # | 任务 | 内容 | 验收 |
 |---|---|---|---|
@@ -176,7 +179,8 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 | E4b | 持久化/主题回归修复 ✅ | P1 布局 reload 被空目录覆盖、P1b reload 后插件尺寸档位/主题不同步、P2 同会话换配色插件卡不跟随 | 已完成（2026-10-20，commit `8c43d0b`/`0bca3ab`/`a467830`）：focused 复测 52/52 PASS；六插件 `verify-plugin` 重打包后全 PASS；布局/尺寸/主题三条链均有 raw 证据（`shots/e3-final/p1-fix*`） |
 | E5 | 视觉收口 ✅ | spacing/分组/层级/字号统一（HIG 分组原则 + Fluent 2 token）；天气右端对齐、卡片内边距、详情首屏密度；亮暗两套 | 已完成（2026-10-20，commit `f568c86`）：P0/P1 清零；5 组 P1 修复（详情溢出渐隐、countdown 主层/Badge、设置标题 20、AQI 对比 10.05:1）；1440×960/1024×768 × 亮暗全量截图与量测；P2 清单见 `shots/e5/REPORT.md` §4（不阻塞交付） |
 | E6 | 测试脚手架清理 ✅ | 删除 `src/host/{shell,agent,plugins}/demo.html` 三套演示宿主与 `bridge-check`；去掉演示页的“Agent 模块演示 / scenario / 源码路径”测试横幅与假桌面；Agent「演示模式」移出主设置（只保留高级/URL `?mock=1`） | 已完成（2026-10-20，commit `14fd1e7`）：删 9 文件；正式 host 仅 `index.html`；dist 的 host bundle 演示文案=0；设置/插件页/Agent 设置无演示入口；`?mock=1` 能力保留；`verify-plugin` 连跑 2 次无残留 Edge/profile。注：旧 demo URL 在 Vite dev 下按 SPA fallback 返回官方 host（200 非 404，无 demo 内容）；`dist/plugins/**` 的插件 `?demo=1` 资产属插件 dev 数据，保留 |
-| E7 | 回归与发布 | 更新 `verify-widgets` / `verify-overlays`；做一个最小第三方插件跑 plug-and-play 验收（零宿主改动）；更新 RELEASE/RELEASE-REPORT；截图归档 | 断言全 PASS；契约验收清单全勾 |
+| E7 | 回归与发布 ✅ | 更新 `verify-widgets` / `verify-overlays`；做一个最小第三方插件跑 plug-and-play 验收（零宿主改动）；更新 RELEASE/RELEASE-REPORT；截图归档 | 已完成（2026-10-20）：`verify-plugin` 6/6、`verify-widgets` 25/25（暗+亮，1 项已接受 P2 记账）、`verify-overlays` 6/6 × 暗/亮、`shot-host-overlays` 6/6 × 暗/亮；plug-and-play 19/19（临时 `ping` 插件，零宿主改动，验收后删除）；宿主 E2E 53/53 × 4（1440×960 / 1024×768 × 暗/亮）+ 页面 E2E 12/12；`typecheck`/`build`/`cargo check` 通过；P1 修复「插件启用/禁用偏好未被桌面读取」。证据 `shots/e7/`，报告 `shots/e7/REPORT.md`、`docs/RELEASE-REPORT.md` |
 
 > 执行顺序：E0 →（E1/E2 可并行）→ E2b → E3.0 → E3.0b → E3.x（逐插件）→ E4 → E5 → E6 → E7。
+> E0–E7 全部完成（2026-10-20，v0.2.0）；`templates/plugin-template/` 自包含模板不参与运行时，后续升级共享底座时按模板 README 重新快照。
 > 动效（E4）的具体参数在实现前单独定稿；视觉（E5）不再改交互语义。

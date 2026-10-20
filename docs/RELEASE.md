@@ -1,65 +1,77 @@
-# 发布前检查清单
+# 发布前检查清单（v0.2.0）
 
-> 最后一次全量验证用。每项都要有证据（命令输出 / 截图路径 / commit hash）。
+> 最后一次全量验证：2026-10-20（E7）。每项都有证据（命令输出 / 截图路径 / commit hash）。
+> 证据根：`shots/e7/`；总报告：`docs/RELEASE-REPORT.md`、`shots/e7/REPORT.md`。
+> 勾选口径：`[x]` = 本阶段实际执行并通过；`[ ]` = 未执行/未验证，原因写在行内。
 
 ## 1. 代码与构建
 
-- [ ] `npm run typecheck` 通过（0 错误）
-- [ ] `npm run build` 通过（tsc + vite）
-- [ ] `src-tauri` 目录 `cargo check` 通过
-- [ ] `npx tauri build --debug --no-bundle` 通过（真窗口可运行）
-- [ ] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建并通过 `git status` 确认 `app/app.js` 已提交（N-05）
-- [ ] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1 的 8 类断言，25/25 通过）
-- [ ] 插件浮层 UI 断言通过：`node scripts/verify-overlays.mjs --screenshots`（12 个设置/详情视图，暗色；再跑 `--scheme light` 抽查）
-- [ ] 宿主内浮层联调：`node scripts/shot-host-overlays.mjs` 7/7 PASS（截图 `shots/rewrite/overlays/host-*`）
-- [ ] 亮暗两套主题的宿主整屏 + 插件代表尺寸截图（亮色跟随系统）
+- [x] `npm run typecheck` 通过（0 错误）— `shots/e7/logs/typecheck.log`
+- [x] `npm run build` 通过（tsc + vite；仅 chunk >500KB 已知警告）— `shots/e7/logs/build.log`
+- [x] `src-tauri` 目录 `cargo check` 通过（1m40s，app v0.2.0）— `shots/e7/logs/cargo-check.log`
+- [ ] `npx tauri build --debug --no-bundle`（真窗口）— **本阶段未重跑**，继承 v0.1.0 真窗口结论（见 `docs/RELEASE-REPORT.md` §7）
+- [x] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建后 `git diff -- public/plugins` 为空 — `shots/e7/logs/build-plugin-all.log`
+- [x] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1，25/25；亮色同 25/25；1 项已接受 P2 记账，见报告）
+- [x] 插件详情浮层 UI 断言通过：`node scripts/verify-overlays.mjs`（六插件 `?view=detail`，834×582；暗 6/6、亮 6/6）— `shots/e7/logs/verify-overlays-*.log`
+- [x] 宿主内浮层联调：`node scripts/shot-host-overlays.mjs`（点卡 → detail 浮层 880×680；暗 6/6、亮 6/6，截图 `shots/e7/host/`）
+- [x] 亮暗两套的宿主整屏 + 插件代表尺寸截图：`shots/e7/desktop/`（1440×960 / 1024×768 × 暗/亮）、`shots/e7/cards/`（1440 网格下 25 档 × 暗/亮）
+- [x] 插件验收：六插件 `node scripts/verify-plugin.mjs <id>` 全 PASS（尺寸 + 宿主点卡冒烟 + console 0）— `shots/e7/logs/verify-plugin-final.log`
+- [x] Plug-and-play：最小第三方插件零宿主改动 19/19 PASS（临时 `ping` 已删除）— `shots/e7/plug-and-play/`
+- [x] 宿主 E2E：1440×960 / 1024×768 × 暗/亮 各 53/53 PASS；页面专项 12/12 — `shots/e7/logs/desktop-e2e-*.log`、`pages-e2e.log`
 
 ## 2. 运行时冒烟（Tauri 真窗口）
 
-- [ ] 启动 `src-tauri/target/debug/app.exe`，无 panic / stderr 为空
-- [ ] 窗口全屏 2880×1920（1440×960 epx @200%），无边框
-- [ ] 六个插件通过 `wtsl://` 加载并渲染（clock / countdown / pomodoro / sedentary / todo / weather）
-- [ ] 天气显示真实数据（种子注入的 API Host/Key 生效）
-- [ ] Agent 面板可打开（浮层/侧栏/全屏切换），MiMo 对话可发送并流式返回
-- [ ] 联网搜索：`web_search` 可用（MiMo 插件已开通），来源 chips 显示
-- [ ] `Ctrl+Shift+H` 隐藏/显示窗口（全局热键，隐藏后仍可唤回）
-- [ ] `Ctrl+Q` 退出应用
-- [ ] 编辑模式：长按进、拖拽换格、改尺寸、删除、设置
-- [ ] 插件管理：启用/禁用、重载、zip 安装（拖入）
-- [ ] 设置页：开机自启开关、主题切换、退出
-- [ ] 复盘页：能聚合插件 stats（todo / pomodoro）
-- [ ] 通知：普通 Toast + 强提醒遮罩
+> 本节整节**本阶段未重跑**：E7 只复用 dev server 与 headless Edge，未启动 Tauri 真窗口。
+> 下列勾选为 v0.1.0 的既有结论，0.2.0 未复验；发布说明需标注为“继承、未复验”。
+
+- [ ] 启动 `src-tauri/target/debug/app.exe`，无 panic / stderr 为空 — 未重跑（v0.1.0 通过）
+- [ ] 窗口全屏 2880×1920（1440×960 epx @200%），无边框 — 未重跑（v0.1.0 通过）
+- [ ] 六个插件通过 `wtsl://` 加载并渲染 — 未重跑（v0.1.0 部分验证）
+- [ ] 天气显示真实数据（种子注入的 API Host/Key 生效）— 未重跑（需真实 Key）
+- [ ] Agent 面板可打开（浮层/侧栏/全屏切换），MiMo 对话可发送并流式返回 — 未重跑（需 Key；本轮只验证 `?mock=1`）
+- [ ] 联网搜索：`web_search` 可用，来源 chips 显示 — 未重跑（需 MiMo 控制台开通）
+- [ ] `Ctrl+Shift+H` 隐藏/显示窗口 — 未重跑（v0.1.0 通过注册探测）
+- [ ] `Ctrl+Q` 退出应用 — 未重跑（v0.1.0 通过命令注册）
+- [ ] 编辑模式：长按进、拖拽换格、改尺寸、删除、设置 — **浏览器 E2E 通过**（`desktop-e2e` C1–C6），Tauri 真窗口未重跑
+- [ ] 插件管理：启用/禁用、重载、zip 安装（拖入）— 启用/禁用与重扫在浏览器通过（`pages-e2e` P1–P5），zip 安装仅 Tauri 可用、未重跑
+- [ ] 设置页：开机自启开关、主题切换、退出 — 主题切换通过；开机自启/退出仅 Tauri
+- [ ] 复盘页：能聚合插件 stats（todo / pomodoro）— **浏览器通过**（`pages-e2e` R1–R3）
+- [ ] 通知：普通 Toast + 强提醒遮罩 — Toast 通过（设置保存触发）；强提醒需 Tauri 空闲检测，未重跑
 
 ## 3. 设计合规（对照 FLUENT2.md / DENSITY.md）
 
-- [ ] `design-auditor` 复检通过：P0 = 0，P1 已修复或明确记录
-- [ ] 六个插件全部是 React + Fluent UI React（`src/main.jsx` + `FluentProvider`），无自绘控件（DECISIONS D-02b）
-- [ ] 插件设置/详情走宿主全窗口浮层（`?view=settings|detail`），卡片 iframe 内无被裁切的 Dialog/Drawer
-- [ ] 双分辨率截图：1440×960 / 1024×768（深色 + 亮色各一套，亮色验证跟随系统；竖屏产品不要求）
-- [ ] 普通模式卡片无 chrome；编辑模式才出现操作
-- [ ] 每个组件每个尺寸的信息预算内（见 DENSITY.md 第 2 节）
-- [ ] 无手写 hex、无非 token 圆角/阴影/间距/字号/动效时长（样式相关；已记录例外：天气图标对比度算法常量、项目材质 token 声明、内容图形尺寸 clamp）
-- [ ] 加载态符合 1s/3s 阈值；文案无句号、短句
+- [x] 设计审计结论：发布时点 P0 = 0、P1 = 0（E5 收口；E7 回归期间发现并修复 1 项 P1「插件启用/禁用无效」，复验通过）— `shots/e5/REPORT.md`、`docs/RELEASE-REPORT.md` §6
+- [x] 六个插件全部是 React + Fluent UI React（`FluentProvider`），无自绘控件（DECISIONS D-02b）— `verify-plugin` 静态检查
+- [x] 设置只在宿主设置页（manifest `settings` schema）渲染，插件内无设置视图；详情/设置均为宿主全窗口浮层（`?view=detail`）— 原“`?view=settings|detail`”条目已过时并删除
+- [x] 双分辨率截图：1440×960 / 1024×768（深色 + 亮色各一套）— `shots/e7/desktop/`
+- [x] 普通模式卡片无 chrome；编辑模式才出现操作 — E2E A4 / C1
+- [x] 每个组件每个尺寸的信息预算内 — `verify-widgets` 25/25（weather 2×2 为已接受 P2 记账）
+- [x] 无手写 hex、无非 token 圆角/阴影/间距/字号/动效时长（样式相关；例外：天气图标对比度常量、项目材质 token、内容图形尺寸 clamp）— `verify-plugin` 静态检查
+- [x] 加载态符合 1s/3s 阈值；文案无句号、短句 — E5 复核 + 本轮未改文案
+- [x] 详情浮层：视口 834×582、根 padding 24、控件根 ≥40、最小字号 ≥12、无横向溢出、console 0 — 六插件 × 暗/亮
+- [x] 动效：打开 container transform（首帧从卡片缩放）、末帧 880×680、关闭 ~150ms 收回、焦点归还 — E2E B1–B6
 
 ## 4. 打包与发布
 
-- [ ] `npx tauri build`（release）产出安装包，路径记录
-- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）
-- [ ] `git status` 干净；`secrets.json` 未被跟踪
-- [ ] commit 信息清晰；`git push` 到 origin/main
-- [ ] 打 tag（可选）：`v0.1.0`
+- [ ] `npx tauri build`（release）产出安装包，路径记录 — 未做
+- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做
+- [x] `git status` 干净（E7 变更待 Lead 提交；`public/plugins/**`、`templates/**` 无 diff；`secrets.json` 未跟踪）
+- [ ] commit 信息清晰；`git push` 到 origin/main — 由 Lead 执行
+- [ ] 打 tag（可选）：`v0.2.0` — 未做
 
 ## 5. 文档齐套
 
-- [ ] docs/VISION.md（需求）
-- [ ] docs/FLUENT2.md（Fluent 2 设计规范落地）
-- [ ] docs/DENSITY.md（信息密度）
-- [ ] docs/DESIGN.md（工程约定）
-- [ ] docs/PLAN.md（开发计划）
-- [ ] docs/components/*.md（6 插件 + Agent）
-- [ ] docs/audit/AUDIT.md（设计审计报告）
-- [ ] docs/audit2/REPORT-VISUAL.md、REPORT-TYPE.md（第二版独立审计）
-- [ ] docs/OVERLAY-REWRITE-SPEC.md、OVERLAY-REWRITE-RESULT.md（设置/详情浮层规格与结果）
+- [x] docs/VISION.md（需求）
+- [x] docs/FLUENT2.md（Fluent 2 设计规范落地）
+- [x] docs/DENSITY.md（信息密度）
+- [x] docs/DESIGN.md（工程约定）
+- [x] docs/PLAN.md（开发计划，E0–E7 全部 ✅）
+- [x] docs/components/*.md（6 插件 + Agent）
+- [x] docs/PLUGIN-CONTRACT.md（契约；§7 验收清单已勾选，§8 已人工验收 2026-10-20）
+- [x] docs/RELEASE.md（本清单）
+- [x] docs/RELEASE-REPORT.md（v0.2.0 本阶段报告）
+- [x] shots/e7/REPORT.md（E7 回归报告与断言矩阵）
+- [x] docs/DECISIONS.md、docs/audit/AUDIT.md、docs/audit2/*（历史审计，保留不改）
 
 ## 6. 已知限制（发布说明里写明）
 
@@ -68,3 +80,6 @@
 - 人脸识别：需要摄像头；headless/无摄像头环境不可用
 - TTS/ASR：依赖 MiMo 语音接口，受网络与配额影响
 - 本地运行：Windows 10 19044 无 Mica/Acrylic 系统材质，界面用 CSS 近似
+- Tauri 真窗口与安装包：0.2.0 未重跑，结论继承 v0.1.0
+- 浏览器预览：zip 安装/删除、开机自启、系统定位、空闲检测不可用
+- 编辑模式删除卡片是会话级：reload 后按插件目录重建；持久移除用插件管理页启用/禁用

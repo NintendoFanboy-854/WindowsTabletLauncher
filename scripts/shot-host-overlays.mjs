@@ -1,298 +1,282 @@
 /**
- * 宿主内浮层联调截图（OVERLAY-REWRITE-SPEC §6 的集成侧证据）。
+ * 宿主内详情浮层联调（E7 重写）：点桌面卡片 → 宿主 Fluent Dialog 加载 `?view=detail`。
+ *
+ * 历史：E1 之前用 `host:open-settings` 直接给卡片 iframe 转发宿主消息，打开 6 个
+ * `?view=settings`（该视图已删除）。现在插件只有 detail 浮层，且真实入口是「点卡片」，
+ * 所以本脚本改为走完整用户路径：点卡 → 等浮层 iframe 渲染 → 截图 → Esc 关闭 → 焦点归还。
  *
  * 用法（仓库根目录，dev server 需在 http://localhost:5173 运行）：
- *   node scripts/shot-host-overlays.mjs
+ *   node scripts/shot-host-overlays.mjs                  # 暗色，1440×960
+ *   node scripts/shot-host-overlays.mjs --scheme light   # 亮色
+ *   node scripts/shot-host-overlays.mjs --dsf 1          # 降低截图分辨率（默认 2）
  *
- * 做什么：
- * 1. 用 headless Edge 打开宿主（1440×960，暗色）；
- * 2. 给每个插件的桌面 iframe 直接转发宿主的 `host:open-settings`（与编辑模式
- *    「设置」按钮同一条通道），等宿主 Fluent Dialog 内的浮层视图渲染完成；
- * 3. 全屏截图到 shots/rewrite/overlays/host-<plugin>-<view>.png；
- * 4. 天气额外点一次卡片打开「详情」浮层截图。
+ * 与 verify-overlays.mjs 的分工：那个只测插件页 standalone 的 detail 布局与字号/控件；
+ * 这个测宿主集成（点卡开浮层、Dialog 尺寸、iframe 内容、Esc 收回、焦点归还），
+ * 截图归档 `shots/e7/host/`。
  *
- * 只读宿主页面、不改业务代码；串行单 Edge，结束清理 profile。
+ * 实现：复用 `scripts/lib/cdp.mjs`（串行单 Edge、唯一 `%TEMP%\wtsl-verify-*` profile、自动清理）。
  */
-import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const HOST_URL = 'http://localhost:5173';
-const VIEW_WIDTH = 1440;
-const VIEW_HEIGHT = 960;
-const DSF = 2;
+import { launch, sleep } from './lib/cdp.mjs';
 
-const WEATHER_SETTINGS = {
-  apiKey: '',
-  apiHost: '',
-  unit: 'c',
-  refreshMin: 30,
-  autoLocate: false,
-  showAir: true,
-  showWarnings: true,
-  showMinutely: false,
-  mock: true,
-  places: [
-    {
-      id: '101010100',
-      name: '北京',
-      adm1: '北京市',
-      adm2: '北京',
-      lat: 39.92,
-      lon: 116.41,
-      country: '中国',
-      tz: 'Asia/Shanghai',
-      isCurrent: true,
-    },
-  ],
-};
+const WIDTH = 1440;
+const HEIGHT = 960;
+const DIALOG_WIDTH = 880;
+const DIALOG_HEIGHT = 680;
 
-const TARGETS = [
-  { plugin: 'clock', view: 'settings' },
-  { plugin: 'weather', view: 'settings' },
-  { plugin: 'countdown', view: 'settings' },
-  { plugin: 'pomodoro', view: 'settings' },
-  { plugin: 'sedentary', view: 'settings' },
-  { plugin: 'todo', view: 'settings' },
-];
+const PLUGINS = ['clock', 'countdown', 'pomodoro', 'sedentary', 'todo', 'weather'];
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const FIND_FRAME = (plugin) => `
-  [...document.querySelectorAll('iframe')].find((frame) => {
-    const src = frame.getAttribute('src') || '';
-    return src.includes('plugin=${plugin}&') && !src.includes('background=1');
-  })`;
-
-const overlayState = (plugin) => `(() => {
-  const iframe = ${FIND_FRAME(plugin)};
-  return iframe ? iframe.getBoundingClientRect().toJSON() : null;
-})()`;
-
-const DIALOG_READY = `(() => {
-  const dialog = document.querySelector('[role="dialog"]');
-  if (!dialog) return 0;
-  const frame = dialog.querySelector('iframe');
-  if (!frame) return 0;
-  try {
-    return (frame.contentDocument?.body?.innerText || '').trim().length;
-  } catch {
-    return -1;
-  }
-})()`;
-
-async function launch(port) {
-  const profile = join(process.env.TEMP, `wtsl-host-overlay-${Date.now()}`);
-  const child = spawn(
-    EDGE,
-    [
-      '--headless=new',
-      `--remote-debugging-port=${port}`,
-      `--user-data-dir=${profile}`,
-      '--disable-gpu',
-      '--hide-scrollbars',
-      '--no-first-run',
-      '--no-default-browser-check',
-      `--window-size=${VIEW_WIDTH},${VIEW_HEIGHT}`,
-      'about:blank',
-    ],
-    { stdio: 'ignore' },
-  );
-  let wsUrl = null;
-  for (let i = 0; i < 160; i += 1) {
-    try {
-      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-      const page = list.find((t) => t.type === 'page' && !t.url.startsWith('edge://') && !t.url.startsWith('devtools://'));
-      if (page?.webSocketDebuggerUrl) {
-        wsUrl = page.webSocketDebuggerUrl;
-        break;
-      }
-    } catch {
-      /* wait */
-    }
-    await sleep(250);
-  }
-  if (!wsUrl) throw new Error('Edge CDP 没起来');
-  const ws = new WebSocket(wsUrl);
-  await new Promise((res, rej) => {
-    ws.onopen = res;
-    ws.onerror = rej;
+const findCard = (plugin) => `(() => {
+  const frame = [...document.querySelectorAll('iframe')].find((item) => {
+    const src = item.getAttribute('src') || '';
+    return src.includes('plugin=${plugin}&') && !src.includes('background=1') && !src.includes('view=detail');
   });
-  let seq = 0;
-  const pending = new Map();
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.id && pending.has(msg.id)) {
-      const { resolve: ok, reject } = pending.get(msg.id);
-      pending.delete(msg.id);
-      if (msg.error) reject(new Error(JSON.stringify(msg.error)));
-      else ok(msg.result);
-    }
-  };
-  const send = (method, params = {}, timeoutMs = 60000) =>
-    new Promise((resolveP, reject) => {
-      const id = ++seq;
-      pending.set(id, { resolve: resolveP, reject });
-      ws.send(JSON.stringify({ id, method, params }));
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          reject(new Error(`CDP timeout ${method}`));
-        }
-      }, timeoutMs);
-    });
-  await send('Page.enable');
-  await send('Runtime.enable');
+  const card = frame?.closest('[data-widget-card]');
+  if (!card) return null;
+  const rect = card.getBoundingClientRect();
   return {
-    send,
-    close: async () => {
-      try {
-        ws.close();
-      } catch {
-        /* ignore */
-      }
-      child.kill();
-      await sleep(600);
-      try {
-        const { execSync } = await import('node:child_process');
-        execSync(
-          `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='msedge.exe'\\" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('wtsl-host-overlay-') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`,
-          { stdio: 'ignore' },
-        );
-      } catch {
-        /* ignore */
-      }
-      try {
-        rmSync(profile, { recursive: true, force: true });
-      } catch {
-        /* ignore */
-      }
-    },
+    uid: card.getAttribute('data-widget-uid') || '',
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
   };
-}
+})()`;
 
-async function evaluate(cdp, expression) {
-  const result = await cdp.send('Runtime.evaluate', { expression, returnByValue: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || 'Runtime.evaluate 异常');
-  return result.result?.value;
-}
-
-async function waitFor(cdp, expression, check, timeoutMs = 30000) {
-  const deadline = Date.now() + timeoutMs;
-  let value = null;
-  while (Date.now() < deadline) {
-    value = await evaluate(cdp, expression);
-    if (check(value)) return value;
-    await sleep(300);
+const dialogState = `(() => {
+  const surface = document.querySelector('[data-overlay-phase]');
+  if (!surface) return null;
+  const frame = surface.querySelector('iframe');
+  const rect = surface.getBoundingClientRect();
+  let textLength = -1;
+  try {
+    textLength = (frame?.contentDocument?.body?.innerText || '').trim().length;
+  } catch {
+    textLength = -1;
   }
-  return value;
-}
+  return {
+    mode: surface.getAttribute('data-overlay-mode'),
+    phase: surface.getAttribute('data-overlay-phase'),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    src: frame?.getAttribute('src') || '',
+    textLength,
+  };
+})()`;
 
-async function screenshot(cdp, name) {
-  mkdirSync(join('shots', 'rewrite', 'overlays'), { recursive: true });
-  const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-  writeFileSync(join('shots', 'rewrite', 'overlays', name), Buffer.from(shot.data, 'base64'));
-  console.log(`  截图 → shots/rewrite/overlays/${name}`);
+async function clickCard(cdp, card) {
+  await cdp.dispatchMouse('mouseMoved', card.x, card.y);
+  await cdp.dispatchMouse('mousePressed', card.x, card.y);
+  await sleep(70);
+  await cdp.dispatchMouse('mouseReleased', card.x, card.y);
 }
 
 async function pressEscape(cdp) {
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-  await waitFor(cdp, `document.querySelector('[role="dialog"]') ? 1 : 0`, (value) => value === 0, 8000);
-  await sleep(400);
+  await cdp.send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: 'Escape',
+    code: 'Escape',
+    windowsVirtualKeyCode: 27,
+  });
+  await cdp.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: 'Escape',
+    code: 'Escape',
+    windowsVirtualKeyCode: 27,
+  });
 }
 
-async function openSettings(cdp, plugin) {
-  const sent = await evaluate(
-    cdp,
+async function waitDialog(cdp, plugin, timeout) {
+  try {
+    return await cdp.waitFor(dialogState, {
+      timeout,
+      interval: 200,
+      message: `${plugin} 浮层没有出现`,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function openDetail(cdp, plugin) {
+  const card = await cdp.evaluate(findCard(plugin));
+  if (!card || !card.uid) return { fail: `桌面没有 ${plugin} 卡片` };
+  await clickCard(cdp, card);
+  let state = await waitDialog(cdp, plugin, 6000);
+  if (!state) {
+    // 卡片中心可能落在内部快捷控件上（例如番茄钟的开始按钮）：补一次触控轻点
+    await cdp.dispatchTouch('touchStart', [{ x: card.x, y: card.y }]);
+    await sleep(120);
+    await cdp.dispatchTouch('touchEnd', []);
+    state = await waitDialog(cdp, plugin, 12000);
+  }
+  if (!state) return { fail: `${plugin} 点卡后宿主浮层没有出现（鼠标 + 触控均未打开）` };
+  // 等内容渲染（container transform 结束后 iframe 内才有完整文字）
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 20000) {
+    state = await cdp.evaluate(dialogState);
+    if (state && state.textLength > 20 && state.phase === 'open') break;
+    await sleep(300);
+  }
+  await sleep(900);
+  return { card, state: await cdp.evaluate(dialogState) };
+}
+
+async function closeDetail(cdp, plugin, card) {
+  await pressEscape(cdp);
+  let closed = false;
+  try {
+    closed = await cdp.waitFor(`!document.querySelector('[role="dialog"]')`, {
+      timeout: 8000,
+      interval: 150,
+      message: `${plugin} 浮层按 Esc 后没有关闭`,
+    });
+  } catch {
+    closed = false;
+  }
+  if (!closed) return { fail: `${plugin} 浮层按 Esc 后没有关闭` };
+  const focused = await cdp.evaluate(
     `(() => {
-      const iframe = ${FIND_FRAME(plugin)};
-      if (!iframe) return 'no-frame';
-      iframe.contentWindow.postMessage({ type: 'host:open-settings' }, '*');
-      return 'sent';
+      const el = document.activeElement;
+      return {
+        tag: el?.tagName || null,
+        uid: el?.closest?.('[data-widget-card]')?.getAttribute('data-widget-uid') || null,
+        ariaLabel: el?.getAttribute?.('aria-label') || null,
+      };
     })()`,
   );
-  if (sent !== 'sent') return `桌面没有 ${plugin} 卡片（${sent}）`;
-  const length = await waitFor(cdp, DIALOG_READY, (value) => typeof value === 'number' && value > 20, 30000);
-  if (typeof length !== 'number' || length <= 20) return `${plugin} 设置浮层没有渲染（文本长度 ${length}）`;
-  await sleep(1200);
-  await screenshot(cdp, `host-${plugin}-settings.png`);
-  await pressEscape(cdp);
-  return null;
-}
-
-async function openWeatherDetail(cdp) {
-  const rect = await evaluate(cdp, overlayState('weather'));
-  if (!rect) return '桌面没有天气卡片';
-  const x = Math.round(rect.x + rect.width / 2);
-  const y = Math.round(rect.y + rect.height / 2);
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
-  const length = await waitFor(cdp, DIALOG_READY, (value) => typeof value === 'number' && value > 20, 30000);
-  if (typeof length !== 'number' || length <= 20) return `天气详情浮层没有渲染（文本长度 ${length}）`;
-  await sleep(1200);
-  await screenshot(cdp, 'host-weather-detail.png');
-  await pressEscape(cdp);
-  return null;
+  if (!focused || focused.uid !== card.uid) {
+    return { fail: `${plugin} 关闭后焦点未归还卡片（${JSON.stringify(focused)}）` };
+  }
+  return { focused };
 }
 
 async function main() {
-  const port = 9480 + Math.floor(Math.random() * 20);
-  const cdp = await launch(port);
+  const args = process.argv.slice(2);
+  const scheme = args.includes('--scheme') ? args[args.indexOf('--scheme') + 1] : 'dark';
+  const dsfIndex = args.indexOf('--dsf');
+  const dsf = dsfIndex >= 0 ? Number(args[dsfIndex + 1]) : 2;
+  if (scheme !== 'dark' && scheme !== 'light') throw new Error(`非法 scheme：${scheme}`);
+  if (!Number.isFinite(dsf) || dsf <= 0) throw new Error(`非法 dsf：${args[dsfIndex + 1]}`);
+
+  const dir = join('shots', 'e7', 'host');
+  const suffix = scheme === 'light' ? '-light' : '-dark';
+  const cdp = await launch({ width: WIDTH, height: HEIGHT, scheme });
   const problems = [];
+  const evidence = [];
   try {
     await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: VIEW_WIDTH,
-      height: VIEW_HEIGHT,
-      deviceScaleFactor: DSF,
+      width: WIDTH,
+      height: HEIGHT,
+      deviceScaleFactor: dsf,
       mobile: false,
     });
-    await cdp.send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-color-scheme', value: 'dark' }],
-    });
 
-    await cdp.send('Page.navigate', { url: HOST_URL });
-    await waitFor(cdp, `document.querySelectorAll('iframe').length`, (value) => (value || 0) >= 6, 45000);
-    // 注入天气 mock 配置后再刷新，让天气详情有真实内容
-    await evaluate(
-      cdp,
-      `(() => {
-        try { localStorage.setItem('plugin.weather.settings', JSON.stringify(${JSON.stringify(WEATHER_SETTINGS)})); } catch (error) {}
-        return 'ok';
-      })()`,
+    cdp.clearConsoleErrors();
+    await cdp.navigate(`${cdp.baseUrl}/`);
+    await cdp.waitFor(
+      `document.querySelectorAll('[data-widget-card]').length >= ${PLUGINS.length}`,
+      { timeout: 60000, interval: 300, message: '桌面卡片没有全部挂载' },
     );
-    await cdp.send('Page.reload');
-    const frames = await waitFor(cdp, `document.querySelectorAll('iframe').length`, (value) => (value || 0) >= 6, 45000);
-    if ((frames || 0) < 6) throw new Error(`桌面只渲染了 ${frames} 个 iframe`);
-    await sleep(5000); // 等插件完成 host:init / 首屏数据
+    // 等六张卡片的 iframe 都出了文字（插件首屏就绪）
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 60000) {
+      const ready = await cdp.evaluate(`(() => {
+        const frames = [...document.querySelectorAll('[data-widget-card] iframe')];
+        return {
+          count: frames.length,
+          withText: frames.filter((frame) => {
+            try { return (frame.contentDocument?.body?.innerText || '').trim().length > 10; } catch { return false; }
+          }).length,
+        };
+      })()`);
+      if (ready && ready.count >= PLUGINS.length && ready.withText >= PLUGINS.length) break;
+      await sleep(500);
+    }
+    await sleep(1200);
+    await cdp.screenshot(join(dir, `desktop-${WIDTH}x${HEIGHT}${suffix}.png`));
 
-    for (const target of TARGETS) {
-      const problem = await openSettings(cdp, target.plugin);
-      if (problem) {
-        problems.push(problem);
-        console.log(`  FAIL ${target.plugin} 设置：${problem}`);
-      } else {
-        console.log(`  PASS ${target.plugin} 设置`);
+    for (const plugin of PLUGINS) {
+      const opened = await openDetail(cdp, plugin);
+      if (opened.fail) {
+        problems.push(opened.fail);
+        console.log(`  FAIL ${plugin} detail：${opened.fail}`);
+        continue;
       }
+      const { card, state } = opened;
+      const caseFails = [];
+      if (!state) caseFails.push('浮层状态读不到');
+      else {
+        if (state.width !== DIALOG_WIDTH || state.height !== DIALOG_HEIGHT) {
+          // 固定 1440×960：浮层 surface 必须是 880×680（1024 视口才会 min(72vh,680) 变矮）
+          caseFails.push(
+            `浮层尺寸 ${state.width}×${state.height} ≠ ${DIALOG_WIDTH}×${DIALOG_HEIGHT}`,
+          );
+        }
+        if (!(state.src || '').includes('view=detail')) {
+          caseFails.push(`浮层 iframe 不是 detail 视图：${state.src}`);
+        }
+        if (!(state.textLength > 20)) {
+          caseFails.push(`浮层 iframe 文字不足（${state.textLength}）`);
+        }
+      }
+      await cdp.screenshot(join(dir, `overlay-${plugin}-detail${suffix}.png`));
+      const closed = await closeDetail(cdp, plugin, card);
+      if (closed.fail) caseFails.push(closed.fail);
+      evidence.push({
+        plugin,
+        card,
+        open: state,
+        close: closed.focused || null,
+        fails: caseFails,
+      });
+      if (caseFails.length === 0) {
+        console.log(
+          `  PASS ${plugin} detail  ${state?.width}×${state?.height}  mode=${state?.mode}  ` +
+            `文本 ${state?.textLength}  焦点 ${closed.focused?.uid}`,
+        );
+      } else {
+        problems.push(...caseFails);
+        for (const fail of caseFails) console.log(`  FAIL ${plugin} detail：${fail}`);
+      }
+      await sleep(400);
     }
 
-    const detailProblem = await openWeatherDetail(cdp);
-    if (detailProblem) {
-      problems.push(detailProblem);
-      console.log(`  FAIL 天气详情：${detailProblem}`);
+    const errors = cdp.consoleErrors;
+    if (errors.length > 0) {
+      problems.push(`console error ${errors.length} 条`);
+      for (const error of errors) console.log(`  FAIL console ${error.type}: ${error.text}`);
     } else {
-      console.log('  PASS 天气详情');
+      console.log('  PASS console 0 error');
     }
   } finally {
     await cdp.close();
   }
+
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  mkdirSync(join('shots', 'e7', 'logs'), { recursive: true });
+  writeFileSync(
+    join('shots', 'e7', 'logs', `host-overlays-${scheme}.json`),
+    `${JSON.stringify(
+      {
+        scheme,
+        viewport: { width: WIDTH, height: HEIGHT, deviceScaleFactor: dsf },
+        expectedDialog: { width: DIALOG_WIDTH, height: DIALOG_HEIGHT },
+        generatedAt: new Date().toISOString(),
+        problems,
+        evidence,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
   if (problems.length > 0) {
-    console.log(`\n${problems.length} 个宿主内浮层没有通过`);
+    console.log(`\n${problems.length} 个宿主内详情浮层问题`);
     process.exitCode = 1;
   } else {
-    console.log('\n宿主内浮层全部渲染通过');
+    console.log(`\n宿主内 ${PLUGINS.length} 个详情浮层全部通过（${scheme}）`);
   }
 }
 

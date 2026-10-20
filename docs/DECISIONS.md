@@ -96,13 +96,16 @@
 
 ## D-11 设置/详情浮层统一骨架（2026-10-19，已落地）
 
-- 插件浮层视图（`?view=settings|detail|edit|all`）统一按 `docs/OVERLAY-REWRITE-SPEC.md`：
+- 插件浮层视图统一按 `docs/OVERLAY-REWRITE-SPEC.md`：**E1 起插件只保留 `?view=detail`**；
+  旧的 `?view=settings` 已删除（设置统一由 manifest schema 在宿主设置页渲染），`edit` / `all`
+  也已并入详情内的 L2/Tabs。历史写法 `?view=settings|detail|edit|all` 仅见旧文档。
   视图根 padding 24、内容 max-width 720 居中、section 间距 24、设置行 48 / 列表行 44、
   控件 40（Input/Dropdown/Button `size="large"` + Switch/Radio/Slider `min-height: 40`）、
   辅助文字 12、表单正文 14、section 标题 20、无 `Divider` 分组、无 10/11px 与 clamp 字号。
 - 浮层标题与关闭按钮只由宿主 Dialog 提供，插件视图内不再画标题栏/关闭按钮。
-- 回归入口：`node scripts/verify-overlays.mjs`（12 视图断言）+ `node scripts/shot-host-overlays.mjs`
-  （宿主内联调截图）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
+- 回归入口：`node scripts/verify-overlays.mjs`（E7 起重写为**六插件 × detail 的 6 个视图断言**，
+  暗/亮各一遍；E1 之前的 12 个 settings/edit/all 用例已失效）+ `node scripts/shot-host-overlays.mjs`
+  （宿主内联调截图，E7 更新为真实路径「点卡 → detail 浮层 → Esc → 焦点归还」）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
 - 宽度口径（E5 复核，2026-10-20）：**表单/设置内容 max-width 720 居中；详情里的列表/统计区可用满宽 834**
   （见 [OVERLAY-REWRITE-SPEC.md](OVERLAY-REWRITE-SPEC.md) §2）。组件文档未要求 720 的详情页不强制收窄，
   避免改变列表密度与列对齐。
@@ -219,3 +222,14 @@
   `shots/e3-template/`。
 - 本轮同时修复宿主缺口：浮层内发 `plugin:request-host-settings` 时，宿主先关闭浮层再导航
   （契约 §5），插件只发一条消息；模板与后续六个插件的「设置…」都按这个口径写。
+
+## D-18 插件可见性：编辑删除 = 会话级，启用/禁用 = 持久（2026-10-20，E7 定稿）
+
+- **桌面编辑模式「删除」**：只从当前布局移除卡片，**会话级**；reload 后插件目录会被
+  `reconcileLayout` 重新并入。它用于临时腾位置，不是卸载插件。
+- **插件管理页「启用/禁用」**：持久偏好（`wtsl.plugins.preferences`），禁用后桌面不渲染该插件、
+  不运行后台 iframe、焦点/键盘导航跳过；**不删布局条目**，重新启用后卡片回到原位置与尺寸。
+- 背景：E7 回归发现插件页启用/禁用此前只写偏好、桌面层没有读取，开关无实际效果（P1）；
+  `Desktop.tsx` 改为订阅 `usePluginPreferences` 并按偏好过滤渲染（含 `BackgroundFrames`），
+  `layout` 中禁用插件的条目保留。
+- 验收：禁用后桌面 5 卡、重新启用 6 卡；reload 后位置/尺寸不变；全量宿主 E2E 53/53 ×4 复跑通过。
