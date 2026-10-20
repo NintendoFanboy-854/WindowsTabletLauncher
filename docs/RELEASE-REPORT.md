@@ -1,7 +1,7 @@
 # 发布验证报告（v0.2.0）
 
 > 生成时间：2026-10-20（+08:00）
-> 代码提交：`1e2b44f`（E6 收口）+ 本轮 E7 未提交变更（脚本、文档、版本号、1 处 P1 修复），由 Lead 审查后统一提交
+> 代码提交：`66c2330`（E7：脚本、文档、版本号、1 处 P1 修复），父提交 `1e2b44f`（E6 收口）
 > 分支：`main`；版本：`0.2.0`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
 > 证据根：`shots/e7/`（本报告所有路径相对仓库根）；逐项矩阵见 `shots/e7/REPORT.md`
@@ -26,7 +26,7 @@
 | E4b | P1 布局 reload 覆盖 / reload 后尺寸主题不同步 / P2 同会话换色 | `8c43d0b`、`0bca3ab`、`a467830` |
 | E5 | 视觉收口（P0/P1 清零，P2 清单） | `f568c86`、`c305374` |
 | E6 | 测试脚手架清理与 cdp 生命周期加固 | `14fd1e7`、`1e2b44f` |
-| E7 | 回归与发布（本轮） | 未提交（工作树）；HEAD = `1e2b44f` |
+| E7 | 回归与发布（本轮） | `66c2330` |
 
 ## 2. 构建与工程门禁
 
@@ -182,7 +182,7 @@ npm run tauri dev                  # Tauri 真窗口（本阶段未验证）
 
 ## 9. 发布前剩余动作
 
-1. Lead 审查 E7 工作树 diff（脚本 / 文档 / 版本号 / 1 个 P1 修复）后统一提交；
+1. E7 工作树 diff（脚本 / 文档 / 版本号 / 1 个 P1 修复）已由 Lead 审查、`typecheck` + `build` 门禁复跑后提交为 `66c2330`；
 2. `git push origin main`；
 3. 如需安装包：执行 `npx tauri build` 并在真机安装验证（本阶段未做）；
-4. 可选：把 `verify-plug-and-play` 落成正式脚本、统一 DENSITY 与 todo 文档口径。
+4. 可选：把 `verify-plug-and-play` 落成正式脚本（DENSITY 与 todo 文档口径已在 E7 统一）。

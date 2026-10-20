@@ -161,7 +161,7 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 > 共享插件底座 `d2c3ae8`、模板 `27ef06c`、六插件 `15bb70d`…`03be1e6`、B5 设置隔离 `b970287`、
 > E4 动效 `4a6ac2a`、E5 视觉 `f568c86`、E6 清理 `14fd1e7`；附带修掉 P1/P2 回归：
 > 布局 reload 覆盖 `8c43d0b`、reload 后插件尺寸/主题不同步 `0bca3ab`、同会话换配色不跟随 `a467830`。
-> E7（`1e2b44f` 之后本轮变更，未提交，由 Lead 统一提交）：重写 `verify-overlays` / `shot-host-overlays`、
+> E7（`66c2330`）：重写 `verify-overlays` / `shot-host-overlays`、
 > 修正 `verify-widgets`、最小插件 plug-and-play（19/19）、四套视口×亮暗宿主 E2E（53/53 ×4）、
 > P1 修复「插件启用/禁用偏好未被桌面读取」；结论见 [shots/e7/REPORT.md](../shots/e7/REPORT.md)、
 > 发布报告 [RELEASE-REPORT.md](RELEASE-REPORT.md)。

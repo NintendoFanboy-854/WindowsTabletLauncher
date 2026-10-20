@@ -71,7 +71,7 @@
   {
     "id": "clock",
     "name": "时钟",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "widgets": [
       {
         "id": "clock",
