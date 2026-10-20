@@ -386,7 +386,7 @@ export function hintOf(settings, runtime, now = new Date()) {
   if (status === 'quiet') return '免打扰时段，仍在计时';
   const snoozed = safeDate(runtime.snoozedUntil);
   if (snoozed && snoozed > now) return `提醒已推迟到 ${formatClock(snoozed)}`;
-  if (!runtime.sittingSince) return '刚起身，久坐计时还没开始';
+  if (!runtime.sittingSince) return '刚起身，计时未开始';
   const remaining = settings.thresholdMin - currentStreakMin(runtime, now.getTime());
   if (remaining <= 0) return '已超过提醒阈值';
   return `距提醒还有 ${Math.max(1, Math.ceil(remaining))} 分钟`;

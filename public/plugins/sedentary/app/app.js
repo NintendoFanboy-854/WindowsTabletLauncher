@@ -15925,7 +15925,7 @@ function tu(e, t, n = /* @__PURE__ */ new Date()) {
 	if (r === "quiet") return "免打扰时段，仍在计时";
 	let i = Al(t.snoozedUntil);
 	if (i && i > n) return `提醒已推迟到 ${kl(i)}`;
-	if (!t.sittingSince) return "刚起身，久坐计时还没开始";
+	if (!t.sittingSince) return "刚起身，计时未开始";
 	let a = e.thresholdMin - Zl(t, n.getTime());
 	return a <= 0 ? "已超过提醒阈值" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
 }
