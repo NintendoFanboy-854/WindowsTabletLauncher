@@ -60,8 +60,8 @@
 - [x] `npx tauri build`（release）产出安装包，路径记录 — ✅ **v0.2.2 中文安装包**：NSIS `Windows Tablet Launcher_0.2.2_x64-setup.exe` 8.16 MiB（SHA-256 前缀 `29D763199A2279AA`，SimpChinese）、MSI `Windows Tablet Launcher_0.2.2_x64_zh-CN.msi` 9.27 MiB（`E8FF653E75AA6AF0`，zh-CN）— `src-tauri/target/release/bundle/`；构建日志 `shots/v022-final/tauri-build.log`
 - [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做自动安装验证（避免修改系统）；v0.2.2 已用真实 release exe + WebView2 CDP 验证插件种子/6 卡渲染（`RELEASE-REPORT.md` §11），安装/卸载由用户手动执行
 - [x] `git status` 干净（本 hotfix 变更均已提交；`public/plugins/**`、`templates/**` 无意外 diff；`secrets.json` 未跟踪）
-- [x] commit 信息清晰；`git push` 到 origin/main — 见 §4 回填
-- [x] 打 tag：`v0.2.2` — 见 §4 回填（v0.2.0/v0.2.1 tag 保留作历史记录）
+- [x] commit 信息清晰；`git push` 到 origin/main — v0.2.2 实现提交 `348587c` 已推送（文档 hash 回填随后同批推送）
+- [x] 打 tag：`v0.2.2` — 已创建并推送（v0.2.0/v0.2.1 tag 保留作历史记录）
 - [x] 回填 v0.2.2 安装包哈希：NSIS `29D763199A2279AA`、MSI `E8FF653E75AA6AF0`（完整 SHA-256 见 `RELEASE-REPORT.md` §11）
 
 ## 5. 文档齐套
