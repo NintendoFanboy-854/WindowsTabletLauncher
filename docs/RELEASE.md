@@ -29,7 +29,7 @@
 
 ## 3. 天气 3×2（v0.3.0 三带式）
 
-- [ ] `verify-widgets.mjs` 天气 3×2 门禁：横向连续空白 ≤40px、上带分栏间距 ≤40px、今日指标占满上带、内容带 ≥70%、分栏空带 ≤22%、Secondary 3×2 = 2×2 + 1、1024 断点复测 — 数值待回填
+- [x] `verify-widgets.mjs` 天气 3×2 门禁 PASS：1440 横向连续空白 **16px**（旧版 166px）、上带分栏间距 16px、分栏空带 6.1%、今日指标 3 项占上带 56.9%/右缘 16px、Secondary=2（2×2+1）、裁切/省略 0；1024 复测横向 12px / 上带 12px / 指标 2 项 / 裁切 0；整卡内容带 ≥70% 通过（`shots/v030-dev/existing-scripts.log`、`shots/v030-dev/weather/`）
 - [x] 结构：上带当前簇（城市/图标 56/温度 68/现象/高低温）+ 今日指标（体感/降水概率/风，占满剩余宽度、右缘对齐）+ 组间 16；下带全宽 6 列逐时（时间/图标/温度/降水概率）；3×2 不显示 AQI/7 天；4×2 未改
 - [x] 文档：`docs/components/weather.md`（3×2 规格/今日指标/1024 说明）、`docs/DENSITY.md`（横向空洞/内容带/Secondary 门禁、旧 weather 口径删除）已更新
 
@@ -55,7 +55,7 @@
 - [x] `docs/AGENT-SURFACE-CONTRACT.md`（设计/接口/验收口径）
 - [x] `docs/components/agent.md` / `docs/components/weather.md` / `docs/DENSITY.md`
 - [x] `docs/DESIGN.md` / `docs/MOTION.md`（Agent 三段 morph §5.1）
-- [ ] `docs/PLAN.md` E8 完成回填；`docs/RELEASE-REPORT.md` §12 待回填；`scripts/smoke-mimo-audio.mjs` 保留
+- [x] `docs/PLAN.md` E8 完成回填；`docs/RELEASE-REPORT.md` §12 Phase 1/2 已回填；`scripts/smoke-mimo-audio.mjs` 保留
 
 ## 7. 已知限制 / 风险（发布说明）
 
