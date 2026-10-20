@@ -265,7 +265,9 @@ plugin → host: { type: 'plugin:request-host-settings' }
 > （桌面出卡、点卡进详情、编辑改尺寸/拖拽/删除、设置页自动分区并按 schema 渲染/即时保存、详情「设置…」
 > 跳分区、Agent `?mock=1` 工具调用、复盘页 `Ping 测试` 统计块、删除后桌面恢复六卡无残留）。
 > 步骤、用例与证据：`shots/e7/REPORT.md` §2.3（截图与 JSON 在 `shots/e7/plug-and-play/`）。
-> 自动化脚本 `scripts/verify-plug-and-play.mjs` 仍待补（本轮为人工清单 + 临时脚本）。
+> 自动化脚本：`node scripts/verify-plug-and-play.mjs`（2026-10-20 落地）。冷复制模板 → 仅登记 index →
+> 正式宿主断言第 7 卡 / 详情 / 设置 schema / 清理，**12/12 PASS**；Agent 工具与复盘统计仍以 E7 人工
+> fixture 证据为准（模板未声明 `*.stats` 工具）。
 
 1. 准备一个最小第三方插件（manifest + 卡片 + `?view=detail` + settings schema + 一个 `*.stats` 工具）；
 2. zip 拖入/放入 `plugins/<id>/`，重扫；
@@ -276,7 +278,7 @@ plugin → host: { type: 'plugin:request-host-settings' }
    - 详情里的「设置…」跳转到该分区；
    - Agent 工具列表出现该插件工具，可调用；
    - 复盘页出现该插件的统计块（名称来自 manifest）。
-4. 该验收将来落成 `scripts/verify-plug-and-play.mjs`（本轮先作为人工清单）。
+4. 自动化脚本：`node scripts/verify-plug-and-play.mjs`（2026-10-20 落地；覆盖桌面/详情/设置/清理，12/12 PASS）。
 
 ## 9. 反模式（出现即不通过）
 

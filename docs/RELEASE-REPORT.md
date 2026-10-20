@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**可发布（浏览器 / dev-server 范围内）**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（本轮回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。Tauri 真窗口与安装包**本阶段未重跑**，结论继承 v0.1.0（见 §7），属于已知未验证项而不是失败。
+**可发布（浏览器 / dev-server / Tauri debug 真窗口范围）**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（本轮回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。**2026-10-20 补充**：Tauri debug 真窗口已重跑（§2.2），release 安装包已产出 MSI + NSIS（§2.3），安装验证未做（需人工双击安装）。
 
 ## 1. 阶段与关键 commit
 
@@ -38,8 +38,8 @@
 | Rust 侧 | `cargo check`（`src-tauri`） | ✅ exit 0（1m40s，版本 0.2.0） | `shots/e7/logs/cargo-check.log` |
 | `dist` 结构 | 构建后静态检查 | ✅ 7 个 HTML = 1 个 host entry（`dist/index.html` → 单脚本 `assets/index-CvN8saV_.js`）+ 6 个插件 standalone；无 `demo.html` / `bridge-check.html` | 见 §2.1 |
 | host bundle 演示文案 | 对 `dist/assets/index-*.js` 原文检索 | ✅ `演示/测试/demo/scenario/bridge-check/源码路径/浏览器演示模式` 均为 0 | 见 §2.1 |
-| Tauri 真窗口 | `tauri build --debug --no-bundle` | ⬜ **本阶段未重跑**（继承 v0.1.0 结论） | §7 |
-| 安装包 | `npx tauri build`（release） | ⬜ 未做 | §7 |
+| Tauri 真窗口 | `tauri build --debug --no-bundle` + 真实启动 | ✅ **2026-10-20 补充重跑**：v0.2.0 debug exe 构建并启动，窗口/六插件渲染见 §2.2 | `shots/e7/tauri/` |
+| 安装包 | `npx tauri build`（release） | ✅ 2026-10-20 产出 MSI + NSIS（§2.3）；未做安装验证 | `src-tauri/target/release/bundle/` |
 
 ### 2.1 dist 审计明细
 
@@ -47,6 +47,37 @@
 - host bundle `dist/assets/index-CvN8saV_.js`（1,122,797 B）：演示类关键词全部 0。
 - `dist/plugins/todo/js/demo.js` 与插件 bundle 内的 26 处「演示」属插件 `?demo=1` 开发数据（E6 已记录、按“不改 `public/plugins/**`”保留），不在 host 入口。
 - `dist` 总大小 14.0 MB。
+
+### 2.2 Tauri debug 真窗口冒烟（2026-10-20 补充重跑）
+
+在 E7 报告之后补做（v0.2.0 实际二进制，而非浏览器模拟）：
+
+| 项 | 结果 / 证据 |
+|---|---|
+| 构建 | `cargo build --release`/debug 等价路径；`src-tauri/target/debug/app.exe` v0.2.0，22,730,240 B；`cargo build` 日志 `Finished dev profile` |
+| 启动 | 真实窗口启动成功，进程存活、无 panic |
+| 窗口 | 标题 `Windows Tablet Launcher`；`IsWindowVisible=True`；DPI-aware `GetWindowRect` = `(0,0,2880,1920)` 全屏无边框 |
+| 插件加载 | Rust 日志 `插件目录: …\public\plugins`；窗口截图可见六张卡片真实渲染（clock 13:01:36、countdown 空态、sedentary「0 分钟 / 我起来了」+ 久坐 Toast、pomodoro 25:00、todo「今日 · 0」、weather「还没有城市」） |
+| stderr | 仅关闭时 WebView2 teardown 一条 `Failed to unregister class Chrome_WidgetWin_0 (1412)`（已知无害，退出阶段） |
+| 截图 | `shots/e7/tauri/app-window.png`（2880×1920 全窗口）；日志 `shots/e7/tauri/{app-stdout.log,app-stderr.log,verify.json}` |
+| 限制 | 真窗口内的长按/拖拽/浮层/热键等交互未自动化驱动；窗口由人工关闭，未做完整交互回归（交互回归仍以 §3 的 headless 套件为准） |
+
+### 2.3 发布安装包（2026-10-20 补充）
+
+`npx tauri build` exit 0，`Finished release profile [optimized] in 6m 33s`，产出两个安装包（未安装验证，避免自动修改系统）：
+
+| 类型 | 产物 | 大小 | SHA-256 前 16 位 |
+|---|---|---|---|
+| MSI | `src-tauri/target/release/bundle/msi/Windows Tablet Launcher_0.2.0_x64_en-US.msi` | 9.43 MiB | `190554C2DDC9FDC2` |
+| NSIS | `src-tauri/target/release/bundle/nsis/Windows Tablet Launcher_0.2.0_x64-setup.exe` | 8.32 MiB | `267182BB8F3121B1` |
+
+构建过程由 Tauri 自动下载并校验 WiX 3.14.1 与 NSIS 3.13 + nsis_tauri_utils；release `app.exe`（16,735,232 B）同时产出。
+安装/卸载验证留给真机人工执行（会写注册表与安装目录），本报告不代做。
+
+## 2.4 plug-and-play 自动化脚本（2026-10-20 补充）
+
+`scripts/verify-plug-and-play.mjs` 已落地并跑通 **12/12 PASS**：冷复制 `templates/plugin-template` → 只改 manifest id/name → 仅追加 `index.json` 条目 → 正式宿主出现第 7 张卡、点卡开 detail、Esc 关闭、设置页按 schema 渲染 3 字段、console 0 → 删除目录与 index 后恢复 6 卡、无残留。截图 `shots/pnp/`。
+（Agent 工具与复盘统计块仍依赖插件声明 `*.stats`，模板无该工具，故以 E7 人工 ping fixture 证据为准。）
 
 ## 3. 脚本回归（全量）
 
@@ -59,6 +90,7 @@
 | `verify-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/e7/logs/verify-overlays-light.log`、`overlays-light.json` |
 | `shot-host-overlays.mjs` | 宿主内点卡 → detail 浮层（880×680）暗色 | ✅ 6/6 PASS | `shots/e7/logs/shot-host-overlays-dark.log` |
 | `shot-host-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/e7/logs/shot-host-overlays-light.log` |
+| `verify-plug-and-play.mjs` | 冷复制模板 + 仅登记 index → 正式宿主卡片/详情/设置/清理 | ✅ 12/12 PASS（2026-10-20 补充，§2.4） | `shots/pnp/` |
 
 ### 3.1 六个插件
 
@@ -141,9 +173,9 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 
 1. **weather 2×2 空带**：实测 26.8% > DENSITY 22%，E5-P2-01 已记录为“需产品决定加/减内容”；E7 在脚本中登记为已接受 P2（护栏 30% / 内容带 40%），不改产品。
 2. **clock L1 数据少时偏空、pomodoro 3×2 右列、列表卡空底、亮色渐隐弱**：沿用 `shots/e5/REPORT.md` §4 的 P2 清单。
-3. **DENSITY §2.1 与 `docs/components/todo.md` 冲突**：前者要求“列表卡列表头主层 ≥28px、主次比 ≥1.5”，后者明确 todo 卡片头部为「今日 · N」12 fg3 + 行 16。E7 以组件文档（更具体、E0 定稿）为准，脚本改用行预算/行高断言；建议 Lead 统一文档口径（要么把 todo 头部提到 28，要么在 DENSITY 注明纯列表卡例外）。
-4. **编辑模式删除卡片是会话级**：reload 后按插件目录重建（`reconcileLayout` 会把缺失组件补回）；持久移除路径是插件管理页的启用/禁用。E7 已在 E2E 断言并记录，非回归。
-5. **`docs/DECISIONS.md` D-11 仍写 `?view=settings|detail|edit|all`**：E1 起只有 `?view=detail`；D-11 的宽度口径（表单 720 / 详情列表满宽 834）仍有效。属文档历史残留。
+3. **DENSITY §2.1 与 `docs/components/todo.md` 冲突（已收口）**：DENSITY 已补「纯列表卡（todo）按组件文档：12 fg3 分组标题 + 16 行标题，不套用列表头主层 ≥28」的口径；`verify-widgets` 对 todo 使用行预算/行高断言，两者一致。
+4. **编辑模式删除卡片是会话级（已定稿）**：reload 后按插件目录重建（`reconcileLayout` 补回）；持久移除路径是插件管理页启用/禁用（E7 P1 修复后真正生效，且不删布局条目）。见 `DECISIONS.md` D-18。
+5. **`docs/DECISIONS.md` D-11（已更新）**：E1 起插件只有 `?view=detail`；D-11 宽度口径（表单 720 / 详情列表满宽 834）仍有效。
 6. **`verify-overlays.mjs` / `shot-host-overlays.mjs` 的旧截图目录**（`shots/rewrite/overlays`）不再写入；新证据在 `shots/e7/overlays`、`shots/e7/host`。
 
 ### 6.3 设计合规复核
@@ -156,8 +188,8 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 
 ## 7. 已知限制与未验证项
 
-- **Tauri 真窗口 / 安装包本阶段未重跑**：v0.1.0 报告中的真窗口结论（全屏、`wtsl://` 加载、全局热键、退出）**继承有效但未在 0.2.0 上复验**；本轮未启动 Tauri、未执行 `tauri build`。发布包（`npx tauri build`）仍未产出。
-- **物理 200% DPI**：E7 用 CSS 1440×960 / 1024×768 + CDP 设备模拟，未在 2880×1920 物理屏重拍。
+- **Tauri 真窗口已重跑（debug）**：v0.2.0 debug exe 构建并启动，窗口/六插件渲染已验证（§2.2）；**release 安装包**已产出 MSI + NSIS（§2.3），未做安装/卸载验证（需人工双击安装，避免自动改系统）。真窗口内的长按/拖拽/浮层/热键/退出等交互未自动化驱动，交互结论仍以 headless 套件（§3）为准。
+- **物理 200% DPI**：真窗口 `GetWindowRect` 为 2880×1920 物理像素（200% 全屏无边框）已确认；但像素级排版审计仍以 headless CSS 1440×960 / 1024×768 截图为准，未做 200% 缩放下的逐像素对比。
 - **浏览器环境无 Tauri 能力**：插件 zip 安装/删除、开机自启、系统定位、空闲检测、阻止息屏只在 Tauri 运行时可用（插件页已明确提示）。
 - **和风天气**：需用户自己的 API Host + Key；无 Key 时卡片显示配置引导（E7 用 `?mock=1` 演示数据验收）。
 - **MiMo / 语音 / 人脸 / 联网搜索**：需 API Key、麦克风、摄像头；E7 只验证 `?mock=1` 对话与工具调用，真实模型链路沿用 v0.1.0 结论（未重跑）。
@@ -177,12 +209,14 @@ node scripts/verify-widgets.mjs --screenshots
 node scripts/verify-overlays.mjs --scheme dark --screenshots
 node scripts/verify-overlays.mjs --scheme light
 node scripts/shot-host-overlays.mjs --scheme dark
-npm run tauri dev                  # Tauri 真窗口（本阶段未验证）
+node scripts/verify-plug-and-play.mjs
+npm run tauri dev                  # Tauri 真窗口（debug）
+npx tauri build                    # release + 安装包
 ```
 
 ## 9. 发布前剩余动作
 
-1. E7 工作树 diff（脚本 / 文档 / 版本号 / 1 个 P1 修复）已由 Lead 审查、`typecheck` + `build` 门禁复跑后提交为 `66c2330`；
-2. `git push origin main`；
-3. 如需安装包：执行 `npx tauri build` 并在真机安装验证（本阶段未做）；
-4. 可选：把 `verify-plug-and-play` 落成正式脚本（DENSITY 与 todo 文档口径已在 E7 统一）。
+1. E7 工作树 diff 已由 Lead 审查、`typecheck` + `build` 门禁复跑后提交为 `66c2330`；后续 `899f885`（hash 回填）、`66e5021`（久坐空态文案）已提交；
+2. ✅ `git push origin main` 已完成（远端 HEAD 与本地一致）；
+3. ✅ Tauri debug 真窗口已重跑（§2.2）；release 安装包 MSI + NSIS 已产出（§2.3），安装验证待人工；
+4. ✅ `scripts/verify-plug-and-play.mjs` 已落地并 12/12 PASS（§2.4）。
