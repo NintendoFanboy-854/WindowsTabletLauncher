@@ -44,7 +44,7 @@
 ## 5. 打包与发布
 
 - [x] `npx tauri build`（release）exit 0，产物：`app.exe` 12,163,584 B / `E540F13D…`；NSIS `Windows Tablet Launcher_0.3.0_x64-setup.exe` 3,927,851 B / `A786D075…`；MSI `Windows Tablet Launcher_0.3.0_x64_zh-CN.msi` 5,136,384 B / `9888375A…`（体积比 v0.2.2 明显下降，删人脸模型/依赖）
-- [ ] release exe 真窗口验证（WebView2 CDP 六卡/8 iframe/console 0/seed 0.3.0/窗口全屏）— **未执行**：用户要求关机前直接推送；下次启动补验（方法同 v0.2.2，`shots/v030-final/` 尚未生成）
+- [x] release exe 真窗口验证（`shots/v030-final/REPORT.md`）：标题 4.3s/Responding/全屏 1440×960 CSS @DPR2（物理 2880×1920）；`.seed-version` 0.2.2→0.3.0 且 weather 新产物重种（SHA-256 `49E47718…` 与仓库一致）；WebView2 CDP 六卡 / 8 iframe（wtsl 协议）/ 无 dock / 无机器人 / Agent 入口 56×56 / console 0 / 无加载文案 / 无溢出；截图 `app-cdp-window.png`、`webview2-cdp.json`、`seed-upgrade.json`、`patch-evidence.json`
 - [x] 安装包语言/哈希回填（NSIS SimpChinese / MSI zh-CN）
 - [x] `git status` 干净；commit / push / tag `v0.3.0` — 本次推送（tag 见 git）
 

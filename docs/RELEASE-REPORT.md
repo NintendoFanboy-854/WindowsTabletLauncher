@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**v0.3.0 可发布（Phase 1 绿，Phase 2 release 验证见 §12.5）**：Agent 改为右下角浮空三段界面（点按/空格立即录音）；语音本轮原生音频只发一次、ASR 回填文字入库、上下文零音频；人脸/全屏/dock/机器人全部移除；设置入口收进设置页；天气 3×2 三带式重排 + 横向空洞门禁。Phase 1 dev 全绿（Agent surface 107/108，1 项 TEST；既有四套脚本全 PASS；真实 MiMo 音频冒烟 5/5），P1/P2 两个产品 bug 修复后复测 PASS。
+**v0.3.0 可发布（Phase 1 + Phase 2 全绿，P0=0/P1=0）**：Agent 改为右下角浮空三段界面（点按/空格立即录音）；语音本轮原生音频只发一次、ASR 回填文字入库、上下文零音频；人脸/全屏/dock/机器人全部移除；设置入口收进设置页；天气 3×2 三带式重排 + 横向空洞门禁。Phase 1 dev 全绿（Agent surface 107/108，1 项 TEST；既有四套脚本全 PASS；真实 MiMo 音频冒烟 5/5，P1/P2 修复后复测 PASS）；Phase 2 release 真窗口 + 升级重种 + WebView2 CDP 全 PASS（六卡/8 iframe/console 0/无 dock/无机器人/无音频落盘），安装包 NSIS 3.93MB / MSI 5.14MB。
 
 **历史结论**：v0.2.0 E0–E7 全部完成（P0=0、P1=0）；v0.2.1 修复安装包首次运行卡「正在加载桌面」（§10）；v0.2.2 修复天气定位/尺寸菜单/添加组件/删除持久化四个问题（§11）。
 
@@ -403,22 +403,27 @@ npx tauri build                    # release + 安装包
 
 天气 2×2 已知 P2（空带 26.8%）沿用接受口径；4×2 本批未改。
 
-### 12.5 Phase 2：release exe + 安装包
+### 12.5 Phase 2：release exe + 安装包验证 — PASS
 
-- release 构建：`npx tauri build` **exit 0**（2026-10-20 21:0x；beforeBuild tsc + vite 18.36s；cargo release 编译耗时约 13 分钟；NSIS/MSI bundling 完成）。
-- 产物（`src-tauri/target/release/`）：
+- release 构建：`npx tauri build` **exit 0**（beforeBuild tsc+vite 18.36s；cargo release 约 13 分钟；NSIS/MSI bundling 完成）。
+- 产物（验证前后哈希未变）：
   | 产物 | 大小 | SHA-256 |
   |---|---|---|
   | `app.exe` | 12,163,584 B | `E540F13DAA31451ECD0B1A3CA49A2686E4509E25F7B4FC415737F97262AFB528` |
   | NSIS `Windows Tablet Launcher_0.3.0_x64-setup.exe` | 3,927,851 B | `A786D075B4A7FA571E2D9C33DC66CB9AA7D8AB9E84D2A91E17290E3D4908294B` |
   | MSI `Windows Tablet Launcher_0.3.0_x64_zh-CN.msi` | 5,136,384 B | `9888375AED02A506CE0C1C93D532CB02AE0270E6C115EEEFE86A99E261DD9D53` |
 - 体积相比 v0.2.2 明显下降（NSIS 8.56MB→3.93MB、MSI 9.72MB→5.14MB、exe 16.74MB→12.16MB），主要来自删除 `@vladmandic/face-api` 与 6.7MB 人脸模型。
-- **Phase 2 真窗口 CDP 验证未执行**：用户要求在关机前直接推送交付，故本轮只确认构建 exit 0 与产物落盘；`.seed-version=0.3.0` 升级重种、六卡/8 iframe/console 0、窗口尺寸、真实安装包语言等**留待下次启动补验**（验证方法同 v0.2.2，`shots/v030-final/` 尚未生成）。此项不阻塞本次代码推送，但发布说明需注明。
+- **真实 exe 真窗口**（`shots/v030-final/genuine-window.json/.png`）：标题 4.3s 出现、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.0`。
+- **升级重种**（`seed-upgrade.json`）：appdata `.seed-version` 0.2.2 → **0.3.0**；`weather/app/app.js` 重写后 SHA-256 `49E47718…` 与仓库新产物一致，含 `data-content-band`×2、`data-secondary-block`×3，保留 v0.2.2 定位语义；6 个 manifest 全部合法、index.json 6 项。
+- **WebView2 CDP**（`webview2-cdp.json`、`launch-cdp.json`、`patch-evidence.json`）：页面 `http://tauri.localhost/` complete、无「正在加载桌面」；**6 卡**（全 page 0）、**8 iframe**=2 background+6 widget（均 `http://wtsl.localhost/…`）；**无 dock**、无机器人/头像/麦克风图标；Agent 入口唯一、collapsed 56×56、圆角 12、aria「开始语音提问」；console.error/exception/log.error **全 0**；localStorage 无音频/base64、layout v3 6 widgets `removed=[]`；截图 `app-cdp-window.png`（2880×1920）。
+- 工具链说明（P2）：release exe 无法用 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 开 CDP（wry 0.57 无条件 set args，同 v0.2.2），本次沿用临时副本方案（仅替换 app.exe 内 62 字节默认 WebView2 参数串；原产物未动、副本已删，证据 `patch-evidence.json`）。
+- 未覆盖：NSIS/MSI 实际安装/注册表/升级路径（按任务不安装，由用户手动）；release 内 Agent 语音录音未实测（fake mic 仅 dev）。
 
 ### 12.6 已知风险 / 限制（v0.3.0）
 
 - 不做唤醒词/常驻监听/人脸（D-22）；全屏与 dock 已删除，设置入口为长按桌面空白 → 编辑工具栏「设置」或 `Ctrl+,`。
-- 语音链路真实浏览器内「录音→原生音频对话→出声播报」尚未在真窗口驱动（无头假麦克风只能验证状态机与请求体）；MiMo 音频格式/流式由 Node 冒烟与真实接口实证。
+- 语音链路真实浏览器内「录音→原生音频对话→出声播报」：dev 用假麦克风验证状态机与 mock 请求体；真实 MiMo 音频格式/流式由 Node 冒烟实证；**release exe 内录音未实测**（留待用户日常使用验证）。
 - ASR 超时 30s；网络/配额影响 ASR/TTS；上下文只留文字，转写失败占位「（用户发来一段语音）」。
 - `public/secrets.json` 仍打进 `dist`/安装包（个人自用 P2；对外分发前应排除或改为运行时录入）。
 - 和风天气 Key/自动定位、联网搜索开通等沿用 v0.2.2 限制。
+- 旧 `wtsl.layout` 若有 2 页（第二页空）会显示 2 个页码点：v0.2.2 持久化状态，允许；需要时用设置页「重置布局」恢复单页（P3）。
