@@ -3,6 +3,11 @@
  *
  * 读取时做一次归一化（老数据缺字段、模型名失效、数值越界都收拢到合法值），
  * 写入后通过 CustomEvent 通知同页订阅者，跨窗口靠 storage 事件。
+ *
+ * v0.3.0 迁移（契约 §9）：
+ * - `tts.readTextReplies` 取代旧的 `tts.autoPlay` / `tts.continuous`：
+ *   `readTextReplies = old.tts.autoPlay === true`（continuous 是旧语音模式强制写的，不迁移）；
+ * - `panelMode` 与 `face` 整块丢弃（浮空形态只有一套，人脸能力删除）。
  */
 
 import {
@@ -11,7 +16,6 @@ import {
   MIMO_MODELS,
   type AgentSettings,
   type MimoModel,
-  type PanelMode,
 } from './types';
 
 export const SETTINGS_STORAGE_KEY = 'agent.settings';
@@ -22,8 +26,6 @@ export type SettingsPatch = {
     ? Partial<AgentSettings[K]>
     : AgentSettings[K];
 };
-
-const PANEL_MODES: PanelMode[] = ['overlay', 'sidebar', 'fullscreen'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -41,45 +43,32 @@ function clampNumber(raw: unknown, min: number, max: number, fallback: number): 
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeDescriptors(raw: unknown): number[][] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((item): item is number[] => Array.isArray(item) && item.length > 0)
-    .map((item) => item.map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : 0)))
-    .filter((item) => item.length >= 32); // face-api 的 128 维描述子；短于此的样本不可用
-}
-
-/** 把任意来源的 JSON 归一化成完整设置 */
+/** 把任意来源的 JSON 归一化成完整设置（旧字段在这里迁移/丢弃） */
 export function normalizeSettings(raw: unknown): AgentSettings {
   const source = isRecord(raw) ? raw : {};
   const tts = isRecord(source.tts) ? source.tts : {};
-  const face = isRecord(source.face) ? source.face : {};
   const search = isRecord(source.search) ? source.search : {};
   const mimo = isRecord(source.mimo) ? source.mimo : {};
 
-  const panelMode =
-    PANEL_MODES.find((mode) => mode === source.panelMode) ?? DEFAULT_SETTINGS.panelMode;
+  // 迁移：旧 tts.autoPlay → tts.readTextReplies；旧 continuous 不迁移（语音模式专用）
+  const readTextReplies =
+    typeof tts.readTextReplies === 'boolean'
+      ? tts.readTextReplies
+      : typeof tts.autoPlay === 'boolean'
+        ? tts.autoPlay
+        : DEFAULT_SETTINGS.tts.readTextReplies;
 
   return {
     model: pickModel(source.model),
-    panelMode,
     thinking: typeof source.thinking === 'boolean' ? source.thinking : DEFAULT_SETTINGS.thinking,
     tts: {
-      autoPlay: typeof tts.autoPlay === 'boolean' ? tts.autoPlay : DEFAULT_SETTINGS.tts.autoPlay,
-      continuous:
-        typeof tts.continuous === 'boolean' ? tts.continuous : DEFAULT_SETTINGS.tts.continuous,
+      readTextReplies,
       voice:
         typeof tts.voice === 'string' && tts.voice.trim()
           ? tts.voice
           : DEFAULT_SETTINGS.tts.voice,
       // 规格：0.5–2.0
       rate: clampNumber(tts.rate, 0.5, 2, DEFAULT_SETTINGS.tts.rate),
-    },
-    face: {
-      enabled: typeof face.enabled === 'boolean' ? face.enabled : DEFAULT_SETTINGS.face.enabled,
-      descriptors: normalizeDescriptors(face.descriptors),
-      // face-api 的欧氏距离在 0–1 区间，默认 0.5（规格）
-      threshold: clampNumber(face.threshold, 0.05, 1, DEFAULT_SETTINGS.face.threshold),
     },
     search: {
       enabled: typeof search.enabled === 'boolean' ? search.enabled : DEFAULT_SETTINGS.search.enabled,
@@ -107,7 +96,6 @@ function mergeSettings(current: AgentSettings, patch: SettingsPatch): AgentSetti
     ...current,
     ...patch,
     tts: { ...current.tts, ...patch.tts },
-    face: { ...current.face, ...patch.face },
     search: { ...current.search, ...patch.search },
     mimo: { ...current.mimo, ...patch.mimo },
   });

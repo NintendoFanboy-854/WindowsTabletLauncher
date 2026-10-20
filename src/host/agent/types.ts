@@ -1,25 +1,17 @@
 /**
  * Agent 模块的数据契约。
  *
- * 与 docs/components/agent.md 的 `Message` / `Conversation` / `Settings` 对齐；
- * 规格没写、但实现必须有的字段（MiMo Key、Mock 开关、reasoning、来源）都标了注释，
- * 它们只增加可选能力，不改变既有字段语义。
+ * 与 docs/AGENT-SURFACE-CONTRACT.md §8 / §9 对齐：
+ * - Message 的 `input` / `voicePeaks` / `voiceDurationSec` / `transcriptStatus` 只给 UI，
+ *   不进入模型请求，也不含任何音频数据；
+ * - Settings 不再有 panelMode / face / tts.autoPlay / tts.continuous；
+ * - 模型请求里只有“本轮语音”那一条 user 消息的 content 是 content parts 数组
+ *   （`input_audio` + `text`），其余历史全部是纯文字。
  */
 
 import type { AgentToolDecl } from '../bridge/types';
 
 export type { AgentToolDecl };
-
-// ---------- 面板 ----------
-
-/** 浮层 / 常驻侧栏 / 全屏 */
-export type PanelMode = 'overlay' | 'sidebar' | 'fullscreen';
-
-/** 浮层与侧栏宽度（规格：min(420px, 92vw)） */
-export const AGENT_PANEL_WIDTH = 'min(420px, 92vw)';
-
-/** 常驻侧栏的最小窗口宽度（DESIGN.md §8） */
-export const SIDEBAR_MIN_WIDTH = 1280;
 
 // ---------- 消息 ----------
 
@@ -60,6 +52,12 @@ export interface AgentErrorAction {
 
 export type MessageStatus = 'streaming' | 'done' | 'error' | 'aborted';
 
+/** 这条用户消息来自语音还是键盘（只给 UI，不发模型） */
+export type MessageInput = 'voice' | 'text';
+
+/** 语音转写状态（只给 UI；入库的 content 是 ASR 文字） */
+export type TranscriptStatus = 'pending' | 'ready' | 'failed';
+
 export interface Message {
   id: string;
   role: MessageRole;
@@ -73,6 +71,12 @@ export interface Message {
   /** MiMo 原生 web_search 用量（可选，不占卡片主信息） */
   webSearchUsage?: { toolUsage: number; pageUsage: number };
   status?: MessageStatus;
+  /** 只给 UI：语音消息的声纹装饰（12–24 个 0..1 桶，纯数字，不含音频） */
+  input?: MessageInput;
+  voicePeaks?: number[];
+  voiceDurationSec?: number;
+  /** 只给 UI：ASR 回填进度；音频 Blob 永不进 Message */
+  transcriptStatus?: TranscriptStatus;
 }
 
 export interface Conversation {
@@ -124,25 +128,14 @@ export const TTS_VOICES: readonly TtsVoiceOption[] = [
 export interface AgentSettings {
   /** 默认 flash（规格） */
   model: MimoModel;
-  /** 默认浮层（规格） */
-  panelMode: PanelMode;
   /** 深度思考开关，默认关（规格） */
   thinking: boolean;
   tts: {
-    /** 默认 false：只显示文字，点喇叭才读 */
-    autoPlay: boolean;
-    /** 连续朗读的持久状态：点过一次喇叭后保持 */
-    continuous: boolean;
+    /** 文字提问的回复也朗读；语音提问的回复必定朗读。默认 false */
+    readTextReplies: boolean;
     voice: string;
     /** 0.5–2.0，默认 1.0 */
     rate: number;
-  };
-  face: {
-    enabled: boolean;
-    /** 注册的人脸特征样本（只存本地） */
-    descriptors: number[][];
-    /** 欧氏距离阈值，默认 0.5 */
-    threshold: number;
   };
   search: {
     /** 默认开：是否在请求里携带 MiMo 原生 web_search 工具 */
@@ -169,18 +162,11 @@ export const MIMO_PLUGIN_CONSOLE_URL = 'https://platform.xiaomimimo.com/#/consol
 
 export const DEFAULT_SETTINGS: AgentSettings = {
   model: 'mimo-v2.6-flash',
-  panelMode: 'overlay',
   thinking: false,
   tts: {
-    autoPlay: false,
-    continuous: false,
+    readTextReplies: false,
     voice: 'mimo_default',
     rate: 1,
-  },
-  face: {
-    enabled: true,
-    descriptors: [],
-    threshold: 0.5,
   },
   search: {
     enabled: true,
@@ -222,9 +208,29 @@ export interface OpenAIToolCall {
   function: { name: string; arguments: string };
 }
 
+/**
+ * 本轮语音的音频输入（MiMo 原生音频理解，见官方文档：mimo-v2.6-flash/pro 支持）。
+ * `data` 是 `data:audio/wav;base64,…` 形式的 data URL。
+ */
+export interface ChatInputAudioPart {
+  type: 'input_audio';
+  input_audio: { data: string };
+}
+
+export interface ChatTextPart {
+  type: 'text';
+  text: string;
+}
+
+export type ChatContentPart = ChatInputAudioPart | ChatTextPart;
+
+/**
+ * 模型消息。只有“本轮语音”的那一条 user 消息允许 content 为 content parts 数组；
+ * 历史消息（含 retry / 切会话 / 重启）一律 string，绝不重传音频。
+ */
 export type ChatRequestMessage =
   | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string | ChatContentPart[] }
   | {
       role: 'assistant';
       content: string | null;
@@ -258,7 +264,7 @@ export interface ToolRunOptions {
 
 /**
  * Agent 的模型/工具/语音/搜索传输层。
- * 真实实现走 MiMo（含原生 web_search）；`MockTransport` 提供离线示例数据。
+ * 真实实现走 MiMo（含原生音频输入、原生 web_search）；`MockTransport` 提供离线示例数据。
  */
 export interface AgentTransport {
   readonly kind: 'mimo' | 'mock';

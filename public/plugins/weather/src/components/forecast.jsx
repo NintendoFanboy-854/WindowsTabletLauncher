@@ -3,14 +3,15 @@
  *
  * 尺寸与字号按 docs/components/weather.md：
  * - 2×2 逐时 6 列：时间 12 / 图标 20 / 温度 14；
- * - 3×2 逐时 6 行：行高 40 / 时间 12 / 图标 20 / 温度 16 右对齐；
+ * - 3×2 下带全宽逐时 6 列（v0.3.0 三带式）：列 gap 8；时间 12 fg3 / 图标 24 /
+ *   温度 16 semibold fg1 / 降水概率 12 fg3；等宽列，无中间 spacer；
  * - 4×2 未来 7 天等宽 7 列：星期 12 / 图标 20 / 高温 16 semibold / 低温 12；
  * - AQI 环：4×2 72、详情 88；值 24 / AQI 标签 12 / 类别 14。
  */
 
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import { WeatherIcon } from './atoms.jsx';
-import { fmtTemp, hourLabel, weekdayLabel } from '../data/format.js';
+import { fmtPop, fmtTemp, hourLabel, weekdayLabel } from '../data/format.js';
 
 const useStyles = makeStyles({
   hourlyStrip: {
@@ -31,24 +32,32 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
 
-  hourlyRows: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
+  // 3×2 下带：全宽等宽 6 列（列宽由 grid 均分，gap 8；不再有行内 spacer 造成的横向空洞）
+  hourlyBand: {
+    display: 'grid',
+    gridAutoFlow: 'column',
+    gridAutoColumns: 'minmax(0, 1fr)',
     height: '100%',
-    minWidth: 0,
-  },
-  hourRow: {
-    display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '40px',
     minWidth: 0,
   },
-  hourSpacer: { flex: 1, minWidth: 0 },
-  hourRowTime: {
+  hourBandColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalXS,
+    minWidth: 0,
+  },
+  bandMuted: {
     color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  bandTemp: {
+    color: tokens.colorNeutralForeground1,
+    fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   },
 
@@ -151,27 +160,35 @@ export function HourlyStrip({ items, unit, scheme, sunrise, sunset, count = 6 })
   );
 }
 
-/** 3×2 右侧的逐时 6 行（行高 40） */
-export function HourlyRows({ items, unit, scheme, sunrise, sunset, count = 6 }) {
+/**
+ * 3×2 下带的全宽逐时 6 列（v0.3.0 三带式）。
+ *
+ * 每列竖排：时间 12 fg3 → 图标 24 → 温度 16 semibold fg1 → 降水概率 12 fg3；
+ * 列 gap 8、等宽（`minmax(0, 1fr)`），内容居中，不裁切也不出现行内 spacer 空洞。
+ * 降水概率缺数据时只留空行占位，保证 6 列基线一致。
+ */
+export function HourlyBand({ items, unit, scheme, sunrise, sunset, count = 6 }) {
   const styles = useStyles();
   const list = (items || []).slice(0, count);
   return (
-    <div className={styles.hourlyRows}>
+    <div className={styles.hourlyBand}>
       {list.map((item, index) => (
-        <div key={item.fxTime || index} className={styles.hourRow}>
-          <Text size={200} className={styles.hourRowTime}>
+        <div key={item.fxTime || index} className={styles.hourBandColumn}>
+          <Text size={200} className={styles.bandMuted}>
             {index === 0 ? '现在' : hourLabel(item.fxTime)}
           </Text>
           <WeatherIcon
             code={item.icon}
             night={isNight(item.fxTime, sunrise, sunset)}
             scheme={scheme}
-            size={20}
+            size={24}
             title={item.text}
           />
-          <span className={styles.hourSpacer} />
-          <Text size={400} weight="semibold" className={styles.temp}>
+          <Text size={400} weight="semibold" className={styles.bandTemp}>
             {fmtTemp(item.temp, unit)}
+          </Text>
+          <Text size={200} className={styles.bandMuted}>
+            {fmtPop(item.pop)}
           </Text>
         </div>
       ))}

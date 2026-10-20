@@ -1,14 +1,24 @@
 /**
- * 录音：MediaRecorder 采集 → 解码 → 重采样到 16kHz 单声道 → WAV（MiMo ASR 只收 wav/mp3）。
+ * 录音：MediaRecorder 采集 → 解码 → 重采样到 16kHz 单声道 → WAV。
+ *
+ * 产出 `{ wav, durationSec, peaks }`：
+ * - `wav` 同时用于 MiMo 原生音频对话（input_audio）与 MiMo ASR；
+ * - `peaks` 是 12–24 桶的 0..1 音量包络，只给 UI 画声纹（纯数字，可持久化）。
+ *
+ * 音频 Blob 由会话层用完即弃：不写 localStorage、不进 Message。
  */
 
 export interface RecordedAudio {
-  /** 16kHz 单声道 PCM16 WAV，可直接送 ASR */
+  /** 16kHz 单声道 PCM16 WAV，可直接送 ASR / input_audio */
   wav: Blob;
   durationSec: number;
+  /** 12–24 个 0..1 桶的包络（契约 §6：供用户语音气泡的声纹装饰） */
+  peaks: number[];
 }
 
 const TARGET_SAMPLE_RATE = 16_000;
+/** 声纹桶数：契约要求 12–24，取 24 让窄气泡也够细腻 */
+const PEAK_BUCKETS = 24;
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
@@ -53,7 +63,40 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
-async function toWav16k(recorded: Blob): Promise<RecordedAudio> {
+/**
+ * 从 16kHz PCM 采样算 0..1 包络：每桶取 RMS，再按整段最大 RMS 归一。
+ * 静音返回全 0；用平方根压缩让轻声也能看见（纯视觉数据，不影响音频本身）。
+ */
+export function computePeaks(samples: Float32Array, buckets = PEAK_BUCKETS): number[] {
+  const count = Math.max(12, Math.min(24, Math.round(buckets)));
+  const peaks = new Array<number>(count).fill(0);
+  if (samples.length === 0) return peaks;
+
+  const bucketSize = Math.max(1, Math.ceil(samples.length / count));
+  let maxRms = 0;
+  for (let bucket = 0; bucket < count; bucket += 1) {
+    const start = bucket * bucketSize;
+    const end = Math.min(samples.length, start + bucketSize);
+    if (start >= end) continue;
+    let sum = 0;
+    for (let index = start; index < end; index += 1) {
+      const value = samples[index];
+      sum += value * value;
+    }
+    const rms = Math.sqrt(sum / (end - start));
+    peaks[bucket] = rms;
+    if (rms > maxRms) maxRms = rms;
+  }
+
+  if (maxRms <= 1e-6) return peaks.fill(0);
+  for (let bucket = 0; bucket < count; bucket += 1) {
+    const relative = Math.min(1, Math.max(0, peaks[bucket] / maxRms));
+    peaks[bucket] = Math.round(Math.sqrt(relative) * 100) / 100;
+  }
+  return peaks;
+}
+
+async function toWav16k(recorded: Blob): Promise<Omit<RecordedAudio, 'peaks'>> {
   const arrayBuffer = await recorded.arrayBuffer();
   const decodeContext = new AudioContext();
   let decoded: AudioBuffer;
@@ -70,8 +113,9 @@ async function toWav16k(recorded: Blob): Promise<RecordedAudio> {
   source.connect(offline.destination);
   source.start();
   const rendered = await offline.startRendering();
+  const samples = rendered.getChannelData(0);
   return {
-    wav: encodeWav(rendered.getChannelData(0), TARGET_SAMPLE_RATE),
+    wav: encodeWav(samples, TARGET_SAMPLE_RATE),
     durationSec: rendered.duration,
   };
 }
@@ -153,7 +197,13 @@ export class VoiceRecorder {
     this.chunks = [];
     this.stopStream();
     if (blob.size === 0) throw new Error('没有录到音频');
-    return toWav16k(blob);
+    const audio = await toWav16k(blob);
+    const samples = await audio.wav.arrayBuffer();
+    // 直接从 WAV 的 PCM 数据算包络：与送往 MiMo 的音频完全同源
+    const pcm = new Int16Array(samples, 44);
+    const floats = new Float32Array(pcm.length);
+    for (let index = 0; index < pcm.length; index += 1) floats[index] = pcm[index] / 0x8000;
+    return { ...audio, peaks: computePeaks(floats) };
   }
 
   cancel(): void {

@@ -20,7 +20,7 @@
 ├── 桥接层：postMessage 协议（8 个 API、请求响应、主题注入、焦点交接）
 ├── 页面：设置 / 复盘 / 插件管理
 ├── 通知：Toast + 强提醒遮罩
-└── Agent：三形态面板、模型接入、工具调度、语音、人脸
+└── Agent：浮空三段界面、模型接入、工具调度、原生音频语音（v0.3.0 起无人脸、无唤醒词）
 
 插件（iframe 页面 + manifest）
 └── clock / todo / pomodoro / sedentary / weather / countdown
@@ -74,8 +74,8 @@ Tauri（Rust）
 | D1 | 面板三形态 | 浮层 Drawer / 常驻侧栏 / 全屏；对话列表、输入框、工具调用卡片 | A5 | `src/host/agent/panel/**` |
 | D2 | 模型接入 | MiMo V2.6 流式 SSE、tool calls、上下文裁剪、错误重试、Key 设置 | A0 | `src/host/agent/model/**` |
 | D3 | 工具调度 | 插件工具聚合 + 路由（postMessage + requestId）+ 宿主工具 `web.search`/`web.fetch`/`system.time` | A5、D2 | `src/host/agent/tools/**` |
-| D4 | 语音 | MiMo ASR 录音上传、MiMo TTS 流式播放、连续朗读状态持久化 | D2 | `src/host/agent/voice/**` |
-| D5 | 人脸 | `@vladmandic/face-api` 注册/识别/防误唤醒，唤醒后开语音 | D1、D4 | `src/host/agent/face/**` |
+| D4 | 语音 | MiMo ASR 录音上传、MiMo TTS 流式播放、连续朗读状态持久化（v0.3.0 由 E8 取代：音频原生发对话、ASR 回填文字、单条播报） | D2 | `src/host/agent/voice/**` |
+| D5 | 人脸 | ~~`@vladmandic/face-api` 注册/识别/防误唤醒~~（v0.3.0 已删除，D-22） | — | — |
 | D6 | 联网搜索 | Tavily provider、结果摘要、来源链接 | D3 | `src/host/agent/search/**` |
 
 ### 阶段 E：收尾
@@ -123,7 +123,8 @@ A0 → A1/A2/A3 → A5 → A4
 |---|---|
 | iframe 键盘焦点交接复杂 | A5 先写最小协议（宿主→插件 focus、插件→宿主 Esc），跑通一个组件再推广 |
 | 自适应重排算法边界（列数变少时重叠） | A3 只做“按顺序找第一个空位”，先简单后优化 |
-| WebView2 摄像头权限 / face-api 性能 | D5 单独验证，失败则降级为“手动点击语音” |
+| MiMo 原生音频输入字段/流式兼容 | 实现前先跑 `scripts/smoke-mimo-audio.mjs`（TTS 合成→chat 音频输入→ASR 回读）；失败按 D-21 报 Lead 再定降级方案 |
+| 浮空三段 morph 在弱机掉帧 | 只过渡 width/height/radius/shadow，内容用 opacity/位移；reduced-motion 只淡入淡出；弱机回归时看掉帧/长任务 |
 | MiMo tool calls 不稳定 | D3 加错误回传，模型自己解释；不做自动重试循环 |
 | zip 安装路径穿越 | 不搞安全，但要保证解压到 `plugins/<id>/` 内，不污染其他目录 |
 | 天气 API Key / 定位失败 | C5 做缓存与降级，缺 Key 时显示引导 |
@@ -139,7 +140,7 @@ src/
 │   ├── bridge/          # postMessage 协议 + types
 │   ├── pages/           # 设置 / 复盘 / 插件管理
 │   ├── notifications/
-│   ├── agent/           # panel / model / tools / voice / face / search
+│   ├── agent/           # surface / model / tools / voice / search（v0.3.0 起无人脸）
 │   └── shell/           # 快捷键、启动、退出
 └── main.tsx
 public/plugins/          # clock / todo / pomodoro / sedentary / weather / countdown
@@ -183,6 +184,9 @@ A0 工程基线 + 把现有原型代码迁到 `src/host/` 新结构，跑通同�
 | E7b | 安装包热修 ✅ | v0.2.0 安装版首次运行卡「正在加载桌面」：内置插件种子把构建期压缩字节原样写盘 + 忽略 AssetKey 前导 `/`，manifest 全部非法、插件列表为空；安装器改中文 | 已完成（2026-10-20，v0.2.1）：`plugins.rs` 改用 `resolver.get()` 解压 + trim `/`，加 `.seed-version` 按版本重种；真实 release exe + WebView2 CDP 复验 loadingText=false、6 卡、wtsl 帧、console 0；NSIS SimpChinese + MSI zh-CN 安装包产出，详见 `docs/RELEASE-REPORT.md` §10 |
 | E7c | 交互/定位热修 ✅ | 天气自动定位成功即应用为当前城市（含升级迁移的 fresh location 一次性应用，`applied` 标记避免覆盖手动选择）；尺寸菜单勾选改为受控（失败保持原尺寸且不勾选）；编辑模式「添加组件」Dialog + 插件页「添加到桌面」；编辑删除持久化（`wtsl.layout` v3 `removed`，兼容 v2；空桌面可持久化）；插件页状态四态（已禁用 / 已启用 / 已启用 · 未上桌 / 已启用 · 桌面 n/m）；`verify-plug-and-play` 弱机超时加固 | 已完成（2026-10-20，v0.2.2）：`typecheck`/`build` 通过；独立回归 A 4/4、B（verify-plugin 6 插件、widgets 25/25×2、overlays 6/6×2、plug-and-play 12/12）、C 四项修复 21/21（1024×768 light + 1440×960 dark）、C.6 天气定位注入 7/7；证据 `shots/v022-final/REPORT.md`，发布报告 `docs/RELEASE-REPORT.md` §11 |
 
-> 执行顺序：E0 →（E1/E2 可并行）→ E2b → E3.0 → E3.0b → E3.x（逐插件）→ E4 → E5 → E6 → E7。
+| E8 | 语音优先重构（v0.3.0）✅ | Agent 浮空三段式（按钮→半高输入窗→全高浮栏，点按/空格立即录音）；MiMo 原生音频只发一轮、ASR 回填文字入库、上下文零音频；删人脸/全屏/dock/机器人，设置入口收进设置页；天气 3×2 三带式重排 + 横向空洞门禁 | 已完成（2026-10-20，v0.3.0）：`typecheck`/`build`/`tauri build` exit 0；Phase 1 dev 全绿（Agent surface 107/108，1 项 TEST；P1/P2 修复复测 PASS；既有四套脚本全 PASS；真实 MiMo 音频冒烟 5/5）；天气 3×2 横向 166px→16px、内容带/Secondary/1024 门禁通过；release 产物 NSIS 3.93MB / MSI 5.14MB / exe 12.16MB。证据 `shots/v030-dev/REPORT.md`、`docs/RELEASE-REPORT.md` §12；Phase 2 release 真窗口 CDP 因用户关机前直接推送未执行，下次补验 |
+
+> 执行顺序：E0 →（E1/E2 可并行）→ E2b → E3.0 → E3.0b → E3.x（逐插件）→ E4 → E5 → E6 → E7 → E8。
 > E0–E7c 全部完成（2026-10-20，v0.2.2）；`templates/plugin-template/` 自包含模板不参与运行时，后续升级共享底座时按模板 README 重新快照。
 > 动效（E4）的具体参数在实现前单独定稿；视觉（E5）不再改交互语义。
+> E8（v0.3.0）：D4 的连续朗读状态机、D5 的人脸唤醒已被取代；Agent 只保留浮空形态，语音入口为「点按/空格立即录音」。

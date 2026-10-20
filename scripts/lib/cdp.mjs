@@ -253,9 +253,17 @@ function consoleArgText(arg) {
 
 /**
  * 启动一个独立的 headless Edge 并连接 CDP。
- * @param {{width?: number, height?: number, scheme?: 'dark'|'light'}} [options]
+ *
+ * v0.3.0 起默认带上假麦克风与自动播放参数，供 Agent 语音链路（getUserMedia /
+ * MediaRecorder / AudioContext / TTS 播放状态机）在 headless 下可测：
+ * - `--use-fake-device-for-media-stream`：内置假麦克风（正弦音），录音链路可用；
+ * - `--use-fake-ui-for-media-stream`：自动允许麦克风权限，不弹权限框；
+ * - `--autoplay-policy=no-user-gesture-required`：TTS 播放不被自动播放策略拦截。
+ * reduced-motion 用 `setReducedMotion()`（Emulation.setEmulatedMedia）模拟。
+ *
+ * @param {{width?: number, height?: number, scheme?: 'dark'|'light', extraArgs?: string[]}} [options]
  */
-export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {}) {
+export async function launch({ width = 1440, height = 960, scheme = 'dark', extraArgs = [] } = {}) {
   if (!existsSync(EDGE_PATH)) throw new Error(`找不到 Edge：${EDGE_PATH}`);
 
   const port = await getFreePort();
@@ -277,6 +285,10 @@ export async function launch({ width = 1440, height = 960, scheme = 'dark' } = {
     '--no-first-run',
     '--no-default-browser-check',
     '--hide-scrollbars',
+    '--use-fake-device-for-media-stream',
+    '--use-fake-ui-for-media-stream',
+    '--autoplay-policy=no-user-gesture-required',
+    ...extraArgs,
     `--window-size=${width},${height}`,
     'about:blank',
   ];

@@ -2,18 +2,29 @@
 
 桌面的智能入口：听懂人话 → 选插件工具执行 → 用自然语言回你。能力边界 = 插件工具 + 模型 + 联网搜索。
 
-## 面板形态（三种都做，设置里选）
+v0.3.0 起（D-20/D-21/D-22）只保留浮空形态，语音为主入口；全屏页、面板形态、人脸唤醒、dock 与机器人图标均已移除。
 
-- **浮层**（默认）：右侧 `OverlayDrawer`（约 420px），点右下角按钮或语音唤醒时滑出，不占桌面网格。
-- **常驻侧栏**：一直停靠在右侧，桌面网格自动让出宽度。
-- **全屏**：整屏对话，适合语音模式（大字幕 + 波形动画 + 说话按钮）。
+## 浮空三段（唯一形态）
 
-三种形态共用同一套对话状态，切换时不断话。语音交互自动切全屏。
+右下角一个入口按钮（56×56、圆角 12、`ChatSparkle20Regular`），同一容器向右上生长：
 
-## 自适应
+| 阶段 | 尺寸 | 内容 | 进入 / 退出 |
+|---|---|---|---|
+| 按钮 | 56×56 | 图标 | 点按或按住空格 → 立即录音并进入半高窗 |
+| 半高输入窗 | min(420px, 92vw) × clamp(320px, 44vh, 440px) | 最近一条回答的渐隐预览 + 输入区 + 语音/发送；录音时为声纹带 | 发送后自动进入全高浮栏；Esc/点外部/X 回按钮（草稿保留） |
+| 全高浮栏 | 同宽 × calc(100vh − 40px) | 消息列表 + 同一输入组件；头部 ⌄ / ⋯ / X | ⌄ 或 Esc 回半高；X 直接回按钮 |
 
-- 浮层宽度 `min(420px, 92vw)`；常驻侧栏只在大屏（≥1280）可选，否则退化为浮层。
-- 消息列表内部滚动，不带动桌面；消息、输入框、工具卡片全用 Fluent 组件。
+- 右/下锚定，只过渡宽高，圆角恒 12，shadow8 ↔ shadow16；动效、reduced-motion、焦点路径见 [MOTION.md](../MOTION.md) §5.1 与 [AGENT-SURFACE-CONTRACT.md](../AGENT-SURFACE-CONTRACT.md)。
+- 可预测性：Esc 永远退一级；⌄ 收起、X 关闭；composer 点外部一律收起并保存草稿，chat 点外部不关闭；唯一自动升级 = 发送后进入 chat；关闭后焦点回到入口按钮。
+- 不再有「面板形态」设置；旧数据里的 `panelMode` 直接忽略。
+
+## 语音（主入口）
+
+- **点按钮 / 按住空格 = 立即开始录音**（不是先开窗再点麦克风）；松开或点停止 = 结束并发送。空格在输入框/按钮/菜单/对话框/iframe 聚焦时不响应，避免打字误触；短按 <300ms、Esc、窗口失焦取消录音。
+- 录音结束时：当前这轮语音以 `input_audio`（`data:audio/wav;base64,…`）**只发一次**给 MiMo 对话模型；同一份 WAV 并行送 MiMo ASR（`mimo-v2.5-asr`），转写文字回填到该 user 消息并入库。
+- 音频不写 localStorage、不进 Message、不进后续请求；重试/切会话/重启都只发文字。转写失败时该条上下文用「（用户发来一段语音）」占位，界面以声纹 + shimmer 提示，可再录一次。
+- 播报：语音提问的回答自动朗读；文字提问默认不朗读（设置 `文字提问也朗读`，默认关）。每条助手消息可单独播放/停止；收起/关闭窗口、开始录音、发送新消息都先停止播报；TTS 失败只做一次轻提示，不打断文字。
+- 语音消息呈现：与打字消息同形同色；气泡顶部一条声纹装饰（高度来自 `voicePeaks`），转写未回时声纹轻微起伏 + 两行 shimmer，回填后文字淡入、声纹静止。**界面不写「语音/转写结果」等标签**，`aria-label` 给屏幕阅读器。
 
 ## 数据模型
 
@@ -22,49 +33,42 @@ interface Message {
   id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string;
-  toolCalls?: { id: string; name: string; args: unknown; result?: unknown; error?: string }[];
   createdAt: string;
-}
-
-interface Conversation {
-  id: string;
-  title: string;        // 首条用户消息截断
-  messages: Message[];
-  updatedAt: string;
+  status?: 'streaming' | 'done' | 'error' | 'aborted';
+  reasoning?: string;
+  sources?: SourceRef[];
+  webSearchUsage?: { toolUsage: number; pageUsage: number };
+  toolCalls?: ToolCallRecord[];
+  /** 以下仅 UI 使用，不进入模型请求 */
+  input?: 'voice' | 'text';
+  voicePeaks?: number[];        // 12–24 个 0..1 包络桶
+  voiceDurationSec?: number;
+  transcriptStatus?: 'pending' | 'ready' | 'failed';
 }
 
 interface Settings {
   model: 'mimo-v2.6-flash' | 'mimo-v2.6-pro' | 'mimo-v2.6-pro-ultraspeed'; // 默认 flash
-  panelMode: 'overlay' | 'sidebar' | 'fullscreen';   // 默认 overlay
-  thinking: boolean;                                  // 默认 false
+  thinking: boolean;                              // 默认 false
   tts: {
-    autoPlay: boolean;     // 默认 false：只显示文字，点喇叭才读
-    continuous: boolean;   // 记忆的播放状态：点过一次后保持连续朗读
-    voice: string;         // MiMo TTS 音色
-    rate: number;          // 0.5–2.0，默认 1.0
+    readTextReplies: boolean;   // 默认 false：文字提问不自动朗读；语音提问始终朗读
+    voice: string;              // MiMo TTS 音色
+    rate: number;               // 0.5–2.0，默认 1.0
   };
-  face: {
-    enabled: boolean;      // 默认 true
-    descriptors: number[][]; // 注册的人脸特征样本
-    threshold: number;     // 默认 0.5
-  };
-  search: {
-    enabled: boolean;      // 联网搜索开关，默认 true
-    maxKeyword: number;    // 每轮最多并发关键词，默认 3
-    forceSearch: boolean;  // 强制搜索，默认 false（交给模型判断）
-  };
+  search: { enabled: boolean; maxKeyword: number; forceSearch: boolean };
+  mimo: { apiKey: string; baseUrl: string };
 }
 ```
 
-存储：会话 `agent.conversations`、设置 `agent.settings`。**连续朗读状态要持久化**——重启后仍按上次选择。
+- 存储：会话 `agent.conversations`（只存文字，音频用完即弃）、设置 `agent.settings`。
+- 迁移：`readTextReplies` 取旧 `tts.autoPlay`；旧 `tts.continuous`（曾被语音模式强制写 true）不迁移；旧 `face` / `panelMode` 丢弃。
 
 ## 模型接入
 
 - MiMo V2.6（OpenAI 兼容 `/chat/completions`），SSE 流式，支持 tool calls。
-- API Key 在设置里填，本地存。
-- 系统提示：角色说明 + 当前时间 + **全部已注册工具清单**（工具名、描述、参数 schema）+ 输出风格要求（简洁、中文、能用工具就别猜）。
-- 上下文：按模型上下文窗口自动裁剪，保留系统提示 + 最近的消息。工具结果太长时截断后再给模型。
-- 请求失败或超时：提示错误并提供重试按钮。
+- 本轮语音用 content parts 的 `input_audio` 原生输入；历史消息全部为文字。
+- API Key 在设置里填，本地存；服务地址高级项可改。
+- 系统提示：角色说明 + 当前时间 + 全部已注册工具清单 + 输出风格要求（简洁、中文、能用工具就别猜）。
+- 上下文按模型窗口裁剪；工具结果过长截断；请求失败/超时给可重试错误。
 
 ## 工具
 
@@ -80,41 +84,35 @@ interface Settings {
 |---|---|---|
 | `system.time` | — | 当前时间/日期/时区 |
 
-联网搜索不自己实现，用 MiMo 原生 `web_search`（见文末）。
+联网搜索用 MiMo 原生 `web_search`（见文末）。
 
+## 错误与空态
 
+- 无 API Key：按钮/窗口保持可用但发送前提示去设置填写，不发起请求。
+- 麦克风不可用/被占用：入口旁 danger 图标 + Tooltip；恢复后消失。
+- ASR 失败：该条语音气泡保留，声纹 + shimmer 可重试；不阻塞后续文字对话。
+- TTS 失败：该条消息旁一次轻提示，可重试；文字完整保留。
+- 工具调用了不存在的插件：错误回给模型，由模型自然语言说明。
+- 流式输出中用户点停止：中止请求，保留已生成内容（无额外解释文字）。
 
-## 语音
+## 设置入口
 
-- 输入：点麦克风按钮开始录音 → 停止 → 上传 MiMo ASR → 得到文本后走正常对话。
-- 输出：MiMo TTS 流式合成。
-- **连续朗读**：用户点一次喇叭后进入连续朗读模式（`tts.continuous = true`，持久化）——本条回复全部读完，之后每条新回复自动朗读，直到用户点停止或关掉该模式。语音模式下默认开启。
-- 朗读时再次点击喇叭 = 停止朗读。
-
-## 人脸唤醒
-
-- 方案：浏览器端 `@vladmandic/face-api`（WASM）。
-- 注册：设置里对准摄像头拍几张样本，存特征向量。
-- 识别：按较低频率抽帧检测；与注册特征的距离小于 `threshold` 且连续多帧命中才触发（防误唤醒）。
-- 触发：打开全屏语音面板并开始录音，提示音后开始听。
-- 隐私：特征只存本地，不上传；无摄像头/权限被拒 → 设置里显示不可用，不影响其他功能。
-- 不做：头部姿态识别、表情识别、多用户区分。
-
-## 边界与异常
-
-- 无 API Key：面板显示引导“去设置里填 MiMo Key”，不发起请求。
-- 工具调用了不存在的插件：返回错误给模型，模型用自然语言说明。
-- 流式输出中用户点停止：中止请求，保留已生成内容。
-- 语音合成失败：退回纯文本并提示一次。
+- 设置页顶部「入口」组：打开 Agent / 复盘 / 插件管理（取代已删除的 dock）。
+- 打开设置页：长按桌面空白 → 编辑工具栏「设置」；或 `Ctrl+,`。
+- Agent 设置（模型/Key/语音/搜索）：窗口头部 `⋯` → 设置。
 
 ## 不做
 
-多用户、长期记忆向量库、插件自定义提示词、Agent 自主后台任务（定时自动执行）。
+全屏形态、面板形态切换、人脸/摄像头、唤醒词与常驻监听、机器人形象、多用户、长期记忆向量库、插件自定义提示词、Agent 自主后台任务。
 
 ## 联网搜索：用 MiMo 原生能力
 
 - 用 MiMo 自带的 `web_search` 工具：请求里加 `{"type":"web_search","max_keyword":3,"force_search":false,"limit":1}`，与函数工具混用，`tool_choice: "auto"`。
-- 来源来自响应 `message.annotations`（`url_citation`：url / title / site_name / summary / publish_time / logo_url），按 Fluent 2 的来源 chips 展示；流式首个数据包会先带来源。
-- **需要先在 MiMo 控制台 → 插件管理开通 Web Search Plugin**；未开通时接口返回 400（`webSearchEnabled is false`），面板要映射成可读提示并给出控制台链接。
-- 设置项：联网搜索开关（默认开）、`max_keyword`（默认 3）、`force_search`（默认关，交给模型判断）。
-- 不做：自建搜索/抓取 Provider（Tavily 等已删除）、内置浏览器、深度爬虫、多轮检索策略。
+- 来源来自响应 `message.annotations`（`url_citation`），按 Fluent 2 的来源 chips 展示。
+- **需要先在 MiMo 控制台 → 插件管理开通 Web Search Plugin**；未开通时接口返回 400，窗口内映射成可读提示。
+- 设置项：联网搜索开关（默认开）、`max_keyword`（默认 3）、`force_search`（默认关）。
+- 不做：自建搜索/抓取 Provider、内置浏览器、深度爬虫、多轮检索策略。
+
+## 验收
+
+- 交互/动效/颜色/焦点见 [AGENT-SURFACE-CONTRACT.md](../AGENT-SURFACE-CONTRACT.md) §11 与 v0.3.0 回归报告；音频链路、上下文零音频、天气 3×2 由独立 verifier 用 CDP + 真实 release 复核。

@@ -1,17 +1,88 @@
 /*
- * Agent 面板用到的关键帧。
- * 时长/曲线全部由 TS 里的 motionTokens 通过内联 animation 提供，这里只定义形状。
- * 动画元素都带 data-wtsl-agent-animated，在“减少动态效果”下统一关掉。
+ * Agent 浮空界面（契约 docs/AGENT-SURFACE-CONTRACT.md §1/§3）。
+ *
+ * 这里只定义“形状 / 层级 / 关键帧”：尺寸、圆角、描边、阴影全部取 Fluent CSS 变量；
+ * 动效时长与曲线由 TS 的 motionTokens 通过内联 transition / animation 注入，
+ * 不在 CSS 里另写一套常量。舞台切换只改宽高，位置（right/bottom）与圆角不变。
+ *
+ * 减少动态效果（契约 §3）：连续动画（声纹 / shimmer / 脉冲）全部停掉；
+ * 入场只保留 120ms opacity（.wtsl-agent-enter）。
  */
+
+.wtsl-agent-surface {
+  position: fixed;
+  right: var(--spacingHorizontalXL);
+  bottom: var(--spacingVerticalXL);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 1px solid var(--colorNeutralStroke1);
+  border-radius: var(--wtsl-card-radius, 12px);
+  background-color: var(--colorNeutralBackground1);
+  box-shadow: var(--shadow8);
+  color: var(--colorNeutralForeground1);
+  font-family: var(--fontFamilyBase);
+  /* 只过渡宽高 / 描边 / 阴影：不做位移与模糊往返（MOTION §5.1） */
+  transition-property: width, height, border-color, box-shadow;
+}
+
+/* 半高输入窗 / 全高浮栏：只变宽高，圆角恒 12 */
+.wtsl-agent-surface[data-stage='composer'],
+.wtsl-agent-surface[data-stage='chat'] {
+  width: min(420px, 92vw);
+  border-color: var(--colorNeutralStroke2);
+  box-shadow: var(--shadow16);
+}
+
+.wtsl-agent-surface[data-stage='composer'] {
+  height: clamp(320px, 44vh, 440px);
+}
+
+.wtsl-agent-surface[data-stage='chat'] {
+  height: calc(100vh - 40px);
+}
+
+/* 悬停只对鼠标生效：surface hover + shadow16，不做 hover 缩放（契约 §3） */
+@media (hover: hover) {
+  .wtsl-agent-surface[data-stage='collapsed']:hover {
+    box-shadow: var(--shadow16);
+  }
+}
+
+/* 屏幕阅读器专用的状态文本（界面上不写“正在聆听/转写结果”等解释文字，契约 §5/§6） */
+.wtsl-agent-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 @keyframes wtsl-agent-fade-rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
+  }
+}
+
+@keyframes wtsl-agent-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -29,7 +100,7 @@
 @keyframes wtsl-agent-wave {
   0%,
   100% {
-    transform: scaleY(0.28);
+    transform: scaleY(0.32);
   }
   50% {
     transform: scaleY(1);
@@ -40,7 +111,7 @@
   0%,
   100% {
     opacity: 0.55;
-    transform: scale(0.96);
+    transform: scale(0.92);
   }
   50% {
     opacity: 1;
@@ -48,8 +119,57 @@
   }
 }
 
+@keyframes wtsl-agent-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* 转写未回时的骨架条：中性色微光，不是发光渐变装饰（契约 §6） */
+.wtsl-agent-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--colorNeutralBackground3) 0%,
+    var(--colorNeutralBackground4) 50%,
+    var(--colorNeutralBackground3) 100%
+  );
+  background-size: 200% 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* 连续动画（声纹 / shimmer / 脉冲 / 光标）全部停掉 */
   [data-wtsl-agent-animated='true'] {
     animation: none !important;
+  }
+
+  /* 入场只保留 120ms opacity，无位移、无尺寸/阴影动画（契约 §3） */
+  .wtsl-agent-enter {
+    animation-name: wtsl-agent-fade !important;
+    animation-duration: 120ms !important;
+    animation-delay: 0ms !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: 1 !important;
+    animation-fill-mode: both !important;
+  }
+
+  .wtsl-agent-surface {
+    transition-duration: 0ms !important;
+  }
+
+  /* 声纹竖条不做高度过渡（减少动态效果下“声纹/脉冲不动”，契约 §3） */
+  .wtsl-agent-wave-bar {
+    transition: none !important;
+  }
+
+  /* 入口按压不做缩放，只保留颜色 / 淡入淡出 */
+  .wtsl-agent-entry {
+    transition-duration: 0ms !important;
+  }
+
+  .wtsl-agent-entry:active {
+    transform: none !important;
   }
 }

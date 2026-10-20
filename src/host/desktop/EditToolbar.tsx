@@ -17,6 +17,7 @@ import {
   ChevronLeft20Regular,
   ChevronRight20Regular,
   Delete20Regular,
+  Settings20Regular,
 } from '@fluentui/react-icons';
 import { useStyles } from './desktop.styles';
 
@@ -29,6 +30,8 @@ interface EditToolbarProps {
   onMovePage(from: number, to: number): void;
   /** 打开「添加组件」Dialog（已从桌面移除的组件在这里恢复） */
   onAddWidget(): void;
+  /** 打开设置页（v0.3.0 起桌面 dock 删除后的触控入口，Ctrl+, 是键盘入口） */
+  onOpenSettings(): void;
   onDone(): void;
 }
 
@@ -40,6 +43,7 @@ export function EditToolbar({
   onRemovePage,
   onMovePage,
   onAddWidget,
+  onOpenSettings,
   onDone,
 }: EditToolbarProps) {
   const styles = useStyles();
@@ -105,6 +109,14 @@ export function EditToolbar({
         onClick={onAddWidget}
       >
         添加组件
+      </Button>
+      <Button
+        size="large"
+        appearance="secondary"
+        icon={<Settings20Regular />}
+        onClick={onOpenSettings}
+      >
+        设置
       </Button>
       <Button size="large" appearance="primary" icon={<Checkmark20Regular />} onClick={onDone}>
         完成

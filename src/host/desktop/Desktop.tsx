@@ -85,6 +85,8 @@ export interface DesktopProps {
   layoutResetRequest?: number;
   /** 编辑模式「设置」/ Enter：交给 App 导航到设置页对应插件分区 */
   onOpenPluginSettings?: (pluginId: string) => void;
+  /** 编辑模式「设置」按钮：交给 App 打开设置页（v0.3.0 桌面 dock 删除后的触控入口） */
+  onOpenSettings?: () => void;
   /**
    * 当前生效的亮暗模式（App 解析后的 colorScheme）。FluentProvider 换主题时只更新
    * CSS 变量、provider 的 className 不变，桌面层必须靠这个值重新读取 token 并下发给
@@ -281,6 +283,7 @@ export default function Desktop({
   editModeRequest,
   layoutResetRequest,
   onOpenPluginSettings,
+  onOpenSettings,
   colorScheme,
 }: DesktopProps) {
   const styles = useStyles();
@@ -1250,6 +1253,7 @@ export default function Desktop({
           onRemovePage={handleRemovePage}
           onMovePage={handleMovePage}
           onAddWidget={() => setAddWidgetOpen(true)}
+          onOpenSettings={onOpenSettings ?? noop}
           onDone={exitEditMode}
         />
       )}

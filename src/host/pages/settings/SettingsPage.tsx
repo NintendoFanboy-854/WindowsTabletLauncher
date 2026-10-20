@@ -57,7 +57,6 @@ export type SettingsSection =
   | 'appearance'
   | 'shortcuts'
   | 'plugins'
-  | 'agent'
   | 'about';
 
 export interface SettingsPageProps {
@@ -67,7 +66,7 @@ export interface SettingsPageProps {
   /** 当前主题偏好（跟随系统 / 深色 / 亮色）；不传表示 App 层还没接管主题 */
   themeMode?: ThemeMode;
   onThemeModeChange?: (mode: ThemeMode) => void;
-  /** Agent 面板入口；不传则显示“D 阶段接入” */
+  /** Agent 浮空入口：受控打开 chat（不传时入口组里的按钮为禁用态） */
   onOpenAgent?: () => void;
   /** 插件请求设置时直接选中的插件分区（plugin:request-host-settings） */
   initialPluginId?: string | null;
@@ -82,6 +81,7 @@ export interface SettingsPageProps {
 type AutostartState = 'loading' | 'enabled' | 'disabled' | 'unsupported' | 'error';
 
 const SHORTCUTS: { keys: string; action: string; scope: string }[] = [
+  { keys: 'Ctrl + ,', action: '打开设置页', scope: '全局' },
   { keys: 'Ctrl + Shift + H', action: '隐藏 / 显示桌面层', scope: '全局' },
   { keys: 'Ctrl + Q', action: '退出应用', scope: '全局' },
   { keys: 'Esc', action: '退出编辑模式 / 返回桌面', scope: '桌面 / 页面' },
@@ -95,7 +95,6 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
   appearance: '外观',
   shortcuts: '快捷键',
   plugins: '插件',
-  agent: 'Agent',
   about: '关于',
 };
 
@@ -152,6 +151,12 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXXL,
     minWidth: 0,
     paddingTop: tokens.spacingVerticalXS,
+  },
+  main: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXL,
+    minWidth: 0,
   },
   group: {
     display: 'grid',
@@ -543,14 +548,25 @@ export function SettingsPage({
     </>
   );
 
-  const renderAgent = () => (
-    <SettingsGroup title="Agent" hint="模型、语音与工具调度在 Agent 模块里配置（D 阶段）。">
+  /** 顶部「入口」组：桌面 dock 删除后，三个常用入口收敛到这里（设置自身由 Ctrl+, / 编辑工具栏进入） */
+  const renderEntry = () => (
+    <SettingsGroup title="入口" hint="桌面上不再常驻入口按钮；常用页面从这里打开。">
       <SettingsRow
-        label="Agent 面板"
-        description={onOpenAgent ? '对话与工具调用入口' : 'D 阶段接入，接线后可从桌面或这里打开'}
+        label="Agent"
+        description={onOpenAgent ? '对话、语音与工具调用' : '当前实例未接线'}
       >
         <Button appearance="primary" size="large" disabled={!onOpenAgent} onClick={onOpenAgent}>
           打开 Agent
+        </Button>
+      </SettingsRow>
+      <SettingsRow label="复盘" description="查看使用记录与回顾">
+        <Button appearance="secondary" size="large" onClick={() => onNavigate('review')}>
+          打开复盘
+        </Button>
+      </SettingsRow>
+      <SettingsRow label="插件管理" description="安装、启用与配置插件">
+        <Button appearance="secondary" size="large" onClick={() => onNavigate('plugins')}>
+          管理插件
         </Button>
       </SettingsRow>
     </SettingsGroup>
@@ -583,7 +599,6 @@ export function SettingsPage({
     appearance: renderAppearance,
     shortcuts: renderShortcuts,
     plugins: renderPlugins,
-    agent: renderAgent,
     about: renderAbout,
   };
 
@@ -597,11 +612,6 @@ export function SettingsPage({
       title="设置"
       subtitle="启动行为、外观、快捷键与插件设置"
       onBack={onBack}
-      actions={
-        <Button appearance="secondary" size="large" onClick={() => onNavigate('review')}>
-          复盘
-        </Button>
-      }
       maxContentWidth="1040px"
     >
       <div className={wide ? styles.layout : mergeClasses(styles.layout, styles.layoutNarrow)}>
@@ -648,9 +658,14 @@ export function SettingsPage({
           )}
         </nav>
 
-        <ContentTransition className={styles.content} viewKey={contentKey}>
-          {view.kind === 'section' ? sections[view.section]() : renderPluginSettings(view.pluginId)}
-        </ContentTransition>
+        <div className={styles.main}>
+          {renderEntry()}
+          <ContentTransition className={styles.content} viewKey={contentKey}>
+            {view.kind === 'section'
+              ? sections[view.section]()
+              : renderPluginSettings(view.pluginId)}
+          </ContentTransition>
+        </div>
       </div>
     </PageScaffold>
   );

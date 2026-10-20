@@ -1,5 +1,9 @@
 /**
- * 单条消息：用户气泡 / Agent 回答卡片（含工具卡片、思考过程、来源、朗读按钮）。
+ * 单条消息：用户气泡 / Agent 回答卡片（工具卡片、思考过程、来源、单条朗读）。
+ *
+ * 契约 §6：语音消息与打字消息同形同色，顶部只多一条声纹装饰；转写未回时声纹轻微
+ * 起伏 + 两行 shimmer 骨架（不写文字标签），ASR 回填后文字淡入、声纹静止；转写失败
+ * 用警告图标 + tooltip 表达，不上屏解释文字。消息不再有头像：身份只由入口/头部承担。
  */
 
 import { useState } from 'react';
@@ -8,29 +12,28 @@ import {
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
-  Avatar,
   Button,
   Link,
   Text,
+  Tooltip,
   makeStyles,
   motionTokens,
   tokens,
 } from '@fluentui/react-components';
 import {
   AlertRegular,
-  BotRegular,
   ChevronDownRegular,
   ChevronUpRegular,
   GlobeRegular,
-  PersonRegular,
-  Speaker2Regular,
-  SpeakerMuteRegular,
+  SoundWaveCircleRegular,
+  StopRegular,
 } from '@fluentui/react-icons';
 import type { AgentSession } from '../hooks/useAgentSession';
 import type { Message } from '../types';
 import { stripSourceSection } from './markdown';
 import { MessageContent } from './MessageContent';
 import { ToolCallCard } from './ToolCallCard';
+import { VoicePeaks } from './Waveform';
 
 const useStyles = makeStyles({
   row: {
@@ -46,38 +49,80 @@ const useStyles = makeStyles({
   column: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
+    gap: tokens.spacingVerticalXXS,
     minWidth: 0,
-    maxWidth: '92%',
+    flex: 1,
   },
   userColumn: {
     alignItems: 'flex-end',
+    flex: '0 1 auto',
+    maxWidth: '86%',
   },
   bubble: {
     borderRadius: tokens.borderRadiusXLarge,
     paddingInline: tokens.spacingHorizontalM,
     paddingBlock: tokens.spacingVerticalS,
     minWidth: 0,
+    maxWidth: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
   },
   userBubble: {
     backgroundColor: tokens.colorBrandBackground2,
     color: tokens.colorNeutralForeground1,
-    borderStartEndRadius: tokens.borderRadiusSmall,
   },
   assistantBubble: {
     // DENSITY：分组靠留白/背景层级，不用 1px 分割线
     backgroundColor: tokens.colorNeutralBackground2,
-    borderStartStartRadius: tokens.borderRadiusSmall,
+  },
+  plainVoiceRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+  },
+  shimmerBlock: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalS,
+    gap: tokens.spacingVerticalXS,
+    width: '100%',
+    minWidth: '140px',
+  },
+  shimmerLine: {
+    display: 'block',
+    height: '10px',
+    borderRadius: tokens.borderRadiusCircular,
+  },
+  shimmerWide: {
+    width: '86%',
+  },
+  shimmerNarrow: {
+    width: '52%',
+  },
+  contentFade: {
+    minWidth: 0,
+    overflowWrap: 'anywhere',
   },
   statusRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
+    minHeight: '24px',
     color: tokens.colorNeutralForeground3,
     paddingInline: tokens.spacingHorizontalXS,
+  },
+  meta: {
+    color: tokens.colorNeutralForeground3,
+  },
+  speakingButton: {
+    color: tokens.colorBrandForeground1,
+  },
+  playButton: {
+    // 非播放态也要看得见：fg2 而不是和元信息一样的 fg3
+    color: tokens.colorNeutralForeground2,
+  },
+  errorIcon: {
+    color: tokens.colorPaletteRedForeground1,
   },
   caret: {
     display: 'inline-block',
@@ -109,27 +154,19 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     flexShrink: 0,
   },
-  sourcesFooter: {
-    color: tokens.colorNeutralForeground3,
-    textAlign: 'end',
-  },
   reasoning: {
     color: tokens.colorNeutralForeground2,
     fontSize: tokens.fontSizeBase200,
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
   },
-  avatarUser: {
-    backgroundColor: tokens.colorNeutralBackground3,
-  },
-  avatarAgent: {
-    backgroundColor: tokens.colorBrandBackground2,
-    color: tokens.colorNeutralForeground1,
-  },
 });
 
 /** 来源 chips 首屏上限（docs/DENSITY.md · Agent：最多 3 条，其余折叠） */
 const SOURCE_CHIP_LIMIT = 3;
+/** 气泡 20ms 错峰（契约 §3），长会话只让最后几屏有错峰感 */
+const STAGGER_MS = 20;
+const STAGGER_CAP = 9;
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -137,46 +174,55 @@ function formatTime(iso: string): string {
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(total / 60);
+  return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+}
+
 export interface MessageBubbleProps {
   message: Message;
   session: AgentSession;
   /** 是否展示“思考过程”折叠区 */
   showReasoning: boolean;
+  /** 列表内序号：用于气泡 20ms 错峰 */
+  index: number;
 }
 
-export function MessageBubble({ message, session, showReasoning }: MessageBubbleProps) {
+export function MessageBubble({ message, session, showReasoning, index }: MessageBubbleProps) {
   const styles = useStyles();
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const sources = message.sources ?? [];
   const visibleSources = sourcesExpanded ? sources : sources.slice(0, SOURCE_CHIP_LIMIT);
   const hiddenSourceCount = sources.length - visibleSources.length;
-  // 来源只保留 chips：有 annotations 时去掉正文末尾的“来源：”清单
-  const displayContent = sources.length ? stripSourceSection(message.content) : message.content;
   const isUser = message.role === 'user';
+  const isVoice = isUser && message.input === 'voice';
+  const transcriptPending = isVoice && message.transcriptStatus === 'pending';
+  const transcriptFailed = isVoice && message.transcriptStatus === 'failed';
   const isStreaming = message.status === 'streaming';
   const speaking = session.speakingMessageId === message.id;
   const canSpeak =
     message.role === 'assistant' && message.status === 'done' && Boolean(message.content.trim());
+  // 来源只保留 chips：有 annotations 时去掉正文末尾的“来源：”清单
+  const displayContent = sources.length ? stripSourceSection(message.content) : message.content;
+  const spokenLabel = isVoice
+    ? `语音消息：${message.content || (transcriptFailed ? '未识别出文字' : '正在识别')}`
+    : undefined;
 
   return (
     <div
-      className={`${styles.row} ${isUser ? styles.userRow : ''}`}
-      data-wtsl-agent-animated="true"
+      className={`${styles.row} ${isUser ? styles.userRow : ''} wtsl-agent-enter`}
       style={{
         animationName: 'wtsl-agent-fade-rise',
-        animationDuration: `${motionTokens.durationNormal}ms`,
+        animationDuration: `${motionTokens.durationFast}ms`,
         animationTimingFunction: motionTokens.curveDecelerateMid,
+        animationDelay: `${Math.min(index, STAGGER_CAP) * STAGGER_MS}ms`,
+        animationFillMode: 'both',
       }}
+      aria-label={spokenLabel}
     >
-      <Avatar
-        size={28}
-        icon={isUser ? <PersonRegular /> : <BotRegular />}
-        className={isUser ? styles.avatarUser : styles.avatarAgent}
-      />
       <div className={`${styles.column} ${isUser ? styles.userColumn : ''}`}>
-        <div
-          className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}
-        >
+        <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}>
           {message.toolCalls?.map((record) => (
             <ToolCallCard key={record.id} record={record} />
           ))}
@@ -194,7 +240,62 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
             </Accordion>
           ) : null}
 
-          {displayContent ? <MessageContent text={displayContent} /> : null}
+          {isVoice ? (
+            <VoicePeaks
+              peaks={message.voicePeaks}
+              pending={transcriptPending}
+              failed={transcriptFailed}
+            />
+          ) : null}
+
+          {transcriptPending ? (
+            <div className={styles.shimmerBlock} aria-hidden="true">
+              <span
+                className={`${styles.shimmerLine} ${styles.shimmerWide} wtsl-agent-shimmer`}
+                data-wtsl-agent-animated="true"
+                style={{
+                  animationName: 'wtsl-agent-shimmer',
+                  animationDuration: `${motionTokens.durationSlower}ms`,
+                  animationTimingFunction: motionTokens.curveLinear,
+                  animationIterationCount: 'infinite',
+                }}
+              />
+              <span
+                className={`${styles.shimmerLine} ${styles.shimmerNarrow} wtsl-agent-shimmer`}
+                data-wtsl-agent-animated="true"
+                style={{
+                  animationName: 'wtsl-agent-shimmer',
+                  animationDuration: `${motionTokens.durationSlower}ms`,
+                  animationTimingFunction: motionTokens.curveLinear,
+                  animationIterationCount: 'infinite',
+                }}
+              />
+            </div>
+          ) : displayContent ? (
+            <div
+              className={`${styles.contentFade} wtsl-agent-enter`}
+              style={{
+                animationName: 'wtsl-agent-fade',
+                animationDuration: `${motionTokens.durationFast}ms`,
+                animationTimingFunction: motionTokens.curveDecelerateMid,
+                animationFillMode: 'both',
+              }}
+            >
+              <MessageContent text={displayContent} />
+            </div>
+          ) : null}
+
+          {transcriptFailed ? (
+            <div className={styles.plainVoiceRow}>
+              <Tooltip content="没有识别出文字" relationship="label">
+                <AlertRegular
+                  className={styles.errorIcon}
+                  aria-label="没有识别出文字"
+                  fontSize={16}
+                />
+              </Tooltip>
+            </div>
+          ) : null}
 
           {isStreaming ? (
             <span
@@ -213,9 +314,6 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
 
           {sources.length ? (
             <div className={styles.sources}>
-              <Text size={200} weight="semibold">
-                来源
-              </Text>
               {visibleSources.map((source) => (
                 <Link
                   key={source.url}
@@ -225,7 +323,7 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
                   className={styles.sourceChip}
                   title={source.summary ?? source.url}
                 >
-                  <GlobeRegular />
+                  <GlobeRegular fontSize={16} />
                   <Text size={200} truncate className={styles.sourceTitle}>
                     {source.title || source.url}
                   </Text>
@@ -243,37 +341,48 @@ export function MessageBubble({ message, session, showReasoning }: MessageBubble
                   icon={sourcesExpanded ? <ChevronUpRegular /> : <ChevronDownRegular />}
                   onClick={() => setSourcesExpanded((previous) => !previous)}
                 >
-                  {sourcesExpanded ? '收起来源' : `还有 ${hiddenSourceCount} 条来源`}
+                  {sourcesExpanded ? '收起' : `还有 ${hiddenSourceCount} 条`}
                 </Button>
-              ) : null}
-              {message.webSearchUsage ? (
-                <Text size={100} className={styles.sourcesFooter}>
-                  联网搜索 · {message.webSearchUsage.toolUsage} 次检索 /{' '}
-                  {message.webSearchUsage.pageUsage} 个页面
-                </Text>
               ) : null}
             </div>
           ) : null}
         </div>
 
         <div className={styles.statusRow}>
-          <Text size={100}>{formatTime(message.createdAt)}</Text>
-          {message.status === 'aborted' ? <Text size={100}>已停止生成</Text> : null}
+          <Text size={200}>{formatTime(message.createdAt)}</Text>
+          {isVoice && message.voiceDurationSec ? (
+            <Text size={200} className={styles.meta}>
+              {formatDuration(message.voiceDurationSec)}
+            </Text>
+          ) : null}
+          {message.status === 'aborted' ? (
+            <Tooltip content="已停止" relationship="label">
+              <StopRegular aria-label="已停止" fontSize={12} />
+            </Tooltip>
+          ) : null}
           {message.status === 'error' ? (
-            <>
-              <AlertRegular />
-              <Text size={100}>生成失败</Text>
-            </>
+            <Tooltip content="生成失败" relationship="label">
+              <AlertRegular className={styles.errorIcon} aria-label="生成失败" fontSize={12} />
+            </Tooltip>
           ) : null}
           {canSpeak ? (
-            <Button
-              size="large"
-              appearance="subtle"
-              icon={speaking ? <SpeakerMuteRegular /> : <Speaker2Regular />}
-              aria-label={speaking ? '停止朗读这条回答' : '朗读这条回答'}
-              title={speaking ? '停止朗读' : '朗读'}
-              onClick={() => session.speakMessage(message.id)}
-            />
+            <Tooltip content={speaking ? '停止朗读' : '朗读'} relationship="label">
+              <Button
+                size="large"
+                appearance="subtle"
+                className={speaking ? styles.speakingButton : styles.playButton}
+                icon={speaking ? <StopRegular /> : <SoundWaveCircleRegular />}
+                data-wtsl-agent-animated={speaking ? 'true' : undefined}
+                style={{
+                  animationName: speaking ? 'wtsl-agent-pulse' : undefined,
+                  animationDuration: `${motionTokens.durationSlow}ms`,
+                  animationTimingFunction: motionTokens.curveEasyEase,
+                  animationIterationCount: speaking ? 'infinite' : undefined,
+                }}
+                aria-label={speaking ? '停止朗读' : '朗读这条回答'}
+                onClick={() => session.speakMessage(message.id)}
+              />
+            </Tooltip>
           ) : null}
         </div>
       </div>

@@ -4,30 +4,27 @@
  * 宿主接线只需要：
  *   import { AgentSurface } from './agent';
  *   <AgentSurface />
- * 需要自己控制入口时使用受控属性 `open / onOpenChange / mode / onModeChange`，
- * 或者直接用 `useAgentSession` + `AgentPanel` 组装。
+ * 设置页想直接打开 chat 时用受控属性 `open / onOpenChange`；无桌面入口的实例传
+ * `hideEntry`。UI 只消费 `useAgentSession` 暴露的状态与动作（契约 §8）。
  */
 
-export { AgentSurface, type AgentSurfaceProps } from './ui/AgentSurface';
-export { AgentPanel, type AgentPanelProps } from './ui/AgentPanel';
-export { ConversationPane, type ConversationPaneProps } from './ui/ConversationPane';
-export { VoiceStage } from './ui/VoiceStage';
+export { AgentSurface } from './ui/AgentSurface';
+export type { AgentSurfaceProps } from './ui/AgentSurface';
 export { SettingsDialog } from './ui/SettingsDialog';
+export type { SurfaceStage } from './ui/types';
 
 export {
   useAgentSession,
   MAX_TOOL_ROUNDS,
-  type AgentSession,
-  type AgentSeed,
-  type UseAgentSessionOptions,
-  type TurnStatus,
-  type VoiceInteractionState,
-  type VoiceStage as VoiceStageName,
-  type AgentSessionError,
 } from './hooks/useAgentSession';
-export { useSettings } from './hooks/useSettings';
-export { useViewportWidth } from './hooks/useViewportWidth';
-export { useFaceState } from './hooks/useFaceState';
+export type {
+  AgentSession,
+  AgentSeed,
+  AgentSessionError,
+  AgentVoiceState,
+  TurnStatus,
+  UseAgentSessionOptions,
+} from './hooks/useAgentSession';
 
 export { MimoTransport, parseAnnotations, MimoWebSearchDisabledError } from './transport/real';
 export { MockTransport } from './transport/mock';
@@ -39,8 +36,9 @@ export {
   isMockRequestedByUrl,
   normalizeSettings,
   SETTINGS_STORAGE_KEY,
-  type SettingsPatch,
 } from './settings';
+export type { SettingsPatch } from './settings';
+
 export {
   loadConversations,
   saveConversations,
@@ -49,11 +47,7 @@ export {
   CONVERSATIONS_STORAGE_KEY,
 } from './storage';
 
-export { faceService, type FaceServiceState, type FaceStatus } from './face/faceService';
-
 export {
-  AGENT_PANEL_WIDTH,
-  SIDEBAR_MIN_WIDTH,
   DEFAULT_SETTINGS,
   MIMO_MODELS,
   MIMO_BASE_URL,
@@ -67,8 +61,9 @@ export type {
   AgentToolDecl,
   Conversation,
   Message,
+  MessageInput,
   MimoModel,
-  PanelMode,
   SourceRef,
   ToolCallRecord,
+  TranscriptStatus,
 } from './types';

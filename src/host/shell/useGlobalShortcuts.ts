@@ -4,6 +4,7 @@
  *   Rust 侧同时用 tauri-plugin-global-shortcut 注册了同一个系统级热键，
  *   所以窗口隐藏后按热键也能恢复（不依赖 WebView 焦点）。
  * - Ctrl+Q：退出应用（Rust `app_exit`）
+ * - Ctrl+,：打开设置页（v0.3.0 起桌面 dock 删除后设置的键盘主入口）
  * - Esc：交给上层（桌面层在编辑模式里自己要处理 Esc，App 只在非桌面页把 Esc 当“返回桌面”）
  *
  * 页面内再按一次 Ctrl+Shift+H 也生效（非全局路径），两者最终都落到同一个 Rust 命令。
@@ -16,6 +17,8 @@ import { appExit, isTauriRuntime, windowToggleVisible } from '../plugins/tauri';
 export interface GlobalShortcutHandlers {
   /** Esc（非输入框内） */
   onEscape?: () => void;
+  /** Ctrl+,：打开设置页 */
+  onOpenSettings?: () => void;
   /** 覆盖默认 Ctrl+Shift+H 行为 */
   onToggleVisibility?: () => void | Promise<void>;
   /** 覆盖默认 Ctrl+Q 行为 */
@@ -79,6 +82,12 @@ export function useGlobalShortcuts(handlers: GlobalShortcutHandlers = {}): void 
       if (event.defaultPrevented || event.isComposing) return;
 
       const ctrlOnly = event.ctrlKey && !event.altKey && !event.metaKey;
+      if (ctrlOnly && !event.shiftKey && event.key === ',') {
+        event.preventDefault();
+        latest.current.onOpenSettings?.();
+        return;
+      }
+
       if (ctrlOnly && !event.shiftKey && (event.key === 'q' || event.key === 'Q')) {
         event.preventDefault();
         const handlersNow = latest.current;

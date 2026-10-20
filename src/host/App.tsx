@@ -8,7 +8,7 @@
  * - 桌面层自己从全局单例拿 PluginManager / HostBridge。
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Button, FluentProvider, webDarkTheme, webLightTheme } from '@fluentui/react-components';
+import { FluentProvider, webDarkTheme, webLightTheme } from '@fluentui/react-components';
 
 import { getHostBridge } from './bridge';
 import type { HostBridge } from './bridge';
@@ -110,13 +110,6 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
     void syncAutostartOnStartup();
   }, []);
 
-  useGlobalShortcuts({
-    notify,
-    onEscape: () => {
-      if (page !== 'desktop') navigate('desktop');
-    },
-  });
-
   const back = useCallback(() => navigate('desktop'), [navigate]);
   const [agentOpen, setAgentOpen] = useState<boolean>(readAgentParam);
   const openAgent = useCallback(() => setAgentOpen(true), []);
@@ -136,6 +129,15 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
     },
     [navigate],
   );
+
+  useGlobalShortcuts({
+    notify,
+    onEscape: () => {
+      if (page !== 'desktop') navigate('desktop');
+    },
+    // Ctrl+,：从任何页面打开设置（v0.3.0 起桌面 dock 已删除，这是设置的主入口之一）
+    onOpenSettings: () => openSettings(),
+  });
 
   /** 「外观 → 编辑桌面布局」：回桌面并让桌面层进入编辑模式 */
   const [editModeRequest, setEditModeRequest] = useState(0);
@@ -217,45 +219,18 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
             editModeRequest={editModeRequest}
             layoutResetRequest={layoutResetRequest}
             onOpenPluginSettings={openSettings}
+            onOpenSettings={() => openSettings()}
           />
         </PageTransition>
       </div>
 
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
-      {page === 'desktop' && (
-        <DesktopDock
-          onOpenSettings={() => openSettings()}
-          onOpenAgent={openAgent}
-          navigate={navigate}
-        />
-      )}
-      <AgentSurface open={agentOpen} onOpenChange={setAgentOpen} hideFab />
-    </div>
-  );
-}
-
-interface DesktopDockProps {
-  navigate: (page: HostPage) => void;
-  onOpenSettings: () => void;
-  onOpenAgent: () => void;
-}
-
-/** 桌面右下入口：设置 / 复盘 / 插件 / Agent */
-function DesktopDock({ navigate, onOpenSettings, onOpenAgent }: DesktopDockProps) {
-  return (
-    <div className="desktop-dock" role="toolbar" aria-label="桌面入口">
-      <Button size="small" appearance="subtle" onClick={onOpenAgent}>
-        Agent
-      </Button>
-      <Button size="small" appearance="subtle" onClick={() => navigate('review')}>
-        复盘
-      </Button>
-      <Button size="small" appearance="subtle" onClick={() => navigate('plugins')}>
-        插件
-      </Button>
-      <Button size="small" appearance="subtle" onClick={onOpenSettings}>
-        设置
-      </Button>
+      {/* Agent 只有浮空形态：桌面页显示右下角入口按钮，其它页面由设置页「入口」打开 chat */}
+      <AgentSurface
+        open={agentOpen}
+        onOpenChange={setAgentOpen}
+        hideEntry={page !== 'desktop'}
+      />
     </div>
   );
 }

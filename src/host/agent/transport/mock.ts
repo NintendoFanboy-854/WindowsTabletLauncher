@@ -1,9 +1,11 @@
 /**
  * 离线 Mock 传输层：`?mock=1` 时用示例数据验证完整 UI 流程
- * （流式回复、原生联网搜索来源 chips、工具调用卡片、语音状态机、连续朗读）。
+ * （流式回复、原生联网搜索来源 chips、工具调用卡片、语音状态机、单条播报）。
  *
  * 它只模拟传输层：插件工具走 mock 的 listPluginTools/callPluginTool；
  * 联网搜索模拟 MiMo 原生 web_search 的 annotations / usage 事件，因此来源 chips 是真流程。
+ * 语音：chat 请求的 content parts 里忽略 input_audio、返回固定回答；transcribe 返回固定文字；
+ * synthesize 产出静音 PCM，只驱动播放状态机（不产生真实声音）。
  */
 
 import type {
@@ -54,12 +56,21 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
-function lastUserText(messages: ChatRequestMessage[]): string {
+function lastUserContent(messages: ChatRequestMessage[]): { text: string; hasAudio: boolean } {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (message.role === 'user') return message.content;
+    if (message.role !== 'user') continue;
+    if (typeof message.content === 'string') return { text: message.content, hasAudio: false };
+    // 本轮语音：mock 不解码音频，只把它当“用户在说话”的信号，并拼出 text part 备用
+    let text = '';
+    let hasAudio = false;
+    for (const part of message.content) {
+      if (part.type === 'text') text += part.text;
+      else if (part.type === 'input_audio') hasAudio = true;
+    }
+    return { text, hasAudio };
   }
-  return '';
+  return { text: '', hasAudio: false };
 }
 
 function lastToolOutcome(messages: ChatRequestMessage[]): {
@@ -162,7 +173,7 @@ export class MockTransport implements AgentTransport {
     onEvent: (event: ModelStreamEvent) => void,
   ): Promise<void> {
     const { signal } = request;
-    const userText = lastUserText(request.messages);
+    const { text: userText, hasAudio } = lastUserContent(request.messages);
     const available = new Set(request.tools.map((tool) => tool.function.name));
     const previousTool = lastToolOutcome(request.messages);
 
@@ -173,6 +184,19 @@ export class MockTransport implements AgentTransport {
         await sleep(12, signal);
         onEvent({ type: 'reasoning', text: chunk });
       }
+    }
+
+    // 语音轮次（本轮请求带 input_audio）：mock 不解码音频，返回固定回答，
+    // 保证 mock 下“录音 → 停止 → 转写 → 回答 → 自动播报”整条链路可测。
+    if (hasAudio) {
+      const voiceAnswer =
+        '我听到你的语音了，今天的待办有两件：给客户回邮件、整理周三评审材料。需要的话我可以帮你启动一个番茄钟。';
+      for (const chunk of chunkText(voiceAnswer)) {
+        await sleep(14, signal);
+        onEvent({ type: 'content', text: chunk });
+      }
+      onEvent({ type: 'finish', reason: 'stop' });
+      return;
     }
 
     // 第二轮：已经有插件工具结果，生成最终回答
@@ -261,6 +285,7 @@ export class MockTransport implements AgentTransport {
   }
 
   async transcribe(_wav: Blob, options: ToolRunOptions): Promise<string> {
+    // 固定转写文本，保证 mock 语音链路完整可测（WAV 参数在 mock 下不读取）
     await sleep(650, options.signal);
     return '帮我看看今天的待办';
   }

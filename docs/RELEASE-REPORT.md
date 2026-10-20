@@ -1,16 +1,17 @@
-# 发布验证报告（v0.2.2）
+# 发布验证报告（v0.3.0）
 
 > 生成时间：2026-10-20（+08:00）
-> 代码提交：`fb5ab5f`（v0.2.0 发布收尾）；v0.2.1 安装包热修见 §10；v0.2.2 交互/定位热修见 §11（实现提交 `348587c`）
-> 分支：`main`；版本：`0.2.2`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
+> 代码提交：v0.3.0 发布提交（见 `git log -1`）；v0.2.1 热修见 §10；v0.2.2 交互/定位热修见 §11；v0.3.0 语音优先重构见 §12
+> 分支：`main`；版本：`0.3.0`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
-> 证据根：`shots/e7/`、`shots/v022-final/`（本报告所有路径相对仓库根）；逐项矩阵见 `shots/e7/REPORT.md`、`shots/v022-final/REPORT.md`
+> 证据根：`shots/e7/`、`shots/v022-final/`、`shots/v030-dev/`（Phase 1）、`shots/v030-final/`（Phase 2）；逐项矩阵见 `shots/e7/REPORT.md`、`shots/v022-final/REPORT.md`、`shots/v030-dev/REPORT.md`
 
 ## 0. 结论
 
-**可发布**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（E7 回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。Tauri debug 真窗口已重跑（§2.2），release 安装包已产出 MSI + NSIS（§2.3）。
-**v0.2.1 热修（2026-10-20）**：v0.2.0 安装包首次运行桌面卡在「正在加载桌面」——内置插件种子逻辑把构建期压缩字节原样写盘 + 忽略 AssetKey 前导 `/`，导致插件 manifest 全部非法、插件列表为空。已修复并用真实 release exe + CDP 复验 6 卡正常（§10）。
-**v0.2.2 热修（2026-10-20）**：修复用户实测 4 个问题——天气定位成功不应用到 widget、尺寸菜单失败项仍打勾、无添加组件入口、删除后插件页仍只显示已启用。独立回归 A/B/C/C.6 全 PASS（0 P0/P1），真实 release exe + WebView2 CDP 复验见 §11。
+**v0.3.0 可发布（Phase 1 绿，Phase 2 release 验证见 §12.5）**：Agent 改为右下角浮空三段界面（点按/空格立即录音）；语音本轮原生音频只发一次、ASR 回填文字入库、上下文零音频；人脸/全屏/dock/机器人全部移除；设置入口收进设置页；天气 3×2 三带式重排 + 横向空洞门禁。Phase 1 dev 全绿（Agent surface 107/108，1 项 TEST；既有四套脚本全 PASS；真实 MiMo 音频冒烟 5/5），P1/P2 两个产品 bug 修复后复测 PASS。
+
+**历史结论**：v0.2.0 E0–E7 全部完成（P0=0、P1=0）；v0.2.1 修复安装包首次运行卡「正在加载桌面」（§10）；v0.2.2 修复天气定位/尺寸菜单/添加组件/删除持久化四个问题（§11）。
+
 
 ## 1. 阶段与关键 commit
 
@@ -345,3 +346,79 @@ npx tauri build                    # release + 安装包
 
 - **P2 打包内嵌 `secrets.json`**：`public/secrets.json` 会进入 `dist` 与安装包，安装包携带本机和风天气 Key（个人自用可接受；若对外分发需在构建时排除或改为运行时录入）。证据 `shots/v022-final/release/secrets-embed.json`（仅状态，不含 Key 明文）。
 - 真实 Windows Geolocator（系统定位）权限路径未单独验证；本轮真实定位走 ip.cn 成功。QWeather 真实网络链路已在 headless C.6 与真实 release exe 两处验证。
+
+## 12. v0.3.0 语音优先重构（2026-10-20）
+
+### 12.0 范围与决策
+
+- D-20：Agent 只有浮空形态，右下角 56×56 入口 → 半高输入窗（420×clamp(320,44vh,440)）→ 全高浮栏（420×calc(100vh-40px)）；点按/空格**立即录音**；Esc 退一级/⌄ 收起/X 关闭；发送是唯一自动升级。
+- D-21：本轮语音以 `input_audio` 原生发 MiMo 对话（只此一次）；同一 WAV 并行送 MiMo ASR 回填文字入库；音频用完即弃，后续轮次/重试/重启只发文字；语音消息用声纹 + shimmer 表达，不写「语音/转写结果」文字。
+- D-22：删除人脸/全屏/dock/机器人；设置入口 = 长按桌面空白进编辑工具栏「设置」 + `Ctrl+,`；四个入口收进设置页。
+- 天气：3×2 三带式（当前簇 + 今日指标 + 全宽逐时 6 列），补横向空洞/内容带/Secondary 门禁；4×2 不改。
+
+### 12.1 Phase 1：Agent 浮空界面 E2E（dev server，mock + 假麦克风）
+
+证据：`shots/v030-dev/REPORT.md`、`run8.log`、`agent-surface-results.json`、`p1p2-retest.json`、`p1p2-retest.log`、截图 12 张。
+
+| 项 | 结果 |
+|---|---|
+| 入口 | 唯一 56×56、圆角 12、aria「开始语音提问」；无 dock / 机器人 / 头像 / 麦克风图标；console error 0；无横向溢出 |
+| 入口即录 | 单击入口 → composer morph + recording（无需第二下）；停止 → transcribing → chat |
+| 语音气泡 | aria「语音消息：帮我看看今天的待办」、24 桶声纹、转写文字；界面无「语音/转写」文字 |
+| 音频硬约束 | localStorage 无 `data:audio`/大段 base64；会话仅 voicePeaks 数字；mock fetch 0 个 `input_audio` |
+| 播报 | 语音提问自动播报（MutationObserver）；文字提问默认不播报；单条朗读开始/停止 PASS；播报中「停止朗读」存在 |
+| 三段尺寸/动效 | collapsed 56×56；composer 420×422.4（1440）/420×337.9（1024）；chat 420×920 / 420×728；圆角恒 12；过渡 300/300/250/200/250ms；reduced-motion 0ms + 仅 120ms opacity |
+| 语义/焦点 | Esc chat→composer→collapsed、焦点回入口；⌄/X/点外部/草稿保留；空格长按发送、<300ms 取消、输入框内不触发 |
+| 设置入口 | `Ctrl+,` / 编辑工具栏「设置」；设置页「入口」组三按钮；「打开 Agent」进入 chat；Agent 设置仅语音/模型/搜索 |
+| 最终结果 | **107/108 PASS，1 FAIL=TEST**（自动播报结束与 CDP 采样竞态；speaking 由观察器证明，单条停止另测 PASS） |
+
+### 12.2 Phase 1：两个产品 bug（Lead 修复后复测 PASS）
+
+| # | 现象 | 根因 | 修复 | 复测 |
+|---|---|---|---|---|
+| P1 | 空格 <300ms 取消后仍持续录音、麦克风 live | `AgentSurface` 的 keydown `.then` / `finishSpace` 用 React `sessionRef` 判 stage，getUserMedia 慢时读到旧 idle；hook `cancelRecording` 也读旧 `voiceRef` | hook 增加 `recordingCancelRequestedRef`、startRecording 成功后同步写 `voiceRef` 并支持 starting 阶段取消；AgentSurface 先处理 cancelled / 去掉 stale 判断 / blur 无条件 cancel | 1.8s/3.3s idle、无消息、mic tracks `audio:ended`（liveTracks=0） |
+| P2 | composer 点外部收起后焦点落 BODY | pointerdown 默认 focus 覆盖 effect focus | collapsed focus effect 改 rAF×2 + 60ms fallback | activeElement 0/120/300/600/1100ms 全为入口按钮 |
+
+### 12.3 Phase 1：真实 MiMo 音频冒烟与既有回归
+
+- `scripts/smoke-mimo-audio.mjs`（真实 api.xiaomimimo.com）**PASS 5/5**：TTS 流式 pcm16 3.84s / 3309ms → chat `input_audio` HTTP 200 / 6 内容块 / `prompt_tokens=73` / `audio_tokens=25`（≈3.84s×6.25，证明音频被摄入）→ ASR 回读与原句字符相似度 100% → 后续纯文字请求 200 且请求体 `input_audio=false`。
+- 既有脚本（`shots/v030-dev/existing-scripts.log`，全部 exit 0，每步后 edgeAfter=0）：
+  - `verify-plugin.mjs` 六插件全 PASS（clock/countdown/pomodoro/sedentary/todo/weather；各尺寸 + 宿主冒烟 + console 0）
+  - `verify-overlays.mjs` 六插件 detail 6/6 × 暗/亮（51/54s）
+  - `verify-plug-and-play.mjs` 12/12（176s）
+  - `verify-widgets.mjs` 25/25 × 暗/亮（112/113s）
+
+### 12.4 Phase 1：天气 3×2 三带式门禁
+
+证据：`shots/v030-dev/weather/`（3×2 dark/light + 2×2/4×2 对照）、`shots/v030-dev/existing-scripts.log`。
+
+| 项 | 1440 | 1024 |
+|---|---|---|
+| 内容单元横向最大空白 | **16px**（旧版 166px） | **12px** |
+| 上带分栏间距 | 16px | 12px |
+| 分栏空带 | 6.1% | 通过 |
+| 今日指标 | 3 项、占上带 56.9%、右缘 16px | 2 项、55%、右缘 16px |
+| Secondary 区块 | 3×2 = 2（= 2×2 + 1） | 同左 |
+| 裁切/省略号 | 0 | 0 |
+
+天气 2×2 已知 P2（空带 26.8%）沿用接受口径；4×2 本批未改。
+
+### 12.5 Phase 2：release exe + 安装包
+
+- release 构建：`npx tauri build` **exit 0**（2026-10-20 21:0x；beforeBuild tsc + vite 18.36s；cargo release 编译耗时约 13 分钟；NSIS/MSI bundling 完成）。
+- 产物（`src-tauri/target/release/`）：
+  | 产物 | 大小 | SHA-256 |
+  |---|---|---|
+  | `app.exe` | 12,163,584 B | `E540F13DAA31451ECD0B1A3CA49A2686E4509E25F7B4FC415737F97262AFB528` |
+  | NSIS `Windows Tablet Launcher_0.3.0_x64-setup.exe` | 3,927,851 B | `A786D075B4A7FA571E2D9C33DC66CB9AA7D8AB9E84D2A91E17290E3D4908294B` |
+  | MSI `Windows Tablet Launcher_0.3.0_x64_zh-CN.msi` | 5,136,384 B | `9888375AED02A506CE0C1C93D532CB02AE0270E6C115EEEFE86A99E261DD9D53` |
+- 体积相比 v0.2.2 明显下降（NSIS 8.56MB→3.93MB、MSI 9.72MB→5.14MB、exe 16.74MB→12.16MB），主要来自删除 `@vladmandic/face-api` 与 6.7MB 人脸模型。
+- **Phase 2 真窗口 CDP 验证未执行**：用户要求在关机前直接推送交付，故本轮只确认构建 exit 0 与产物落盘；`.seed-version=0.3.0` 升级重种、六卡/8 iframe/console 0、窗口尺寸、真实安装包语言等**留待下次启动补验**（验证方法同 v0.2.2，`shots/v030-final/` 尚未生成）。此项不阻塞本次代码推送，但发布说明需注明。
+
+### 12.6 已知风险 / 限制（v0.3.0）
+
+- 不做唤醒词/常驻监听/人脸（D-22）；全屏与 dock 已删除，设置入口为长按桌面空白 → 编辑工具栏「设置」或 `Ctrl+,`。
+- 语音链路真实浏览器内「录音→原生音频对话→出声播报」尚未在真窗口驱动（无头假麦克风只能验证状态机与请求体）；MiMo 音频格式/流式由 Node 冒烟与真实接口实证。
+- ASR 超时 30s；网络/配额影响 ASR/TTS；上下文只留文字，转写失败占位「（用户发来一段语音）」。
+- `public/secrets.json` 仍打进 `dist`/安装包（个人自用 P2；对外分发前应排除或改为运行时录入）。
+- 和风天气 Key/自动定位、联网搜索开通等沿用 v0.2.2 限制。

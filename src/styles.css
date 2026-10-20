@@ -60,47 +60,18 @@ body {
  * pomodoro.stats）的接收方，整棵卸载会让复盘页报“插件当前不在桌面”。
  * 绝对定位不占页面流；visibility 保留布局尺寸给桌面网格测量，也不会在页面
  * 淡入时透出来；inert / aria-hidden 由 App.tsx 控制。
- * right 跟随 Agent 侧栏让宽，和 .host-root 的 padding-right 对齐。
  */
 .host-desktop-layer {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  right: var(--wtsl-agent-panel-width, 0px);
+  right: 0;
 }
 
 .host-desktop-layer[data-active='false'] {
   visibility: hidden;
   pointer-events: none;
-}
-
-/*
- * 桌面右下入口：位置/间距/圆角/阴影全部走 Fluent token（V-20）。
- * 背景/描边不再自造 rgba fallback，主题 token 由 FluentProvider 提供。
- */
-.desktop-dock {
-  position: fixed;
-  right: var(--spacingHorizontalL);
-  bottom: var(--spacingVerticalL);
-  display: flex;
-  align-items: center;
-  gap: var(--spacingHorizontalXS);
-  padding: var(--spacingVerticalXS) var(--spacingHorizontalS);
-  border-radius: var(--borderRadiusXLarge);
-  background-color: var(--colorNeutralBackground1);
-  box-shadow: var(--shadow8);
-  z-index: 10;
-}
-
-/* ---------- Agent 侧栏让宽（AgentSurface 在 documentElement 上写变量与标记） ---------- */
-
-html[data-agent-panel='sidebar'] .host-root {
-  padding-right: var(--wtsl-agent-panel-width, 0px);
-}
-
-html[data-agent-panel='sidebar'] .desktop-dock {
-  right: calc(var(--spacingHorizontalL) + var(--wtsl-agent-panel-width, 0px));
 }
 
 /* ---------- 平板触控：Fluent 内建表单控件命中区 >=40（DESIGN 1.2 / AUDIT N-03） ---------- */

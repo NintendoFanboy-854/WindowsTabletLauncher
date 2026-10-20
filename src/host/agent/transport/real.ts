@@ -10,6 +10,9 @@
  * - 语音识别：同一个 `/chat/completions`，model = `mimo-v2.5-asr`，音频以 data URL 传入。
  * - 语音合成：同一个 endpoint，model = `mimo-v2.5-tts`，`audio.format = pcm16`，SSE 里读
  *   `choices[0].delta.audio.data`（base64，PCM16LE 24kHz）。
+ * - 原生音频理解：`mimo-v2.6-flash/pro` 的 chat 请求里，user 消息 content 可以是
+ *   `[{ type:'input_audio', input_audio:{ data:'data:audio/wav;base64,…' } }, { type:'text', … }]`。
+ *   只有“本轮语音”这一条会用数组，历史消息全部是 string（契约 §7：音频只上传一次）。
  * - 插件工具：走 HostBridge.callTool。
  */
 
@@ -159,6 +162,17 @@ function base64ToBytes(base64: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+/**
+ * WAV Blob → MiMo `input_audio` 需要的 data URL（`data:audio/wav;base64,…`）。
+ *
+ * 只返回字符串给“本轮语音”的请求用；调用方（会话层）负责用完即弃，
+ * 不写 localStorage、不存进 Message（契约 §7）。
+ */
+export async function wavToDataUrl(wav: Blob): Promise<string> {
+  const bytes = new Uint8Array(await wav.arrayBuffer());
+  return `data:audio/wav;base64,${bytesToBase64(bytes)}`;
 }
 
 /** 去掉 Markdown 语法，让 TTS 读起来自然 */
@@ -356,8 +370,7 @@ export class MimoTransport implements AgentTransport {
     const apiKey = this.apiKey();
     if (!apiKey) throw new Error('未配置 MiMo API Key：语音识别需要 MiMo Key');
 
-    const bytes = new Uint8Array(await wav.arrayBuffer());
-    const dataUrl = `data:audio/wav;base64,${bytesToBase64(bytes)}`;
+    const dataUrl = await wavToDataUrl(wav);
 
     const response = await fetch(`${this.baseUrl()}${CHAT_ENDPOINT}`, {
       method: 'POST',

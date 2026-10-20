@@ -157,9 +157,16 @@ export function fmtHumidity(percent) {
   return `${Math.round(Number(percent))}%`;
 }
 
-export function fmtPop(percent) {
+/** 降水概率数值：`30%`（卡片今日指标/逐时列用） */
+export function fmtPopPercent(percent) {
   if (percent == null || Number.isNaN(Number(percent))) return '';
-  return `降水 ${Math.round(Number(percent))}%`;
+  return `${Math.round(Number(percent))}%`;
+}
+
+/** 降水概率整句：`降水 30%`（详情等需要带标签处用） */
+export function fmtPop(percent) {
+  const value = fmtPopPercent(percent);
+  return value ? `降水 ${value}` : '';
 }
 
 export function fmtVisibility(meters) {

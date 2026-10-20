@@ -4,20 +4,13 @@
  * - --wtsl-material-blur：Fluent web 端没有 Acrylic token，卡片统一用这一处模糊值；
  * - --wtsl-card-radius：FLUENT2 §5 规定卡片 X-Large = 12px，而 Fluent v9 的
  *   borderRadiusXLarge 实际是 8px；项目值在 src/styles.css 定义，桌面卡片 /
- *   页面卡片 / 弹层统一引用它，避免同一产品出现多套圆角（AUDIT V-01/V-02）。
+ *   页面卡片 / 弹层 / Agent 浮空界面统一引用它，避免同一产品出现多套圆角。
  */
 :root {
   --wtsl-material-blur: 24px;
 }
 
 /*
- * AUDIT V-06：桌面 dock 的按钮是 Fluent size="small"（24px 高），平板触控目标
- * 应 ≥40×40（DESIGN §1.2）。dock 的 markup 在 App.tsx（不在桌面层写作用域），
- * 先在桌面层样式里把命中区域抬到 40×40；后续 App 侧改 size="large" 后可移除本段。
+ * v0.3.0：桌面 dock 已删除，Agent 入口改为右下角 56×56 浮空按钮
+ * （样式在 src/host/agent/ui/agent.css），这里不再保留 dock 的命中区覆盖。
  */
-.desktop-dock button {
-  min-width: 40px;
-  min-height: 40px;
-  padding-left: 12px;
-  padding-right: 12px;
-}

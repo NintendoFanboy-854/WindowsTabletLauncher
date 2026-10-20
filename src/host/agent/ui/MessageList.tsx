@@ -1,10 +1,18 @@
 /**
  * 消息列表：内部滚动，只有用户本来就停在底部时才自动跟随新内容。
+ *
+ * 空态只有 ChatSparkle 小标 + 少量可直接发送的建议（不写标题、不回显模型名）；
+ * 生成/工具调用只给不打断的进度指示，不写“正在生成…”这类解释文字（必要 aria 保留）。
  */
 
 import { useEffect, useRef, type ReactElement } from 'react';
-import { Button, Spinner, Text, Title2, makeStyles, tokens } from '@fluentui/react-components';
-import { BotRegular, SearchRegular, ClockRegular, CheckmarkCircleRegular } from '@fluentui/react-icons';
+import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components';
+import {
+  ChatSparkleRegular,
+  CheckmarkCircleRegular,
+  ClockRegular,
+  SearchRegular,
+} from '@fluentui/react-icons';
 import type { AgentSession } from '../hooks/useAgentSession';
 import { MessageBubble } from './MessageBubble';
 
@@ -25,19 +33,12 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: tokens.spacingVerticalM,
-    textAlign: 'center',
-    padding: tokens.spacingHorizontalXL,
-    maxWidth: '420px',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingHorizontalL,
+    maxWidth: '320px',
   },
-  emptyIcon: {
-    width: '48px',
-    height: '48px',
-    display: 'grid',
-    placeItems: 'center',
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: tokens.colorBrandBackground2,
-    color: tokens.colorNeutralForeground1,
+  emptyMark: {
+    color: tokens.colorBrandForeground1,
   },
   suggestions: {
     display: 'flex',
@@ -45,12 +46,15 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalS,
     width: '100%',
   },
-  streamingRow: {
+  suggestionButton: {
+    justifyContent: 'flex-start',
+  },
+  progressRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    color: tokens.colorNeutralForeground3,
     paddingInline: tokens.spacingHorizontalM,
+    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -71,8 +75,7 @@ export function MessageList({ session }: { session: AgentSession }) {
   const handleScroll = () => {
     const element = containerRef.current;
     if (!element) return;
-    stickToBottom.current =
-      element.scrollHeight - element.scrollTop - element.clientHeight < 96;
+    stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 96;
   };
 
   useEffect(() => {
@@ -85,19 +88,14 @@ export function MessageList({ session }: { session: AgentSession }) {
     <div className={styles.scroll} ref={containerRef} onScroll={handleScroll}>
       {messages.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <BotRegular fontSize={24} />
-          </div>
-          <Title2>桌面 Agent</Title2>
-          <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
-            直接说人话：查待办、开番茄钟、搜实时信息，我会调用插件工具完成。
-          </Text>
+          <ChatSparkleRegular fontSize={24} className={styles.emptyMark} aria-hidden="true" />
           <div className={styles.suggestions}>
             {SUGGESTIONS.map((suggestion) => (
               <Button
                 key={suggestion.text}
                 appearance="outline"
                 size="large"
+                className={styles.suggestionButton}
                 icon={suggestion.icon}
                 onClick={() => void session.send(suggestion.text)}
               >
@@ -107,26 +105,35 @@ export function MessageList({ session }: { session: AgentSession }) {
           </div>
         </div>
       ) : (
-        messages.map((message) => (
+        messages.map((message, index) => (
           <MessageBubble
             key={message.id}
             message={message}
             session={session}
             showReasoning={session.settings.thinking}
+            index={index}
           />
         ))
       )}
 
       {session.status === 'streaming' ? (
-        <div className={styles.streamingRow} data-wtsl-agent-animated="true">
-          <Spinner size="tiny" />
-          <Text size={200}>正在生成…</Text>
+        <div
+          className={styles.progressRow}
+          role="status"
+          aria-label="正在生成回答"
+          data-wtsl-agent-animated="true"
+        >
+          <Spinner size="extra-tiny" />
         </div>
       ) : null}
       {session.status === 'tools' ? (
-        <div className={styles.streamingRow} data-wtsl-agent-animated="true">
-          <Spinner size="tiny" />
-          <Text size={200}>正在调用工具…</Text>
+        <div
+          className={styles.progressRow}
+          role="status"
+          aria-label="正在调用工具"
+          data-wtsl-agent-animated="true"
+        >
+          <Spinner size="extra-tiny" />
         </div>
       ) : null}
     </div>

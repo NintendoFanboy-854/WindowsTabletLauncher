@@ -1,6 +1,13 @@
 /**
- * 会话状态机：对话、工具循环、停止/重试、连续朗读、语音交互都收在这里，
- * UI（浮层 / 侧栏 / 全屏语音）只消费同一份状态，因此切换形态不断话。
+ * Agent 会话状态机：对话、工具循环、停止/重试、语音（原生音频一次发送 + ASR 回填）、单条播报。
+ *
+ * 语音链路（契约 §7）：
+ * 1. `stopRecording()` 结束时立即发一轮带 `input_audio` 的 chat 请求（只此一次）；
+ * 2. 同一份 WAV 并行送 MiMo ASR，结果回填该 user 消息的 `content` / `transcriptStatus`；
+ * 3. 音频 Blob / data URL 用完即弃：不写 localStorage、不进 Message；后续轮次（工具循环）、
+ *    重试、切会话、重启全部只发文字（转写失败用「（用户发来一段语音）」占位）；
+ * 4. 语音提问的回复自动朗读；文字提问按 `tts.readTextReplies`；单条消息可播放/停止；
+ *    新发送、开始录音、新会话、切会话、删除会话都先停止播报；TTS 失败写入 `voice.speechError`。
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -9,9 +16,10 @@ import {
   updateSettings as persistSettings,
   type SettingsPatch,
 } from '../settings';
-import { MimoTransport } from '../transport/real';
+import { MimoTransport, wavToDataUrl } from '../transport/real';
 import { MockTransport } from '../transport/mock';
 import {
+  VOICE_TRANSCRIPT_PLACEHOLDER,
   messagesToHistory,
   toolResultToText,
   trimHistory,
@@ -39,6 +47,7 @@ import type {
   AgentErrorAction,
   AgentSettings,
   AgentTransport,
+  ChatContentPart,
   ChatRequestMessage,
   ChatToolCall,
   Conversation,
@@ -47,21 +56,36 @@ import type {
   ToolDefinition,
 } from '../types';
 import { TtsPlayer } from '../voice/ttsPlayer';
-import { VoiceRecorder } from '../voice/recorder';
+import { VoiceRecorder, type RecordedAudio } from '../voice/recorder';
 
 /** 工具调用轮次上限：防止模型在工具之间无限循环；达到后让它直接回答 */
 export const MAX_TOOL_ROUNDS = 12;
 
-export type TurnStatus = 'idle' | 'streaming' | 'tools';
-export type VoiceStage = 'idle' | 'recording' | 'transcribing' | 'speaking';
+/** 语音会话标题占位：ASR 回填后替换成首句转写 */
+const VOICE_CONVERSATION_TITLE = '语音提问';
 
-export interface VoiceInteractionState {
-  /** 是否处于全屏语音交互 */
-  active: boolean;
-  stage: VoiceStage;
-  /** 录音电平 0–1 */
+/** ASR 超时：网络挂起时 voice.stage 不能永远停在 transcribing */
+const ASR_TIMEOUT_MS = 30_000;
+
+/** 本轮语音请求里 text part 的指令：让模型直接回答音频里的问题，不要描述音频 */
+const VOICE_AUDIO_INSTRUCTION = '请听上面这段用户语音，直接回答用户的问题；不要描述音频本身。';
+
+/** 会话错误提示：没配 MiMo Key 时统一话术 */
+const CONFIGURATION_ERROR_MESSAGE =
+  '还没有配置 MiMo API Key。请到设置 → 模型里填写后再试。';
+
+export type TurnStatus = 'idle' | 'streaming' | 'tools';
+
+/** 契约 §8：声音状态机（没有 active/continuous，只有录音、转写与两类错误） */
+export interface AgentVoiceState {
+  stage: 'idle' | 'recording' | 'transcribing';
+  /** 0..1 实时录音电平 */
   level: number;
-  error: string | null;
+  /** 本次录音时长（秒） */
+  durationSec: number;
+  error: { kind: 'mic' | 'asr'; message: string } | null;
+  /** TTS 失败（一次性提示，dismissSpeechError 清除） */
+  speechError: string | null;
 }
 
 export interface AgentSessionError {
@@ -74,7 +98,6 @@ export interface AgentSessionError {
 export interface AgentSeed {
   messages?: Message[];
   title?: string;
-  voice?: { active?: boolean; stage?: VoiceStage };
 }
 
 export interface UseAgentSessionOptions {
@@ -84,6 +107,7 @@ export interface UseAgentSessionOptions {
   seed?: AgentSeed;
 }
 
+/** 契约 §8：W1 的 UI 只依赖这个接口 */
 export interface AgentSession {
   settings: AgentSettings;
   updateSettings: (patch: SettingsPatch) => void;
@@ -91,31 +115,56 @@ export interface AgentSession {
   conversation: Conversation | null;
   status: TurnStatus;
   error: AgentSessionError | null;
-  voice: VoiceInteractionState;
+  voice: AgentVoiceState;
   speakingMessageId: string | null;
   isMock: boolean;
   configured: boolean;
   toolBindings: ToolBinding[];
+  /** 打字发送（无音频） */
   send: (text: string) => Promise<void>;
+  /** 开始录音；已在录音/转写时忽略 */
+  startRecording: () => Promise<void>;
+  /** 结束录音：立即发送音频（原生 input_audio）+ 并行 ASR 回填文字 */
+  stopRecording: () => Promise<void>;
+  /** 取消录音（不发送、不留消息） */
+  cancelRecording: () => void;
   stop: () => void;
   retry: () => Promise<void>;
   dismissError: () => void;
+  dismissSpeechError: () => void;
   newConversation: () => void;
   selectConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
-  enterVoice: () => void;
-  exitVoice: () => void;
-  startRecording: () => Promise<void>;
-  stopRecording: () => Promise<void>;
+  /** 单条朗读/停止切换；失败写入 voice.speechError */
   speakMessage: (messageId: string) => void;
-  toggleContinuousReading: () => void;
   stopSpeaking: () => void;
-  dismissVoiceError: () => void;
 }
 
 interface ConversationStore {
   conversations: Conversation[];
   activeId: string;
+}
+
+/** 本轮语音请求的临时音频上下文：只在首次请求使用，之后清空 */
+interface VoiceTurnContext {
+  dataUrl: string;
+  /** ASR 回填结果；null 表示还没返回或转写失败 */
+  transcript: { text: string | null };
+}
+
+interface RunTurnParams {
+  conversationId: string;
+  assistantId: string;
+  baseMessages: Message[];
+  controller: AbortController;
+  /** 有值 = 本轮是语音提问：首次请求带 input_audio */
+  voice?: VoiceTurnContext;
+  /** 本轮回复是否强制朗读（语音提问 / 重试语音提问） */
+  forceRead?: boolean;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function initStore(seed?: AgentSeed): ConversationStore {
@@ -138,7 +187,10 @@ function initStore(seed?: AgentSeed): ConversationStore {
   return { conversations: saved, activeId };
 }
 
-function mergeSources(current: SourceRef[] | undefined, incoming: SourceRef[] | undefined): SourceRef[] | undefined {
+function mergeSources(
+  current: SourceRef[] | undefined,
+  incoming: SourceRef[] | undefined,
+): SourceRef[] | undefined {
   if (!incoming?.length) return current;
   const merged = [...(current ?? [])];
   for (const source of incoming) {
@@ -159,17 +211,24 @@ function abortError(): DOMException {
   return new DOMException('用户已停止生成', 'AbortError');
 }
 
+/** 找 history 里最后一条 user 消息的下标（= 本轮用户消息） */
+function lastUserIndex(history: ChatRequestMessage[]): number {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].role === 'user') return index;
+  }
+  return -1;
+}
+
+function initialVoiceState(): AgentVoiceState {
+  return { stage: 'idle', level: 0, durationSec: 0, error: null, speechError: null };
+}
+
 export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSession {
   const storedSettings = useSettings();
   const [store, setStore] = useState<ConversationStore>(() => initStore(options.seed));
   const [status, setStatusState] = useState<TurnStatus>('idle');
   const [error, setError] = useState<AgentSessionError | null>(null);
-  const [voice, setVoice] = useState<VoiceInteractionState>(() => ({
-    active: options.seed?.voice?.active ?? false,
-    stage: options.seed?.voice?.stage ?? 'idle',
-    level: 0,
-    error: null,
-  }));
+  const [voice, setVoice] = useState<AgentVoiceState>(initialVoiceState);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
   const settingsRef = useRef<AgentSettings>(storedSettings);
@@ -178,9 +237,17 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   const voiceRef = useRef(voice);
   const abortRef = useRef<AbortController | null>(null);
   const speakAbortRef = useRef<AbortController | null>(null);
+  const asrAbortRef = useRef<AbortController | null>(null);
   const ttsPlayerRef = useRef<TtsPlayer | null>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
-  const lastTurnRef = useRef<{ conversationId: string; text: string } | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const recordingStartingRef = useRef(false);
+  /** recorder.start() 还在 await 时用户已取消（<300ms 快速点按空格） */
+  const recordingCancelRequestedRef = useRef(false);
+  const mountedRef = useRef(true);
+  /** 每次 voice turn 的序号：旧 ASR 结果不能覆盖新录音/新消息的状态 */
+  const voiceTurnTokenRef = useRef(0);
+  const lastTurnRef = useRef<{ conversationId: string } | null>(null);
 
   useEffect(() => {
     settingsRef.current = storedSettings;
@@ -209,25 +276,29 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     return () => clearTimeout(timer);
   }, [store]);
 
-  // 卸载时清理：停止生成 / 朗读 / 录音
-  useEffect(
-    () => () => {
+  // 卸载时清理：停止生成 / 朗读 / ASR / 录音
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       abortRef.current?.abort();
       speakAbortRef.current?.abort();
+      asrAbortRef.current?.abort();
       recorderRef.current?.cancel();
       ttsPlayerRef.current?.dispose();
       ttsPlayerRef.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
 
-  // 录音电平轮询
+  // 录音电平 / 时长轮询
   useEffect(() => {
     if (voice.stage !== 'recording') return;
     const timer = setInterval(() => {
       const level = recorderRef.current?.readLevel() ?? 0;
+      const startedAt = recordingStartedAtRef.current;
+      const durationSec = startedAt ? (Date.now() - startedAt) / 1000 : 0;
       setVoice((previous) =>
-        previous.stage === 'recording' ? { ...previous, level } : previous,
+        previous.stage === 'recording' ? { ...previous, level, durationSec } : previous,
       );
     }, 120);
     return () => clearInterval(timer);
@@ -236,6 +307,11 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   const updateStatus = (next: TurnStatus) => {
     statusRef.current = next;
     setStatusState(next);
+  };
+
+  const activeConversation = (): Conversation | null => {
+    const current = storeRef.current;
+    return current.conversations.find((item) => item.id === current.activeId) ?? null;
   };
 
   const updateMessage = (
@@ -269,18 +345,15 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     speakAbortRef.current = null;
     ttsPlayerRef.current?.stop();
     setSpeakingMessageId(null);
-    setVoice((previous) =>
-      previous.stage === 'speaking' ? { ...previous, stage: 'idle' } : previous,
-    );
   };
 
+  /** 朗读一段文本；失败不再静默，写入 voice.speechError */
   const speakText = async (text: string, messageId: string): Promise<void> => {
     if (!text.trim() || !transport.isConfigured()) return;
     speakAbortRef.current?.abort();
     const controller = new AbortController();
     speakAbortRef.current = controller;
     setSpeakingMessageId(messageId);
-    setVoice((previous) => ({ ...previous, stage: 'speaking', error: null }));
     try {
       await getTtsPlayer().speak({
         transport,
@@ -293,69 +366,59 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       if (!controller.signal.aborted) {
         setVoice((previous) => ({
           ...previous,
-          stage: 'idle',
-          error: '语音合成失败，本条回答保留为文字',
+          speechError: `语音合成失败：${errorMessage(speakError)}`,
         }));
       }
     } finally {
       if (speakAbortRef.current === controller) {
         speakAbortRef.current = null;
         setSpeakingMessageId(null);
-        setVoice((previous) =>
-          previous.stage === 'speaking' ? { ...previous, stage: 'idle' } : previous,
-        );
       }
     }
   };
 
-  const runTurn = async (params: {
-    conversationId: string;
-    assistantId: string;
-    baseMessages: Message[];
-    text: string;
-    controller: AbortController;
-  }): Promise<void> => {
-    const { conversationId, assistantId, baseMessages, text, controller } = params;
+  const runTurn = async (params: RunTurnParams): Promise<void> => {
+    const { conversationId, assistantId, baseMessages, controller, voice: voiceTurn } = params;
     const { signal } = controller;
     abortRef.current = controller;
-    lastTurnRef.current = { conversationId, text };
+    lastTurnRef.current = { conversationId };
     setError(null);
     updateStatus('streaming');
 
     let accumulated = '';
 
+    let audioParts: ChatContentPart[] | null = voiceTurn
+      ? [
+          { type: 'input_audio', input_audio: { data: voiceTurn.dataUrl } },
+          { type: 'text', text: VOICE_AUDIO_INSTRUCTION },
+        ]
+      : null;
+
     const buildBindings = (): ToolBinding[] => buildToolBindings(transport.listPluginTools());
     const currentSettings = (): AgentSettings => settingsRef.current;
 
+    const voiceText = (): string =>
+      voiceTurn?.transcript.text?.trim() || VOICE_TRANSCRIPT_PLACEHOLDER;
+
     try {
-      let bindings = buildBindings();
-      let tools: ToolDefinition[] = bindings.map((binding) => ({
-        type: 'function',
-        function: {
-          name: binding.exposedName,
-          description: binding.description,
-          parameters: binding.parameters,
-        },
-      }));
-
-      const makeSystemMessage = (): ChatRequestMessage => ({
-        role: 'system',
-        content: buildSystemPrompt({
-          bindings,
-          now: new Date(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时区',
-          webSearchEnabled: currentSettings().search.enabled,
-        }),
-      });
-
+      const bindings = buildBindings();
       const history: ChatRequestMessage[] = [
-        makeSystemMessage(),
+        {
+          role: 'system',
+          content: buildSystemPrompt({
+            bindings,
+            now: new Date(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时区',
+            webSearchEnabled: currentSettings().search.enabled,
+          }),
+        },
         ...messagesToHistory(baseMessages, { thinking: currentSettings().thinking }),
       ];
+      const voiceUserIndex = voiceTurn ? lastUserIndex(history) : -1;
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-        bindings = buildBindings();
-        tools = bindings.map((binding) => ({
+        const roundBindings = buildBindings();
+        const tools: ToolDefinition[] = roundBindings.map((binding) => ({
           type: 'function',
           function: {
             name: binding.exposedName,
@@ -363,7 +426,23 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
             parameters: binding.parameters,
           },
         }));
-        history[0] = makeSystemMessage();
+        history[0] = {
+          role: 'system',
+          content: buildSystemPrompt({
+            bindings: roundBindings,
+            now: new Date(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || '本地时区',
+            webSearchEnabled: currentSettings().search.enabled,
+          }),
+        };
+
+        // 只有“本轮语音”的第一次请求带音频；其余轮次/历史一律文字
+        if (voiceUserIndex >= 0) {
+          history[voiceUserIndex] =
+            round === 0 && audioParts
+              ? { role: 'user', content: audioParts }
+              : { role: 'user', content: voiceText() };
+        }
 
         const pendingCalls: ChatToolCall[] = [];
         let roundText = '';
@@ -407,6 +486,15 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
           },
         );
 
+        // 音频用完即弃：第一次请求发出去后立刻清空 data URL，历史改回文字
+        if (voiceUserIndex >= 0) {
+          history[voiceUserIndex] = { role: 'user', content: voiceText() };
+        }
+        if (audioParts) {
+          audioParts = null;
+          if (voiceTurn) voiceTurn.dataUrl = '';
+        }
+
         if (signal.aborted) throw abortError();
 
         if (pendingCalls.length === 0) {
@@ -449,7 +537,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
 
         updateStatus('tools');
         for (const call of pendingCalls) {
-          const binding = findBindingByName(bindings, call.name);
+          const binding = findBindingByName(roundBindings, call.name);
           let resultText = '';
           try {
             if (call.parseError) throw new Error(call.parseError);
@@ -468,8 +556,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
             resultText = toolResultToText(outcome.result);
           } catch (toolError) {
             if (signal.aborted) throw abortError();
-            const message =
-              toolError instanceof Error ? toolError.message : String(toolError);
+            const message = errorMessage(toolError);
             updateMessage(conversationId, assistantId, (previous) => ({
               ...previous,
               toolCalls: previous.toolCalls?.map((record) =>
@@ -503,12 +590,10 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       }));
       updateStatus('idle');
 
-      const finalSettings = currentSettings();
-      if (
-        accumulated.trim() &&
-        (finalSettings.tts.continuous || finalSettings.tts.autoPlay || voiceRef.current.active)
-      ) {
-        void speakText(accumulated, assistantId);
+      // 播报：语音提问必读；文字提问按设置；mock 下 synthesize 为静音，状态机照走
+      if (!signal.aborted && accumulated.trim()) {
+        const shouldRead = Boolean(params.forceRead) || currentSettings().tts.readTextReplies;
+        if (shouldRead) void speakText(accumulated, assistantId);
       }
     } catch (turnError) {
       if (signal.aborted) {
@@ -519,7 +604,7 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
         updateStatus('idle');
         return;
       }
-      const message = turnError instanceof Error ? turnError.message : String(turnError);
+      const message = errorMessage(turnError);
       updateMessage(conversationId, assistantId, (previous) => ({
         ...previous,
         status: 'error',
@@ -528,6 +613,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       const action = (turnError as { action?: AgentErrorAction }).action;
       setError({ message, retryable: true, ...(action ? { action } : {}) });
     } finally {
+      // 无论成功/失败/中止，音频 data URL 都不留在内存里
+      if (voiceTurn) voiceTurn.dataUrl = '';
       if (abortRef.current === controller) abortRef.current = null;
     }
   };
@@ -535,20 +622,16 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   const send = async (rawText: string): Promise<void> => {
     const text = rawText.trim();
     if (!text || statusRef.current !== 'idle') return;
+    if (voiceRef.current.stage !== 'idle') return;
     if (!transport.isConfigured()) {
-      setError({
-        message: '还没有配置 MiMo API Key。请到设置 → 模型里填写后再试。',
-        retryable: false,
-      });
+      setError({ message: CONFIGURATION_ERROR_MESSAGE, retryable: false });
       return;
     }
-    const currentStore = storeRef.current;
-    const conversation = currentStore.conversations.find(
-      (item) => item.id === currentStore.activeId,
-    );
+    stopSpeaking();
+    const conversation = activeConversation();
     if (!conversation) return;
 
-    const userMessage = createMessage('user', text);
+    const userMessage = createMessage('user', text, { input: 'text' });
     const assistantMessage = createMessage('assistant', '', { status: 'streaming' });
     const baseMessages = [...conversation.messages, userMessage];
 
@@ -571,7 +654,6 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       conversationId: conversation.id,
       assistantId: assistantMessage.id,
       baseMessages,
-      text,
       controller: new AbortController(),
     });
   };
@@ -584,13 +666,14 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   const retry = async (): Promise<void> => {
     const lastTurn = lastTurnRef.current;
     if (!lastTurn || statusRef.current !== 'idle') return;
-    const conv = storeRef.current.conversations.find(
+    if (voiceRef.current.stage !== 'idle') return;
+    const conversation = storeRef.current.conversations.find(
       (item) => item.id === lastTurn.conversationId,
     );
-    if (!conv) return;
+    if (!conversation) return;
 
     setError(null);
-    const messages = conv.messages;
+    const messages = conversation.messages;
     let lastAssistantIndex = -1;
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       if (messages[index].role === 'assistant') {
@@ -603,8 +686,11 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       lastAssistant !== null &&
       (lastAssistant.status === 'error' || lastAssistant.status === 'aborted');
     const baseMessages = failed ? messages.slice(0, lastAssistantIndex) : messages;
+    // 重试只发文字：语音消息的历史内容是 ASR 文字（没有时用占位），这里不会重建 audio part
+    const lastUserMessage = [...baseMessages].reverse().find((item) => item.role === 'user');
     const assistantMessage = createMessage('assistant', '', { status: 'streaming' });
 
+    stopSpeaking();
     setStore((previous) => ({
       ...previous,
       conversations: previous.conversations.map((item) =>
@@ -622,15 +708,31 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       conversationId: lastTurn.conversationId,
       assistantId: assistantMessage.id,
       baseMessages,
-      text: lastTurn.text,
       controller: new AbortController(),
+      forceRead: lastUserMessage?.input === 'voice',
     });
   };
 
-  const dismissError = () => setError(null);
+  const dismissError = () => {
+    setError(null);
+    setVoice((previous) => (previous.error ? { ...previous, error: null } : previous));
+  };
+
+  const dismissSpeechError = () => {
+    setVoice((previous) =>
+      previous.speechError ? { ...previous, speechError: null } : previous,
+    );
+  };
 
   const newConversation = () => {
-    if (statusRef.current !== 'idle') stop();
+    stopSpeaking();
+    if (statusRef.current !== 'idle') abortRef.current?.abort();
+    if (voiceRef.current.stage === 'recording') {
+      recorderRef.current?.cancel();
+      recorderRef.current = null;
+      recordingStartedAtRef.current = null;
+      setVoice((previous) => ({ ...previous, stage: 'idle', level: 0, durationSec: 0 }));
+    }
     const conversation = createConversation();
     setStore((previous) => ({
       conversations: [
@@ -642,7 +744,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   };
 
   const selectConversation = (id: string) => {
-    if (statusRef.current !== 'idle') stop();
+    stopSpeaking();
+    if (statusRef.current !== 'idle') abortRef.current?.abort();
     setStore((previous) =>
       previous.conversations.some((conversation) => conversation.id === id)
         ? { ...previous, activeId: id }
@@ -651,7 +754,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   };
 
   const deleteConversation = (id: string) => {
-    if (statusRef.current !== 'idle') stop();
+    stopSpeaking();
+    if (statusRef.current !== 'idle') abortRef.current?.abort();
     setStore((previous) => {
       const remaining = previous.conversations.filter(
         (conversation) => conversation.id !== id,
@@ -668,66 +772,238 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     });
   };
 
-  const enterVoice = () => {
-    setVoice((previous) => ({ ...previous, active: true, error: null }));
-    if (!settingsRef.current.tts.continuous) {
-      persistSettings({ tts: { continuous: true } });
-    }
-  };
-
-  const exitVoice = () => {
-    recorderRef.current?.cancel();
-    recorderRef.current = null;
-    stopSpeaking();
-    setVoice({ active: false, stage: 'idle', level: 0, error: null });
-  };
-
   const startRecording = async (): Promise<void> => {
-    if (
-      voiceRef.current.stage === 'recording' ||
-      voiceRef.current.stage === 'transcribing'
-    ) {
+    if (voiceRef.current.stage !== 'idle' || recordingStartingRef.current) return;
+    // 正在生成回答时不叠新录音（避免两条 turn 并发写同一会话）
+    if (statusRef.current !== 'idle') return;
+    if (!transport.isConfigured()) {
+      setError({ message: CONFIGURATION_ERROR_MESSAGE, retryable: false });
       return;
     }
+    // 开始录音前先停止播报（契约 §5）
     stopSpeaking();
+    recordingStartingRef.current = true;
+    recordingCancelRequestedRef.current = false;
     const recorder = recorderRef.current ?? new VoiceRecorder();
     recorderRef.current = recorder;
     try {
       await recorder.start();
-      setVoice((previous) => ({ ...previous, stage: 'recording', level: 0, error: null }));
     } catch (recordError) {
-      const message =
-        recordError instanceof Error ? recordError.message : String(recordError);
-      setVoice((previous) => ({
-        ...previous,
+      if (recorderRef.current === recorder) recorderRef.current = null;
+      recordingStartingRef.current = false;
+      const next: AgentVoiceState = {
+        ...voiceRef.current,
         stage: 'idle',
         level: 0,
-        error: `无法开始录音：${message}`,
-      }));
+        durationSec: 0,
+        error: { kind: 'mic', message: `无法开始录音：${errorMessage(recordError)}` },
+      };
+      voiceRef.current = next;
+      setVoice(next);
+      return;
     }
+    recordingStartingRef.current = false;
+    if (recorderRef.current !== recorder) return;
+    // 启动过程中用户已经松开空格（<300ms）：取消，不进入录音态
+    if (recordingCancelRequestedRef.current) {
+      recordingCancelRequestedRef.current = false;
+      recorder.cancel();
+      recorderRef.current = null;
+      recordingStartedAtRef.current = null;
+      const next: AgentVoiceState = {
+        ...voiceRef.current,
+        stage: 'idle',
+        level: 0,
+        durationSec: 0,
+        error: null,
+      };
+      voiceRef.current = next;
+      setVoice(next);
+      return;
+    }
+    recordingStartedAtRef.current = Date.now();
+    // voiceRef 同步更新：空格 keyup/取消逻辑在 React 渲染前就要读到 recording
+    const next: AgentVoiceState = {
+      ...voiceRef.current,
+      stage: 'recording',
+      level: 0,
+      durationSec: 0,
+      error: null,
+    };
+    voiceRef.current = next;
+    setVoice(next);
   };
 
   const stopRecording = async (): Promise<void> => {
     const recorder = recorderRef.current;
     if (!recorder || voiceRef.current.stage !== 'recording') return;
+
     setVoice((previous) => ({ ...previous, stage: 'transcribing', level: 0 }));
-    const controller = new AbortController();
+    let audio: RecordedAudio;
     try {
-      const audio = await recorder.stop();
-      const transcript = await transport.transcribe(audio.wav, {
-        signal: controller.signal,
-      });
-      setVoice((previous) => ({ ...previous, stage: 'idle' }));
-      if (transcript.trim()) await send(transcript);
-    } catch (transcribeError) {
-      const message =
-        transcribeError instanceof Error ? transcribeError.message : String(transcribeError);
+      audio = await recorder.stop();
+    } catch (recordError) {
+      if (recorderRef.current === recorder) recorderRef.current = null;
+      recordingStartedAtRef.current = null;
       setVoice((previous) => ({
         ...previous,
         stage: 'idle',
-        error: `语音识别失败：${message}`,
+        level: 0,
+        error: { kind: 'mic', message: `录音失败：${errorMessage(recordError)}` },
       }));
+      return;
     }
+    if (recorderRef.current === recorder) recorderRef.current = null;
+    recordingStartedAtRef.current = null;
+
+    const conversation = activeConversation();
+    if (!conversation) {
+      setVoice((previous) => ({ ...previous, stage: 'idle', level: 0 }));
+      return;
+    }
+    if (!transport.isConfigured()) {
+      setVoice((previous) => ({ ...previous, stage: 'idle', level: 0 }));
+      setError({ message: CONFIGURATION_ERROR_MESSAGE, retryable: false });
+      return;
+    }
+
+    const durationSec = Math.round(audio.durationSec * 10) / 10;
+    const userMessage = createMessage('user', '', {
+      input: 'voice',
+      voicePeaks: audio.peaks,
+      voiceDurationSec: durationSec,
+      transcriptStatus: 'pending',
+    });
+    const assistantMessage = createMessage('assistant', '', { status: 'streaming' });
+    const baseMessages = [...conversation.messages, userMessage];
+    const isFirstMessage = conversation.messages.length === 0;
+
+    setStore((previous) => ({
+      ...previous,
+      conversations: previous.conversations.map((item) =>
+        item.id !== conversation.id
+          ? item
+          : {
+              ...item,
+              title: isFirstMessage ? VOICE_CONVERSATION_TITLE : item.title,
+              updatedAt: nowIso(),
+              messages: [...item.messages, userMessage, assistantMessage],
+            },
+      ),
+    }));
+
+    // 音频 data URL 只存在于本轮请求；Message / localStorage 里没有它
+    let dataUrl: string;
+    try {
+      dataUrl = await wavToDataUrl(audio.wav);
+    } catch (audioError) {
+      updateMessage(conversation.id, userMessage.id, (message) => ({
+        ...message,
+        transcriptStatus: 'failed',
+      }));
+      setVoice((previous) => ({
+        ...previous,
+        stage: 'idle',
+        level: 0,
+        error: { kind: 'asr', message: `无法准备音频：${errorMessage(audioError)}` },
+      }));
+      return;
+    }
+
+    const voiceTurn: VoiceTurnContext = { dataUrl, transcript: { text: null } };
+    const asrToken = voiceTurnTokenRef.current + 1;
+    voiceTurnTokenRef.current = asrToken;
+
+    // 1) 立即发起带音频的对话请求（不 await，让 ASR 并行走）
+    void runTurn({
+      conversationId: conversation.id,
+      assistantId: assistantMessage.id,
+      baseMessages,
+      controller: new AbortController(),
+      voice: voiceTurn,
+      forceRead: true,
+    });
+
+    // 2) 同一份 WAV 并行 ASR：回填 user message，并供后续上下文使用。
+    //    加 30s 超时：网络挂起时不能让 voice.stage 永远停在 transcribing（否则无法开始下一轮）。
+    const asrController = new AbortController();
+    asrAbortRef.current = asrController;
+    let asrTimedOut = false;
+    const asrTimer = window.setTimeout(() => {
+      asrTimedOut = true;
+      asrController.abort();
+    }, ASR_TIMEOUT_MS);
+    try {
+      const transcript = (await transport.transcribe(audio.wav, {
+        signal: asrController.signal,
+      })).trim();
+      if (!transcript) throw new Error('语音识别没有返回文字');
+      voiceTurn.transcript.text = transcript;
+      updateMessage(conversation.id, userMessage.id, (message) => ({
+        ...message,
+        content: transcript,
+        transcriptStatus: 'ready',
+      }));
+      setStore((previous) => ({
+        ...previous,
+        conversations: previous.conversations.map((item) =>
+          item.id !== conversation.id || item.title !== VOICE_CONVERSATION_TITLE
+            ? item
+            : { ...item, title: deriveConversationTitle(transcript) },
+        ),
+      }));
+    } catch (transcribeError) {
+      // 超时也要落到 failed/idle 并提示；只有“用户主动取消/卸载”才静默
+      if (asrTimedOut || !asrController.signal.aborted) {
+        updateMessage(conversation.id, userMessage.id, (message) => ({
+          ...message,
+          transcriptStatus: 'failed',
+        }));
+        if (voiceTurnTokenRef.current === asrToken) {
+          setVoice((previous) => ({
+            ...previous,
+            stage: 'idle',
+            level: 0,
+            error: {
+              kind: 'asr',
+              message: asrTimedOut
+                ? '语音识别超时，可以再说一次'
+                : `语音识别失败：${errorMessage(transcribeError)}`,
+            },
+          }));
+        }
+      }
+    } finally {
+      window.clearTimeout(asrTimer);
+      if (asrAbortRef.current === asrController) asrAbortRef.current = null;
+      if (voiceTurnTokenRef.current === asrToken && mountedRef.current) {
+        setVoice((previous) =>
+          previous.stage === 'transcribing'
+            ? { ...previous, stage: 'idle', level: 0 }
+            : previous,
+        );
+      }
+    }
+  };
+
+  const cancelRecording = (): void => {
+    // recorder.start() 还在 await：先记下取消意图，start 完成后由 startRecording 自己清理
+    if (recordingStartingRef.current) {
+      recordingCancelRequestedRef.current = true;
+      return;
+    }
+    if (voiceRef.current.stage !== 'recording') return;
+    recorderRef.current?.cancel();
+    recorderRef.current = null;
+    recordingStartedAtRef.current = null;
+    const next: AgentVoiceState = {
+      ...voiceRef.current,
+      stage: 'idle',
+      level: 0,
+      durationSec: 0,
+    };
+    voiceRef.current = next;
+    setVoice(next);
   };
 
   const speakMessage = (messageId: string) => {
@@ -735,45 +1011,14 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       stopSpeaking();
       return;
     }
-    const conversation = storeRef.current.conversations.find(
-      (item) => item.id === storeRef.current.activeId,
-    );
+    const conversation = activeConversation();
     const message = conversation?.messages.find((item) => item.id === messageId);
-    if (message?.content.trim()) void speakText(message.content, messageId);
-  };
-
-  const toggleContinuousReading = () => {
-    const currentSettings = settingsRef.current;
-    const readingActive =
-      currentSettings.tts.continuous ||
-      Boolean(speakAbortRef.current) ||
-      Boolean(ttsPlayerRef.current?.isSpeaking);
-    if (readingActive) {
-      persistSettings({ tts: { continuous: false } });
-      stopSpeaking();
-      return;
-    }
-    persistSettings({ tts: { continuous: true } });
-    const conversation = storeRef.current.conversations.find(
-      (item) => item.id === storeRef.current.activeId,
-    );
-    const lastAssistant = [...(conversation?.messages ?? [])]
-      .reverse()
-      .find(
-        (message) =>
-          message.role === 'assistant' &&
-          message.status === 'done' &&
-          message.content.trim(),
-      );
-    if (lastAssistant) void speakText(lastAssistant.content, lastAssistant.id);
+    if (!message || message.role !== 'assistant' || !message.content.trim()) return;
+    void speakText(message.content, messageId);
   };
 
   const updateSettings = (patch: SettingsPatch) => {
     persistSettings(patch);
-  };
-
-  const dismissVoiceError = () => {
-    setVoice((previous) => ({ ...previous, error: null }));
   };
 
   const conversation =
@@ -792,19 +1037,17 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     configured: transport.isConfigured(),
     toolBindings,
     send,
+    startRecording,
+    stopRecording,
+    cancelRecording,
     stop,
     retry,
     dismissError,
+    dismissSpeechError,
     newConversation,
     selectConversation,
     deleteConversation,
-    enterVoice,
-    exitVoice,
-    startRecording,
-    stopRecording,
     speakMessage,
-    toggleContinuousReading,
     stopSpeaking,
-    dismissVoiceError,
   };
 }

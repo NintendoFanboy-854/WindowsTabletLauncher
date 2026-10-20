@@ -5,7 +5,9 @@
  * - 1×1 图标 + 温度 48；
  * - 2×1 图标 + 温度 48 + 现象 16 + 今日高低温 14；
  * - 2×2 上当前天气、下逐时 6 列（时间 12 / 图标 20 / 温度 14）；
- * - 3×2 左当前（城市 12 / 图标 56 / 温度 68 / 现象 14 / 高低温 14）+ 右逐时 6 行（行高 40），不放 7 天；
+ * - 3×2 三带式（v0.3.0）：上带当前簇（城市 12 / 图标 56 / 温度 68 / 现象 14 / 高低温 14）
+ *   + 今日指标（体感 / 降水概率 / 风），组间 16；下带全宽逐时 6 列（时间 12 / 图标 24 /
+ *   温度 16 / 降水概率 12）；AQI 与 7 天只在 4×2；
  * - 4×2 上当前 + 空气质量（AQI 环 72），下未来 7 天等宽 7 列。
  *
  * 卡片上没有城市菜单、刷新、设置、长按、右键：手势与主操作由共享 CardRoot 接管。
@@ -15,7 +17,8 @@ import { Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react
 import { Key20Regular, Location20Regular } from '@fluentui/react-icons';
 import { CardRoot, Metric } from '../../../_shared/ui.jsx';
 import { Condition, HiLo, WarningBadge, WeatherIcon } from './atoms.jsx';
-import { AirRing, DailyColumns, HourlyRows, HourlyStrip, isNight } from './forecast.jsx';
+import { AirRing, DailyColumns, HourlyBand, HourlyStrip, isNight } from './forecast.jsx';
+import { TodayMetrics } from './todayMetrics.jsx';
 import { conditionText } from '../data/icons.js';
 import { fmtTemp } from '../data/format.js';
 
@@ -113,27 +116,62 @@ const useStyles = makeStyles({
     paddingTop: tokens.spacingVerticalXS,
   },
 
-  // 3×2：左当前 46% / 右逐时 6 行；列间距 16
+  // 3×2（v0.3.0 三带式）：上带当前簇 + 今日指标（组间 16），下带全宽逐时 6 列（约 102 高）
   body32: {
     flex: 1,
     display: 'flex',
-    flexDirection: 'row',
-    gap: tokens.spacingHorizontalL,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalL,
     minHeight: 0,
     minWidth: 0,
   },
+  top32: {
+    display: 'grid',
+    // 当前簇按内容取宽，今日指标占满剩余宽度：两簇之间只有固定 16 的组间距，
+    // 不出现 space-between 推到两端造成的大块中间空洞。
+    gridTemplateColumns: 'max-content minmax(0, 1fr)',
+    columnGap: tokens.spacingHorizontalL,
+    alignItems: 'center',
+    minHeight: 0,
+    minWidth: 0,
+    // 1024（6 列网格）下 3×2 iframe 约 474px：组间距收窄
+    '@media (max-width: 480px)': {
+      columnGap: tokens.spacingHorizontalM,
+    },
+  },
   current32: {
-    flex: '46 1 0',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     gap: tokens.spacingVerticalXS,
     minWidth: 0,
+    minHeight: 0,
+  },
+  current32Main: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  current32Meta: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  // 3×2 的现象文字用次级前景（fg2），高低温仍走 HiLo 的 fg3
+  condition32: {
+    color: tokens.colorNeutralForeground2,
+  },
+  metrics32: {
+    // 占满 top32 的第二列（minmax(0, 1fr)），不再缩成右侧小岛
+    minWidth: 0,
   },
   hourly32: {
-    flex: '54 1 0',
-    minWidth: 0,
+    flex: '0 0 102px',
     minHeight: 0,
+    minWidth: 0,
   },
 
   // 4×2：上当前 + AQI，下 7 天 96 高
@@ -370,7 +408,7 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
                 </div>
               </div>
             </div>
-            <div className={styles.hourly22}>
+            <div className={styles.hourly22} data-secondary-block="hourly">
               <HourlyStrip
                 items={data.hourly}
                 unit={settings.unit}
@@ -384,28 +422,46 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
         ) : null}
 
         {size === '3x2' ? (
-          <div className={styles.body32}>
-            <div className={styles.current32}>
-              <div className={styles.cityRow}>
-                <Text size={200} className={styles.cityName}>
-                  {place.name}
-                </Text>
-                <WarningBadge count={warnings.length} />
-                {offline ? (
-                  <Text size={200} className={styles.offline}>
-                    离线
+          <div className={styles.body32} data-weather-layout="3x2">
+            <div className={styles.top32} data-content-band="top">
+              <div className={styles.current32} data-content-block="current">
+                <div className={styles.cityRow}>
+                  <Text size={200} className={styles.cityName}>
+                    {place.name}
                   </Text>
-                ) : null}
+                  <WarningBadge count={warnings.length} />
+                  {offline ? (
+                    <Text size={200} className={styles.offline}>
+                      离线
+                    </Text>
+                  ) : null}
+                </div>
+                <div className={styles.current32Main}>
+                  <WeatherIcon
+                    code={current.icon}
+                    night={currentNight}
+                    scheme={scheme}
+                    size={56}
+                    title={current.text}
+                  />
+                  <Metric value={fmtTemp(current.temp, settings.unit)} size={68} />
+                </div>
+                <div className={styles.current32Meta}>
+                  <Condition code={current.icon} text={current.text} size={300} className={styles.condition32} />
+                  <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
+                </div>
               </div>
-              <div className={styles.cityRow}>
-                <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={56} title={current.text} />
-                <Metric value={fmtTemp(current.temp, settings.unit)} size={68} />
+              <div className={styles.metrics32}>
+                <TodayMetrics current={current} hourly={data.hourly} unit={settings.unit} />
               </div>
-              <Condition code={current.icon} text={current.text} size={300} />
-              <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />
             </div>
-            <div className={styles.hourly32}>
-              <HourlyRows
+            <div
+              className={styles.hourly32}
+              data-content-band="hourly"
+              data-content-block="hourly"
+              data-secondary-block="hourly"
+            >
+              <HourlyBand
                 items={data.hourly}
                 unit={settings.unit}
                 scheme={scheme}

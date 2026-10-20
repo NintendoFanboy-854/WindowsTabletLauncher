@@ -1,6 +1,8 @@
 /**
  * 上下文管理：
  * - 把面板消息还原成 OpenAI Chat Completions 的消息序列（含工具调用/工具结果）
+ * - 历史里 user 消息一律是 `string`（语音消息用 ASR 文字，失败/未返回用占位），
+ *   音频 content parts 只在“本轮语音”的首次请求里临时拼装（见 hooks/useAgentSession.ts）
  * - 按模型上下文窗口裁剪历史（保留系统提示 + 最近若干轮）
  * - 工具结果过长时截断
  *
@@ -16,6 +18,12 @@ import type {
   OpenAIToolCall,
   ToolCallRecord,
 } from '../types';
+
+/**
+ * 转写失败（或转写尚未返回）的语音消息在上下文里的占位文字。
+ * 只进模型请求，不上屏（界面靠 `transcriptStatus` 展示声纹/shimmer）。
+ */
+export const VOICE_TRANSCRIPT_PLACEHOLDER = '（用户发来一段语音）';
 
 /** MiMo 模型上下文窗口（token），来源：docs 模型列表 */
 export const MODEL_CONTEXT_WINDOWS: Record<MimoModel, number> = {
@@ -52,8 +60,20 @@ export function estimateTokens(text: string): number {
 function estimateMessageTokens(message: ChatRequestMessage): number {
   switch (message.role) {
     case 'system':
-    case 'user':
       return estimateTokens(message.content) + 4;
+    case 'user': {
+      if (Array.isArray(message.content)) {
+        // 本轮语音：audio part 的 data URL 不计字符数（服务端按“时长秒 × 6.25”折算 token），
+        // 只估算 text part，避免 base64 把上下文预算直接撑爆。
+        let tokens = 4;
+        for (const part of message.content) {
+          if (part.type === 'text') tokens += estimateTokens(part.text);
+          else tokens += 6;
+        }
+        return tokens;
+      }
+      return estimateTokens(message.content) + 4;
+    }
     case 'assistant': {
       let tokens = estimateTokens(message.content ?? '') + 4;
       if (message.tool_calls) {
@@ -114,7 +134,12 @@ export function messagesToHistory(messages: Message[], options: { thinking: bool
 
   for (const message of messages) {
     if (message.role === 'user') {
-      history.push({ role: 'user', content: message.content });
+      // 语音消息入库的是 ASR 文字；没有文字（pending / 转写失败）时用占位，
+      // 保证后续轮次、重试、重启都只发文字，且上下文不出现“空用户消息”。
+      const content =
+        message.content.trim() ||
+        (message.input === 'voice' ? VOICE_TRANSCRIPT_PLACEHOLDER : message.content);
+      history.push({ role: 'user', content });
       continue;
     }
     if (message.role === 'tool') {
