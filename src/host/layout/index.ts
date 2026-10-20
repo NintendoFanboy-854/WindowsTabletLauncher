@@ -25,6 +25,7 @@ export {
   normalizeSize,
   occupancyOf,
   pagesUsed,
+  placeWidget,
   rectFitsInGrid,
   rectOf,
   rectsOverlap,
@@ -54,3 +55,10 @@ export {
   sanitizeLayout,
   saveLayout,
 } from './persist';
+export {
+  notifyDesktopPresenceChanged,
+  onAddWidgetRequest,
+  requestAddWidget,
+  useDesktopPresence,
+} from './presence';
+export type { AddWidgetRequest } from './presence';

@@ -1,6 +1,6 @@
 /**
  * 编辑模式顶部工具栏（Fluent Toolbar）：
- * 增删页、左右移动当前页的顺序、完成退出。
+ * 增删页、左右移动当前页的顺序、添加组件、完成退出。
  *
  * 常驻 DOM、用 `visible` 切换 opacity/transform 过渡（motionTokens），
  * 隐藏时 inert + pointer-events:none，不参与布局也不响应点击。
@@ -12,6 +12,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { Button, Text, Toolbar, ToolbarDivider, mergeClasses } from '@fluentui/react-components';
 import {
   Add20Regular,
+  AppsAddIn20Regular,
   Checkmark20Regular,
   ChevronLeft20Regular,
   ChevronRight20Regular,
@@ -26,6 +27,8 @@ interface EditToolbarProps {
   onAddPage(): void;
   onRemovePage(): void;
   onMovePage(from: number, to: number): void;
+  /** 打开「添加组件」Dialog（已从桌面移除的组件在这里恢复） */
+  onAddWidget(): void;
   onDone(): void;
 }
 
@@ -36,6 +39,7 @@ export function EditToolbar({
   onAddPage,
   onRemovePage,
   onMovePage,
+  onAddWidget,
   onDone,
 }: EditToolbarProps) {
   const styles = useStyles();
@@ -94,6 +98,14 @@ export function EditToolbar({
         onClick={onRemovePage}
       />
       <ToolbarDivider />
+      <Button
+        size="large"
+        appearance="secondary"
+        icon={<AppsAddIn20Regular />}
+        onClick={onAddWidget}
+      >
+        添加组件
+      </Button>
       <Button size="large" appearance="primary" icon={<Checkmark20Regular />} onClick={onDone}>
         完成
       </Button>

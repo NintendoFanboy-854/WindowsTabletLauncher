@@ -1,6 +1,12 @@
 /**
  * 插件管理页（B4 + F5 信息密度复核）：列表 / 启用禁用 / 删除 / 重载 / zip 安装入口。
  *
+ * D-18 修订后的可见性语义：
+ * - 启用/禁用 = 持久偏好，禁用不删布局条目（重新启用回原位）；
+ * - 编辑模式删除 = 持久移除，reload 不复活；
+ * - 状态列因此要区分「已启用」「已启用 · 未上桌」「已启用 · 桌面 n/m」，
+ *   未上桌的组件在操作列提供「添加到桌面」（presence 订阅，添加后状态即时刷新）。
+ *
  * 密度约定（docs/DENSITY.md §4/§5）：
  * - 一屏一个主任务：管理插件；页头只有一个次要操作（重新扫描）；
  * - 宽屏表格只留 插件 / 状态 / 操作 三列；名称是 Primary，id / 版本 / 尺寸清单
@@ -33,14 +39,10 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import { Add20Regular } from '@fluentui/react-icons';
 
-import {
-  getPluginManager,
-  isTauriRuntime,
-  usePlugins,
-  type NormalizedPlugin,
-  type PluginManager,
-} from '../../plugins';
+import { getPluginManager, isTauriRuntime, usePlugins, type NormalizedPlugin, type PluginManager } from '../../plugins';
+import { requestAddWidget, useDesktopPresence, widgetKey } from '../../layout';
 import { PageScaffold } from '../shared/PageScaffold';
 import { EmptyState } from '../shared/EmptyState';
 import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
@@ -117,6 +119,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
   },
   rowActions: {
     display: 'flex',
@@ -187,6 +190,15 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
   const preferences = usePluginPreferences();
   const disabledIds = useMemo(() => new Set(preferences.disabled), [preferences.disabled]);
   const isEnabled = (plugin: NormalizedPlugin) => !disabledIds.has(plugin.id);
+
+  /** 当前桌面上的组件键集合；桌面层每次保存布局后派发事件，这里即时刷新 */
+  const presence = useDesktopPresence();
+  const widgetOnDesktop = (plugin: NormalizedPlugin, widgetId: string) =>
+    presence.has(widgetKey(plugin.id, widgetId));
+  const presentCount = (plugin: NormalizedPlugin) =>
+    plugin.widgets.filter((widget) => widgetOnDesktop(plugin, widget.id)).length;
+  const missingWidgets = (plugin: NormalizedPlugin) =>
+    plugin.widgets.filter((widget) => !widgetOnDesktop(plugin, widget.id));
 
   const [confirmTarget, setConfirmTarget] = useState<NormalizedPlugin | null>(null);
   const [zipPath, setZipPath] = useState('');
@@ -280,11 +292,46 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
     );
   };
 
-  const renderStatus = (plugin: NormalizedPlugin) => (
-    <Text size={200} className={isEnabled(plugin) ? styles.statusOn : styles.statusOff}>
-      {isEnabled(plugin) ? '已启用' : '已禁用'}
-    </Text>
-  );
+  /**
+   * 已启用但没上桌的小组件 → 操作列「添加到桌面」。
+   * 一个小组件一个按钮（manifest 允许一个插件多个组件）；点击后由常驻桌面层插入，
+   * presence 事件把状态列刷成「桌面 n/m」。
+   */
+  const addToDesktopButtons = (plugin: NormalizedPlugin) => {
+    if (!isEnabled(plugin)) return null;
+    const missing = missingWidgets(plugin);
+    if (missing.length === 0) return null;
+    return missing.map((widget) => (
+      <Button
+        key={widget.id}
+        appearance="secondary"
+        size="large"
+        icon={<Add20Regular />}
+        aria-label={`添加「${widget.title}」到桌面`}
+        onClick={() => requestAddWidget(plugin.id, widget.id)}
+      >
+        添加到桌面
+      </Button>
+    ));
+  };
+
+  const renderStatus = (plugin: NormalizedPlugin) => {
+    // 已禁用 → 只说禁用；纯后台插件没有“上桌”概念；有组件则报上桌数量。
+    let text = '已启用';
+    if (!isEnabled(plugin)) text = '已禁用';
+    else if (plugin.widgets.length > 0) {
+      const present = presentCount(plugin);
+      text =
+        present === 0
+          ? '已启用 · 未上桌'
+          : `已启用 · 桌面 ${present}/${plugin.widgets.length}`;
+    }
+    return (
+      <Text size={200} className={isEnabled(plugin) ? styles.statusOn : styles.statusOff}>
+        {text}
+      </Text>
+    );
+  };
 
   return (
     <PageScaffold
@@ -371,6 +418,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                               enabled={isEnabled(plugin)}
                               onChange={(enabled) => toggleEnabled(plugin, enabled)}
                             />
+                            {addToDesktopButtons(plugin)}
                             {removeButton(plugin)}
                           </div>
                         </TableCell>
@@ -396,6 +444,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                         enabled={isEnabled(plugin)}
                         onChange={(enabled) => toggleEnabled(plugin, enabled)}
                       />
+                      {addToDesktopButtons(plugin)}
                       {removeButton(plugin)}
                     </div>
                   </article>
@@ -404,7 +453,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
             )}
 
             <Text size={200} className={styles.hint}>
-              启用/禁用会保存在本机，桌面重新加载后生效。
+              启用/禁用是持久偏好，禁用不会删掉桌面上的卡片；「已启用 · 未上桌」表示小组件已从桌面移除，可用「添加到桌面」放回。
             </Text>
           </>
         )}

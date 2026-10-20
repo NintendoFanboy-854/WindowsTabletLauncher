@@ -560,9 +560,10 @@ export function WidgetCard({
             />
           </Tooltip>
           <Menu
-            defaultCheckedValues={{
-              'widget-size': [`${widget.size[0]}x${widget.size[1]}`],
-            }}
+            // 受控勾选：唯一事实来源是 widget.size。改尺寸失败时 Menu 内部不会留下
+            // “已勾选但没生效”的假状态；成功重渲染后勾选跟随新尺寸（D-18 相关回归）。
+            checkedValues={{ 'widget-size': [`${widget.size[0]}x${widget.size[1]}`] }}
+            onCheckedValueChange={() => {}}
           >
             <MenuTrigger disableButtonEnhancement>
               <Button

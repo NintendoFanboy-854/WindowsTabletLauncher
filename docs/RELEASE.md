@@ -1,24 +1,27 @@
-# 发布前检查清单（v0.2.1）
+# 发布前检查清单（v0.2.2）
 
-> 最后一次全量验证：2026-10-20（E7）。每项都有证据（命令输出 / 截图路径 / commit hash）。
-> 证据根：`shots/e7/`；总报告：`docs/RELEASE-REPORT.md`、`shots/e7/REPORT.md`。
+> 最后一次全量验证：2026-10-20（v0.2.2 独立回归）。每项都有证据（命令输出 / 截图路径 / commit hash）。
+> 证据根：`shots/e7/`、`shots/v022-final/`；总报告：`docs/RELEASE-REPORT.md`、`shots/e7/REPORT.md`、`shots/v022-final/REPORT.md`。
 > 勾选口径：`[x]` = 本阶段实际执行并通过；`[ ]` = 未执行/未验证，原因写在行内。
 > **v0.2.1 热修（2026-10-20）**：修复安装包首次运行卡「正在加载桌面」（内置插件种子写成压缩字节/未匹配路径）；安装器改为中文。详见 `docs/RELEASE-REPORT.md` §10。
+> **v0.2.2 热修（2026-10-20）**：天气定位成功即应用、尺寸菜单受控勾选、添加组件入口、删除持久化 + 插件页上桌状态。详见 `docs/RELEASE-REPORT.md` §11。
 
 ## 1. 代码与构建
 
-- [x] `npm run typecheck` 通过（0 错误）— `shots/e7/logs/typecheck.log`
-- [x] `npm run build` 通过（tsc + vite；仅 chunk >500KB 已知警告）— `shots/e7/logs/build.log`
-- [x] `src-tauri` 目录 `cargo check` 通过（app v0.2.1）
+- [x] `npm run typecheck` 通过（0 错误）— v0.2.2：`shots/v022-final/A-gates.json`
+- [x] `npm run build` 通过（tsc + vite；仅 chunk >500KB 已知警告）— v0.2.2：`shots/v022-final/A-gates.json`
+- [x] `src-tauri` 目录 `cargo check` 通过（app v0.2.2；`npx tauri build` 内 release 编译）
 - [x] `npx tauri build --debug --no-bundle`（真窗口）— ✅ 2026-10-20 补充重跑：v0.2.0 debug exe 真窗口全屏 2880×1920、六插件真实渲染（`shots/e7/tauri/`）；v0.2.1 release exe 另经 WebView2 CDP 复验 6 卡（`shots/e7/release-seed/`）
-- [x] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建后 `git diff -- public/plugins` 为空 — `shots/e7/logs/build-plugin-all.log`
-- [x] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1，25/25；亮色同 25/25；1 项已接受 P2 记账，见报告）
-- [x] 插件详情浮层 UI 断言通过：`node scripts/verify-overlays.mjs`（六插件 `?view=detail`，834×582；暗 6/6、亮 6/6）— `shots/e7/logs/verify-overlays-*.log`
+- [x] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建后 `git diff -- public/plugins` 为空 — v0.2.2 复查 weather 重建前后 SHA-256 一致（`6ACA66D8…`，`A-gates.json`）
+- [x] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1，25/25；亮色同 25/25；1 项已接受 P2 记账，见报告）— v0.2.2 复跑通过（`B-verify-widgets.log`）
+- [x] 插件详情浮层 UI 断言通过：`node scripts/verify-overlays.mjs`（六插件 `?view=detail`，834×582；暗 6/6、亮 6/6）— v0.2.2 复跑通过（`B-overlays-pnp.log`）
 - [x] 宿主内浮层联调：`node scripts/shot-host-overlays.mjs`（点卡 → detail 浮层 880×680；暗 6/6、亮 6/6，截图 `shots/e7/host/`）
-- [x] 亮暗两套的宿主整屏 + 插件代表尺寸截图：`shots/e7/desktop/`（1440×960 / 1024×768 × 暗/亮）、`shots/e7/cards/`（1440 网格下 25 档 × 暗/亮）
-- [x] 插件验收：六插件 `node scripts/verify-plugin.mjs <id>` 全 PASS（尺寸 + 宿主点卡冒烟 + console 0）— `shots/e7/logs/verify-plugin-final.log`
-- [x] Plug-and-play：最小第三方插件零宿主改动 19/19 PASS（临时 `ping` 已删除）— `shots/e7/plug-and-play/`；另有正式脚本 `scripts/verify-plug-and-play.mjs` **12/12 PASS**（冷复制模板 + index 登记 → 卡片/详情/设置/清理）— `shots/pnp/`
+- [x] 亮暗两套的宿主整屏 + 插件代表尺寸截图：`shots/e7/desktop/`（1440×960 / 1024×768 × 暗/亮）、`shots/e7/cards/`（1440 网格下 25 档 × 暗/亮）；v0.2.2 修复证据 `shots/v022-final/*.png`
+- [x] 插件验收：六插件 `node scripts/verify-plugin.mjs <id>` 全 PASS（尺寸 + 宿主点卡冒烟 + console 0）— v0.2.2 复跑通过（`B-verify-plugin.log`）
+- [x] Plug-and-play：最小第三方插件零宿主改动 19/19 PASS（临时 `ping` 已删除）— `shots/e7/plug-and-play/`；正式脚本 `scripts/verify-plug-and-play.mjs` **12/12 PASS**（v0.2.2 加固弱机超时后复跑，`B-plug-and-play-final.log`）
 - [x] 宿主 E2E：1440×960 / 1024×768 × 暗/亮 各 53/53 PASS；页面专项 12/12 — `shots/e7/logs/desktop-e2e-*.log`、`pages-e2e.log`
+- [x] v0.2.2 四项修复 E2E：21/21 PASS（1024×768 light + 1440×960 dark）— `shots/v022-final/C-e2e-results.json`
+- [x] v0.2.2 天气自动定位「成功即应用」：7/7 PASS（空列表 / 已有城市 / 手动选择不覆盖 / 升级迁移）— `shots/v022-final/C6-locate-results.json`
 
 ## 2. 运行时冒烟（Tauri 真窗口）
 
@@ -54,11 +57,12 @@
 
 ## 4. 打包与发布
 
-- [x] `npx tauri build`（release）产出安装包，路径记录 — ✅ **v0.2.1 中文安装包**：NSIS `Windows Tablet Launcher_0.2.1_x64-setup.exe` 8.16 MiB（SHA-256 前缀 `84BACC6C951E4162`，SimpChinese）、MSI `Windows Tablet Launcher_0.2.1_x64_zh-CN.msi` 9.27 MiB（`F09A1D5A77E293EE`，zh-CN）— `src-tauri/target/release/bundle/`
-- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做自动安装验证（避免修改系统）；v0.2.1 已用真实 release exe + CDP 验证插件种子/6 卡渲染（`RELEASE-REPORT.md` §10），安装/卸载由用户手动执行
-- [x] `git status` 干净（E7 与后续补充变更均已提交；`public/plugins/**`、`templates/**` 无意外 diff；`secrets.json` 未跟踪）
-- [x] commit 信息清晰；`git push` 到 origin/main — 已 push（本地 HEAD 与 origin/main 一致）
-- [x] 打 tag：`v0.2.1` — 已创建并推送（v0.2.0 tag 保留作历史记录）
+- [x] `npx tauri build`（release）产出安装包，路径记录 — ✅ **v0.2.2 中文安装包**：NSIS `Windows Tablet Launcher_0.2.2_x64-setup.exe` 8.16 MiB（SHA-256 前缀 `29D763199A2279AA`，SimpChinese）、MSI `Windows Tablet Launcher_0.2.2_x64_zh-CN.msi` 9.27 MiB（`E8FF653E75AA6AF0`，zh-CN）— `src-tauri/target/release/bundle/`；构建日志 `shots/v022-final/tauri-build.log`
+- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做自动安装验证（避免修改系统）；v0.2.2 已用真实 release exe + WebView2 CDP 验证插件种子/6 卡渲染（`RELEASE-REPORT.md` §11），安装/卸载由用户手动执行
+- [x] `git status` 干净（本 hotfix 变更均已提交；`public/plugins/**`、`templates/**` 无意外 diff；`secrets.json` 未跟踪）
+- [x] commit 信息清晰；`git push` 到 origin/main — 见 §4 回填
+- [x] 打 tag：`v0.2.2` — 见 §4 回填（v0.2.0/v0.2.1 tag 保留作历史记录）
+- [x] 回填 v0.2.2 安装包哈希：NSIS `29D763199A2279AA`、MSI `E8FF653E75AA6AF0`（完整 SHA-256 见 `RELEASE-REPORT.md` §11）
 
 ## 5. 文档齐套
 
@@ -66,7 +70,7 @@
 - [x] docs/FLUENT2.md（Fluent 2 设计规范落地）
 - [x] docs/DENSITY.md（信息密度）
 - [x] docs/DESIGN.md（工程约定）
-- [x] docs/PLAN.md（开发计划，E0–E7 全部 ✅）
+- [x] docs/PLAN.md（开发计划，E0–E7c 全部 ✅）
 - [x] docs/components/*.md（6 插件 + Agent）
 - [x] docs/PLUGIN-CONTRACT.md（契约；§7 验收清单已勾选，§8 已人工验收 2026-10-20）
 - [x] docs/RELEASE.md（本清单）
@@ -83,4 +87,7 @@
 - 本地运行：Windows 10 19044 无 Mica/Acrylic 系统材质，界面用 CSS 近似
 - Tauri 真窗口：0.2.0 debug 已重跑（窗口/六插件渲染通过）；安装包与真窗口内交互未完整验证
 - 浏览器预览：zip 安装/删除、开机自启、系统定位、空闲检测不可用
-- 编辑模式删除卡片是会话级：reload 后按插件目录重建；持久移除用插件管理页启用/禁用
+- 编辑模式删除卡片是**持久下桌**（v0.2.2 起，`wtsl.layout.removed`）：reload 不会自动恢复，用编辑模式「添加组件」或插件页「添加到桌面」加回；重置布局恢复 manifest 默认六卡
+- 天气自动定位：成功即应用为当前城市；已应用过的 30 分钟内结果不会覆盖手动选择（`location.applied` 标记）；无 API Key 时自动定位跳过
+- v0.2.2 未验证：真实 Windows Geolocator（系统定位）权限路径（本轮真实定位走 ip.cn 成功；QWeather 真实网络已验证）；安装包卸载与安装过程（用户手动执行）
+- v0.2.2 已知风险 P2：`public/secrets.json` 会被打进 `dist`/安装包（个人自用可接受；对外分发前应排除或改为运行时录入，见 `RELEASE-REPORT.md` §11.6）

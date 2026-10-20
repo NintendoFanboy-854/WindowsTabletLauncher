@@ -24,7 +24,10 @@ import {
   compareReadingOrder,
   layoutNeedsReflow,
   moveWidgetToPage,
+  notifyDesktopPresenceChanged,
+  onAddWidgetRequest,
   pagesUsed,
+  placeWidget,
   removePage,
   removeWidgetFromLayout,
   reorderPage,
@@ -35,12 +38,15 @@ import {
   loadLayout,
   setActivePage,
   tryMoveWidget,
+  widgetKey,
 } from '../layout';
 import type { LayoutState } from '../layout';
 import type { ColorScheme } from '../shell/themeMode';
 import { usePluginPreferences } from '../pages/plugins/preferences';
 import { getPluginManager, readFluentThemePayload, usePlugins } from '../plugins';
 import type { NormalizedPlugin, NormalizedWidget, PluginManager } from '../plugins';
+import { AddWidgetDialog } from './AddWidgetDialog';
+import type { AddWidgetCandidate } from './AddWidgetDialog';
 import { BackgroundFrames } from './BackgroundFrames';
 import { EditToolbar } from './EditToolbar';
 import { PageIndicator } from './PageIndicator';
@@ -132,10 +138,6 @@ type Catalog = Map<string, CatalogEntry>;
 
 const noop = () => undefined;
 
-function widgetKey(pluginId: string, widgetId: string): string {
-  return `${pluginId}:${widgetId}`;
-}
-
 function sameSizes(left: WidgetSize[], right: WidgetSize[]): boolean {
   if (left.length !== right.length) return false;
   return left.every(
@@ -152,7 +154,8 @@ function readInitialEditMode(): boolean {
 /**
  * 用插件管理器的最新数据修正已保存布局：
  * - 插件被删/组件被删 → 对应实例丢弃；
- * - 标题 / 支持尺寸档位 → 用 manifest 最新声明刷新。
+ * - 标题 / 支持尺寸档位 → 用 manifest 最新声明刷新；
+ * - removed 不动（由 reconcileLayout 按目录过滤）。
  */
 function refreshWidgets(state: LayoutState, catalog: Catalog): LayoutState {
   let changed = false;
@@ -174,6 +177,27 @@ function refreshWidgets(state: LayoutState, catalog: Catalog): LayoutState {
   return changed ? { ...state, widgets } : state;
 }
 
+/** 已移除键只保留插件目录里仍存在的：插件卸载后清掉，避免 removed 无限增长 */
+function filterRemoved(state: LayoutState, catalog: Catalog): LayoutState {
+  const removed = state.removed.filter((key) => catalog.has(key));
+  return removed.length === state.removed.length ? state : { ...state, removed };
+}
+
+/** 插件目录条目 → 还没落到网格上的实例（uid = pluginId:widgetId） */
+function instanceFromEntry({ plugin, widget }: CatalogEntry): WidgetInstance {
+  return {
+    uid: widgetKey(plugin.id, widget.id),
+    pluginId: plugin.id,
+    widgetId: widget.id,
+    title: widget.title,
+    page: 0,
+    col: widget.cell?.[0] ?? -1,
+    row: widget.cell?.[1] ?? -1,
+    size: [widget.defaultSize[0], widget.defaultSize[1]],
+    sizes: widget.sizes.map((size) => [size[0], size[1]] as WidgetSize),
+  };
+}
+
 /**
  * 把插件目录展开成默认实例（每个 manifest widget 一个，page 由调用方给）。
  *
@@ -182,18 +206,8 @@ function refreshWidgets(state: LayoutState, catalog: Catalog): LayoutState {
  */
 function instancesFromCatalog(catalog: Catalog, page: number): WidgetInstance[] {
   const instances: WidgetInstance[] = [];
-  for (const { plugin, widget } of catalog.values()) {
-    instances.push({
-      uid: widgetKey(plugin.id, widget.id),
-      pluginId: plugin.id,
-      widgetId: widget.id,
-      title: widget.title,
-      page,
-      col: widget.cell?.[0] ?? -1,
-      row: widget.cell?.[1] ?? -1,
-      size: [widget.defaultSize[0], widget.defaultSize[1]],
-      sizes: widget.sizes.map((size) => [size[0], size[1]] as WidgetSize),
-    });
+  for (const entry of catalog.values()) {
+    instances.push({ ...instanceFromEntry(entry), page });
   }
   return instances;
 }
@@ -202,7 +216,8 @@ function instancesFromCatalog(catalog: Catalog, page: number): WidgetInstance[] 
  * 布局与插件目录合并（首次初始化 / 热重载 / zip 安装后都会走这里）：
  * - 有存档 → 校验并丢弃已不存在的实例；
  * - 没有任何可用实例 → 按插件目录摆全部组件（autoPlace 负责分页）；
- * - 有新插件/新组件 → 追加到当前页的空位（autoPlace 保证不重叠）。
+ * - 有新插件/新组件 → 追加到当前页的空位（autoPlace 保证不重叠）；
+ * - removed 里记录的是用户主动删除（D-18 修订后持久），不再自动补位。
  */
 function reconcileLayout(
   previous: LayoutState | null,
@@ -221,30 +236,41 @@ function reconcileLayout(
   if (!state) {
     const saved = loadLayout();
     if (saved) {
-      const refreshed = refreshWidgets(sanitizeLayout(saved, columns, rows), catalog);
-      if (refreshed.widgets.length > 0) state = refreshed;
+      const refreshed = filterRemoved(
+        refreshWidgets(sanitizeLayout(saved, columns, rows), catalog),
+        catalog,
+      );
+      // “全部删光”也是有效存档：widgets 为空但 removed 非空时不能退回默认布局。
+      if (refreshed.widgets.length > 0 || refreshed.removed.length > 0) state = refreshed;
     }
   }
 
   if (!state) {
     const placed = autoPlace(instancesFromCatalog(catalog, 0), columns, rows);
-    return { widgets: placed, pages: pagesUsed(placed, 1), activePage: 0 };
+    return { widgets: placed, pages: pagesUsed(placed, 1), activePage: 0, removed: [] };
   }
 
-  const refreshed = refreshWidgets(state, catalog);
+  const refreshed = filterRemoved(refreshWidgets(state, catalog), catalog);
   const present = new Set(
     refreshed.widgets.map((widget) => widgetKey(widget.pluginId, widget.widgetId)),
   );
-  const additions = instancesFromCatalog(catalog, refreshed.activePage).filter(
-    (instance) => !present.has(widgetKey(instance.pluginId, instance.widgetId)),
-  );
+  const removed = new Set(refreshed.removed);
+  const additions = instancesFromCatalog(catalog, refreshed.activePage).filter((instance) => {
+    const key = widgetKey(instance.pluginId, instance.widgetId);
+    return !present.has(key) && !removed.has(key);
+  });
 
   if (additions.length === 0) return refreshed;
 
   const placed = autoPlace(additions, columns, rows);
   const widgets = [...refreshed.widgets, ...placed];
   const pages = Math.max(refreshed.pages, pagesUsed(widgets, 1), refreshed.activePage + 1);
-  return { widgets, pages, activePage: clampPage(refreshed.activePage, pages) };
+  return {
+    widgets,
+    pages,
+    activePage: clampPage(refreshed.activePage, pages),
+    removed: refreshed.removed,
+  };
 }
 
 export default function Desktop({
@@ -295,6 +321,8 @@ export default function Desktop({
   const [focusedUid, setFocusedUid] = useState<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<number | null>(null);
   const [dragView, setDragView] = useState<DragView | null>(null);
+  /** 编辑模式「添加组件」Dialog 是否打开 */
+  const [addWidgetOpen, setAddWidgetOpen] = useState(false);
 
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -314,6 +342,8 @@ export default function Desktop({
   const dragRef = useRef<DragSession | null>(null);
   const wheelRef = useRef({ delta: 0, at: 0 });
   const initialEditAppliedRef = useRef(false);
+  /** 新添加的卡片渲染完后要聚焦的 uid（布局更新是异步的，DOM 还没挂上） */
+  const pendingFocusUidRef = useRef<string | null>(null);
 
   const registerNode = useCallback((uid: string, node: HTMLDivElement | null) => {
     if (node) cardNodesRef.current.set(uid, node);
@@ -391,7 +421,108 @@ export default function Desktop({
     if (!layout) return;
     if (pluginsLoading || catalog.size === 0) return;
     saveLayout(layout);
+    // 先写存档再通知：插件管理页的存在性 hook 会立即重新 loadLayout。
+    notifyDesktopPresenceChanged();
   }, [layout, pluginsLoading, catalog]);
+
+  /**
+   * 添加组件（编辑模式 Dialog 与插件管理页「添加到桌面」共用）：
+   * 经过目录 / 禁用偏好 / 是否已在桌面三道校验，再交给布局纯函数 placeWidget。
+   * 返回 true 表示已插入（Dialog 据此关闭）。
+   */
+  const addWidget = useCallback(
+    (pluginId: string, widgetId: string): boolean => {
+      const key = widgetKey(pluginId, widgetId);
+      const entry = catalogRef.current.get(key);
+      if (!entry) {
+        notify('找不到这个小组件，插件可能已被卸载');
+        return false;
+      }
+      const state = layoutRef.current;
+      if (!state) return false;
+      if (state.widgets.some((widget) => widgetKey(widget.pluginId, widget.widgetId) === key)) {
+        notify(`「${entry.widget.title}」已经在桌面上了`);
+        return false;
+      }
+      if (disabledPluginsRef.current.has(pluginId)) {
+        notify(`「${entry.plugin.name}」已禁用，先在插件管理里启用`);
+        return false;
+      }
+      const instance = instanceFromEntry(entry);
+      const placed = placeWidget(
+        state.widgets,
+        state.pages,
+        state.activePage,
+        instance,
+        metricsRef.current.columns,
+        metricsRef.current.rows,
+      );
+      setLayout({
+        widgets: placed.widgets,
+        pages: Math.max(state.pages, placed.pages),
+        activePage: placed.page,
+        removed: state.removed.filter((removedKey) => removedKey !== key),
+      });
+      pendingFocusUidRef.current = instance.uid;
+      setFocusedUid(instance.uid);
+      notify(`已添加「${entry.widget.title}」`);
+      return true;
+    },
+    [notify],
+  );
+
+  // 插件管理页「添加到桌面」：桌面层常驻挂载，所以插件页发请求、这里插入并持久化。
+  useEffect(
+    () =>
+      onAddWidgetRequest((request) => {
+        addWidget(request.pluginId, request.widgetId);
+      }),
+    [addWidget],
+  );
+
+  // 新卡片渲染完成后聚焦（添加请求可能来自别的页面，此时桌面层隐藏）
+  useEffect(() => {
+    const uid = pendingFocusUidRef.current;
+    if (!uid) return;
+    if (!layout || !layout.widgets.some((widget) => widget.uid === uid)) return;
+    pendingFocusUidRef.current = null;
+    focusCardNode(uid);
+  }, [layout, focusCardNode]);
+
+  /** 「添加组件」候选：已启用、但当前不在桌面上的小组件（按插件目录顺序） */
+  const presentKeys = useMemo(
+    () =>
+      new Set(
+        (layout?.widgets ?? []).map((widget) => widgetKey(widget.pluginId, widget.widgetId)),
+      ),
+    [layout],
+  );
+  const addCandidates = useMemo<AddWidgetCandidate[]>(() => {
+    if (!editMode) return [];
+    const candidates: AddWidgetCandidate[] = [];
+    for (const { plugin, widget } of catalog.values()) {
+      if (disabledPlugins.has(plugin.id)) continue;
+      const key = widgetKey(plugin.id, widget.id);
+      if (presentKeys.has(key)) continue;
+      candidates.push({
+        key,
+        pluginId: plugin.id,
+        widgetId: widget.id,
+        title: widget.title,
+        pluginName: plugin.name,
+        sizes: widget.sizes,
+      });
+    }
+    return candidates;
+  }, [catalog, disabledPlugins, editMode, presentKeys]);
+  /** 空态提示用：有小组件但被禁用的插件名 */
+  const disabledWidgetPluginNames = useMemo(
+    () =>
+      plugins
+        .filter((plugin) => disabledPlugins.has(plugin.id) && plugin.widgets.length > 0)
+        .map((plugin) => plugin.name),
+    [plugins, disabledPlugins],
+  );
 
   // ---------- 列数变化：降级重排（DESIGN.md §1.1） ----------
 
@@ -411,6 +542,7 @@ export default function Desktop({
         widgets: reflowed.widgets,
         pages,
         activePage: clampPage(previous.activePage, pages),
+        removed: previous.removed,
       };
     });
   }, [metrics.columns, metrics.rows]);
@@ -472,6 +604,7 @@ export default function Desktop({
   const exitEditMode = useCallback(() => {
     setEditMode(false);
     setDragView(null);
+    setAddWidgetOpen(false);
   }, []);
 
   // 非桌面页保持挂载但退到后台：结束编辑模式、取消进行中的拖拽/滑动，
@@ -480,6 +613,7 @@ export default function Desktop({
     if (active) return;
     setEditMode(false);
     setDragView(null);
+    setAddWidgetOpen(false);
     dragRef.current = null;
     const swipe = swipeRef.current;
     if (swipe?.longPressTimer != null) window.clearTimeout(swipe.longPressTimer);
@@ -507,6 +641,7 @@ export default function Desktop({
     clearLayout();
     setDragView(null);
     setEditMode(false);
+    setAddWidgetOpen(false);
     setFocusedUid(null);
     setLayout(
       reconcileLayout(
@@ -541,8 +676,9 @@ export default function Desktop({
 
   const deleteWidget = useCallback(
     (widget: WidgetInstance) => {
+      // 持久删除：removeWidgetFromLayout 会把 key 写进 layout.removed，reload 不会复活
       setLayout((previous) => (previous ? removeWidgetFromLayout(previous, widget.uid) : previous));
-      notify(`已删除「${widget.title}」`);
+      notify(`已删除「${widget.title}」，可在编辑模式「添加组件」里恢复`);
     },
     [notify],
   );
@@ -551,6 +687,8 @@ export default function Desktop({
     (widget: WidgetInstance, size: WidgetSize) => {
       const state = layoutRef.current;
       if (!state) return;
+      // 点当前已勾选的尺寸：Menu 会关闭，不提示“放不下”
+      if (size[0] === widget.size[0] && size[1] === widget.size[1]) return;
       const next = resizeWidget(
         state.widgets,
         widget.uid,
@@ -559,7 +697,7 @@ export default function Desktop({
         metricsRef.current.rows,
       );
       if (!next) {
-        notify('当前页面没有空间放这个尺寸');
+        notify(`当前页面没有空间放 ${size[0]} × ${size[1]}，尺寸保持不变`);
         return;
       }
       setLayout({ ...state, widgets: next });
@@ -1111,7 +1249,18 @@ export default function Desktop({
           onAddPage={handleAddPage}
           onRemovePage={handleRemovePage}
           onMovePage={handleMovePage}
+          onAddWidget={() => setAddWidgetOpen(true)}
           onDone={exitEditMode}
+        />
+      )}
+
+      {layout && (
+        <AddWidgetDialog
+          open={addWidgetOpen}
+          candidates={addCandidates}
+          disabledPluginNames={disabledWidgetPluginNames}
+          onAdd={(candidate) => addWidget(candidate.pluginId, candidate.widgetId)}
+          onOpenChange={setAddWidgetOpen}
         />
       )}
 

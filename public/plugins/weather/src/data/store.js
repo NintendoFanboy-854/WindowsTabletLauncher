@@ -100,6 +100,9 @@ export function normalizeLocation(raw) {
     place,
     source: typeof raw.source === 'string' ? raw.source : '',
     at: Number.isFinite(at) ? at : 0,
+    // 是否已经把这条定位结果应用为当前城市：旧版数据没有该字段（视为未应用，
+    // 启动时迁移一次）；应用过的不再覆盖用户手动选择的城市。
+    applied: raw.applied === true,
   };
 }
 
@@ -141,6 +144,22 @@ export function addPlaceToList(places, place) {
     ...(places || []).map((item) => ({ ...item, isCurrent: false })),
     { ...normalized, isCurrent: true },
   ];
+}
+
+/**
+ * 应用一次定位结果：不存在则加入并设为当前，已存在则切换为当前。
+ *
+ * 当前城市已经是它时返回原数组引用，调用方据此跳过写配置（避免无意义写盘与
+ * storage 事件）。useWeather 的自动定位 effect 与 weather.locate 工具共用，
+ * 保证两条路径语义一致。
+ */
+export function applyLocatedPlace(places, place) {
+  const list = Array.isArray(places) ? places : [];
+  const normalized = normalizePlace(place);
+  if (!normalized) return list;
+  const existing = findPlace(list, normalized.id);
+  if (existing?.isCurrent) return list;
+  return addPlaceToList(list, normalized);
 }
 
 /** 删除城市；删掉当前城市时把第一个城市设为当前 */

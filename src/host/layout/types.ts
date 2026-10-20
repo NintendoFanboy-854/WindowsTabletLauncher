@@ -48,11 +48,27 @@ export interface CellRect {
   h: number;
 }
 
-/** 桌面的完整状态：组件实例 + 页数 + 当前页 */
+/**
+ * 桌面组件的稳定键：`pluginId:widgetId`。
+ * 布局里的 WidgetInstance.uid 也用它，所以 removed 与实例、插件目录能直接互相校验。
+ */
+export function widgetKey(pluginId: string, widgetId: string): string {
+  return `${pluginId}:${widgetId}`;
+}
+
+/**
+ * 桌面的完整状态：组件实例 + 页数 + 当前页 + 已移除的组件键。
+ *
+ * `removed` 是用户主动从桌面删掉的组件（D-18 修订：删除改为持久）。它单独存在是因为
+ * 布局里只看得到“当前摆了什么”，看不到“用户明确不要什么”；没有这份记录，reload 时
+ * reconcileLayout 会把删掉的组件当成新插件组件重新摆回来。插件仍存在时保留，插件
+ * 被卸载后由 reconcileLayout 清掉。
+ */
 export interface LayoutState {
   widgets: WidgetInstance[];
   pages: number;
   activePage: number;
+  removed: string[];
 }
 
 /** 页面指示器模型：页数超过阈值折叠成“当前页/总页数”胶囊 */
@@ -60,12 +76,18 @@ export type PageIndicator =
   | { kind: 'dots'; total: number; active: number }
   | { kind: 'capsule'; total: number; active: number };
 
-/** localStorage 里保存的结构（version 用于将来迁移） */
+/**
+ * localStorage 里保存的结构（version 用于迁移）。
+ *
+ * v3 起带 `removed`；读取仍兼容 v2（v2 没有 removed，按 `[]` 处理）。
+ * 允许 widgets 为空但 removed 非空：用户删光所有小组件后 reload 不应自动复活。
+ */
 export interface PersistedLayout {
-  version: 2;
+  version: 3;
   pages: number;
   activePage: number;
   widgets: WidgetInstance[];
+  removed: string[];
   savedAt: number;
 }
 

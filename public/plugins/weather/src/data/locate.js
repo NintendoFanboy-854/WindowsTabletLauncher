@@ -8,7 +8,8 @@
  *   3. 全失败返回 null：保留上次城市，由 UI 提示手动搜索。
  *
  * 整条链路 8 秒封顶（ip.cn 后端自己也有 8 秒超时）；不阻塞首屏——卡片/详情先显示
- * 缓存或加载态，定位只更新「当前位置 · X」这一项。
+ * 缓存或加载态，定位成功后由调用方（useWeather 自动应用 / weather.locate 工具）把
+ * 定位城市加入列表并设为当前城市，卡片/详情随配置变化刷新。
  * 浏览器 dev 没有 Tauri 后端：getLocation / ipLocate 都返回 null，这里静默跳过。
  *
  * 无 API Key 时自动定位直接跳过（GeoAPI 换坐标需要 Key）；mock 模式用 mock 城市演示。
@@ -72,7 +73,8 @@ export function ipCityName(ip) {
  * 执行一次定位，返回 `{ place, source }` 或 null。
  * `source`: 'system'（Windows 定位） / 'ip'（ip.cn 网络归属地） / 'mock'（演示）。
  *
- * 不写配置、不切城市；调用方决定是否加入列表 / 只显示「当前位置」。
+ * 只取回候选城市，不写配置、不切城市：成功即由调用方应用（加入列表并设为当前），
+ * 失败返回 null 时保留上次城市。
  */
 export async function locatePlace(settings, { budgetMs = TOTAL_BUDGET_MS } = {}) {
   if (!canLocate(settings)) return null;

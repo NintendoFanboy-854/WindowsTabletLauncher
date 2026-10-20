@@ -38,8 +38,10 @@ interface Settings {
   首页无 CORS 头，整条链路只能在 Tauri Rust 后端执行；插件通过宿主 API `ipLocate()` 取结果。
 - 优先级：`getLocation()`（Windows 定位，有坐标）→ `ipLocate()`（城市名）→
   和风 GeoAPI `geoLookup(城市名)` 换 `id` 与经纬度 → 全失败保留上次城市并提示手动搜索。
-- 语义：城市列表为空时，定位城市自动加入并设为当前；已有城市时**不自动切换**，
-  只在城市菜单显示「当前位置 · X 一键切换」。
+- 语义：定位成功后**自动应用**——城市不在列表里则加入并设为当前，已存在则切换为当前；
+  卡片与详情立即刷新该城市天气。当前城市已经是定位城市时只更新定位结果，不重复写配置。
+  定位结果缓存 30 分钟（`location` 键，含 `applied` 标记）：启动时只迁移「未应用过」的 fresh 结果
+  （升级前旧版可能已存了但没应用），应用过的不再覆盖用户手动选择的城市；fresh 结果不重复请求定位。
 - 无 API Key / mock 模式：自动定位跳过（GeoAPI 换坐标需要 Key）；mock 模式用 mock 城市演示。
 - 隐私：仅在 `autoLocate` 打开时请求；只暴露公网 IP 与常规 UA，不发送本地数据。
 
@@ -77,7 +79,8 @@ interface Settings {
 - 从城市菜单「管理城市…」进入；header 56（← 返回 +「管理城市」16 semibold）。
 - 搜索 Input 40（GeoAPI 城市搜索）；结果行 44：城市 14 + 行政区 12 fg3 +「添加」40。
 - 已添加城市行 44：城市 14 + 当前 Badge +「设为当前」40 +「删除」40（删除行内确认）。
-- 城市菜单底部：系统定位 / 网络定位得到的「当前位置 · X」一键加入或切换（D-16）。
+- 城市菜单：「当前位置 · X」一行在定位城市**不是**当前城市时出现（例如定位后用户手动切到了
+  别的城市），点一下加入或切换；D-16 定位成功即自动应用，通常不会出现。
 - 添加/删除/设为当前后 pop 回 L1，卡片数据随之刷新。
 
 ## 设置 schema
@@ -120,7 +123,7 @@ interface Settings {
 | 详情·搜索任意城市 | `weather.queryPlace` |
 | 城市菜单/管理城市 | `weather.places` / `weather.addPlace` / `weather.removePlace` / `weather.setCurrentPlace` |
 | 详情·刷新 | `weather.refresh` |
-| 自动定位 | `weather.locate`（系统定位 → ip.cn 网络归属地 → GeoAPI） |
+| 自动定位 | `weather.locate`（系统定位 → ip.cn 网络归属地 → GeoAPI；成功后加入并设为当前城市） |
 | 宿主设置页·天气 | `weather.settings.get` / `weather.settings.set` |
 
 ## 边界与异常
@@ -131,7 +134,8 @@ interface Settings {
 - 分钟级降水仅在有数据时显示。
 - 定位：Windows Geolocator 优先 → ip.cn 网络归属地兜底（D-16）→ 失败保留上次城市并提示手动搜索；
   无 API Key 时自动定位跳过（GeoAPI 换坐标需要 Key）。
-- 自动定位不自动切换已有当前城市，只在城市菜单标「当前位置」。
+- 自动定位成功即应用：定位城市加入城市列表并设为当前（卡片/详情随之切换）；
+  已是当前城市时只更新「当前位置」，不重复写配置。
 
 ## 不做什么
 

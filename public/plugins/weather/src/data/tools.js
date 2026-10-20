@@ -15,6 +15,7 @@ import {
   PLACES_KEY,
   SETTINGS_KEY,
   addPlaceToList,
+  applyLocatedPlace,
   currentPlaceOf,
   findPlace,
   normalizeCache,
@@ -138,7 +139,7 @@ export const AGENT_TOOLS = [
   {
     name: 'weather.locate',
     description:
-      '自动定位并返回定位城市：系统定位优先，失败用 ip.cn 网络归属地兜底，再由和风 GeoAPI 换成坐标。城市列表为空时自动加入并设为当前；已有城市时不自动切换。',
+      '自动定位并应用定位城市：系统定位优先，失败用 ip.cn 网络归属地兜底，再由和风 GeoAPI 换成坐标。定位成功后自动加入城市列表并设为当前城市（已存在则切换；已是当前时不重复写入）。',
     parameters: { type: 'object', properties: {} },
   },
   {
@@ -293,10 +294,10 @@ function ensurePlaceInList(state, id) {
   return place;
 }
 
-function swappedMessage({ hadPlaces, alreadyCurrent }) {
-  if (!hadPlaces) return '城市列表为空：定位城市已加入并设为当前城市';
-  if (alreadyCurrent) return '当前城市就是定位城市';
-  return '已有城市，未自动切换；可在城市菜单一键切换';
+function locatedMessage({ added, switched, name }) {
+  if (added) return `定位城市 ${name} 已加入并设为当前`;
+  if (switched) return `已切换当前城市为 ${name}`;
+  return `当前城市已是 ${name}`;
 }
 
 /** 注册到 useAgentTools 的处理器表；context 由卡片视图提供 */
@@ -500,30 +501,28 @@ export function createToolHandlers(context) {
         });
       }
       const located = { ...result.place };
-      const locationValue = { place: located, source: result.source, at: Date.now() };
+      const locationValue = {
+        place: located,
+        source: result.source,
+        at: Date.now(),
+        applied: true,
+      };
       context.weather.setLocation(locationValue);
 
-      const hadPlaces = state.places.length > 0;
+      // 定位成功即应用：不存在则加入，已存在则切换为当前；已是当前城市则跳过写配置
       const existing = findPlace(state.places, located.id);
-      const alreadyCurrent = Boolean(existing?.isCurrent);
-      let next = state.places;
-      let added = false;
-      let switched = false;
-      if (!hadPlaces) {
-        next = addPlaceToList(state.places, located);
-        context.weather.updatePlaces(next);
-        added = true;
-        switched = true;
-      }
+      const next = applyLocatedPlace(state.places, located);
+      const added = !existing;
+      const switched = next !== state.places;
+      if (switched) context.weather.updatePlaces(next);
       return {
         located: fmtPlace(located),
         source: result.source,
         added,
         switched,
-        alreadyCurrent,
-        canSwitch: hadPlaces && !alreadyCurrent,
+        alreadyCurrent: Boolean(existing?.isCurrent),
         currentPlaceId: currentPlaceOf(next)?.id || null,
-        message: swappedMessage({ hadPlaces, alreadyCurrent }),
+        message: locatedMessage({ added, switched, name: located.name }),
       };
     },
 

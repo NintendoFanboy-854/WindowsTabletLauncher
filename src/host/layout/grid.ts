@@ -161,6 +161,48 @@ export function autoPlace(
 }
 
 /**
+ * 往桌面添加一个组件（编辑模式「添加组件」/ 插件页「添加到桌面」共用）。
+ *
+ * 放置顺序：当前页第一个空位 → 后续页的第一空位 → 都放不下就新开一页。
+ * 不回头用前面的页：用户明确在当前页附近加东西，跨到已翻过的页反而找不到。
+ * 纯函数，调用方负责持久化与把 activePage 切到落点页。
+ */
+export function placeWidget(
+  widgets: WidgetInstance[],
+  pages: number,
+  activePage: number,
+  instance: WidgetInstance,
+  columns: number,
+  rows: number,
+): { widgets: WidgetInstance[]; pages: number; page: number } {
+  const size = normalizeSize(instance.size, columns, rows);
+  const totalPages = Math.max(1, Math.floor(pages) || 1);
+  const startPage = Math.max(0, Math.min(totalPages - 1, Math.floor(activePage) || 0));
+
+  for (let page = startPage; page < totalPages; page++) {
+    const occupied = occupancyOf(widgets, page);
+    const found = findFirstFit(occupied, size[0], size[1], columns, rows);
+    if (found) {
+      return {
+        widgets: [
+          ...widgets,
+          { ...instance, page, col: found.col, row: found.row, size },
+        ],
+        pages: totalPages,
+        page,
+      };
+    }
+  }
+
+  const page = totalPages;
+  return {
+    widgets: [...widgets, { ...instance, page, col: 0, row: 0, size }],
+    pages: page + 1,
+    page,
+  };
+}
+
+/**
  * 列数/行数变化后的降级重排（DESIGN.md §1.1）：
  * - 尺寸先降级：w = min(w, 列数)，h = min(h, 行数)
  * - 整页按“从左到右、从上到下”重排到第一个放得下的空位

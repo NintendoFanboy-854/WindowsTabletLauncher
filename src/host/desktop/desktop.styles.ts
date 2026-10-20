@@ -237,6 +237,10 @@ export const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
+    // 绝对定位 + left:50% 的 shrink-to-fit 可用宽度只有半屏，按钮多时会把「添加组件」
+    // 折成两行并顶高工具栏；显式 max-content 让内容决定宽度，超宽时再按窗口夹住。
+    width: 'max-content',
+    maxWidth: `calc(100vw - ${tokens.spacingHorizontalL} * 2)`,
     padding: tokens.spacingHorizontalXXS,
     borderRadius: tokens.borderRadiusCircular,
     backgroundColor: MATERIAL_BACKGROUND,

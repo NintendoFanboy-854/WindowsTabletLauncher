@@ -4,7 +4,8 @@
  * - 配置：settings（schema 字段）、places（内容键）、cache（按城市）、location（定位结果）；
  * - 数据：当前城市的缓存立即显示，随后按 refreshMin 后台刷新；失败保留缓存；
  * - 城市：添加 / 删除 / 设为当前，全部写宿主配置，另一个 iframe 通过 storage 事件同步；
- * - 自动定位：D-16 链路只在 autoLocate 打开且有 Key 时跑，mock 模式用 mock 城市演示。
+ * - 自动定位：D-16 链路只在 autoLocate 打开且有 Key 时跑，定位成功即加入/切换当前城市，
+ *   mock 模式用 mock 城市演示。
  *
  * 卡片和详情各自挂一份 hook；它们通过 `plugin.weather.*` 的 localStorage 副本同步。
  */
@@ -19,6 +20,7 @@ import {
   PLACES_KEY,
   SETTINGS_KEY,
   addPlaceToList,
+  applyLocatedPlace,
   currentPlaceOf,
   migrateLegacyPlaces,
   normalizeCache,
@@ -218,24 +220,48 @@ export function useWeather({ mock = false } = {}) {
     setLocation(value);
   }, [mock, placesLoaded, setLocation]);
 
-  // 自动定位（D-16）：只在 autoLocate 打开且有 Key 时请求；8s 封顶，不阻塞 UI
+  // 自动定位（D-16）：只在 autoLocate 打开且有 Key 时跑；8s 封顶，不阻塞 UI。
+  // - 已有 30 分钟内的定位结果（location TTL）：直接应用，不重复请求；
+  // - 否则请求一次定位，成功后立即把定位城市加入列表并设为当前。
   useEffect(() => {
     if (mock || !settingsLoaded || !placesLoaded) return undefined;
     if (!settings.autoLocate || !canLocate(settings)) return undefined;
-    if (isLocationFresh(locationRef.current)) return undefined;
+
+    // 定位成功即应用（D-16 新语义）：城市不存在则加入，已存在则切换为当前。
+    // 用 placesRef.current 的最新列表；已是当前时不重复写 places。
+    const applyLocated = (place) => {
+      const next = applyLocatedPlace(placesRef.current, place);
+      if (next !== placesRef.current) updatePlaces(next);
+    };
+
+    const cached = locationRef.current;
+    if (isLocationFresh(cached) && cached.place) {
+      // 升级迁移：旧版可能已存了 fresh 定位结果但没应用（旧语义只做候选），
+      // 这里只迁移「未应用过」的结果；已应用过的不再覆盖用户手动选择的城市
+      // （详情 iframe 每次打开都会重新挂载本 effect）。不重复请求定位。
+      if (cached.applied !== true) {
+        applyLocated(cached.place);
+        const marked = { ...cached, applied: true };
+        locationRef.current = marked;
+        setLocation(marked);
+      }
+      return undefined;
+    }
 
     let cancelled = false;
     setLocating(true);
     locatePlace(settings)
       .then((result) => {
         if (cancelled || !result?.place) return;
-        const value = { place: result.place, source: result.source, at: Date.now() };
+        const value = {
+          place: result.place,
+          source: result.source,
+          at: Date.now(),
+          applied: true,
+        };
         locationRef.current = value;
         setLocation(value);
-        // 城市列表为空：定位城市自动加入并设为当前；已有城市时只显示「当前位置」
-        if (placesRef.current.length === 0) {
-          updatePlaces([{ ...result.place, isCurrent: true }]);
-        }
+        applyLocated(result.place);
       })
       .finally(() => {
         if (!cancelled) setLocating(false);

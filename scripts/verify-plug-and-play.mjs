@@ -55,7 +55,9 @@ function restoreIndex(original) {
 async function waitCards(cdp, expected, message) {
   return cdp.waitFor(
     `document.querySelectorAll('[data-widget-card]').length === ${expected}`,
-    { timeout: 30000, interval: 200, message },
+    // v0.2.2 回归：弱机 + Vite 冷加载时宿主首屏可达 60–100s（见 shots/v022-final/pnp-investigation.json），
+    // 30s 会把环境慢误判成产品回归；放宽到 120s，断言本身不变。
+    { timeout: 120000, interval: 200, message },
   );
 }
 
@@ -72,7 +74,7 @@ async function clickProbeCard(cdp) {
         return false;
       }
     })()`,
-    { timeout: 30000, interval: 200, message: '探测插件 iframe 未挂载出 CardRoot' },
+    { timeout: 120000, interval: 200, message: '探测插件 iframe 未挂载出 CardRoot' },
   );
 
   // 优先用 iframe 内的 CardRoot 触发主操作：同源（dev server）可直接访问 contentDocument。
@@ -178,7 +180,7 @@ async function main() {
             const rect = surface ? surface.getBoundingClientRect() : frame.getBoundingClientRect();
             return { src: frame.getAttribute('src'), surface: [Math.round(rect.width), Math.round(rect.height)] };
           })()`,
-          { timeout: 15000, interval: 150, message: '点卡后没有出现探测插件的 detail 浮层' },
+          { timeout: 60000, interval: 150, message: '点卡后没有出现探测插件的 detail 浮层' },
         );
       } catch (error) {
         const srcs = await cdp.evaluate(
@@ -205,7 +207,7 @@ async function main() {
       });
       await cdp.waitFor(
         `![...document.querySelectorAll('iframe')].some((item) => (item.getAttribute('src') || '').includes('view=detail'))`,
-        { timeout: 8000, interval: 150, message: 'Esc 后 detail 浮层未关闭' },
+        { timeout: 30000, interval: 150, message: 'Esc 后 detail 浮层未关闭' },
       );
       check('Esc 关闭 detail 浮层', true);
       await waitCards(cdp, 7, '关闭浮层后卡片数量应保持 7');
@@ -215,12 +217,12 @@ async function main() {
     // ---------- 宿主设置页：按 schema 渲染插件分区 ----------
     await cdp.navigate(`${baseUrl}/?page=settings`);
     await cdp.waitFor(`document.body.innerText.includes('PnP 探针')`, {
-      timeout: 20000,
+      timeout: 60000,
       interval: 200,
       message: '设置页没有出现探测插件分区',
     });
     check('设置页出现探测插件分区', true);
-    await cdp.clickText('PnP 探针');
+    await cdp.clickText('PnP 探针', { timeout: 60000 });
     const fieldState = await cdp.waitFor(
       `(() => {
         const text = document.body.innerText;
@@ -229,7 +231,7 @@ async function main() {
           ? { labels, found: true }
           : null;
       })()`,
-      { timeout: 10000, interval: 200, message: '设置分区没有按 schema 渲染字段' },
+      { timeout: 60000, interval: 200, message: '设置分区没有按 schema 渲染字段' },
     );
     check('设置分区按 manifest schema 渲染 3 个字段', Boolean(fieldState), JSON.stringify(fieldState));
     if (wantScreenshots) await cdp.screenshot(join(shotDir, '03-settings-section.png'));

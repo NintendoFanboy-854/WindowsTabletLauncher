@@ -3,13 +3,19 @@
  *
  * 存的是逻辑坐标（页、列、行、尺寸档位），不存像素；窗口尺寸变了由布局引擎重排。
  * 旧原型存在 `wtsl.layout.v1` 的数组会迁移过来。
+ *
+ * v3（D-18 修订）起额外保存 `removed`：用户主动删掉的组件键，reload 后不再被
+ * reconcileLayout 自动摆回。读取兼容 v2（视为 removed: []）。
  */
 import { layoutNeedsReflow, normalizeSize, pagesUsed, reflowLayout } from './grid';
+import { widgetKey } from './types';
 import type { LayoutState, LayoutStorage, PersistedLayout, WidgetInstance, WidgetSize } from './types';
 
 export const LAYOUT_STORAGE_KEY = 'wtsl.layout';
 export const LEGACY_LAYOUT_STORAGE_KEY = 'wtsl.layout.v1';
-export const LAYOUT_STORAGE_VERSION = 2;
+export const LAYOUT_STORAGE_VERSION = 3;
+/** 上一个公开的存档版本：没有 removed 字段，读取时补空数组 */
+const LAYOUT_STORAGE_VERSION_V2 = 2;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -46,6 +52,20 @@ function parseSizes(value: unknown, fallback: WidgetSize): WidgetSize[] {
     if (size) sizes.push(size);
   }
   return sizes.length > 0 ? sizes : [fallback];
+}
+
+/** 已移除组件键：非空字符串，去重；不做格式猜测（插件 id / 组件 id 都允许带冒号） */
+function parseRemoved(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const removed: string[] = [];
+  for (const entry of value) {
+    const key = toNonEmptyString(entry);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    removed.push(key);
+  }
+  return removed;
 }
 
 function parseWidget(value: unknown): WidgetInstance | null {
@@ -106,21 +126,23 @@ export function migrateLegacyLayout(raw: unknown): LayoutState | null {
     });
   }
   if (widgets.length === 0) return null;
-  return { widgets, pages: pagesUsed(widgets, 1), activePage: 0 };
+  return { widgets, pages: pagesUsed(widgets, 1), activePage: 0, removed: [] };
 }
 
-/** 校验 + 归位：坏数据丢弃，越界/重叠的布局触发降级重排 */
+/** 校验 + 归位：坏数据丢弃，越界/重叠的布局触发降级重排；removed 去重并剔除已在桌面的键 */
 export function sanitizeLayout(
   layout: LayoutState,
   columns: number,
   rows: number,
 ): LayoutState {
   const seen = new Set<string>();
+  const present = new Set<string>();
   const widgets: WidgetInstance[] = [];
   for (const raw of layout.widgets) {
     const widget = parseWidget(raw);
     if (!widget || seen.has(widget.uid)) continue;
     seen.add(widget.uid);
+    present.add(widgetKey(widget.pluginId, widget.widgetId));
     widgets.push({
       ...widget,
       page: Math.max(0, Math.min(Math.max(1, layout.pages) - 1, widget.page)),
@@ -128,16 +150,23 @@ export function sanitizeLayout(
       sizes: widget.sizes,
     });
   }
+  // 不变量：一个组件不可能同时“在桌面上”和“已被移除”。
+  const removed = parseRemoved(layout.removed).filter((key) => !present.has(key));
 
   let pages = Math.max(1, Math.floor(layout.pages) || 1, pagesUsed(widgets, 1));
   let activePage = Math.max(0, Math.min(pages - 1, Math.floor(layout.activePage) || 0));
 
   if (layoutNeedsReflow(widgets, columns, rows)) {
     const reflowed = reflowLayout(widgets, columns, rows, pages);
-    return { widgets: reflowed.widgets, pages: Math.max(pages, reflowed.pages), activePage };
+    return {
+      widgets: reflowed.widgets,
+      pages: Math.max(pages, reflowed.pages),
+      activePage,
+      removed,
+    };
   }
 
-  return { widgets, pages, activePage };
+  return { widgets, pages, activePage, removed };
 }
 
 function defaultStorage(): LayoutStorage | null {
@@ -161,20 +190,26 @@ function readJson(storage: LayoutStorage, key: string): unknown {
 
 function parsePersisted(raw: unknown): LayoutState | null {
   if (!isRecord(raw)) return null;
-  if (toInt(raw.version) !== LAYOUT_STORAGE_VERSION) return null;
-  if (!Array.isArray(raw.widgets) || raw.widgets.length === 0) return null;
+  const version = toInt(raw.version);
+  // v2（无 removed）继续读；写入统一升到 v3。
+  if (version !== LAYOUT_STORAGE_VERSION && version !== LAYOUT_STORAGE_VERSION_V2) return null;
+  const removed = version === LAYOUT_STORAGE_VERSION ? parseRemoved(raw.removed) : [];
   const widgets: WidgetInstance[] = [];
-  const seen = new Set<string>();
-  for (const entry of raw.widgets) {
-    const widget = parseWidget(entry);
-    if (!widget || seen.has(widget.uid)) continue;
-    seen.add(widget.uid);
-    widgets.push(widget);
+  if (Array.isArray(raw.widgets)) {
+    const seen = new Set<string>();
+    for (const entry of raw.widgets) {
+      const widget = parseWidget(entry);
+      if (!widget || seen.has(widget.uid)) continue;
+      seen.add(widget.uid);
+      widgets.push(widget);
+    }
   }
-  if (widgets.length === 0) return null;
+  // 允许“桌面为空但移除记录非空”（用户删光所有小组件）持久化；
+  // 两者都空说明没有有效存档，退回默认布局。
+  if (widgets.length === 0 && removed.length === 0) return null;
   const pages = Math.max(1, toNonNegativeInt(raw.pages) ?? pagesUsed(widgets, 1), pagesUsed(widgets, 1));
   const activePage = Math.max(0, Math.min(pages - 1, toNonNegativeInt(raw.activePage) ?? 0));
-  return { widgets, pages, activePage };
+  return { widgets, pages, activePage, removed };
 }
 
 /** 从 localStorage 读布局；新键没有就尝试迁移旧键。坏数据返回 null */
@@ -194,6 +229,7 @@ export function saveLayout(state: LayoutState, storage: LayoutStorage | null = d
     pages: state.pages,
     activePage: state.activePage,
     widgets: state.widgets,
+    removed: state.removed,
     savedAt: Date.now(),
   };
   try {

@@ -1,15 +1,16 @@
-# 发布验证报告（v0.2.1）
+# 发布验证报告（v0.2.2）
 
 > 生成时间：2026-10-20（+08:00）
-> 代码提交：`fb5ab5f`（v0.2.0 发布收尾）；v0.2.1 安装包热修见 §10（同批提交）
-> 分支：`main`；版本：`0.2.1`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
+> 代码提交：`fb5ab5f`（v0.2.0 发布收尾）；v0.2.1 安装包热修见 §10；v0.2.2 交互/定位热修见 §11（提交 hash 见 §11）
+> 分支：`main`；版本：`0.2.2`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
-> 证据根：`shots/e7/`（本报告所有路径相对仓库根）；逐项矩阵见 `shots/e7/REPORT.md`
+> 证据根：`shots/e7/`、`shots/v022-final/`（本报告所有路径相对仓库根）；逐项矩阵见 `shots/e7/REPORT.md`、`shots/v022-final/REPORT.md`
 
 ## 0. 结论
 
 **可发布**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（E7 回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。Tauri debug 真窗口已重跑（§2.2），release 安装包已产出 MSI + NSIS（§2.3）。
 **v0.2.1 热修（2026-10-20）**：v0.2.0 安装包首次运行桌面卡在「正在加载桌面」——内置插件种子逻辑把构建期压缩字节原样写盘 + 忽略 AssetKey 前导 `/`，导致插件 manifest 全部非法、插件列表为空。已修复并用真实 release exe + CDP 复验 6 卡正常（§10）。
+**v0.2.2 热修（2026-10-20）**：修复用户实测 4 个问题——天气定位成功不应用到 widget、尺寸菜单失败项仍打勾、无添加组件入口、删除后插件页仍只显示已启用。独立回归 A/B/C/C.6 全 PASS（0 P0/P1），真实 release exe + WebView2 CDP 复验见 §11。
 
 ## 1. 阶段与关键 commit
 
@@ -267,3 +268,80 @@ npx tauri build                    # release + 安装包
 
 - 直接运行 v0.2.1 安装包覆盖 v0.2.0 即可；首次启动检测到 `.seed-version` 缺失/版本变化会重新种内置插件，自动修复用户目录里的坏文件。
 - v0.2.0 的安装包仍在 bundle 目录（`*_0.2.0_*`），仅作历史证据；分发请用 **v0.2.1**。
+
+## 11. v0.2.2 交互/定位热修（2026-10-20）
+
+安装 v0.2.1 后用户实测反馈 4 个问题，本轮全部修复并独立回归。
+
+### 11.1 用户报告与根因
+
+| # | 用户可见现象 | 根因 |
+|---|---|---|
+| 1 | 天气自动定位成功后，定位城市只出现在详情「当前位置」候选，widget 仍是旧城市/无城市 | 旧语义（D-16）只在城市列表为空时加入定位城市；已有城市时只写 `location` 候选、永不应用。且 `location` 有 30 分钟 TTL，升级后 fresh 结果也不会补应用 |
+| 2 | 尺寸菜单选当前页放不下的档位（如 4×2）提示失败、卡片没变，但菜单里该项仍被勾选 | `<Menu defaultCheckedValues>` 非受控：点击菜单项后 Fluent 内部已改勾选状态，而 `widget.size` 没变；失败不回滚，成功改尺寸后重开菜单也不刷新 |
+| 3 | 没有「增加 widget」入口，删掉的组件无法加回 | 编辑删除只有会话级移除（D-18），reload 由 `reconcileLayout` 自动并入；没有显式添加入口 |
+| 4 | 删除 widget 后右下角「插件」页里该插件仍只显示「已启用」，看不出组件已不在桌面 | 插件页只读启用/禁用偏好，不知道布局里还有没有该组件；删除又是会话级，语义对用户不可见 |
+
+### 11.2 修复
+
+**天气自动定位成功即应用（`public/plugins/weather/**`，D-16 修订）**
+- 新增纯函数 `store.applyLocatedPlace`：不存在则加入并 current、存在则切换、已是当前返回原引用（跳过写配置）；`useWeather` 自动定位 effect 与 Agent 工具 `weather.locate` 共用。
+- 定位成功立即应用为当前城市，卡片/详情随 `places` 配置变化刷新；`weather.locate` 的工具描述/返回 message 同步更新。
+- `location` 记录新增 `applied` 标记：升级迁移只应用「尚未应用过」的 fresh 结果（旧数据无 `applied`），应用过的不再覆盖用户手动选择的城市、不重复请求定位。
+- `app/app.js` 重建（906 KB）；README / 组件文档 / DECISIONS 同步。
+
+**桌面小组件生命周期（`src/host/layout/**`、`desktop/**`、`plugins/**`）**
+- 尺寸菜单改受控 `checkedValues={widget.size}`：勾选只跟真实尺寸；失败 toast 改为「当前页面没有空间放 W × H，尺寸保持不变」，卡片/勾选都保持原尺寸；成功改尺寸后重开菜单勾选跟随。
+- `LayoutState.removed`（widget key `pluginId:widgetId`）：编辑删除 = 持久下桌，reload 不复活；`wtsl.layout` 升 v3，读取兼容 v2（`removed: []`），「widgets 空 + removed 非空」是合法存档；重置布局清空 removed。
+- 新增 `placeWidget` 纯函数：当前页第一个空位 → 后续页 → 新开页。
+- 新增 `layout/presence.ts`（`useSyncExternalStore` 桌面存在性 + `requestAddWidget` 事件通道）：Desktop 保存布局后广播，插件页即时刷新。
+- 新增编辑模式工具条「添加组件」+ Fluent Dialog（列出已启用但不在桌面的组件、两种空态、添加后关闭并聚焦）；插件页对「已启用 · 未上桌」的插件提供「添加到桌面」。
+- 插件页状态四态：`已禁用` / `已启用`（纯后台）/ `已启用 · 未上桌` / `已启用 · 桌面 n/m`；启用/禁用语义不变（不删布局条目，重新启用回原位）。
+- 版本 0.2.2 + `.seed-version` 版本变化：安装/升级后自动重种内置插件，weather 新 `app.js` 进入用户目录。
+
+**测试基础设施**
+- `scripts/verify-plug-and-play.mjs` 等待超时按弱机加固（30s→120s，detail/设置 8–20s→30–60s），断言不变；原因见 11.3 环境说明。
+
+### 11.3 独立回归（verifier，2026-10-20 15:34–17:30）
+
+| 阶段 | 结果 | 证据 |
+|---|---|---|
+| A 工程门禁 | 4/4：`typecheck` 0、`build` 0（2234 modules）、`node --check` weather app.js 0、重建前后 SHA-256 一致 `6ACA66D8…` | `shots/v022-final/A-gates.json` |
+| B 既有脚本 | `verify-plugin` 六插件全 PASS；`verify-widgets` 25/25 × 暗/亮；`verify-overlays` 6/6 × 暗/亮；`verify-plug-and-play` 12/12 | `shots/v022-final/B-*.log` |
+| C 四项修复 E2E | **21/21 PASS**：1024×768 light + 1440×960 dark；尺寸菜单负例 toast+rect 不变+勾选回退、成功跟随；删除持久化 + reload 5 卡 + 插件页「未上桌」→「桌面 1/1」；「添加组件」列表/添加/空态；外观→重置布局恢复六卡；六卡基线/无横向溢出/无编辑 chrome/console 0 | `shots/v022-final/C-e2e-results.json`、`*-C1..C5-*.png` |
+| C.6 天气定位注入 | **7/7 PASS**：空列表自动加入上海 + `location.applied=true` + 卡片真实显示「上海 25°」（QWeather 真实网络）；已有北京→切上海且北京保留；`applied=true` 不覆盖手动城市、定位请求 0；无 `applied` 迁移应用、请求 0；console 0 | `shots/v022-final/C6-locate-results.json`、`C6-*.png` |
+
+环境说明：回归期间本机 4 核持续 93–100% CPU，Vite 冷加载 60–100s，导致 plug-and-play 首次 30s 超时误报；对照实验（`pnp-investigation.json`：15s 时 0 卡、83.6s 时 6 卡、console 0）确认非产品回归，加固超时后 12/12 PASS。完整报告：`shots/v022-final/REPORT.md`。
+
+### 11.4 安装包与升级路径
+
+`npx tauri build`（release）产出见下表；安装器中文配置沿用 v0.2.1。**安装/卸载仍由用户手动执行**（会写注册表与安装目录，不自动安装）。
+
+| 类型 | 产物 | 大小 | SHA-256 前 16 位 |
+|---|---|---|---|
+| NSIS（推荐） | `src-tauri/target/release/bundle/nsis/Windows Tablet Launcher_0.2.2_x64-setup.exe` | 8.16 MiB（8,561,260 B） | `29D763199A2279AA` |
+| MSI | `src-tauri/target/release/bundle/msi/Windows Tablet Launcher_0.2.2_x64_zh-CN.msi` | 9.27 MiB（9,715,712 B） | `E8FF653E75AA6AF0` |
+
+`npx tauri build` exit 0（release 编译 7m36s；日志 `shots/v022-final/tauri-build.log`）；release `app.exe` 16,737,280 B（SHA-256 `5A17A9991CE9F3AD…`）。
+
+- 直接安装 v0.2.2 覆盖 v0.2.1：`.seed-version` 变化会重新种六个内置插件（weather 新产物生效）；`wtsl.layout` v2 存档自动迁移到 v3（`removed: []`）；升级前 30 分钟内的天气定位结果会在首次启动应用一次（`applied` 迁移），之后不再覆盖手动选择。
+- 用户数据（插件配置、城市列表、布局、插件启用偏好）保留；自己放进插件目录的额外插件不受影响。
+
+### 11.5 release exe + WebView2 CDP 复验（2026-10-20 17:41–17:52）
+
+证据：`shots/v022-final/release/RELEASE-VERIFY.md`、`webview2-cdp.json`、`seed-upgrade.json`、`app-cdp-window.png`。
+
+| 项 | 结果 |
+|---|---|
+| 三产物哈希 | NSIS `29D76319…`、MSI `E8FF653E…`、`app.exe` `5A17A999…` 与构建后一致，验证前后未变 |
+| 真实 exe 启动 | 窗口标题正确、Responding、全屏 CSS 1440×960（DPR=2 → 物理 2880×1920）；UI Automation 命中六卡 aria-label；截图 `genuine-window.png` |
+| **升级重种** | 启动前 appdata `.seed-version=0.2.1` → 启动后 **0.2.2**；`weather/app/app.js` 被重写，SHA-256 `6ACA66D8…` 与仓库产物一致；`已切换当前城市为`/`当前城市已是`/`applied` 命中、旧「不自动切换」文案 0；6 个 manifest 合法；第二次启动幂等 |
+| CDP DOM 采集 | `http://tauri.localhost/` complete、无「正在加载桌面」、6 卡、8 iframe（2 background + 6 widget，均 `http://wtsl.localhost/...`）、无横向溢出、console.error/exception 0、`wtsl.layout` v3 / removed=[] |
+| 真实定位应用 | 用户配置 `autoLocate=true`；首轮启动真实 ip.cn 定位成功并应用（`source=ip`、`applied=true`、澳门），天气卡显示「澳门 30° 晴」；第二轮不再重复请求 |
+
+限制：`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 在 wry 0.57 下被忽略，DOM 取证通过临时副本（仅替换 62 字节调试参数，原产物哈希不变，副本已删除）完成；安装包实际安装/卸载未执行（由用户手动）。
+
+### 11.6 已知风险（v0.2.2）
+
+- **P2 打包内嵌 `secrets.json`**：`public/secrets.json` 会进入 `dist` 与安装包，安装包携带本机和风天气 Key（个人自用可接受；若对外分发需在构建时排除或改为运行时录入）。证据 `shots/v022-final/release/secrets-embed.json`（仅状态，不含 Key 明文）。
+- 真实 Windows Geolocator（系统定位）权限路径未单独验证；本轮真实定位走 ip.cn 成功。QWeather 真实网络链路已在 headless C.6 与真实 release exe 两处验证。

@@ -5,6 +5,7 @@
  * 所以调顺序 = 重映射 page 序号，删页 = 把该页组件顺延到剩下的页。
  */
 import { autoPlace, pagesUsed } from './grid';
+import { widgetKey } from './types';
 import type { LayoutState, PageIndicator, WidgetInstance } from './types';
 
 /** DESIGN.md §1.3：页数超过 7 时指示点折叠成“当前页/总页数”胶囊 */
@@ -73,7 +74,7 @@ export function removePage(
       ? state.activePage - 1
       : Math.min(state.activePage, pages - 1);
 
-  return { widgets, pages, activePage: clampPage(activePage, pages) };
+  return { ...state, widgets, pages, activePage: clampPage(activePage, pages) };
 }
 
 /** 页面调顺序：from/to 都是页序号，组件跟着页走 */
@@ -90,6 +91,7 @@ export function reorderPage(state: LayoutState, from: number, to: number): Layou
   order.forEach((oldPage, newPage) => pageMap.set(oldPage, newPage));
 
   return {
+    ...state,
     widgets: state.widgets.map((widget) => ({
       ...widget,
       page: pageMap.get(widget.page) ?? widget.page,
@@ -99,9 +101,18 @@ export function reorderPage(state: LayoutState, from: number, to: number): Layou
   };
 }
 
-/** 删除组件：页数不再回缩，避免用户手动加的空白页被顺手删掉 */
+/**
+ * 从桌面删除组件（D-18 修订：持久删除）。
+ *
+ * - 从 widgets 移除实例；
+ * - 把 `pluginId:widgetId` 写进 removed，reload 后 reconcileLayout 不会自动摆回；
+ * - 页数不回收，避免用户手动加的空白页被顺手删掉。
+ */
 export function removeWidgetFromLayout(state: LayoutState, uid: string): LayoutState {
+  const target = state.widgets.find((widget) => widget.uid === uid);
+  if (!target) return state;
   const widgets = state.widgets.filter((widget) => widget.uid !== uid);
-  if (widgets.length === state.widgets.length) return state;
-  return { ...state, widgets, pages: Math.max(state.pages, pagesUsed(widgets, 1)) };
+  const key = widgetKey(target.pluginId, target.widgetId);
+  const removed = state.removed.includes(key) ? state.removed : [...state.removed, key];
+  return { ...state, widgets, removed, pages: Math.max(state.pages, pagesUsed(widgets, 1)) };
 }
