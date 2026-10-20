@@ -314,32 +314,52 @@ fn dev_repo_root() -> Option<PathBuf> {
     None
 }
 
-/// 首次发布运行时把前端内嵌的 `plugins/**` 种到用户插件目录（已有插件就不动）。
+/// 种子标记：记录种入时的应用版本；升级安装后会重新种一遍内置插件，
+/// 避免旧版本种下的坏文件（例如压缩字节）永远留在用户目录里。
+const SEED_MARKER: &str = ".seed-version";
+
+/// 首次发布运行（以及每次版本升级）把前端内嵌的 `plugins/**` 种到用户插件目录。
+/// 只覆盖内置插件文件；用户自己放进来的额外插件目录不受影响。
 fn seed_bundled_plugins(app: &tauri::AppHandle, root: &Path) -> Result<(), String> {
-    if root.join("index.json").exists() {
+    let version = env!("CARGO_PKG_VERSION");
+    let marker = root.join(SEED_MARKER);
+    if std::fs::read_to_string(&marker)
+        .map(|value| value.trim() == version)
+        .unwrap_or(false)
+    {
         return Ok(());
     }
     let resolver = app.asset_resolver();
     let mut written = 0usize;
-    for (path, bytes) in resolver.iter() {
+    for (path, _compressed) in resolver.iter() {
+        // tauri-utils 的 AssetKey 会把路径规范成以 `/` 开头（assets.rs 的 From<Path> 实现），
+        // 所以这里必须先去掉前导 `/`，否则 strip_prefix("plugins/") 永远匹配不到，
+        // 发布安装后 app_data/plugins 会是空目录，桌面卡在“正在加载桌面”（v0.2.0 安装包问题）。
+        let path = path.trim_start_matches('/');
         let Some(relative) = path.strip_prefix("plugins/") else {
             continue;
         };
         if relative.is_empty() {
             continue;
         }
+        // iter() 返回的是构建期压缩（brotli）后的字节，直接写盘会得到不可读文件；
+        // 必须走 get() 拿解压后的 Asset.bytes（protocol.rs 的 plugin-sdk.js 也是这样取的）。
+        let Some(asset) = resolver.get(path.to_string()) else {
+            continue;
+        };
         let target = root.join(relative.replace('/', std::path::MAIN_SEPARATOR_STR));
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent).map_err(|err| format!("创建插件目录失败: {err}"))?;
         }
-        std::fs::write(&target, bytes.as_ref())
+        std::fs::write(&target, asset.bytes)
             .map_err(|err| format!("写入内置插件失败: {err}"))?;
         written += 1;
     }
     if written == 0 {
         log::warn!("没有可种入的内置插件资源（plugins/**）");
     } else {
-        log::info!("已种入 {written} 个内置插件文件");
+        std::fs::write(&marker, version).map_err(|err| format!("写入种子标记失败: {err}"))?;
+        log::info!("已种入 {written} 个内置插件文件（版本 {version}）");
     }
     Ok(())
 }

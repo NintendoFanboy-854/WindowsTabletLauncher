@@ -1,15 +1,16 @@
-# 发布前检查清单（v0.2.0）
+# 发布前检查清单（v0.2.1）
 
 > 最后一次全量验证：2026-10-20（E7）。每项都有证据（命令输出 / 截图路径 / commit hash）。
 > 证据根：`shots/e7/`；总报告：`docs/RELEASE-REPORT.md`、`shots/e7/REPORT.md`。
 > 勾选口径：`[x]` = 本阶段实际执行并通过；`[ ]` = 未执行/未验证，原因写在行内。
+> **v0.2.1 热修（2026-10-20）**：修复安装包首次运行卡「正在加载桌面」（内置插件种子写成压缩字节/未匹配路径）；安装器改为中文。详见 `docs/RELEASE-REPORT.md` §10。
 
 ## 1. 代码与构建
 
 - [x] `npm run typecheck` 通过（0 错误）— `shots/e7/logs/typecheck.log`
 - [x] `npm run build` 通过（tsc + vite；仅 chunk >500KB 已知警告）— `shots/e7/logs/build.log`
-- [x] `src-tauri` 目录 `cargo check` 通过（1m40s，app v0.2.0）— `shots/e7/logs/cargo-check.log`
-- [ ] `npx tauri build --debug --no-bundle`（真窗口）— **本阶段未重跑**，继承 v0.1.0 真窗口结论（见 `docs/RELEASE-REPORT.md` §7）
+- [x] `src-tauri` 目录 `cargo check` 通过（app v0.2.1）
+- [x] `npx tauri build --debug --no-bundle`（真窗口）— ✅ 2026-10-20 补充重跑：v0.2.0 debug exe 真窗口全屏 2880×1920、六插件真实渲染（`shots/e7/tauri/`）；v0.2.1 release exe 另经 WebView2 CDP 复验 6 卡（`shots/e7/release-seed/`）
 - [x] 插件产物与源码一致：`node scripts/build-plugin.mjs --all` 重建后 `git diff -- public/plugins` 为空 — `shots/e7/logs/build-plugin-all.log`
 - [x] 小部件 UI 断言通过：`node scripts/verify-widgets.mjs`（DENSITY §2.1，25/25；亮色同 25/25；1 项已接受 P2 记账，见报告）
 - [x] 插件详情浮层 UI 断言通过：`node scripts/verify-overlays.mjs`（六插件 `?view=detail`，834×582；暗 6/6、亮 6/6）— `shots/e7/logs/verify-overlays-*.log`
@@ -53,11 +54,11 @@
 
 ## 4. 打包与发布
 
-- [x] `npx tauri build`（release）产出安装包，路径记录 — ✅ 2026-10-20 产出 MSI 9.43 MiB / NSIS 8.32 MiB（`src-tauri/target/release/bundle/{msi,nsis}/`，校验见 RELEASE-REPORT §2.3）
-- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做安装验证（避免自动修改系统；由用户手动双击安装）
+- [x] `npx tauri build`（release）产出安装包，路径记录 — ✅ **v0.2.1 中文安装包**：NSIS `Windows Tablet Launcher_0.2.1_x64-setup.exe` 8.16 MiB（SHA-256 前缀 `84BACC6C951E4162`，SimpChinese）、MSI `Windows Tablet Launcher_0.2.1_x64_zh-CN.msi` 9.27 MiB（`F09A1D5A77E293EE`，zh-CN）— `src-tauri/target/release/bundle/`
+- [ ] 安装包可在当前机器安装、启动（或明确记录未验证项）— 未做自动安装验证（避免修改系统）；v0.2.1 已用真实 release exe + CDP 验证插件种子/6 卡渲染（`RELEASE-REPORT.md` §10），安装/卸载由用户手动执行
 - [x] `git status` 干净（E7 与后续补充变更均已提交；`public/plugins/**`、`templates/**` 无意外 diff；`secrets.json` 未跟踪）
 - [x] commit 信息清晰；`git push` 到 origin/main — 已 push（本地 HEAD 与 origin/main 一致）
-- [x] 打 tag：`v0.2.0` — 已创建并推送
+- [x] 打 tag：`v0.2.1` — 已创建并推送（v0.2.0 tag 保留作历史记录）
 
 ## 5. 文档齐套
 

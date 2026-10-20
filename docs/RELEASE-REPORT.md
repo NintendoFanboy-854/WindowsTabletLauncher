@@ -1,14 +1,15 @@
-# 发布验证报告（v0.2.0）
+# 发布验证报告（v0.2.1）
 
 > 生成时间：2026-10-20（+08:00）
-> 代码提交：`66c2330`（E7：脚本、文档、版本号、1 处 P1 修复），父提交 `1e2b44f`（E6 收口）
-> 分支：`main`；版本：`0.2.0`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
+> 代码提交：`fb5ab5f`（v0.2.0 发布收尾）；v0.2.1 安装包热修见 §10（同批提交）
+> 分支：`main`；版本：`0.2.1`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
 > 证据根：`shots/e7/`（本报告所有路径相对仓库根）；逐项矩阵见 `shots/e7/REPORT.md`
 
 ## 0. 结论
 
-**可发布（浏览器 / dev-server / Tauri debug 真窗口范围）**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（本轮回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。**2026-10-20 补充**：Tauri debug 真窗口已重跑（§2.2），release 安装包已产出 MSI + NSIS（§2.3），安装验证未做（需人工双击安装）。
+**可发布**：E0–E7 全部完成；工程门禁、六个插件的脚本回归、宿主 E2E、plug-and-play 验收全部通过；发布时点 **P0 = 0、P1 = 0**（E7 回归期间发现 1 项 P1，已修复并复验，见 §6.1），P2 债务均为已记录、不阻塞交付的已知项。Tauri debug 真窗口已重跑（§2.2），release 安装包已产出 MSI + NSIS（§2.3）。
+**v0.2.1 热修（2026-10-20）**：v0.2.0 安装包首次运行桌面卡在「正在加载桌面」——内置插件种子逻辑把构建期压缩字节原样写盘 + 忽略 AssetKey 前导 `/`，导致插件 manifest 全部非法、插件列表为空。已修复并用真实 release exe + CDP 复验 6 卡正常（§10）。
 
 ## 1. 阶段与关键 commit
 
@@ -220,3 +221,49 @@ npx tauri build                    # release + 安装包
 2. ✅ `git push origin main` 已完成（远端 HEAD 与本地一致）；
 3. ✅ Tauri debug 真窗口已重跑（§2.2）；release 安装包 MSI + NSIS 已产出（§2.3），安装验证待人工；
 4. ✅ `scripts/verify-plug-and-play.mjs` 已落地并 12/12 PASS（§2.4）。
+
+## 10. v0.2.1 安装包热修（2026-10-20）
+
+### 10.1 现象与根因
+
+安装 v0.2.0（MSI/NSIS）后启动，桌面永久显示「正在加载桌面…」，控制台无报错。
+
+- **根因 A（前导 `/`）**：Tauri 的 `asset_resolver().iter()` 返回的 `AssetKey` 统一带前导 `/`（`tauri-utils/assets.rs` 的 `From<Path>` 实现），`strip_prefix("plugins/")` 永远不匹配 → 种子写出 0 个文件。
+- **根因 B（压缩字节）**：即使匹配上，`iter()` 返回的是构建期 **brotli 压缩后的字节**；直接 `fs::write` 得到的 `manifest.json` 不是合法 JSON → 6 个插件全部解析失败（`manifest.json 不是合法 JSON: expected value at line 1 column 1`），插件列表为空，`reconcileLayout` 在空目录下不产出布局，桌面就卡在 loading。
+
+### 10.2 修复（`src-tauri/src/plugins.rs`）
+
+- `iter()` 只用来取 key；文件内容改用 `resolver.get(path)` 拿**解压后的** `Asset.bytes`。
+- key 先 `trim_start_matches('/')` 再 `strip_prefix("plugins/")`。
+- 新增 `.seed-version` 标记（内容为 `CARGO_PKG_VERSION`）：首次运行或版本升级时重新种内置插件，**会覆盖旧版本种下的坏文件**，用户自己放进来的额外插件目录不受影响。
+
+### 10.3 复验（真实 release exe + WebView2 CDP）
+
+启动 `target/release/app.exe`（v0.2.1），CDP 重载后采集：
+
+| 断言 | 结果 |
+|---|---|
+| `document.body.innerText` 含「正在加载桌面」 | ❌ 不出现（loadingText=false） |
+| 桌面卡片数 | **6**（clock/countdown/pomodoro/sedentary/todo/weather） |
+| 插件 iframe | 全部走 `http://wtsl.localhost/<id>/...`（TauriPluginSource 生效） |
+| `plugin_list` | 6 条记录，`hasManifest=true` |
+| console error / warning | 0 |
+| 窗口截图 | `shots/e7/release-seed/seed-window.png`（2880×1920，六卡真实内容） |
+
+诊断原始输出：`shots/e7/release-debug/diag2.json`。修复前同一诊断可见 6 条 `manifest.json 不是合法 JSON`（`diag.json`）。
+
+### 10.4 中文安装器与 v0.2.1 产物
+
+`tauri.conf.json > bundle.windows` 增加 NSIS `languages: ["SimpChinese"]`（安装界面简体中文、无语言选择框）与 WiX `language: ["zh-CN"]`（MSI 中文语言包）。
+
+| 类型 | 产物 | 大小 | SHA-256 前 16 位 |
+|---|---|---|---|
+| NSIS（推荐） | `src-tauri/target/release/bundle/nsis/Windows Tablet Launcher_0.2.1_x64-setup.exe` | 8.16 MiB | `84BACC6C951E4162` |
+| MSI | `src-tauri/target/release/bundle/msi/Windows Tablet Launcher_0.2.1_x64_zh-CN.msi` | 9.27 MiB | `F09A1D5A77E293EE` |
+
+`npx tauri build` exit 0；release `app.exe` 16,735,232 B。**安装/卸载仍由用户手动验证**（安装器会写注册表与安装目录，不自动执行）。
+
+### 10.5 升级路径
+
+- 直接运行 v0.2.1 安装包覆盖 v0.2.0 即可；首次启动检测到 `.seed-version` 缺失/版本变化会重新种内置插件，自动修复用户目录里的坏文件。
+- v0.2.0 的安装包仍在 bundle 目录（`*_0.2.0_*`），仅作历史证据；分发请用 **v0.2.1**。
