@@ -17,8 +17,8 @@
 | 阶段 | 尺寸 | 表面/层级 | 内容 |
 |---|---|---|---|
 | collapsed（按钮） | 56×56 | surface1 + stroke1 + shadow8 | `ChatSparkle20Regular` 品牌色图标；无文字、无机器人、无麦克风 |
-| composer（半高窗） | width min(420px, 92vw) × height clamp(320px, 44vh, 440px) | surface1 + stroke2 + shadow16 | 顶部：最近一条助手回答的渐隐预览（无回答时留空）；中部：输入区（Textarea 自动增高 ≤3 行）；底部：语音波形按钮 + 发送按钮；录音时中部换成声纹带 |
-| chat（全高浮栏） | 同宽 × calc(100vh - 40px) | surface1 + stroke2 + shadow16 | 头部：[ChatSparkle 小标] + 右侧 ⌄（收起）/ ⋯ 菜单 / X（关闭）；消息列表；底部同一输入组件（不重挂） |
+| composer（半高窗） | width min(420px, 92vw) × height clamp(320px, 44vh, 440px) | surface1 + stroke2 + shadow16 | 顶部：⌃ 展开对话 / 朗读开关 / ✕ 收起；中部：最近 3 条消息的 peek（底部对齐、顶部渐隐，整块可点/Enter/空格展开；无消息时 ChatSparkle 空态）；底部：输入区（Textarea 自动增高 ≤3 行）+ 语音/发送按钮；录音/转写时中部换成声纹带，peek 与展开暂隐 |
+| chat（全高浮栏） | 同宽 × calc(100vh - 40px) | surface1 + stroke2 + shadow16 | 头部：[ChatSparkle 小标] + 右侧 朗读开关（常驻）/（仅播报中）停止朗读 / ⌄（收起）/ ⋯ 菜单 / X（关闭）；消息列表；底部同一输入组件（不重挂） |
 
 - 不做全屏、不做侧栏让宽、不做 dock。桌面其它 chrome 不变（页码点、编辑工具栏）。
 
@@ -29,16 +29,22 @@
 | 点入口按钮 | **立即开始录音**，同时 morph 到 composer（录音态）；再点音符/停止方块 = 结束并发送 |
 | 按住空格（无修饰键、焦点不在 input/textarea/button/菜单/dialog/iframe、非输入法组合、非 auto-repeat） | 立即开始录音；松开 = 结束并发送；<300ms 或失焦 = 取消 |
 | 录音中 Esc | 取消录音，停留在 composer（可改文字）；再 Esc 收起为按钮 |
+| composer：⌃ 展开对话 | 进入 chat，焦点到输入框；录音/转写中禁用（不给“看起来能展开但没结果”的死路） |
 | composer：Esc / 点外部 | 收起为按钮，草稿保留（HIG popover：点外关闭必须保存工作） |
+| composer：录音中 X / 点外部 | 先取消录音再收起：不能留下没人能停的麦克风在后台 |
+| composer：转写中 X | 收起后转写完成不再自动弹回 chat（关闭就是关闭；结果仍保存，展开可见） |
+| composer：peek 区域点击 / Enter / 空格 | 展开到 chat（半高窗不是死路，不需要先发一条消息才能升级） |
+| chat：朗读开关（常驻） | 切换自动朗读总开关 `tts.autoRead`，立即持久化；切换时先停当前播报 |
 | chat：⌄ / Esc | 收起到 composer（草稿、会话不丢） |
 | chat：X | 直接收成按钮；停止播报 |
-| composer：X | 直接收成按钮 |
+| chat：播放中 | 显示临时「停止朗读」；不播放时该按钮不渲染（状态控件常驻、动作控件按需出现） |
 | chat：点外部 | 不关闭（稳定阅读） |
 | 发送（打字 Enter / 语音结束） | 自动 morph 到 chat；只此一种自动升级，不自动收起 |
 | 关闭/收起后焦点 | 回到入口按钮；展开后焦点到输入框；chat 收起后焦点到 composer 输入框 |
 
 - 按钮 56×56（≥40 触控）；所有图标按钮 ≥40×40，带 Tooltip；无隐藏手势、无双击语义。
 - 禁用态必须可见（发送按钮空内容时 outline+禁用，不隐藏）。
+- 状态与操作分离：常驻控件只表达**状态**（朗读开/关，用图标 + aria-pressed），临时控件只在**动作可用**时出现（停止朗读、展开在转写中禁用）；不出现“只有播放时才凭空冒出的语音控件”。
 
 ## 3. 动效（只用 motionTokens；无自定义曲线/弹簧/模糊）
 
@@ -64,14 +70,14 @@
 - 气泡：用户 `colorBrandBackground2`；助手 `colorNeutralBackground2`；工具卡 `colorNeutralBackground3`；时间/元信息 `colorNeutralForeground3`。
 - 语义色只用于错误/警告图标与 tooltip，不做装饰。
 - 字体：输入 400（16/22）、消息正文 300（14/20）、元信息 200（12/16）；无大标题、无模型 badge、不出现工程术语。
-- 图标：入口/品牌标记 `ChatSparkle20Regular`；语音动作 `SoundWaveCircle20Regular`；发送 `SendRegular`；收起 `ChevronDown20Regular`；关闭 `DismissRegular`；更多 `MoreHorizontal20Regular`。**全项目删除 `Bot*` / `Person*` 头像与机器人图标**。
+- 图标：入口/品牌标记 `ChatSparkle20Regular`；语音动作 `SoundWaveCircle20Regular`；发送 `SendRegular`；收起 `ChevronDown20Regular`；展开 `ChevronUp20Regular`；关闭 `DismissRegular`；更多 `MoreHorizontal20Regular`；朗读开/关 `Speaker2Regular` / `SpeakerMuteRegular`。**全项目删除 `Bot*` / `Person*` 头像与机器人图标**。
 
 ## 5. 语音交互（入口即录）
 
 - 录音 UI：composer 中部变成声纹带（Waveform 复用/重写）：品牌色 `colorBrandBackground2` 底、实时电平条 `colorBrandForeground1`；右侧停止方块（主操作）+ 取消 X；无“正在聆听”等文字。
 - 状态：`idle → recording → transcribing → (发送后) streaming → speaking`；录音开始时立即开始，不等界面。
 - 转写中停在 composer，声纹收敛为静态；转写完成后进入 chat（或已在 chat 就地显示）。
-- 播报：**语音提问的回答必读**；文字提问默认不读（设置 `文字提问也朗读` 默认关）。播报中：消息元信息旁的声纹图标在动，点它停止；收起/关闭窗口、开始新一轮录音、发送新消息都先停止播报。
+- 播报：总开关 `tts.autoRead`（默认开）关闭后，语音/文字回答都不自动读，手动点单条朗读仍可用；开启时语音提问必读、文字提问按 `tts.readTextReplies`（默认关）。播报中：消息元信息旁的声纹图标在动，点它停止；头部显示「停止朗读」；收起/关闭窗口、开始新一轮录音、发送新消息都先停止播报。
 - 兼容 mock：`?mock=1` 下录音仍可走假麦克风，ASR 返回固定文字。
 
 ## 6. 语音消息呈现（无文字标签）
@@ -191,10 +197,13 @@ interface AgentSettings {
 2. 点按钮/按空格 = 立即录音（不是先开窗再点录音）；录音中 Esc 取消；发送后 morph 到 chat。
 3. 三段 morph 时长/曲线符合 §3，reduced-motion 只有淡入淡出。
 4. Esc/⌄/X/点外部的语义符合 §2；焦点回到该回的位置；草稿保留。
-5. 语音气泡无声纹以外的文字标签；转写 shimmer→文字；`localStorage`/网络后续请求无音频。
-6. 语音提问自动播报；文字提问默认不播报；单条播报可停；收起/关闭即停。
-7. `tsc --noEmit` 通过；mock 下可走完整录音→转写→回答链路（假麦克风）。
-8. 天气 3×2 无 166px 横向空洞；内容带 ≥70%；1024/1440 不裁切（W3）。
+5. composer 顶部有展开对话 + 朗读开关 + 收起；peek 可展开；录音中收起会取消录音；转写中收起不自动弹回。
+6. chat header 不播放时也有朗读开关；「停止朗读」只在播报中出现；开关状态持久化到 `tts.autoRead`。
+7. 桌面空白右键能打开「打开 Agent / 编辑桌面 / 设置」；Agent ⋯ 菜单不含宿主设置入口。
+8. 语音气泡无声纹以外的文字标签；转写 shimmer→文字；`localStorage`/网络后续请求无音频。
+9. 总开关关闭后语音/文字回答都不自动播报；单条播报可停；收起/关闭即停。
+10. `tsc --noEmit` 通过；mock 下可走完整录音→转写→回答链路（假麦克风）。
+11. 天气 3×2 无 166px 横向空洞；内容带 ≥70%；1024/1440 不裁切（W3）。
 
 ## 12. 实现备注（v0.3.0 落地时确认）
 
@@ -211,4 +220,19 @@ interface AgentSettings {
 - **入口按钮 hover**：只变 surface/shadow，不做 hover 缩放；按压 0.98（reduced-motion 取消）。
 - **机器人清理**：`Bot*`/`Person*`/`Avatar`/`Mic*` 图标、模型 badge、解释性状态文字均已从 Agent UI 移除；
   身份只由 ChatSparkle 承担。
+
+## 13. v0.3.1 修订（用户反馈：半高窗死路 / 不能默认静音 / header 空 / 鼠标进不了设置）
+
+- **半高窗补出口**：顶部控制条（⌃ 展开 / 朗读开关 / ✕ 收起）+ 最近 3 条消息 peek；录音/转写时这两块暂隐，
+  展开按钮禁用。理由：半高窗不再必须“先发一条消息”才能升级，也不会只有一条渐隐预览可看。
+- **关闭即结束**：录音中收起先 `cancelRecording()`；转写中收起后 `suppressVoiceReveal` 阻止 ASR 完成时把窗口
+  弹回 chat。旧行为是“关闭只改布局”，会留下后台录音 / 覆盖用户关闭意图。
+- **播报状态常驻**：chat header 与 composer 顶部都有朗读开关（`tts.autoRead`，默认开）；「停止朗读」只在播报中
+  出现。旧行为把唯一的语音控件放在“播放中才出现”，导致不播放时看起来没有语音能力。
+- **设置入口的层级**（详见 DECISIONS D-23）：Agent ⋯ 菜单只保留 Agent 自己的设置，**不**加入宿主的
+  「桌面设置」。宿主设置入口 = 桌面空白右键菜单「设置」/ `Ctrl+,` / 触控长按空白 → 编辑工具栏「设置」。
+  桌面右键菜单同时提供「打开 Agent」「编辑桌面」，用 Fluent Menu 的虚拟 target 定位（Portal，无 MenuTrigger）。
+- **鼠标路径**：桌面空白处右键 = Windows 桌面惯例；不再要求用户先知道 Ctrl+, 或长按空白。触控长按语义不变。
+- 验收：`scripts/smoke-v031-ui.mjs`（headless Edge + 假麦克风）A–H 全 PASS（24/24，console error 0）；
+  `tsc --noEmit` 通过；截图 `shots/v031-dev/`。
 

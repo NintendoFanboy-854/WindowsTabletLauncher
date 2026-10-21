@@ -11,8 +11,31 @@
  * - 编辑模式下整个卡片由宿主浮层接管，拖拽/点击都可用。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
-import { Button, MessageBar, MessageBarBody, Spinner, Text, mergeClasses, useThemeClassName } from '@fluentui/react-components';
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+} from 'react';
+import {
+  Button,
+  Menu,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  MenuPopover,
+  MessageBar,
+  MessageBarBody,
+  Spinner,
+  Text,
+  mergeClasses,
+  useThemeClassName,
+} from '@fluentui/react-components';
+import {
+  ChatSparkleRegular,
+  EditRegular,
+  SettingsRegular,
+} from '@fluentui/react-icons';
 import { getHostBridge } from '../bridge';
 import type { BridgeServices, HostBridge } from '../bridge';
 import type { ShowReminderParams, ThemePayload, WidgetInstance, WidgetSize } from '../bridge/types';
@@ -87,6 +110,8 @@ export interface DesktopProps {
   onOpenPluginSettings?: (pluginId: string) => void;
   /** 编辑模式「设置」按钮：交给 App 打开设置页（v0.3.0 桌面 dock 删除后的触控入口） */
   onOpenSettings?: () => void;
+  /** 桌面右键菜单「打开 Agent」：交给 App 打开浮空 Agent 对话 */
+  onOpenAgent?: () => void;
   /**
    * 当前生效的亮暗模式（App 解析后的 colorScheme）。FluentProvider 换主题时只更新
    * CSS 变量、provider 的 className 不变，桌面层必须靠这个值重新读取 token 并下发给
@@ -284,6 +309,7 @@ export default function Desktop({
   layoutResetRequest,
   onOpenPluginSettings,
   onOpenSettings,
+  onOpenAgent,
   colorScheme,
 }: DesktopProps) {
   const styles = useStyles();
@@ -326,6 +352,8 @@ export default function Desktop({
   const [dragView, setDragView] = useState<DragView | null>(null);
   /** 编辑模式「添加组件」Dialog 是否打开 */
   const [addWidgetOpen, setAddWidgetOpen] = useState(false);
+  /** 桌面空白处右键菜单的位置（鼠标用户的设置入口；触控仍走长按编辑栏） */
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -342,6 +370,8 @@ export default function Desktop({
   const cardNodesRef = useRef(new Map<string, HTMLDivElement>());
   const frameHandlesRef = useRef(new Map<string, WidgetFrameHandle>());
   const swipeRef = useRef<SwipeSession | null>(null);
+  /** 最近一次 pointerdown 的指针类型：右键菜单只对鼠标生效，触控长按仍进编辑模式 */
+  const lastPointerTypeRef = useRef('mouse');
   const dragRef = useRef<DragSession | null>(null);
   const wheelRef = useRef({ delta: 0, at: 0 });
   const initialEditAppliedRef = useRef(false);
@@ -966,6 +996,7 @@ export default function Desktop({
   // ---------- 空白区手势：滑动切页 / 长按进编辑 / 点空白退出编辑 ----------
 
   const handleRootPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    lastPointerTypeRef.current = event.pointerType;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     // Portal 内容（Fluent Dialog/Menu/Toast）的 pointerdown 会沿 React 树冒泡到桌面根节点，
     // 但 DOM 上不在根节点内；这里抢指针会把浮层按钮的 click 重定向到桌面，必须放行。
@@ -1041,6 +1072,25 @@ export default function Desktop({
     if (session.longPressTimer !== null) window.clearTimeout(session.longPressTimer);
     swipeRef.current = null;
     setSwipeOffset(null);
+  };
+
+  /**
+   * 桌面空白处右键 = Windows 桌面惯例的上下文菜单。
+   * 这是鼠标用户的正文入口（设置 / 编辑桌面 / 打开 Agent），不把宿主设置塞进 Agent。
+   * 触控长按仍进入编辑模式；只有鼠标 pointerType 才弹菜单。
+   */
+  const handleRootContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (lastPointerTypeRef.current !== 'mouse') return;
+    if (editModeRef.current) return;
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest('[data-widget-card],[data-no-desktop-gesture]')
+    ) {
+      return;
+    }
+    setContextMenu({ x: event.clientX, y: event.clientY });
   };
 
   // 触控板双指 / 鼠标滚轮翻页：累计一个单元格的滚动距离算一次翻页
@@ -1169,7 +1219,7 @@ export default function Desktop({
       onPointerCancel={handleRootPointerCancel}
       onWheel={handleWheel}
       onKeyDown={handleKeyDown}
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={handleRootContextMenu}
     >
       <BackgroundFrames
         plugins={backgroundPlugins}
@@ -1269,6 +1319,63 @@ export default function Desktop({
       )}
 
       {layout && <PageIndicator total={layout.pages} active={layout.activePage} />}
+
+      {/* 鼠标右键菜单：浮层挂 Portal，位置用虚拟 target 取自光标点 */}
+      {contextMenu && (
+        <Menu
+          open
+          onOpenChange={(_, data) => {
+            if (!data.open) setContextMenu(null);
+          }}
+          positioning={{
+            target: {
+              getBoundingClientRect: () => ({
+                x: contextMenu.x,
+                y: contextMenu.y,
+                top: contextMenu.y,
+                bottom: contextMenu.y,
+                left: contextMenu.x,
+                right: contextMenu.x,
+                width: 0,
+                height: 0,
+              }),
+            },
+          }}
+        >
+          <MenuPopover>
+            <MenuList>
+              <MenuItem
+                icon={<ChatSparkleRegular />}
+                onClick={() => {
+                  setContextMenu(null);
+                  onOpenAgent?.();
+                }}
+              >
+                打开 Agent
+              </MenuItem>
+              <MenuItem
+                icon={<EditRegular />}
+                onClick={() => {
+                  setContextMenu(null);
+                  enterEditMode();
+                }}
+              >
+                编辑桌面
+              </MenuItem>
+              <MenuDivider />
+              <MenuItem
+                icon={<SettingsRegular />}
+                onClick={() => {
+                  setContextMenu(null);
+                  onOpenSettings?.();
+                }}
+              >
+                设置
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
+      )}
 
       {dragView && (
         <div

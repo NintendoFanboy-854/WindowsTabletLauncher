@@ -220,6 +220,7 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
             layoutResetRequest={layoutResetRequest}
             onOpenPluginSettings={openSettings}
             onOpenSettings={() => openSettings()}
+            onOpenAgent={openAgent}
           />
         </PageTransition>
       </div>

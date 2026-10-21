@@ -134,7 +134,18 @@ export function SettingsDialog({
               <div className={styles.toggleRow}>
                 <Switch
                   className={styles.control40}
+                  checked={settings.tts.autoRead}
+                  onChange={(_, data) =>
+                    session.updateSettings({ tts: { autoRead: data.checked } })
+                  }
+                  label="自动朗读回答（总开关）"
+                />
+              </div>
+              <div className={styles.toggleRow}>
+                <Switch
+                  className={styles.control40}
                   checked={settings.tts.readTextReplies}
+                  disabled={!settings.tts.autoRead}
                   onChange={(_, data) =>
                     session.updateSettings({ tts: { readTextReplies: data.checked } })
                   }
@@ -142,7 +153,8 @@ export function SettingsDialog({
                 />
               </div>
               <Text size={200} className={styles.hint}>
-                语音提问的回答总会朗读；文字提问默认只显示文字。
+                关闭总开关后，语音提问和文字提问的回答都只显示文字；仍可点单条回答旁的朗读按钮。
+                半高窗顶部和全高窗右上角的扬声器按钮可以随时静音/恢复。
               </Text>
               <Field label="音色">
                 <Dropdown

@@ -20,6 +20,7 @@ import {
   MenuPopover,
   MenuTrigger,
   Text,
+  ToggleButton,
   Tooltip,
   makeStyles,
   motionTokens,
@@ -31,9 +32,12 @@ import {
   ChatSparkleRegular,
   CheckmarkRegular,
   ChevronDownRegular,
+  ChevronUpRegular,
   DismissRegular,
   MoreHorizontalRegular,
   SettingsRegular,
+  Speaker2Regular,
+  SpeakerMuteRegular,
   StopRegular,
 } from '@fluentui/react-icons';
 import {
@@ -165,24 +169,69 @@ const useStyles = makeStyles({
     flex: '1 1 auto',
     paddingBlock: tokens.spacingVerticalM,
   },
-  previewRow: {
+  // 半高窗顶部控制条：展开对话 / 静音 / 关闭（鼠标与触控都直接可见）
+  composerTop: {
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
     minHeight: '40px',
     flex: '0 0 auto',
   },
-  previewText: {
+  composerTopSpacer: {
     flex: 1,
-    minWidth: 0,
-    maxHeight: '88px',
+  },
+  // 半高窗里的近期消息 peek：底部对齐、顶部渐隐；整块点击展开对话
+  peekArea: {
+    flex: '1 1 auto',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingVerticalS,
     overflow: 'hidden',
-    color: tokens.colorNeutralForeground3,
+    paddingBlock: tokens.spacingVerticalS,
+    cursor: 'pointer',
+    borderRadius: tokens.borderRadiusLarge,
+    maskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)',
+    ':focus-visible': {
+      outlineColor: tokens.colorStrokeFocus2,
+      outlineStyle: 'solid',
+      outlineWidth: '2px',
+      outlineOffset: '-2px',
+    },
+  },
+  peekRow: {
+    display: 'flex',
+    minWidth: 0,
+  },
+  peekRowUser: {
+    justifyContent: 'flex-end',
+  },
+  peekBubble: {
+    maxWidth: '86%',
+    paddingInline: tokens.spacingHorizontalS,
+    paddingBlock: tokens.spacingVerticalXS,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    color: tokens.colorNeutralForeground2,
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: 'vertical',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
-    // 渐隐预览（契约 §1）：只做透明度遮罩，不是发光/渐变装饰
-    maskImage: 'linear-gradient(to bottom, black 45%, transparent 100%)',
-    WebkitMaskImage: 'linear-gradient(to bottom, black 45%, transparent 100%)',
+  },
+  peekBubbleUser: {
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorNeutralForeground1,
+  },
+  peekEmpty: {
+    flex: 1,
+    display: 'grid',
+    placeItems: 'center',
+    color: tokens.colorBrandForeground1,
+    opacity: 0.75,
   },
   composerSlot: {
     display: 'flex',
@@ -195,10 +244,6 @@ const useStyles = makeStyles({
     flex: '1 1 auto',
     justifyContent: 'center',
     paddingBlockEnd: tokens.spacingVerticalXXL,
-  },
-  grow: {
-    flex: '1 1 auto',
-    minHeight: 0,
   },
   header: {
     display: 'flex',
@@ -299,6 +344,8 @@ export function AgentSurface({
   const menuOpenRef = useRef(menuOpen);
   const onOpenChangeRef = useRef(onOpenChange);
   const previousStageRef = useRef<SurfaceStage>(stage);
+  /** 转写途中被收起：识别完成后不再把窗口弹回 chat（关闭就是关闭） */
+  const suppressVoiceRevealRef = useRef(false);
 
   sessionRef.current = session;
   settingsOpenRef.current = settingsOpen;
@@ -338,13 +385,30 @@ export function AgentSurface({
     const current = stageRef.current;
     if (current === 'collapsed') return;
     sessionRef.current.stopSpeaking();
+    // 录音中收起 = 放弃这次录音：不能留一个没人能停的麦克风在后台
+    const voiceStage = sessionRef.current.voice.stage;
+    if (voiceStage === 'recording') {
+      sessionRef.current.cancelRecording();
+    } else if (voiceStage === 'transcribing') {
+      suppressVoiceRevealRef.current = true;
+    }
     go('collapsed', current === 'chat' ? 'close-chat' : 'back-collapsed');
     onOpenChangeRef.current?.(false);
   }, [go]);
 
+  /** 语音结束的回调：只有用户没有主动收起时才升级到 chat */
+  const handleVoiceDone = useCallback(() => {
+    if (suppressVoiceRevealRef.current) {
+      suppressVoiceRevealRef.current = false;
+      return;
+    }
+    openChat();
+  }, [openChat]);
+
   const startVoice = useCallback(() => {
     const current = sessionRef.current;
     if (current.voice.stage !== 'idle' || current.status !== 'idle') return;
+    suppressVoiceRevealRef.current = false;
     openComposer();
     void current.startRecording();
   }, [openComposer]);
@@ -523,12 +587,24 @@ export function AgentSurface({
   }, [stage, collapse]);
 
   const messages = session.conversation?.messages ?? [];
-  const preview = useMemo(() => {
-    const lastAssistant = [...messages]
-      .reverse()
-      .find((message) => message.role === 'assistant' && message.content.trim());
-    return lastAssistant ? lastAssistant.content.replace(/\s+/g, ' ').trim() : '';
-  }, [messages]);
+  // 半高窗只展示最近 3 条有内容的对话（用户/助手），最新一条贴着输入区
+  const peekMessages = useMemo(
+    () =>
+      messages
+        .filter(
+          (message) =>
+            (message.role === 'user' || message.role === 'assistant') &&
+            message.content.trim().length > 0,
+        )
+        .slice(-3),
+    [messages],
+  );
+  const autoRead = session.settings.tts.autoRead;
+  const toggleAutoRead = () => {
+    const next = !sessionRef.current.settings.tts.autoRead;
+    sessionRef.current.stopSpeaking();
+    sessionRef.current.updateSettings({ tts: { autoRead: next } });
+  };
 
   const spec = MORPH[motion];
   const inChat = stage === 'chat';
@@ -633,6 +709,20 @@ export function AgentSurface({
                 aria-hidden="true"
               />
               <div className={styles.headerSpacer} />
+              {/* 常驻朗读开关：显示当前是否会自动朗读（不再只在播放时才冒出一个控件） */}
+              <Tooltip
+                content={autoRead ? '关闭自动朗读' : '开启自动朗读'}
+                relationship="label"
+              >
+                <ToggleButton
+                  size="large"
+                  appearance="subtle"
+                  checked={autoRead}
+                  icon={autoRead ? <Speaker2Regular /> : <SpeakerMuteRegular />}
+                  aria-label={autoRead ? '关闭自动朗读' : '开启自动朗读'}
+                  onClick={toggleAutoRead}
+                />
+              </Tooltip>
               {speaking ? (
                 <Tooltip content="停止朗读" relationship="label">
                   <Button
@@ -724,18 +814,32 @@ export function AgentSurface({
             }`}
           >
             {inComposer ? (
-              <div className={styles.previewRow}>
-                {preview ? (
-                  <Text
-                    size={300}
-                    className={styles.previewText}
-                    style={voiceStage === 'idle' ? undefined : { opacity: 0.55 }}
-                  >
-                    {preview}
-                  </Text>
-                ) : (
-                  <div className={styles.headerSpacer} />
-                )}
+              <div className={styles.composerTop}>
+                {/* 半高窗不再是死路：这里直接展开到全高对话 */}
+                <Tooltip content="展开对话" relationship="label">
+                  <Button
+                    size="large"
+                    appearance="subtle"
+                    icon={<ChevronUpRegular />}
+                    disabled={voiceStage !== 'idle'}
+                    aria-label="展开对话"
+                    onClick={openChat}
+                  />
+                </Tooltip>
+                <div className={styles.composerTopSpacer} />
+                <Tooltip
+                  content={autoRead ? '关闭自动朗读' : '开启自动朗读'}
+                  relationship="label"
+                >
+                  <ToggleButton
+                    size="large"
+                    appearance="subtle"
+                    checked={autoRead}
+                    icon={autoRead ? <Speaker2Regular /> : <SpeakerMuteRegular />}
+                    aria-label={autoRead ? '关闭自动朗读' : '开启自动朗读'}
+                    onClick={toggleAutoRead}
+                  />
+                </Tooltip>
                 <Tooltip content="收起" relationship="label">
                   <Button
                     size="large"
@@ -747,7 +851,43 @@ export function AgentSurface({
                 </Tooltip>
               </div>
             ) : null}
-            {inComposer && voiceStage === 'idle' ? <div className={styles.grow} /> : null}
+            {inComposer && voiceStage === 'idle' ? (
+              <div
+                className={styles.peekArea}
+                role="button"
+                tabIndex={0}
+                aria-label="展开对话"
+                onClick={openChat}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  openChat();
+                }}
+              >
+                {peekMessages.length === 0 ? (
+                  <div className={styles.peekEmpty} aria-hidden="true">
+                    <ChatSparkleRegular fontSize={28} />
+                  </div>
+                ) : (
+                  peekMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`${styles.peekRow} ${
+                        message.role === 'user' ? styles.peekRowUser : ''
+                      }`}
+                    >
+                      <div
+                        className={`${styles.peekBubble} ${
+                          message.role === 'user' ? styles.peekBubbleUser : ''
+                        }`}
+                      >
+                        <Text size={200}>{message.content}</Text>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : null}
             <div
               className={`${styles.composerSlot} ${
                 inComposer && voiceStage !== 'idle' ? styles.composerSlotCenter : ''
@@ -758,7 +898,7 @@ export function AgentSurface({
                 stage={stage}
                 focusSignal={focusSignal}
                 onSent={openChat}
-                onVoiceDone={openChat}
+                onVoiceDone={handleVoiceDone}
                 onOpenSettings={() => setSettingsOpen(true)}
               />
             </div>

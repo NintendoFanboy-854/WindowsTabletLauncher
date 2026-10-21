@@ -590,9 +590,11 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       }));
       updateStatus('idle');
 
-      // 播报：语音提问必读；文字提问按设置；mock 下 synthesize 为静音，状态机照走
+      // 播报：autoRead 总开关关闭时一律不自动读；开启时语音提问必读、文字提问按设置。
+      // mock 下 synthesize 为静音，状态机照走。
       if (!signal.aborted && accumulated.trim()) {
-        const shouldRead = Boolean(params.forceRead) || currentSettings().tts.readTextReplies;
+        const tts = currentSettings().tts;
+        const shouldRead = tts.autoRead && (Boolean(params.forceRead) || tts.readTextReplies);
         if (shouldRead) void speakText(accumulated, assistantId);
       }
     } catch (turnError) {

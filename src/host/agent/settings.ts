@@ -62,6 +62,9 @@ export function normalizeSettings(raw: unknown): AgentSettings {
     model: pickModel(source.model),
     thinking: typeof source.thinking === 'boolean' ? source.thinking : DEFAULT_SETTINGS.thinking,
     tts: {
+      // 自动朗读总开关：旧版本默认有自动朗读行为，迁移时保持开启；用户可在头部/设置里静音
+      autoRead:
+        typeof tts.autoRead === 'boolean' ? tts.autoRead : DEFAULT_SETTINGS.tts.autoRead,
       readTextReplies,
       voice:
         typeof tts.voice === 'string' && tts.voice.trim()

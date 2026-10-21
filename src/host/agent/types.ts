@@ -131,7 +131,9 @@ export interface AgentSettings {
   /** 深度思考开关，默认关（规格） */
   thinking: boolean;
   tts: {
-    /** 文字提问的回复也朗读；语音提问的回复必定朗读。默认 false */
+    /** 自动朗读总开关：关掉后语音/文字回答都只显示文字（手动点单条朗读仍可用）。默认 true */
+    autoRead: boolean;
+    /** 文字提问的回复也朗读；语音提问的回答在 autoRead 开启时朗读。默认 false */
     readTextReplies: boolean;
     voice: string;
     /** 0.5–2.0，默认 1.0 */
@@ -164,6 +166,7 @@ export const DEFAULT_SETTINGS: AgentSettings = {
   model: 'mimo-v2.6-flash',
   thinking: false,
   tts: {
+    autoRead: true,
     readTextReplies: false,
     voice: 'mimo_default',
     rate: 1,
