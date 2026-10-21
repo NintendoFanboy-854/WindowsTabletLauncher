@@ -27,8 +27,8 @@ const NO_ARGS = Object.freeze({
 const PLACE_TARGET_SCHEMA = {
   type: 'object',
   properties: {
-    id: { type: 'string', description: '内置城市 id，如 beijing / tokyo' },
-    name: { type: 'string', description: '城市中文名或英文名，如 东京 / Tokyo' },
+    id: { type: 'string', description: '城市 id，如搜索结果里的 osm:node:123 / tz:Asia/Tokyo' },
+    name: { type: 'string', description: '城市名，如 大阪 / Osaka' },
     tz: { type: 'string', description: 'IANA 时区，如 Asia/Tokyo' },
   },
   additionalProperties: false,
@@ -70,7 +70,7 @@ export const CLOCK_TOOLS = Object.freeze([
   },
   {
     name: 'clock.world.add',
-    description: '添加一个世界时钟城市；至少提供 id、name、tz 之一，最多 8 个。',
+    description: '添加一个世界时钟城市；必须提供 tz（IANA 时区），name/country 可选，最多 8 个。',
     parameters: PLACE_TARGET_SCHEMA,
   },
   {

@@ -1,5 +1,9 @@
 /**
- * 世界时钟数据层：内置常用城市、localStorage 持久化、跨 iframe 同步与 Intl 时区计算。
+ * 世界时钟数据层：城市搜索（Nominatim + timeapi.io）、搜索缓存、localStorage
+ * 持久化、跨 iframe 同步与 Intl 时区计算。
+ *
+ * 不内置城市表：能搜到什么完全取决于 API；搜过的关键词缓存在 `clock.searchCache`，
+ * 之后同一关键词直接读缓存。
  *
  * 存储键按 docs/components/clock.md：`clock.places`。旧版本键
  * `plugin.clock.places` / `clock.worldClocks` / `clock.world` 只在主键不存在时导入，
@@ -24,69 +28,178 @@ const LEGACY_WORLD_KEYS = ['plugin.clock.places', 'clock.worldClocks', 'clock.wo
 /** 同文档内多组件同步用的自定义事件（storage 事件只发给其它 window）。 */
 const WORLD_CHANGED_EVENT = 'clock:places-changed';
 
-/**
- * 内置常用城市（约 45 个，中英文名 + IANA 时区）。
- * 不引入外部数据依赖；国家/行政区只用于 L2 结果行的 12px 辅助信息。
- */
-export const CITIES = Object.freeze([
-  { id: 'beijing', name: '北京', nameEn: 'Beijing', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'shanghai', name: '上海', nameEn: 'Shanghai', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'guangzhou', name: '广州', nameEn: 'Guangzhou', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'shenzhen', name: '深圳', nameEn: 'Shenzhen', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'chengdu', name: '成都', nameEn: 'Chengdu', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'hangzhou', name: '杭州', nameEn: 'Hangzhou', country: '中国', tz: 'Asia/Shanghai' },
-  { id: 'hongkong', name: '香港', nameEn: 'Hong Kong', country: '中国香港', tz: 'Asia/Hong_Kong' },
-  { id: 'taipei', name: '台北', nameEn: 'Taipei', country: '中国台湾', tz: 'Asia/Taipei' },
-  { id: 'tokyo', name: '东京', nameEn: 'Tokyo', country: '日本', tz: 'Asia/Tokyo' },
-  { id: 'seoul', name: '首尔', nameEn: 'Seoul', country: '韩国', tz: 'Asia/Seoul' },
-  { id: 'singapore', name: '新加坡', nameEn: 'Singapore', country: '新加坡', tz: 'Asia/Singapore' },
-  { id: 'bangkok', name: '曼谷', nameEn: 'Bangkok', country: '泰国', tz: 'Asia/Bangkok' },
-  { id: 'kualalumpur', name: '吉隆坡', nameEn: 'Kuala Lumpur', country: '马来西亚', tz: 'Asia/Kuala_Lumpur' },
-  { id: 'jakarta', name: '雅加达', nameEn: 'Jakarta', country: '印度尼西亚', tz: 'Asia/Jakarta' },
-  { id: 'manila', name: '马尼拉', nameEn: 'Manila', country: '菲律宾', tz: 'Asia/Manila' },
-  { id: 'hanoi', name: '河内', nameEn: 'Hanoi', country: '越南', tz: 'Asia/Ho_Chi_Minh' },
-  { id: 'newdelhi', name: '新德里', nameEn: 'New Delhi', country: '印度', tz: 'Asia/Kolkata' },
-  { id: 'dubai', name: '迪拜', nameEn: 'Dubai', country: '阿联酋', tz: 'Asia/Dubai' },
-  { id: 'istanbul', name: '伊斯坦布尔', nameEn: 'Istanbul', country: '土耳其', tz: 'Europe/Istanbul' },
-  { id: 'moscow', name: '莫斯科', nameEn: 'Moscow', country: '俄罗斯', tz: 'Europe/Moscow' },
-  { id: 'berlin', name: '柏林', nameEn: 'Berlin', country: '德国', tz: 'Europe/Berlin' },
-  { id: 'paris', name: '巴黎', nameEn: 'Paris', country: '法国', tz: 'Europe/Paris' },
-  { id: 'london', name: '伦敦', nameEn: 'London', country: '英国', tz: 'Europe/London' },
-  { id: 'rome', name: '罗马', nameEn: 'Rome', country: '意大利', tz: 'Europe/Rome' },
-  { id: 'madrid', name: '马德里', nameEn: 'Madrid', country: '西班牙', tz: 'Europe/Madrid' },
-  { id: 'amsterdam', name: '阿姆斯特丹', nameEn: 'Amsterdam', country: '荷兰', tz: 'Europe/Amsterdam' },
-  { id: 'zurich', name: '苏黎世', nameEn: 'Zurich', country: '瑞士', tz: 'Europe/Zurich' },
-  { id: 'stockholm', name: '斯德哥尔摩', nameEn: 'Stockholm', country: '瑞典', tz: 'Europe/Stockholm' },
-  { id: 'reykjavik', name: '雷克雅未克', nameEn: 'Reykjavik', country: '冰岛', tz: 'Atlantic/Reykjavik' },
-  { id: 'cairo', name: '开罗', nameEn: 'Cairo', country: '埃及', tz: 'Africa/Cairo' },
-  { id: 'johannesburg', name: '约翰内斯堡', nameEn: 'Johannesburg', country: '南非', tz: 'Africa/Johannesburg' },
-  { id: 'nairobi', name: '内罗毕', nameEn: 'Nairobi', country: '肯尼亚', tz: 'Africa/Nairobi' },
-  { id: 'newyork', name: '纽约', nameEn: 'New York', country: '美国', tz: 'America/New_York' },
-  { id: 'losangeles', name: '洛杉矶', nameEn: 'Los Angeles', country: '美国', tz: 'America/Los_Angeles' },
-  { id: 'chicago', name: '芝加哥', nameEn: 'Chicago', country: '美国', tz: 'America/Chicago' },
-  { id: 'seattle', name: '西雅图', nameEn: 'Seattle', country: '美国', tz: 'America/Los_Angeles' },
-  { id: 'sanfrancisco', name: '旧金山', nameEn: 'San Francisco', country: '美国', tz: 'America/Los_Angeles' },
-  { id: 'honolulu', name: '檀香山', nameEn: 'Honolulu', country: '美国', tz: 'Pacific/Honolulu' },
-  { id: 'anchorage', name: '安克雷奇', nameEn: 'Anchorage', country: '美国', tz: 'America/Anchorage' },
-  { id: 'toronto', name: '多伦多', nameEn: 'Toronto', country: '加拿大', tz: 'America/Toronto' },
-  { id: 'vancouver', name: '温哥华', nameEn: 'Vancouver', country: '加拿大', tz: 'America/Vancouver' },
-  { id: 'mexicocity', name: '墨西哥城', nameEn: 'Mexico City', country: '墨西哥', tz: 'America/Mexico_City' },
-  { id: 'saopaulo', name: '圣保罗', nameEn: 'Sao Paulo', country: '巴西', tz: 'America/Sao_Paulo' },
-  { id: 'buenosaires', name: '布宜诺斯艾利斯', nameEn: 'Buenos Aires', country: '阿根廷', tz: 'America/Argentina/Buenos_Aires' },
-  { id: 'sydney', name: '悉尼', nameEn: 'Sydney', country: '澳大利亚', tz: 'Australia/Sydney' },
-  { id: 'melbourne', name: '墨尔本', nameEn: 'Melbourne', country: '澳大利亚', tz: 'Australia/Melbourne' },
-  { id: 'auckland', name: '奥克兰', nameEn: 'Auckland', country: '新西兰', tz: 'Pacific/Auckland' },
-]);
+/** 搜索缓存键：{ [关键词]: WorldClock[] }。 */
+const SEARCH_CACHE_KEY = 'clock.searchCache';
 
-/** L2 搜索：中英文城市名、行政区、IANA 时区都可匹配。 */
-export function searchCities(query) {
-  const needle = String(query ?? '').trim().toLowerCase();
-  if (!needle) return CITIES;
-  return CITIES.filter((city) =>
-    [city.name, city.nameEn, city.country, city.tz].some((value) =>
-      value.toLowerCase().includes(needle),
-    ),
+/** 缓存最多保留多少个关键词，超出丢最早写入的。 */
+const SEARCH_CACHE_LIMIT = 30;
+
+/* ------------------------------------------------------------------ */
+/* 联网城市搜索（公开 API）                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 城市搜索全部走公开接口（没有内置表）：
+ * - 城市搜索：Nominatim（OpenStreetMap，免 key、CORS 开放）；
+ * - 坐标 → IANA 时区：timeapi.io（免 key、CORS 开放）。
+ * 时差/夏令时仍由 `Intl` 计算，接口挂了不影响已添加的行。
+ */
+const GEO_SEARCH_ENDPOINT = 'https://nominatim.openstreetmap.org/search';
+const GEO_TIMEZONE_ENDPOINT = 'https://timeapi.io/api/TimeZone/coordinate';
+
+/** 单次联网搜索最多几条（每条还要换一次时区）。 */
+const ONLINE_LIMIT = 6;
+
+/** Nominatim 的中文名可能带多语言并列：`纽约;紐約` / `东京都/東京都` → 取第一个。 */
+function cleanCityName(name, displayName) {
+  const source = firstString(name, displayName);
+  const head = source.split(',')[0];
+  return head.split(';')[0].split('/')[0].trim();
+}
+
+/** `display_name` 末段 → 国家/地区（`美国;美國` → 美国，`韩国 / 南韓` → 韩国）。 */
+function countryFromDisplayName(displayName) {
+  const parts = String(displayName || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const tail = parts.length > 0 ? parts[parts.length - 1] : '';
+  return tail.split('/')[0].split(';')[0].trim();
+}
+
+/** 经纬度 → IANA 时区（timeapi.io）；失败返回空串。 */
+export async function timeZoneForCoordinates(latitude, longitude, signal) {
+  const url = `${GEO_TIMEZONE_ENDPOINT}?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) return '';
+  const data = await response.json();
+  const timeZone = firstString(data?.timeZone);
+  return timeZone && hasTimeZoneApi(timeZone) ? timeZone : '';
+}
+
+/**
+ * 联网搜索城市：Nominatim 找到城市（带经纬度），再换 IANA 时区。
+ * 返回 `{ id: 'osm:node:123', name, country, tz }`；同一关键词命中缓存直接返回，
+ * 不再发请求。解析不出时区的条目丢弃。
+ */
+export async function searchCitiesOnline(query, { signal, limit = ONLINE_LIMIT } = {}) {
+  const text = String(query ?? '').trim();
+  const cacheKey = text.toLowerCase();
+  if (cacheKey.length < 2) return [];
+
+  const cache = readSearchCache();
+  if (Array.isArray(cache[cacheKey])) return cache[cacheKey];
+
+  const url =
+    `${GEO_SEARCH_ENDPOINT}?format=jsonv2&q=${encodeURIComponent(text)}` +
+    `&limit=${limit}&featureType=settlement&accept-language=zh-CN`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`联网搜索失败（HTTP ${response.status}）`);
+  const rows = await response.json();
+
+  const candidates = [];
+  const seen = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const name = cleanCityName(row?.name, row?.display_name);
+    const latitude = Number(row?.lat);
+    const longitude = Number(row?.lon);
+    if (!name || !Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+    const country = countryFromDisplayName(row?.display_name);
+    const key = `${name}|${country}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const id =
+      row?.osm_type && row?.osm_id
+        ? `osm:${row.osm_type}:${row.osm_id}`
+        : `osm:${name}:${latitude.toFixed(2)}:${longitude.toFixed(2)}`;
+    candidates.push({ id, name, country, latitude, longitude });
+    if (candidates.length >= limit) break;
+  }
+
+  const resolved = await Promise.all(
+    candidates.map(async (candidate) => {
+      const tz = await timeZoneForCoordinates(candidate.latitude, candidate.longitude, signal);
+      return tz ? { id: candidate.id, name: candidate.name, country: candidate.country, tz } : null;
+    }),
   );
+  const results = resolved.filter(Boolean);
+  if (results.length > 0) writeSearchCache(cacheKey, results);
+  return results;
+}
+
+/** 强制刷新的请求间隔：Nominatim 上限 1 次/秒。 */
+const REFRESH_INTERVAL_MS = 1100;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 搜索缓存：{ [关键词]: WorldClock[] }，只存「下载过的」。 */
+function readSearchCache() {
+  try {
+    const raw = localStorage.getItem(SEARCH_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSearchCache(cacheKey, results) {
+  try {
+    const cache = readSearchCache();
+    const keys = Object.keys(cache);
+    if (!cache[cacheKey] && keys.length >= SEARCH_CACHE_LIMIT) delete cache[keys[0]];
+    cache[cacheKey] = results;
+    localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    /* 缓存写不了就下次重新搜 */
+  }
+}
+
+/** 一条世界时钟 → API 时区（Nominatim 找城市 → timeapi.io 换 IANA）。 */
+async function resolveTimeZoneFromApi(place, signal) {
+  const url =
+    `${GEO_SEARCH_ENDPOINT}?format=jsonv2&q=${encodeURIComponent(place.name)}` +
+    `&limit=1&featureType=settlement&accept-language=zh-CN`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) return '';
+  const rows = await response.json();
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const latitude = Number(row?.lat);
+  const longitude = Number(row?.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  return timeZoneForCoordinates(latitude, longitude, signal);
+}
+
+/**
+ * 强制刷新：已添加的城市逐条从 API 重新解析时区并写回；解析失败保留原值。
+ */
+export async function refreshWorldClocksFromApi({ signal } = {}) {
+  const current = readWorldClocks();
+  if (current.length === 0) return { total: 0, resolved: 0, updated: 0 };
+
+  const next = [];
+  let resolved = 0;
+  let updated = 0;
+  for (let index = 0; index < current.length; index += 1) {
+    const place = current[index];
+    if (index > 0) await sleep(REFRESH_INTERVAL_MS);
+    let tz = '';
+    try {
+      tz = await resolveTimeZoneFromApi(place, signal);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      tz = '';
+    }
+    if (tz) {
+      resolved += 1;
+      if (tz !== place.tz) updated += 1;
+      next.push({ ...place, tz });
+    } else {
+      next.push(place);
+    }
+  }
+  if (updated > 0) writeWorldClocks(next);
+  return { total: current.length, resolved, updated };
 }
 
 const WEEKDAYS_ZH = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
@@ -121,68 +234,38 @@ function hasTimeZoneApi(timeZone) {
   return valid;
 }
 
-function findCityById(id) {
-  if (!id) return null;
-  const needle = String(id).toLowerCase();
-  return CITIES.find((city) => city.id.toLowerCase() === needle) ?? null;
-}
-
-function findCityByName(name) {
-  if (!name) return null;
-  const needle = String(name).trim().toLowerCase();
-  return (
-    CITIES.find(
-      (city) =>
-        city.name.toLowerCase() === needle ||
-        city.nameEn.toLowerCase() === needle,
-    ) ?? null
-  );
-}
-
-function findCityByTimeZone(timeZone) {
-  if (!timeZone) return null;
-  return CITIES.find((city) => city.tz === timeZone) ?? null;
-}
-
 /** IANA 时区兜底名：`America/New_York` → `New York`。 */
 function fallbackNameForTimeZone(timeZone) {
   const segment = String(timeZone).split('/').pop() || timeZone;
   return segment.replace(/_/g, ' ');
 }
 
-/** 单条旧数据/工具入参 → 完整 WorldClock；无法识别返回 null。 */
+/** L2 直接输入 IANA 时区时的候选（如 `Asia/Tokyo`）；不是合法时区返回 null。 */
+export function timeZoneCandidate(query) {
+  const text = String(query ?? '').trim();
+  if (!hasTimeZoneApi(text)) return null;
+  return { id: `tz:${text}`, name: fallbackNameForTimeZone(text), country: '', tz: text };
+}
+
+/** 单条存档/工具入参 → 完整 WorldClock；无法识别返回 null。 */
 function resolveWorldPlace(input) {
   if (typeof input === 'string') {
     const text = input.trim();
-    if (!text) return null;
-    const byId = findCityById(text);
-    if (byId) return { ...byId };
-    const byName = findCityByName(text);
-    if (byName) return { ...byName };
     if (!hasTimeZoneApi(text)) return null;
-    const byZone = findCityByTimeZone(text);
-    if (byZone) return { ...byZone };
     return { id: `tz:${text}`, name: fallbackNameForTimeZone(text), country: '', tz: text };
   }
 
   if (!isRecord(input)) return null;
 
-  const byId = findCityById(firstString(input.id));
-  if (byId) return { ...byId };
-
-  const byName = findCityByName(firstString(input.name, input.city));
-  if (byName) return { ...byName };
-
   const timeZone = firstString(input.tz, input.timezone, input.timeZone, input.zone);
   if (!timeZone || !hasTimeZoneApi(timeZone)) return null;
 
-  const byZone = findCityByTimeZone(timeZone);
-  if (byZone && !firstString(input.name, input.city, input.country)) return { ...byZone };
-
-  const id = firstString(input.id) || byZone?.id || `tz:${timeZone}`;
-  const name = firstString(input.name, input.city) || byZone?.name || fallbackNameForTimeZone(timeZone);
-  const country = firstString(input.country, input.region) || byZone?.country || '';
-  return { id, name, country, tz: timeZone };
+  return {
+    id: firstString(input.id) || `tz:${timeZone}`,
+    name: firstString(input.name, input.city) || fallbackNameForTimeZone(timeZone),
+    country: firstString(input.country, input.region),
+    tz: timeZone,
+  };
 }
 
 /** 数组 / {places} / 单条对象 → 去重后的 WorldClock[]，最多 8 条。 */
@@ -284,15 +367,13 @@ export function addWorldPlace(input) {
 }
 
 function matchesSelector(place, selector) {
-  const city = findCityById(place.id);
   if (typeof selector === 'string') {
     const needle = selector.trim().toLowerCase();
     if (!needle) return false;
     return (
       place.id.toLowerCase() === needle ||
       place.tz.toLowerCase() === needle ||
-      place.name.toLowerCase() === needle ||
-      city?.nameEn.toLowerCase() === needle
+      place.name.toLowerCase() === needle
     );
   }
   if (!isRecord(selector)) return false;
@@ -302,8 +383,7 @@ function matchesSelector(place, selector) {
   if (timeZone) return place.tz.toLowerCase() === timeZone.toLowerCase();
   const name = firstString(selector.name, selector.city);
   if (!name) return false;
-  const needle = name.toLowerCase();
-  return place.name.toLowerCase() === needle || city?.nameEn.toLowerCase() === needle;
+  return place.name.toLowerCase() === name.toLowerCase();
 }
 
 /** 删除一条（UI 与 Agent 工具共用）；找不到返回 { ok:false, error }。 */

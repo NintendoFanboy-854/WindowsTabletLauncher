@@ -7,7 +7,8 @@
  * - 日期信息：本周第 N 周 / 今年第 N 天 / 系统时区；
  * - 设置…只发 requestHostSettings()，关浮层再导航由宿主负责。
  *
- * L2：Subpage push「添加城市」；搜索内置城市，点「添加」提交并 pop；
+ * L2：Subpage push「添加城市」；内置城市即时过滤，内置表外的城市走
+ * Nominatim + timeapi.io 联网补（见 world.js），点「添加」提交并 pop；
  * 返回/取消不写数据。删除在 L1 行内二次确认，不弹第二个 Dialog。
  */
 
@@ -29,6 +30,7 @@ import {
 } from '@fluentui/react-components';
 import {
   Add20Regular,
+  ArrowSync20Regular,
   Delete20Regular,
   Globe24Regular,
   MoreHorizontal20Regular,
@@ -60,7 +62,9 @@ import {
 import {
   WORLD_LIMIT,
   describeWorldPlace,
-  searchCities,
+  refreshWorldClocksFromApi,
+  searchCitiesOnline,
+  timeZoneCandidate,
   useWorldClocks,
 } from './world.js';
 
@@ -84,6 +88,11 @@ const useStyles = makeStyles({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalS,
+  },
+  sectionTools: {
+    display: 'flex',
+    alignItems: 'center',
     gap: tokens.spacingHorizontalS,
   },
   hint: {
@@ -329,6 +338,7 @@ export default function ClockDetail() {
   const [adding, setAdding] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
   const [animateAdds, setAnimateAdds] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // 首次进入 L1 时不要给已有行加入场动画；之后新挂载的行才淡入。
   useEffect(() => {
@@ -345,6 +355,18 @@ export default function ClockDetail() {
   }, [now, settings, world.places]);
 
   const openAdd = () => setAdding(true);
+
+  const forceRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshWorldClocksFromApi();
+    } catch {
+      /* 解析失败保留原值 */
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <DetailPage>
@@ -385,9 +407,18 @@ export default function ClockDetail() {
               <Text size={400} weight="semibold">
                 世界时钟
               </Text>
-              <Text size={200} className={styles.hint} data-world-limit={WORLD_LIMIT}>
-                最多 {WORLD_LIMIT} 个 · 已添加 {rows.length} 个
-              </Text>
+              <div className={styles.sectionTools}>
+                <Text size={200} className={styles.hint} data-world-limit={WORLD_LIMIT}>
+                  最多 {WORLD_LIMIT} 个 · 已添加 {rows.length} 个
+                </Text>
+                <ActionButton
+                  data-world-refresh="true"
+                  icon={<ArrowSync20Regular />}
+                  disabled={refreshing || rows.length === 0}
+                  onClick={forceRefresh}
+                >
+                  {refreshing ? '刷新中…' : '刷新'}
+                </ActionButton>              </div>
             </div>
 
             {rows.length === 0 ? (
@@ -462,11 +493,44 @@ function AddCityContent({ existing, onAdd }) {
   const close = useSubpageClose();
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
-  const results = useMemo(() => searchCities(query), [query]);
-  const existingIds = useMemo(
-    () => new Set(existing.map((place) => place.id)),
-    [existing],
-  );
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  // 搜索全部走 API（没有内置表）：输入停顿 400ms 再请求（Nominatim 限 ≤1 次/秒）；
+  // 合法 IANA 时区名直接给候选，不当地名搜。
+  useEffect(() => {
+    const text = query.trim();
+    const manual = timeZoneCandidate(text);
+    if (manual) {
+      setResults([manual]);
+      setSearching(false);
+      return undefined;
+    }
+    if (text.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        setResults(await searchCitiesOnline(text, { signal: controller.signal }));
+      } catch (reason) {
+        if (reason?.name !== 'AbortError') setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  const existingIds = useMemo(() => new Set(existing.map((place) => place.id)), [existing]);
+  const existingNames = useMemo(() => new Set(existing.map((place) => place.name)), [existing]);
+  const isAdded = (city) => existingIds.has(city.id) || existingNames.has(city.name);
   const atLimit = existing.length >= WORLD_LIMIT;
 
   const handleAdd = (city) => {
@@ -499,7 +563,7 @@ function AddCityContent({ existing, onAdd }) {
         size="large"
         type="search"
         value={query}
-        placeholder="搜索城市、国家或时区"
+        placeholder="搜索城市或 IANA 时区"
         aria-label="搜索城市"
         data-city-search="true"
         contentBefore={<Search20Regular />}
@@ -507,25 +571,28 @@ function AddCityContent({ existing, onAdd }) {
       />
       <Text size={200} className={styles.hint}>
         已添加 {existing.length} / {WORLD_LIMIT} 个城市
+        {searching ? ' · 搜索中…' : ''}
       </Text>
 
       {results.length === 0 ? (
-        <EmptyState
-          icon={<Search20Regular />}
-          title="没有找到城市"
-          description="试试中文名、英文名或时区，例如“东京”“Tokyo”“Asia/Tokyo”"
-        />
+        searching ? null : (
+          <EmptyState
+            icon={<Search20Regular />}
+            title="没有找到城市"
+            description="试试中文名、英文名或时区，例如“大阪”“Tokyo”“Asia/Tokyo”"
+          />
+        )
       ) : (
         <div className={styles.cityList} data-city-list="true">
           {results.map((city) => {
-            const added = existingIds.has(city.id);
+            const added = isAdded(city);
             const disabled = added || atLimit;
             return (
               <ListRow
                 key={city.id}
                 data-city-option={city.id}
                 title={city.name}
-                subtitle={`${city.country} · ${city.tz}`}
+                subtitle={[city.country, city.tz].filter(Boolean).join(' · ')}
                 trailing={
                   <ActionButton
                     data-city-add={city.id}
