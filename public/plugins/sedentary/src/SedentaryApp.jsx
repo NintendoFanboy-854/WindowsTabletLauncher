@@ -207,12 +207,10 @@ export default function SedentaryApp({ fallbackSizeKey }) {
     [settings.enabled, standing],
   );
 
-  const postureText = standing ? '已站立' : '已连续久坐';
+  const postureText = snapshot.postureLabel || '久坐提醒';
   const ariaLabel = settings.enabled
-    ? `${snapshot.statusLabel}，${postureText} ${snapshot.currentMin} 分钟，${snapshot.hint}；点击打开详情${
-        compact ? '' : standing ? '，也可以点“我坐下了”' : '，也可以点“我站起来了”'
-      }`
-    : '久坐提醒已关闭，点击打开详情';
+    ? `${snapshot.statusLabel}，${postureText} ${snapshot.currentMin} 分钟；点击打开详情`
+    : '久坐提醒已关闭；点击打开详情';
 
   const statusBadge = (
     <Badge
@@ -224,6 +222,8 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       {snapshot.statusLabel}
     </Badge>
   );
+  // 头部卡片有标题，站立时标题已经说了“站立休息”，不再叠一个同义 Badge
+  const headerBadge = snapshot.status === 'resting' ? null : statusBadge;
 
   const stats = [
     { key: 'sitting', label: '今日久坐', value: Math.round(snapshot.today.sittingMinutes), unit: '分钟' },
@@ -258,11 +258,14 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       icon={standing ? <ArrowDownRegular /> : <ArrowUpRegular />}
       onClick={togglePosture}
       disabled={!settings.enabled}
-      aria-label={standing ? '我坐下了，开始新一轮久坐' : '我站起来了，记录一次起身'}
+      aria-label={standing ? '我坐下了' : '我站起来了'}
     >
       {standing ? '我坐下了' : '我站起来了'}
     </TouchButton>
   );
+
+  /** 2×1 没有 Badge，用一句最短状态文案补位；坐着时显示提醒距离 */
+  const rowHint = standing ? '休息中' : snapshot.hint;
 
   if (compact) {
     return (
@@ -294,9 +297,11 @@ export default function SedentaryApp({ fallbackSizeKey }) {
               style={{ backgroundColor: STATUS_DOT_COLOR[snapshot.status] }}
               aria-hidden="true"
             />
-            <Text size={300} className={styles.hint} style={motionStyle}>
-              {snapshot.hint}
-            </Text>
+            {rowHint ? (
+              <Text size={300} className={styles.hint} style={motionStyle}>
+                {rowHint}
+              </Text>
+            ) : null}
           </div>
         </div>
         {standButton}
@@ -312,11 +317,13 @@ export default function SedentaryApp({ fallbackSizeKey }) {
         className={mergeClasses(styles.root, styles.rootWide)}
       >
         <div className={styles.wideMain}>
-          <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={statusBadge} />
+          <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={headerBadge} />
           <Metric value={snapshot.currentMin} unit="分钟" size={96} />
-          <Text size={300} className={styles.hint} style={motionStyle}>
-            {snapshot.hint}
-          </Text>
+          {snapshot.hint ? (
+            <Text size={300} className={styles.hint} style={motionStyle}>
+              {snapshot.hint}
+            </Text>
+          ) : null}
         </div>
         <div className={styles.wideStats}>{stats.map(renderStat)}</div>
         <div className={styles.wideActions}>{standButton}</div>
@@ -330,11 +337,13 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       onActivate={openDetail}
       className={mergeClasses(styles.root, styles.rootMedium)}
     >
-      <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={statusBadge} />
+      <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={headerBadge} />
       <Metric value={snapshot.currentMin} unit="分钟" size={80} />
-      <Text size={300} className={styles.hint} style={motionStyle}>
-        {snapshot.hint}
-      </Text>
+      {snapshot.hint ? (
+        <Text size={300} className={styles.hint} style={motionStyle}>
+          {snapshot.hint}
+        </Text>
+      ) : null}
       <div className={styles.statsRow}>{stats.slice(0, 2).map(renderStat)}</div>
       <div className={styles.actions}>{standButton}</div>
     </CardRoot>

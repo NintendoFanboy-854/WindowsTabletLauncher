@@ -87,14 +87,18 @@
 - 不加“语音 / 转写结果如下”等文字；`aria-label` 用屏幕阅读器文本（如“语音消息：帮我看看待办”）即可。
 - 助手消息：去掉头像与机器人；身份只由入口/头部的 ChatSparkle 承担。
 
-## 7. 音频与上下文（硬约束）
+## 7. 音频与上下文（硬约束，v0.3.5 起）
 
 1. 每段语音只上传一次：当前轮 user 消息以 `input_audio` 原生发 MiMo chat（`data:audio/wav;base64,…`，仅此一轮）。
-2. 同一份 WAV 并行送 MiMo ASR（`mimo-v2.5-asr`），结果只用于本地展示与入库；音频 Blob 用完即弃。
-3. 音频不写 localStorage、不进 Message、不进后续请求；重试/切会话/重启都不再上传音频。
-4. 历史：ASR 文字作为 user 消息内容进入后续上下文；转写失败时该条用 `（用户发来一段语音）` 文字占位（仅上下文，不上屏）。
-5. `normalizeMessage` 丢弃一切未知/音频字段；`message.voicePeaks` 等 UI 字段允许持久化（纯数字，不含音频）。
-6. 真机冒烟：`scripts/smoke-mimo-audio.mjs`（读 public/secrets.json，TTS 合成→chat 音频输入→ASR 回读）必须通过；若接口不支持音频输入，停下来报告 Lead，不默默改回“先转写再发”。
+2. 发请求前先等 ASR 转写（最多 8s，D-28）：转写文本与音频一起进同一轮请求（文本决定工具调用，音频保留语气）。
+   转写超时才退回纯音频请求；晚到的转写仍会对状态类短语补执行一次。
+3. 同一份 WAV 只送一次 ASR（`mimo-v2.5-asr`）；音频 Blob 用完即弃。
+4. 音频不写 localStorage、不进 Message、不进后续请求；重试/切会话/重启都不再上传音频。
+5. 历史：ASR 文字作为 user 消息内容进入后续上下文；转写失败时该条用 `（用户发来一段语音）` 文字占位（仅上下文，不上屏）。
+6. `normalizeMessage` 丢弃一切未知/音频字段；`message.voicePeaks` 等 UI 字段允许持久化（纯数字，不含音频）。
+7. 状态短语直通（D-28）：插件工具声明 `phrases`，用户整句命中时宿主先执行工具、结果作为 tool call 交给模型；
+   模型只回一句短确认。这条保证“说了就记录”，不依赖纯音频的 function calling。
+8. 真机冒烟：`scripts/smoke-mimo-audio.mjs`（读 public/secrets.json，TTS 合成→chat 音频输入→ASR 回读）必须通过。
 
 ## 8. Session 接口契约（W1 UI 依赖 W2 实现，必须一致）
 
@@ -126,7 +130,7 @@ export interface AgentSession {
   send(text: string): Promise<void>;
   /** 开始录音；已在录音/转写时忽略 */
   startRecording(): Promise<void>;
-  /** 结束录音：立即发送音频（原生 input_audio）+ 并行 ASR 回填文字 */
+  /** 结束录音：先等 ASR 转写（≤8s），再发音频 + 转写文本；状态短语先执行工具 */
   stopRecording(): Promise<void>;
   /** 取消录音（不发送、不留消息） */
   cancelRecording(): void;

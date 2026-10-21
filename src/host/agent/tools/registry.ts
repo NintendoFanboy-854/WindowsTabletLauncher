@@ -19,6 +19,11 @@ export interface ToolBinding {
   description: string;
   parameters: unknown;
   kind: 'builtin' | 'plugin';
+  /**
+   * 用户整句命中其中一条时，宿主直接执行该工具。
+   * 只认整句（忽略空白与标点），避免把「我坐下了之后怎么算？」误判成动作。
+   */
+  phrases: string[];
 }
 
 interface BuiltinToolSpec {
@@ -69,6 +74,7 @@ export function buildToolBindings(pluginTools: AgentToolDecl[]): ToolBinding[] {
       description: builtin.description,
       parameters: builtin.parameters,
       kind: 'builtin',
+      phrases: [],
     });
   }
 
@@ -87,10 +93,43 @@ export function buildToolBindings(pluginTools: AgentToolDecl[]): ToolBinding[] {
         additionalProperties: true,
       },
       kind: 'plugin',
+      phrases: Array.isArray(tool.phrases)
+        ? tool.phrases.filter((phrase): phrase is string => typeof phrase === 'string' && phrase.trim() !== '')
+        : [],
     });
   }
 
   return bindings;
+}
+
+/** 整句比较用：去掉空白与标点，大小写归一 */
+export function normalizeUtterance(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/[，。！？、；：,.!?;:'"“”‘’（）()【】[\]…—–_~-]/g, '');
+}
+
+/**
+ * 找到「用户整句 == 工具短语」的绑定。
+ * 只在整句完全一致时命中：状态报告要确定，但带助词/疑问的长句仍交给模型判断。
+ */
+export function matchPhraseTool(bindings: ToolBinding[], text: string): ToolBinding | undefined {
+  const normalized = normalizeUtterance(text);
+  if (!normalized) return undefined;
+  let matched: ToolBinding | undefined;
+  let matchedLength = 0;
+  for (const binding of bindings) {
+    if (binding.kind !== 'plugin') continue;
+    for (const phrase of binding.phrases) {
+      if (normalizeUtterance(phrase) !== normalized) continue;
+      if (phrase.length > matchedLength) {
+        matched = binding;
+        matchedLength = phrase.length;
+      }
+    }
+  }
+  return matched;
 }
 
 export function findBindingByName(bindings: ToolBinding[], name: string): ToolBinding | undefined {

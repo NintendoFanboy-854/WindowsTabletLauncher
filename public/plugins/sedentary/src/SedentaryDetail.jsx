@@ -143,25 +143,17 @@ export default function SedentaryDetail() {
     [],
   );
 
-  const snoozedUntil = snapshot.runtime.snoozedUntil
-    ? new Date(snapshot.runtime.snoozedUntil)
-    : null;
-  const snoozed = Boolean(snoozedUntil && snoozedUntil.getTime() > Date.now());
   const title = !settings.enabled
     ? '久坐提醒已关闭'
     : sitting
-      ? `已连续久坐 ${snapshot.currentMin} 分钟`
+      ? `连续久坐 ${snapshot.currentMin} 分钟`
       : standing
-        ? `站立休息中 ${snapshot.currentMin} 分钟`
+        ? `站立休息 ${snapshot.currentMin} 分钟`
         : '久坐计时未开始';
 
-  let hint = snapshot.hint;
-  if (!settings.enabled) hint = '在设置里重新启用后，后台会继续计时与提醒';
-  else if (!sitting && !standing) hint = '后台会自动开始计时；也可以手动记录状态';
-  else if (standing) hint = '休息中，坐下后开始新一轮久坐';
-  else if (snapshot.status === 'danger' && !snoozed) {
-    hint = `已超过提醒阈值 ${settings.thresholdMin} 分钟，起身活动一下`;
-  }
+  // 副标题只补状态里看不出来的信息（提醒距离 / 推迟时间）；
+  // 站立、关闭、未开始时标题已经说清楚，不再写“坐下后开始新一轮”这种说明。
+  const hint = settings.enabled && sitting ? snapshot.hint : '';
 
   const postureButton = (
     <ActionButton
@@ -169,7 +161,7 @@ export default function SedentaryDetail() {
       icon={standing ? <ArrowDownRegular /> : <ArrowUpRegular />}
       onClick={togglePosture}
       disabled={!settings.enabled}
-      aria-label={standing ? '我坐下了，开始新一轮久坐' : '我站起来了，记录一次起身'}
+      aria-label={standing ? '我坐下了' : '我站起来了'}
     >
       {standing ? '我坐下了' : '我站起来了'}
     </ActionButton>
@@ -188,9 +180,11 @@ export default function SedentaryDetail() {
           <Text size={400} weight="semibold">
             {title}
           </Text>
-          <Text size={200} className={styles.muted}>
-            {hint}
-          </Text>
+          {hint ? (
+            <Text size={200} className={styles.muted}>
+              {hint}
+            </Text>
+          ) : null}
         </div>
       </DetailHeader>
 
@@ -211,7 +205,7 @@ export default function SedentaryDetail() {
                 </Text>
                 <div className={styles.statGrid}>
                   <Stat
-                    label="今日累计久坐"
+                    label="今日久坐"
                     value={Math.round(snapshot.today.sittingMinutes)}
                     unit="分钟"
                   />
@@ -255,7 +249,6 @@ export default function SedentaryDetail() {
               <EmptyState
                 icon={<Timer20Regular />}
                 title="还没有今天的记录"
-                description="后台会自动开始计时；也可以现在记录一次状态"
                 action={postureButton}
               />
             </div>

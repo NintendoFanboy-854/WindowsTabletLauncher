@@ -346,3 +346,13 @@
   6. 休眠/退出空档只顺延时间，不切换姿态、不记 break（沿用 D-25）。
 - 迁移：旧 runtime `sittingSince` → 坐着继续；旧 days 无 `standingMinutes` 视为 0；旧 `takeBreak` 工具不再提供（Agent 自然语言适配为新工具）。
 - 验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 10/10 PASS；复盘页集成检查 PASS（`sedentary.stats` 被宿主发现并渲染）；typecheck/build/tauri build exit 0。
+
+## D-28 Agent 状态短句直通 + 语音先转写（2026-10-22，v0.3.5）
+
+- 背景：用户反馈「在 Agent 里说了我坐下了，卡片没变，还得手动点按钮」。排查真实数据（WebView2 LevelDB）确认：模型在语音轮里没有调用工具，只回了一段“已记录…”的编造回复；插件状态从未改变。复现实验：同一句「我坐下了」用纯音频请求，4 次里只有 1 次真的产生 tool call，其余是文字幻觉或畸形 `<tool_call>`。
+- 决策：
+  1. **状态短语直通**：插件工具声明可带 `phrases: string[]`；用户整句（忽略空白/标点）完全命中时，宿主 `matchPhraseTool` 在模型请求前直接执行工具，把结果以 tool call 形式放进对话，模型只负责一句短确认。只认整句，带疑问/长句仍交给模型，避免误判。
+  2. **语音先转写再请求**：`stopRecording` 先等 ASR（≤8s），再把音频 + 转写文本一起发给模型；纯音频 function calling 不可靠。转写超时才退回纯音频，晚到的转写对状态短语补执行一次。
+  3. **文案做减法**：删掉「休息中，坐下后开始新一轮」这类状态机说明、工具描述里的「（UI：…）」提示、每次点按后的「已记录…」通知；站立时 `hintOf` 返回空串，状态交给标题/Badge/按钮。Agent 提示词新增“工具成功后只回一句短确认，不要教用户点按钮”。
+- 兼容：`phrases` 是可选项，未声明的插件行为不变；旧会话/旧设置不受影响。
+- 验证：短语匹配单测 10/10；真实 MiMo + headless Edge 端到端 12/12（说“我站起来了/我坐下了”→ 插件 runtime 立即切换、卡片按钮同步、工具卡出现、回复短确认、无防御性文案、console 0）；`scripts/verify-agent-surface.mjs` 语音链路回归。

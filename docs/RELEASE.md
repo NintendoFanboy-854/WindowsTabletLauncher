@@ -132,3 +132,21 @@
 - [x] 文档：D-27、`docs/components/sedentary.md`、README、RELEASE-REPORT §17 已更新
 - [x] 安装包不外发（内含本地 `public/secrets.json`）
 - [x] `git status` 干净；commit / push / tag `v0.3.4`
+
+## 12. v0.3.5 增量检查（2026-10-22）
+
+> 背景：用户反馈「在 Agent 里说『我坐下了』，卡片没变，还得手动点按钮」，并要求久坐 UI 按 HIG 做减法。改动见 D-28、RELEASE-REPORT §18。§1–§11 继续有效。
+
+- [x] 版本号 0.3.5 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
+- [x] 协议：`AgentToolDecl` 增加可选 `phrases`；`buildToolBindings` 带入绑定；`matchPhraseTool` 整句匹配（忽略空白/标点），单测 10/10
+- [x] 文字直通：`send()` 命中短语时先执行插件工具，再以 `assistant.toolCalls` 进对话；模型只回一句短确认（真实 MiMo E2E 验证）
+- [x] 语音链路：`stopRecording()` 先等 ASR（≤8s）→ 音频 + 转写文本同发；转写超时退回纯音频，晚到转写对短语补执行
+- [x] 久坐文案减法：站立 `hintOf` 空串 / 2×1「休息中」；详情站立无辅助说明；去掉每次操作的「已记录…」通知；工具描述去掉「（UI：…）」；提示词禁止“教用户点按钮”
+- [x] 真实 MiMo + headless Edge 同步 E2E：**12/12 PASS** — 说站/坐后 runtime 立即切换（`commandId=null`）、卡片按钮同步、工具卡出现、短确认、无防御性文案、console 0 — `shots/sedentary-agent-sync/`
+- [x] `node scripts/verify-agent-surface.mjs` 复跑 **109/109 PASS、0 FAIL**（ASR-first 未破坏语音状态机）
+- [x] `node scripts/build-plugin.mjs sedentary`（553,803 B / `5F1902C2…`）
+- [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m19s；NSIS/MSI 完成）
+- [x] 产物哈希：`app.exe` 12,168,704 B / `497BB9B9…`；NSIS 3,934,447 B / `65051899…`；MSI 5,140,480 B / `7DA6BD56…`
+- [x] 文档：D-28、`docs/components/sedentary.md` / `agent.md`、`AGENT-SURFACE-CONTRACT.md` §7、`PLUGIN-CONTRACT.md` §6、README、RELEASE-REPORT §18 已更新
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [x] `git status` 干净；commit / push / tag `v0.3.5`

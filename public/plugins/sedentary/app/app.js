@@ -15701,10 +15701,10 @@ var fl = "settings", pl = "sedentary.days", ml = "sedentary.runtime", hl = "sede
 	thresholdMin: [5, 120],
 	remindEveryMin: [1, 60]
 }, wl = {
-	success: "正常",
-	warning: "接近阈值",
-	danger: "已超阈值",
-	resting: "站立休息",
+	success: "久坐中",
+	warning: "接近提醒",
+	danger: "该起身了",
+	resting: "休息中",
 	off: "已关闭"
 }, Tl = {
 	sitting: "坐着",
@@ -15918,12 +15918,12 @@ function iu(e) {
 function G(e, t, n = /* @__PURE__ */ new Date()) {
 	let r = ru(e, t, n);
 	if (r === "off") return "久坐提醒已关闭";
-	if (r === "resting") return "休息中，坐下后开始新一轮";
+	if (r === "resting") return "";
 	let i = jl(t.snoozedUntil);
 	if (i && i > n) return `提醒已推迟到 ${Al(i)}`;
-	if (!t.posture) return "计时准备中";
+	if (!t.posture) return "";
 	let a = e.thresholdMin - tu(t, n.getTime());
-	return a <= 0 ? "已超过提醒阈值" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
+	return a <= 0 ? "该起身了" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
 }
 function au(e, t, n = /* @__PURE__ */ new Date()) {
 	if (!e.enabled || t.posture !== "sitting") return !1;
@@ -16099,41 +16099,30 @@ var bu = class {
 			window.removeEventListener("storage", e), t();
 		};
 	}
-	async handleCommand(t) {
-		if (!t) return;
-		let n = t.type === "break" ? "stand" : t.type;
-		if (n === "stand" || n === "sit" || n === "snooze") try {
-			let r = await K(() => this.#t({
-				...t,
-				type: n
+	async handleCommand(e) {
+		if (!e) return;
+		let t = e.type === "break" ? "stand" : e.type;
+		if (t === "stand" || t === "sit" || t === "snooze") try {
+			await K(() => this.#t({
+				...e,
+				type: t
 			}));
-			r && e.notify(r);
 		} catch (e) {
 			console.warn("[sedentary] 命令执行失败", e);
 		}
 	}
 	#t(e) {
 		let t = Yl();
-		if (t.commandId === e.id) return null;
-		if (t.commandId = e.id, Xl(t), e.type === "snooze") {
-			let t = this.#n(e.minutes);
-			return t ? `${t.minutes} 分钟后再提醒你` : null;
-		}
-		if (e.type === "sit") return this.#s("manual").changed ? "已坐下，开始新一轮久坐" : "现在已经是坐着了";
-		let n = this.#o("manual");
-		return n.changed ? `已记录起身，今日共 ${n.day.breaks} 次` : "现在已经是站立休息";
+		t.commandId !== e.id && (t.commandId = e.id, Xl(t), e.type === "snooze" ? this.#n(e.minutes) : e.type === "sit" ? this.#s("manual") : this.#o("manual"));
 	}
-	async standUp(t = "manual") {
-		let n = await K(() => this.#o(t));
-		return n.changed && e.notify(`已记录起身，今日共 ${n.day.breaks} 次`), n;
+	async standUp(e = "manual") {
+		return K(() => this.#o(e));
 	}
-	async sitDown(t = "manual") {
-		let n = await K(() => this.#s(t));
-		return n.changed && e.notify("已坐下，开始新一轮久坐"), n;
+	async sitDown(e = "manual") {
+		return K(() => this.#s(e));
 	}
-	async snooze(t = 5) {
-		let n = await K(() => this.#n(t));
-		return n && e.notify(`${n.minutes} 分钟后再提醒你`), n;
+	async snooze(e = 5) {
+		return K(() => this.#n(e));
 	}
 	#n(e) {
 		let t = Fl(e, [1, 60], 5), n = Yl();
@@ -16190,14 +16179,14 @@ var bu = class {
 	}
 	async #a(t, n) {
 		if (!n.strongReminder) {
-			e.notify(`该起来动一动了：已连续坐 ${t} 分钟`);
+			e.notify(`已连续坐 ${t} 分钟`);
 			return;
 		}
 		let r = null;
 		try {
 			r = await e.showReminder({
 				title: "该起来动一动了",
-				message: `已连续坐了 ${t} 分钟，站起来走动 1～2 分钟吧。`,
+				message: `已连续坐 ${t} 分钟。`,
 				actions: [{
 					id: "stand",
 					text: "我站起来了",
@@ -16446,13 +16435,13 @@ function ju({ fallbackSizeKey: t }) {
 	}, []);
 	let u = (0, A.useCallback)(() => uc("detail", "久坐详情"), []), d = a.posture === "standing", f = (0, A.useCallback)((e) => {
 		e.stopPropagation(), i.enabled && (d ? hu() : mu());
-	}, [i.enabled, d]), p = d ? "已站立" : "已连续久坐", m = i.enabled ? `${a.statusLabel}，${p} ${a.currentMin} 分钟，${a.hint}；点击打开详情${s ? "" : d ? "，也可以点“我坐下了”" : "，也可以点“我站起来了”"}` : "久坐提醒已关闭，点击打开详情", h = /* @__PURE__ */ (0, j.jsx)(Ts, {
+	}, [i.enabled, d]), p = a.postureLabel || "久坐提醒", m = i.enabled ? `${a.statusLabel}，${p} ${a.currentMin} 分钟；点击打开详情` : "久坐提醒已关闭；点击打开详情", h = /* @__PURE__ */ (0, j.jsx)(Ts, {
 		appearance: "tint",
 		color: Ou[a.status] ?? "informative",
 		size: "large",
 		"aria-label": `状态：${a.statusLabel}`,
 		children: a.statusLabel
-	}), g = [
+	}), g = a.status === "resting" ? null : h, _ = [
 		{
 			key: "sitting",
 			label: "今日久坐",
@@ -16471,7 +16460,7 @@ function ju({ fallbackSizeKey: t }) {
 			value: a.today.breaks,
 			unit: "次"
 		}
-	], _ = (e) => /* @__PURE__ */ (0, j.jsxs)("div", {
+	], v = (e) => /* @__PURE__ */ (0, j.jsxs)("div", {
 		className: n.stat,
 		children: [/* @__PURE__ */ (0, j.jsx)(qs, {
 			size: 200,
@@ -16490,14 +16479,14 @@ function ju({ fallbackSizeKey: t }) {
 				children: e.unit
 			})]
 		})]
-	}, e.key), v = /* @__PURE__ */ (0, j.jsx)(el, {
+	}, e.key), y = /* @__PURE__ */ (0, j.jsx)(el, {
 		appearance: "primary",
 		icon: d ? /* @__PURE__ */ (0, j.jsx)(Vo, {}) : /* @__PURE__ */ (0, j.jsx)(Ho, {}),
 		onClick: f,
 		disabled: !i.enabled,
-		"aria-label": d ? "我坐下了，开始新一轮久坐" : "我站起来了，记录一次起身",
+		"aria-label": d ? "我坐下了" : "我站起来了",
 		children: d ? "我坐下了" : "我站起来了"
-	});
+	}), b = d ? "休息中" : a.hint;
 	return s ? /* @__PURE__ */ (0, j.jsxs)(Uc, {
 		ariaLabel: m,
 		onActivate: u,
@@ -16526,14 +16515,14 @@ function ju({ fallbackSizeKey: t }) {
 					className: n.statusDot,
 					style: { backgroundColor: ku[a.status] },
 					"aria-hidden": "true"
-				}), /* @__PURE__ */ (0, j.jsx)(qs, {
+				}), b ? /* @__PURE__ */ (0, j.jsx)(qs, {
 					size: 300,
 					className: n.hint,
 					style: o,
-					children: a.hint
-				})]
+					children: b
+				}) : null]
 			})]
-		}), v]
+		}), y]
 	}) : l ? /* @__PURE__ */ (0, j.jsxs)(Uc, {
 		ariaLabel: m,
 		onActivate: u,
@@ -16544,28 +16533,28 @@ function ju({ fallbackSizeKey: t }) {
 				children: [
 					/* @__PURE__ */ (0, j.jsx)(Gc, {
 						title: d ? "站立休息" : "连续久坐",
-						trailing: h
+						trailing: g
 					}),
 					/* @__PURE__ */ (0, j.jsx)(Jc, {
 						value: a.currentMin,
 						unit: "分钟",
 						size: 96
 					}),
-					/* @__PURE__ */ (0, j.jsx)(qs, {
+					a.hint ? /* @__PURE__ */ (0, j.jsx)(qs, {
 						size: 300,
 						className: n.hint,
 						style: o,
 						children: a.hint
-					})
+					}) : null
 				]
 			}),
 			/* @__PURE__ */ (0, j.jsx)("div", {
 				className: n.wideStats,
-				children: g.map(_)
+				children: _.map(v)
 			}),
 			/* @__PURE__ */ (0, j.jsx)("div", {
 				className: n.wideActions,
-				children: v
+				children: y
 			})
 		]
 	}) : /* @__PURE__ */ (0, j.jsxs)(Uc, {
@@ -16575,26 +16564,26 @@ function ju({ fallbackSizeKey: t }) {
 		children: [
 			/* @__PURE__ */ (0, j.jsx)(Gc, {
 				title: d ? "站立休息" : "连续久坐",
-				trailing: h
+				trailing: g
 			}),
 			/* @__PURE__ */ (0, j.jsx)(Jc, {
 				value: a.currentMin,
 				unit: "分钟",
 				size: 80
 			}),
-			/* @__PURE__ */ (0, j.jsx)(qs, {
+			a.hint ? /* @__PURE__ */ (0, j.jsx)(qs, {
 				size: 300,
 				className: n.hint,
 				style: o,
 				children: a.hint
-			}),
+			}) : null,
 			/* @__PURE__ */ (0, j.jsx)("div", {
 				className: n.statsRow,
-				children: g.slice(0, 2).map(_)
+				children: _.slice(0, 2).map(v)
 			}),
 			/* @__PURE__ */ (0, j.jsx)("div", {
 				className: n.actions,
-				children: v
+				children: y
 			})
 		]
 	});
@@ -16680,14 +16669,12 @@ function Pu() {
 		e?.stopPropagation?.(), t.enabled && (r ? hu() : mu());
 	}, [t.enabled, r]), o = (0, A.useCallback)((e) => {
 		e?.stopPropagation?.(), gu();
-	}, []), s = n.runtime.snoozedUntil ? new Date(n.runtime.snoozedUntil) : null, c = !!(s && s.getTime() > Date.now()), l = t.enabled ? i ? `已连续久坐 ${n.currentMin} 分钟` : r ? `站立休息中 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", u = n.hint;
-	t.enabled ? !i && !r ? u = "后台会自动开始计时；也可以手动记录状态" : r ? u = "休息中，坐下后开始新一轮久坐" : n.status === "danger" && !c && (u = `已超过提醒阈值 ${t.thresholdMin} 分钟，起身活动一下`) : u = "在设置里重新启用后，后台会继续计时与提醒";
-	let d = /* @__PURE__ */ (0, j.jsx)(tl, {
+	}, []), s = t.enabled ? i ? `连续久坐 ${n.currentMin} 分钟` : r ? `站立休息 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", c = t.enabled && i ? n.hint : "", l = /* @__PURE__ */ (0, j.jsx)(tl, {
 		appearance: "primary",
 		icon: r ? /* @__PURE__ */ (0, j.jsx)(Vo, {}) : /* @__PURE__ */ (0, j.jsx)(Ho, {}),
 		onClick: a,
 		disabled: !t.enabled,
-		"aria-label": r ? "我坐下了，开始新一轮久坐" : "我站起来了，记录一次起身",
+		"aria-label": r ? "我坐下了" : "我站起来了",
 		children: r ? "我坐下了" : "我站起来了"
 	});
 	return /* @__PURE__ */ (0, j.jsxs)(rl, { children: [
@@ -16702,15 +16689,15 @@ function Pu() {
 				children: [/* @__PURE__ */ (0, j.jsx)(qs, {
 					size: 400,
 					weight: "semibold",
-					children: l
-				}), /* @__PURE__ */ (0, j.jsx)(qs, {
+					children: s
+				}), c ? /* @__PURE__ */ (0, j.jsx)(qs, {
 					size: 200,
 					className: e.muted,
-					children: u
-				})]
+					children: c
+				}) : null]
 			})
 		}),
-		n.hasData ? /* @__PURE__ */ (0, j.jsxs)(sl, { children: [d, n.snoozable ? /* @__PURE__ */ (0, j.jsx)(tl, {
+		n.hasData ? /* @__PURE__ */ (0, j.jsxs)(sl, { children: [l, n.snoozable ? /* @__PURE__ */ (0, j.jsx)(tl, {
 			onClick: o,
 			children: "稍后 5 分钟"
 		}) : null] }) : null,
@@ -16729,7 +16716,7 @@ function Pu() {
 						className: e.statGrid,
 						children: [
 							/* @__PURE__ */ (0, j.jsx)(Nu, {
-								label: "今日累计久坐",
+								label: "今日久坐",
 								value: Math.round(n.today.sittingMinutes),
 								unit: "分钟"
 							}),
@@ -16780,8 +16767,7 @@ function Pu() {
 				children: /* @__PURE__ */ (0, j.jsx)(Qc, {
 					icon: /* @__PURE__ */ (0, j.jsx)(V, {}),
 					title: "还没有今天的记录",
-					description: "后台会自动开始计时；也可以现在记录一次状态",
-					action: d
+					action: l
 				})
 			})
 		}) })
@@ -16793,7 +16779,7 @@ ec();
 var Fu = new URLSearchParams(location.search), Iu = lc(), Lu = Fu.get("background") === "1", Ru = Du(), zu = [
 	{
 		name: "sedentary.status",
-		description: "读取久坐状态：当前是坐着还是站立、当前状态持续分钟、今日久坐/站立分钟、起身次数、提醒阈值与距提醒时间",
+		description: "读取久坐状态：当前姿态、当前状态持续分钟、今日久坐/站立分钟、起身次数、距离下次提醒时间",
 		parameters: {
 			type: "object",
 			properties: {},
@@ -16811,7 +16797,13 @@ var Fu = new URLSearchParams(location.search), Iu = lc(), Lu = Fu.get("backgroun
 	},
 	{
 		name: "sedentary.standUp",
-		description: "记录一次起身：坐着→站立，结算本轮久坐并暂停久坐计时（UI：坐着时的「我站起来了」）",
+		description: "用户说自己站起来了、离开座位或起身活动时调用：记录一次起身（坐着→站立），返回当前姿态与今日起身次数。",
+		phrases: [
+			"我站起来了",
+			"站起来了",
+			"我起身了",
+			"我离开座位了"
+		],
 		parameters: {
 			type: "object",
 			properties: {},
@@ -16820,7 +16812,13 @@ var Fu = new URLSearchParams(location.search), Iu = lc(), Lu = Fu.get("backgroun
 	},
 	{
 		name: "sedentary.sitDown",
-		description: "记录坐下：站立→坐着，结算站立时长并开始新一轮久坐（UI：站立时的「我坐下了」）",
+		description: "用户说自己坐下了、回到座位时调用：记录坐下（站立→坐着），返回当前姿态与今日久坐分钟。",
+		phrases: [
+			"我坐下了",
+			"我坐下来了",
+			"坐下了",
+			"我回到座位了"
+		],
 		parameters: {
 			type: "object",
 			properties: {},
@@ -16829,7 +16827,7 @@ var Fu = new URLSearchParams(location.search), Iu = lc(), Lu = Fu.get("backgroun
 	},
 	{
 		name: "sedentary.snooze",
-		description: "把已到阈值的久坐提醒推迟 5 分钟（仅坐着时可用；UI：详情「稍后 5 分钟」）",
+		description: "把久坐提醒推迟 5 分钟（坐着且已到阈值时）",
 		parameters: {
 			type: "object",
 			properties: {},
@@ -16918,25 +16916,22 @@ function Vu() {
 		"sedentary.status": async () => uu(await zl()),
 		"sedentary.today": () => du(),
 		"sedentary.standUp": async () => {
-			let e = await zl();
-			if (!e.enabled) throw Error("久坐提醒已关闭");
-			let t = await Cu().standUp("agent");
-			if (!t.changed) throw Error("当前已经是站立状态");
+			if (!(await zl()).enabled) throw Error("久坐提醒已关闭");
+			let e = await Cu().standUp("agent");
+			if (!e.changed) throw Error("当前已经是站立状态");
 			return {
 				posture: "standing",
-				today: t.day,
-				status: uu(e)
+				breaksToday: e.day.breaks
 			};
 		},
 		"sedentary.sitDown": async () => {
-			let e = await zl();
-			if (!e.enabled) throw Error("久坐提醒已关闭");
-			let t = await Cu().sitDown("agent");
-			if (!t.changed) throw Error("当前已经是坐着状态");
+			if (!(await zl()).enabled) throw Error("久坐提醒已关闭");
+			let e = await Cu().sitDown("agent");
+			if (!e.changed) throw Error("当前已经是坐着状态");
 			return {
 				posture: "sitting",
-				today: t.day,
-				status: uu(e)
+				sittingMinutesToday: Math.round(e.day.sittingMinutes * 10) / 10,
+				breaksToday: e.day.breaks
 			};
 		},
 		"sedentary.snooze": async () => {

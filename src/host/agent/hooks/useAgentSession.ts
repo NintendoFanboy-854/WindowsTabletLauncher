@@ -2,8 +2,10 @@
  * Agent 会话状态机：对话、工具循环、停止/重试、语音（原生音频一次发送 + ASR 回填）、单条播报。
  *
  * 语音链路（契约 §7）：
- * 1. `stopRecording()` 结束时立即发一轮带 `input_audio` 的 chat 请求（只此一次）；
- * 2. 同一份 WAV 并行送 MiMo ASR，结果回填该 user 消息的 `content` / `transcriptStatus`；
+ * 1. `stopRecording()` 结束后先等 ASR 转写（最多 8s）：转写文本决定工具调用，纯音频
+ *    的 function calling 不稳定，模型容易“回答了但没记录”；
+ * 2. 转写就绪后发一轮带 `input_audio` + 转写文本的 chat 请求（只此一次）；
+ *    转写超时/失败才退回纯音频请求，ASR 结果晚到仍会回填并对状态类短语补执行；
  * 3. 音频 Blob / data URL 用完即弃：不写 localStorage、不进 Message；后续轮次（工具循环）、
  *    重试、切会话、重启全部只发文字（转写失败用「（用户发来一段语音）」占位）；
  * 4. 语音提问的回复自动朗读；文字提问按 `tts.readTextReplies`；单条消息可播放/停止；
@@ -30,6 +32,7 @@ import {
   buildToolBindings,
   executeTool,
   findBindingByName,
+  matchPhraseTool,
   type ToolBinding,
 } from '../tools/registry';
 import {
@@ -53,6 +56,7 @@ import type {
   Conversation,
   Message,
   SourceRef,
+  ToolCallRecord,
   ToolDefinition,
 } from '../types';
 import { TtsPlayer } from '../voice/ttsPlayer';
@@ -67,8 +71,19 @@ const VOICE_CONVERSATION_TITLE = '语音提问';
 /** ASR 超时：网络挂起时 voice.stage 不能永远停在 transcribing */
 const ASR_TIMEOUT_MS = 30_000;
 
+/**
+ * 语音回合开始前等 ASR 的上限：转写文本决定工具调用，纯音频不稳定。
+ * 超时就退回纯音频请求（不卡住语音），ASR 晚到仍会补做状态同步。
+ */
+const ASR_PRE_TURN_WAIT_MS = 8_000;
+
 /** 本轮语音请求里 text part 的指令：让模型直接回答音频里的问题，不要描述音频 */
 const VOICE_AUDIO_INSTRUCTION = '请听上面这段用户语音，直接回答用户的问题；不要描述音频本身。';
+
+/** 转写文本与音频一起发，让模型按文字做工具调用；音频只保留语气信息 */
+function voiceTranscriptInstruction(transcript: string): string {
+  return `用户语音转写：「${transcript}」。请按转写内容直接回答或执行操作，不要描述音频本身。`;
+}
 
 /** 会话错误提示：没配 MiMo Key 时统一话术 */
 const CONFIGURATION_ERROR_MESSAGE =
@@ -377,6 +392,36 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     }
   };
 
+  /**
+   * 用户整句命中插件声明的短语（如「我站起来了」）时，宿主先执行工具再让模型确认：
+   * - 状态在点发送 / 说完的瞬间就写进插件，卡片与详情靠 storage 事件立即同步，
+   *   不依赖模型是否愿意调工具；
+   * - 工具结果以 assistant.toolCalls 进对话，模型只负责一句措辞，不会编造“已记录”。
+   */
+  const runPhraseTool = async (
+    binding: ToolBinding,
+    signal: AbortSignal,
+  ): Promise<ToolCallRecord> => {
+    const record: ToolCallRecord = {
+      id: `phrase-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      name: binding.originalName,
+      args: {},
+      status: 'running',
+    };
+    try {
+      // 插件 iframe 异常时不能让发送流程一直等：5s 内拿不到结果就回落给模型解释
+      const result = await Promise.race([
+        transport.callPluginTool(binding.originalName, {}, { signal }),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error('工具执行超时')), 5_000);
+        }),
+      ]);
+      return { ...record, status: 'success', result };
+    } catch (error) {
+      return { ...record, status: 'error', error: errorMessage(error) };
+    }
+  };
+
   const runTurn = async (params: RunTurnParams): Promise<void> => {
     const { conversationId, assistantId, baseMessages, controller, voice: voiceTurn } = params;
     const { signal } = controller;
@@ -390,7 +435,12 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     let audioParts: ChatContentPart[] | null = voiceTurn
       ? [
           { type: 'input_audio', input_audio: { data: voiceTurn.dataUrl } },
-          { type: 'text', text: VOICE_AUDIO_INSTRUCTION },
+          {
+            type: 'text',
+            text: voiceTurn.transcript.text
+              ? voiceTranscriptInstruction(voiceTurn.transcript.text)
+              : VOICE_AUDIO_INSTRUCTION,
+          },
         ]
       : null;
 
@@ -633,9 +683,14 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     const conversation = activeConversation();
     if (!conversation) return;
 
+    const controller = new AbortController();
     const userMessage = createMessage('user', text, { input: 'text' });
     const assistantMessage = createMessage('assistant', '', { status: 'streaming' });
-    const baseMessages = [...conversation.messages, userMessage];
+    /** 状态类短语（我站起来了 / 我坐下了）由宿主直接执行，不等模型决定 */
+    const phraseTool = matchPhraseTool(
+      buildToolBindings(transport.listPluginTools()),
+      text,
+    );
 
     setStore((previous) => ({
       ...previous,
@@ -652,11 +707,21 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       ),
     }));
 
+    let baseMessages: Message[] = [...conversation.messages, userMessage];
+    if (phraseTool) {
+      const record = await runPhraseTool(phraseTool, controller.signal);
+      updateMessage(conversation.id, assistantMessage.id, (message) => ({
+        ...message,
+        toolCalls: [record],
+      }));
+      baseMessages = [...baseMessages, { ...assistantMessage, toolCalls: [record] }];
+    }
+
     await runTurn({
       conversationId: conversation.id,
       assistantId: assistantMessage.id,
       baseMessages,
-      controller: new AbortController(),
+      controller,
     });
   };
 
@@ -877,7 +942,6 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       transcriptStatus: 'pending',
     });
     const assistantMessage = createMessage('assistant', '', { status: 'streaming' });
-    const baseMessages = [...conversation.messages, userMessage];
     const isFirstMessage = conversation.messages.length === 0;
 
     setStore((previous) => ({
@@ -913,21 +977,13 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     }
 
     const voiceTurn: VoiceTurnContext = { dataUrl, transcript: { text: null } };
+    const controller = new AbortController();
     const asrToken = voiceTurnTokenRef.current + 1;
     voiceTurnTokenRef.current = asrToken;
 
-    // 1) 立即发起带音频的对话请求（不 await，让 ASR 并行走）
-    void runTurn({
-      conversationId: conversation.id,
-      assistantId: assistantMessage.id,
-      baseMessages,
-      controller: new AbortController(),
-      voice: voiceTurn,
-      forceRead: true,
-    });
-
-    // 2) 同一份 WAV 并行 ASR：回填 user message，并供后续上下文使用。
-    //    加 30s 超时：网络挂起时不能让 voice.stage 永远停在 transcribing（否则无法开始下一轮）。
+    // 1) 先等 ASR 转写：模型靠文字判断要不要调工具才可靠（纯音频常出现
+    //    “嘴上说已记录、实际没调工具”）。最多等 ASR_PRE_TURN_WAIT_MS，
+    //    超时先按纯音频请求，转写晚到仍会补做状态同步。
     const asrController = new AbortController();
     asrAbortRef.current = asrController;
     let asrTimedOut = false;
@@ -935,56 +991,114 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       asrTimedOut = true;
       asrController.abort();
     }, ASR_TIMEOUT_MS);
-    try {
-      const transcript = (await transport.transcribe(audio.wav, {
-        signal: asrController.signal,
-      })).trim();
-      if (!transcript) throw new Error('语音识别没有返回文字');
-      voiceTurn.transcript.text = transcript;
-      updateMessage(conversation.id, userMessage.id, (message) => ({
-        ...message,
-        content: transcript,
-        transcriptStatus: 'ready',
-      }));
-      setStore((previous) => ({
-        ...previous,
-        conversations: previous.conversations.map((item) =>
-          item.id !== conversation.id || item.title !== VOICE_CONVERSATION_TITLE
-            ? item
-            : { ...item, title: deriveConversationTitle(transcript) },
-        ),
-      }));
-    } catch (transcribeError) {
-      // 超时也要落到 failed/idle 并提示；只有“用户主动取消/卸载”才静默
-      if (asrTimedOut || !asrController.signal.aborted) {
+    const asrTask = (async () => {
+      try {
+        const transcript = (
+          await transport.transcribe(audio.wav, { signal: asrController.signal })
+        ).trim();
+        if (!transcript) throw new Error('语音识别没有返回文字');
+        voiceTurn.transcript.text = transcript;
         updateMessage(conversation.id, userMessage.id, (message) => ({
           ...message,
-          transcriptStatus: 'failed',
+          content: transcript,
+          transcriptStatus: 'ready',
         }));
-        if (voiceTurnTokenRef.current === asrToken) {
-          setVoice((previous) => ({
-            ...previous,
-            stage: 'idle',
-            level: 0,
-            error: {
-              kind: 'asr',
-              message: asrTimedOut
-                ? '语音识别超时，可以再说一次'
-                : `语音识别失败：${errorMessage(transcribeError)}`,
-            },
+        setStore((previous) => ({
+          ...previous,
+          conversations: previous.conversations.map((item) =>
+            item.id !== conversation.id || item.title !== VOICE_CONVERSATION_TITLE
+              ? item
+              : { ...item, title: deriveConversationTitle(transcript) },
+          ),
+        }));
+      } catch (transcribeError) {
+        // 超时也要落到 failed/idle 并提示；只有“用户主动取消/卸载”才静默
+        if (asrTimedOut || !asrController.signal.aborted) {
+          updateMessage(conversation.id, userMessage.id, (message) => ({
+            ...message,
+            transcriptStatus: 'failed',
           }));
+          if (voiceTurnTokenRef.current === asrToken) {
+            setVoice((previous) => ({
+              ...previous,
+              stage: 'idle',
+              level: 0,
+              error: {
+                kind: 'asr',
+                message: asrTimedOut
+                  ? '语音识别超时，可以再说一次'
+                  : `语音识别失败：${errorMessage(transcribeError)}`,
+              },
+            }));
+          }
+        }
+      } finally {
+        window.clearTimeout(asrTimer);
+        if (asrAbortRef.current === asrController) asrAbortRef.current = null;
+        if (voiceTurnTokenRef.current === asrToken && mountedRef.current) {
+          setVoice((previous) =>
+            previous.stage === 'transcribing'
+              ? { ...previous, stage: 'idle', level: 0 }
+              : previous,
+          );
         }
       }
-    } finally {
-      window.clearTimeout(asrTimer);
-      if (asrAbortRef.current === asrController) asrAbortRef.current = null;
-      if (voiceTurnTokenRef.current === asrToken && mountedRef.current) {
-        setVoice((previous) =>
-          previous.stage === 'transcribing'
-            ? { ...previous, stage: 'idle', level: 0 }
-            : previous,
-        );
+    })();
+    await Promise.race([
+      asrTask,
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, ASR_PRE_TURN_WAIT_MS);
+      }),
+    ]);
+
+    // 2) 转写已到手：状态类短语（我站起来了 / 我坐下了）由宿主直接执行，
+    //    卡片/详情立即同步；模型只负责一句确认，不会“说了却没记录”。
+    let baseMessages: Message[] = [...conversation.messages, userMessage];
+    const earlyTranscript = voiceTurn.transcript.text;
+    if (earlyTranscript) {
+      const phraseTool = matchPhraseTool(
+        buildToolBindings(transport.listPluginTools()),
+        earlyTranscript,
+      );
+      if (phraseTool) {
+        const record = await runPhraseTool(phraseTool, controller.signal);
+        updateMessage(conversation.id, assistantMessage.id, (message) => ({
+          ...message,
+          toolCalls: [record],
+        }));
+        baseMessages = [...baseMessages, { ...assistantMessage, toolCalls: [record] }];
       }
+    }
+
+    // 3) 带音频 + 转写文本的对话请求（转写失败/超时才退回纯音频）
+    void runTurn({
+      conversationId: conversation.id,
+      assistantId: assistantMessage.id,
+      baseMessages,
+      controller,
+      voice: voiceTurn,
+      forceRead: true,
+    });
+
+    // 4) 转写晚于请求返回（8s 超时场景）：命中状态短语时补执行一次，
+    //    保证“说了就记录”；重复执行会返回状态错误，忽略即可。
+    if (!earlyTranscript) {
+      void asrTask.then(() => {
+        const lateTranscript = voiceTurn.transcript.text;
+        if (!lateTranscript || controller.signal.aborted) return;
+        const lateTool = matchPhraseTool(
+          buildToolBindings(transport.listPluginTools()),
+          lateTranscript,
+        );
+        if (!lateTool) return;
+        void runPhraseTool(lateTool, controller.signal).then((record) => {
+          if (record.status !== 'success') return;
+          updateMessage(conversation.id, assistantMessage.id, (message) => ({
+            ...message,
+            toolCalls: [...(message.toolCalls ?? []), record],
+          }));
+        });
+      });
     }
   };
 

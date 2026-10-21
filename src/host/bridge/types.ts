@@ -20,6 +20,11 @@ export interface AgentToolDecl {
   description: string;
   /** JSON Schema，可省略 */
   parameters?: unknown;
+  /**
+   * 用户整句与其中一条完全一致时，宿主直接执行这个工具（不交给模型决定）。
+   * 用于「我站起来了」「我坐下了」这类必须立即生效的状态报告。
+   */
+  phrases?: string[];
 }
 
 // ---------- 宿主 → 插件 ----------

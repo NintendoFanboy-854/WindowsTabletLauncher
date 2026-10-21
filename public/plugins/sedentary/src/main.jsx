@@ -48,7 +48,7 @@ const AGENT_TOOLS = [
   {
     name: 'sedentary.status',
     description:
-      '读取久坐状态：当前是坐着还是站立、当前状态持续分钟、今日久坐/站立分钟、起身次数、提醒阈值与距提醒时间',
+      '读取久坐状态：当前姿态、当前状态持续分钟、今日久坐/站立分钟、起身次数、距离下次提醒时间',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -58,17 +58,22 @@ const AGENT_TOOLS = [
   },
   {
     name: 'sedentary.standUp',
-    description: '记录一次起身：坐着→站立，结算本轮久坐并暂停久坐计时（UI：坐着时的「我站起来了」）',
+    description:
+      '用户说自己站起来了、离开座位或起身活动时调用：记录一次起身（坐着→站立），返回当前姿态与今日起身次数。',
+    // 整句命中时宿主直接执行：状态必须在说出口的瞬间落库，不能等模型决定
+    phrases: ['我站起来了', '站起来了', '我起身了', '我离开座位了'],
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'sedentary.sitDown',
-    description: '记录坐下：站立→坐着，结算站立时长并开始新一轮久坐（UI：站立时的「我坐下了」）',
+    description:
+      '用户说自己坐下了、回到座位时调用：记录坐下（站立→坐着），返回当前姿态与今日久坐分钟。',
+    phrases: ['我坐下了', '我坐下来了', '坐下了', '我回到座位了'],
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'sedentary.snooze',
-    description: '把已到阈值的久坐提醒推迟 5 分钟（仅坐着时可用；UI：详情「稍后 5 分钟」）',
+    description: '把久坐提醒推迟 5 分钟（坐着且已到阈值时）',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -151,14 +156,19 @@ function BackgroundRunner() {
       if (!settings.enabled) throw new Error('久坐提醒已关闭');
       const outcome = await getEngine().standUp('agent');
       if (!outcome.changed) throw new Error('当前已经是站立状态');
-      return { posture: 'standing', today: outcome.day, status: toolStatus(settings) };
+      // 只回模型需要的那几个数：模型照此说一句确认，不要整份快照
+      return { posture: 'standing', breaksToday: outcome.day.breaks };
     },
     'sedentary.sitDown': async () => {
       const settings = await readSettings();
       if (!settings.enabled) throw new Error('久坐提醒已关闭');
       const outcome = await getEngine().sitDown('agent');
       if (!outcome.changed) throw new Error('当前已经是坐着状态');
-      return { posture: 'sitting', today: outcome.day, status: toolStatus(settings) };
+      return {
+        posture: 'sitting',
+        sittingMinutesToday: Math.round(outcome.day.sittingMinutes * 10) / 10,
+        breaksToday: outcome.day.breaks,
+      };
     },
     'sedentary.snooze': async () => {
       const settings = await readSettings();

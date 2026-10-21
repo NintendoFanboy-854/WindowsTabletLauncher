@@ -615,3 +615,45 @@ npx tauri build                    # release + 安装包
 
 - 番茄钟联动、插件间能力图/互调（用户已砍掉）。
 - 自动坐/站检测、键鼠空闲推断、免打扰时段。
+
+## 18. v0.3.5 Agent 状态短句直通 + 久坐文案减法（2026-10-22）
+
+> 代码提交：本次功能提交（版本 0.3.5 + 文档）；分支 `main`；tag `v0.3.5`。
+> 证据：`shots/sedentary-agent-sync/`、`.tmp/test-phrases.mjs`、`scripts/verify-agent-surface.mjs` 复跑日志。
+
+### 18.1 背景
+
+用户反馈：在 Agent 里说「我坐下了」，卡片没有变化，仍然要手动点按钮；同时截图里久坐卡片出现「休息中，坐下后开始新一轮」这种说明书式文案，要求按 Apple HIG 做减法。
+
+排查用户机器上的 WebView2 LevelDB（`agent.conversations` / `sedentary.runtime`）确认：模型那一轮**没有调用任何工具**，只回了一段“已记录你起身站立，本轮久坐 38 分钟已结算”的编造回复；插件 `breaks = 0`、`lastBreakAt = null`，随后真正的站立来自用户手动点的按钮（commandId `cmd-…`）。又用真实 MiMo 做对照实验：同一句「我坐下了」纯音频请求 4 次只有 1 次真的产生 tool call，其余是文字幻觉或畸形 `<tool_call>`；而「音频 + ASR 转写文本」3/3 都正确调用工具。结论：状态同步不能依赖模型的工具决定，尤其不能依赖纯音频的 function calling。
+
+### 18.2 决策与实现（D-28）
+
+1. **工具声明 `phrases`**：插件可在 `plugin.ready` 的工具声明里带 `phrases: string[]`；宿主 `matchPhraseTool` 只在“用户整句（忽略空白/标点）完全等于某条短语”时命中，带疑问的长句不误判。
+2. **宿主直通**：文字发送/语音转写后，命中短语的工具在模型请求前由宿主执行；结果作为 `assistant.toolCalls` 进入对话，模型只回一句短确认。状态写入插件后，卡片/详情靠既有 storage 事件在 1s 内同步。
+3. **语音先转写**：`stopRecording()` 先等 ASR（最多 8s），再把 `input_audio` + 「用户语音转写：…」一起发给模型；转写超时才退回纯音频，晚到的转写对状态短语补执行一次。
+4. **文案减法**：站立 `hintOf` 返回空串（标题/Badge 已表达），2×1 只显示「休息中」；详情站立时不再写辅助说明；删除每次卡片操作的「已记录…」通知；工具描述去掉「（UI：…）」；提示词新增“工具成功后只回一句短确认，不要教用户点按钮”。
+5. **工具结果精简**：`standUp` 只回 `{posture, breaksToday}`，`sitDown` 回 `{posture, sittingMinutesToday, breaksToday}`，避免模型复述整份状态。
+
+### 18.3 验证
+
+- 短语匹配单测（`node --experimental-strip-types`）：**10/10 PASS** — 站/坐、带标点、带空格、长句不误判、无关句不误判。
+- 真实 MiMo + headless Edge 端到端：**12/12 PASS** — 聊天里说「我站起来了」→ `sedentary.runtime.posture=standing`（`commandId=null`，即工具路径而非点按）、卡片按钮切「我坐下了」、breaks +1；说「我坐下了」→ 回 `sitting`、按钮切回；两次都有 `sedentary.standUp` / `sedentary.sitDown` 工具卡；回复短确认不含「点一下 / 新一轮」；卡片与详情不再出现「坐下后开始新一轮」；console error 0。截图 `shots/sedentary-agent-sync/01-stand-synced.png`、`02-sit-synced.png`、`03-detail-standalone.png`，明细 `result.json`。
+- Agent 浮空界面回归：`node scripts/verify-agent-surface.mjs` **109/109 PASS、0 FAIL**（mock 语音链路：停止→transcribing→chat 仍正常，ASR-first 不破坏状态机）。
+- `node scripts/build-plugin.mjs sedentary`（553,803 B / `5F1902C2…`）、`npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m19s）。
+
+### 18.4 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,168,704 B | `497BB9B9CC861644DF74F38B24DD9A01E0A7D693030DB8EF5661AC3ADE8F000D` |
+| NSIS `Windows Tablet Launcher_0.3.5_x64-setup.exe` | 3,934,447 B | `65051899177B7AAF772BE0113F80ECBF90CA8B1828B3EA6C1C57867E7B167C28` |
+| MSI `Windows Tablet Launcher_0.3.5_x64_zh-CN.msi` | 5,140,480 B | `7DA6BD5630D20B662B71101B2E21B5AF68FCFC40DADA7688E09F7EBDE9B75559` |
+
+- 插件产物：`public/plugins/sedentary/app/app.js` 553,803 B / `5F1902C2B4F52584E055A33A435BF88D67FC8788FFF3BBF4826592BF8B050AD5`；升级时 `.seed-version` 0.3.4 → 0.3.5 自动重种。
+- 安装包内含本地 `public/secrets.json`，仅本机自用。
+
+### 18.5 范围外（本次明确不做）
+
+- 番茄钟联动、插件间能力图/互调（沿用 D-27 的范围）。
+- 自动坐/站检测、键鼠空闲推断、免打扰时段。

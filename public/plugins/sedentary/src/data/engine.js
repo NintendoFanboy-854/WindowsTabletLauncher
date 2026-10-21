@@ -62,10 +62,10 @@ const NUMBER_LIMITS = {
 };
 
 const STATUS_LABELS = {
-  success: '正常',
-  warning: '接近阈值',
-  danger: '已超阈值',
-  resting: '站立休息',
+  success: '久坐中',
+  warning: '接近提醒',
+  danger: '该起身了',
+  resting: '休息中',
   off: '已关闭',
 };
 
@@ -398,17 +398,19 @@ export function statusLabelOf(status) {
 }
 
 /**
- * 卡片/详情副文案（V-12）：不重复主数值，只讲下一步或状态。
+ * 卡片/详情副文案：只讲当前状态或下一步，不解释状态机怎么运转。
+ * 站立时返回空串——Badge / 状态点已经表达了「休息中」，再写一句“坐下后开始新一轮”
+ * 就是把界面当成说明书（Apple HIG：让控件与状态自己说话）。
  */
 export function hintOf(settings, runtime, now = new Date()) {
   const status = statusOf(settings, runtime, now);
   if (status === 'off') return '久坐提醒已关闭';
-  if (status === 'resting') return '休息中，坐下后开始新一轮';
+  if (status === 'resting') return '';
   const snoozed = safeDate(runtime.snoozedUntil);
   if (snoozed && snoozed > now) return `提醒已推迟到 ${formatClock(snoozed)}`;
-  if (!runtime.posture) return '计时准备中';
+  if (!runtime.posture) return '';
   const remaining = settings.thresholdMin - currentStreakMin(runtime, now.getTime());
-  if (remaining <= 0) return '已超过提醒阈值';
+  if (remaining <= 0) return '该起身了';
   return `距提醒还有 ${Math.max(1, Math.ceil(remaining))} 分钟`;
 }
 
@@ -686,8 +688,8 @@ export class SedentaryEngine {
     const type = command.type === 'break' ? 'stand' : command.type;
     if (type !== 'stand' && type !== 'sit' && type !== 'snooze') return;
     try {
-      const notice = await runExclusive(() => this.#applyCommand({ ...command, type }));
-      if (notice) plugin.notify(notice);
+      // 卡片/详情已经通过 storage 事件立即重绘；不再叠一条“已记录…”通知。
+      await runExclusive(() => this.#applyCommand({ ...command, type }));
     } catch (error) {
       // 单次命令失败不能打断后台定时器；warn 不计入 console error 验收
       console.warn('[sedentary] 命令执行失败', error);
@@ -696,41 +698,32 @@ export class SedentaryEngine {
 
   #applyCommand(command) {
     const runtime = readRuntime();
-    if (runtime.commandId === command.id) return null;
+    if (runtime.commandId === command.id) return;
     // 只记 commandId 做去重；不要改 lastTickAt——姿态切换要按上一次 tick 的
     // 时间戳把过渡期的时长补记进去，提前改写会把这段时间丢掉。
     runtime.commandId = command.id;
     writeRuntime(runtime);
 
     if (command.type === 'snooze') {
-      const outcome = this.#applySnooze(command.minutes);
-      return outcome ? `${outcome.minutes} 分钟后再提醒你` : null;
+      this.#applySnooze(command.minutes);
+    } else if (command.type === 'sit') {
+      this.#sit('manual');
+    } else {
+      this.#stand('manual');
     }
-    if (command.type === 'sit') {
-      const outcome = this.#sit('manual');
-      return outcome.changed ? '已坐下，开始新一轮久坐' : '现在已经是坐着了';
-    }
-    const outcome = this.#stand('manual');
-    return outcome.changed ? `已记录起身，今日共 ${outcome.day.breaks} 次` : '现在已经是站立休息';
   }
 
-  /** 用户动作 / 工具共用：锁内切换姿态，锁外发通知 */
+  /** 用户动作 / Agent 工具共用：锁内切换姿态；界面由 storage 事件自己更新 */
   async standUp(source = 'manual') {
-    const outcome = await runExclusive(() => this.#stand(source));
-    if (outcome.changed) plugin.notify(`已记录起身，今日共 ${outcome.day.breaks} 次`);
-    return outcome;
+    return runExclusive(() => this.#stand(source));
   }
 
   async sitDown(source = 'manual') {
-    const outcome = await runExclusive(() => this.#sit(source));
-    if (outcome.changed) plugin.notify('已坐下，开始新一轮久坐');
-    return outcome;
+    return runExclusive(() => this.#sit(source));
   }
 
   async snooze(minutes = SNOOZE_MINUTES) {
-    const outcome = await runExclusive(() => this.#applySnooze(minutes));
-    if (outcome) plugin.notify(`${outcome.minutes} 分钟后再提醒你`);
-    return outcome;
+    return runExclusive(() => this.#applySnooze(minutes));
   }
 
   /** 锁内实现：只推迟，不通知；仅坐着时有效 */
@@ -842,14 +835,14 @@ export class SedentaryEngine {
 
   async #remind(minutes, settings) {
     if (!settings.strongReminder) {
-      plugin.notify(`该起来动一动了：已连续坐 ${minutes} 分钟`);
+      plugin.notify(`已连续坐 ${minutes} 分钟`);
       return;
     }
     let result = null;
     try {
       result = await plugin.showReminder({
         title: '该起来动一动了',
-        message: `已连续坐了 ${minutes} 分钟，站起来走动 1～2 分钟吧。`,
+        message: `已连续坐 ${minutes} 分钟。`,
         actions: [
           { id: 'stand', text: '我站起来了', kind: 'primary' },
           { id: 'snooze', text: '稍后 5 分钟' },

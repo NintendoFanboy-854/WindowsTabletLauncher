@@ -222,6 +222,9 @@ plugin → host: { type: 'plugin:request-host-settings' }
 - 命名：`<pluginId>.<verb>`，如 `clock.settings.get`、`countdown.update`。只读工具加 `.get/.list/.status` 后缀，
   写操作明确动词。
 - 工具必须返回结构化结果（对象），错误用 `{ error }` 或 SDK 的 `toolResult(ok=false)`。
+- 工具声明可带可选 `phrases: string[]`（v0.3.5，D-28）：用户整句（忽略空白/标点）与其中一条完全相等时，
+  宿主**直接执行该工具**，不再等模型决定。只适合「用户报告自身状态、必须立即生效」的动作
+  （如久坐的「我站起来了 / 我坐下了」）；带疑问或长句仍交给模型判断。
 - 插件文档的「Agent 工具」表必须同时列出 **UI 路径 ↔ 工具** 的对应关系。
 - 宿主不校验对等性（无法通用校验），由插件验收清单与文档负责。
 
