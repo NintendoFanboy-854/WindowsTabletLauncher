@@ -113,3 +113,22 @@
 - [x] 文档：D-26、`docs/components/sedentary.md`、README、RELEASE-REPORT §16 已更新
 - [x] 安装包不外发（内含本地 `public/secrets.json`）
 - [x] `git status` 干净；commit / push / tag `v0.3.3`
+
+## 11. v0.3.4 增量检查（2026-10-21）
+
+> 背景：久坐要「坐着—起来—坐着」循环；Agent 可操作两个动作；复盘页要反映新数据。改动见 D-27、RELEASE-REPORT §17。§1–§10 继续有效。
+
+- [x] 版本号 0.3.4 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
+- [x] 状态机：sitting ↔ standing 全手动；久坐只累计坐姿；站立单独统计；强提醒/按钮/卡片/详情/aria 文案全部随状态切换
+- [x] 数据：`sedentary.days` 增加 `standingMinutes`；`runtime` 改 `posture/postureSince`（旧 `sittingSince` 迁移为 sitting）
+- [x] Agent 工具：移除 `sedentary.takeBreak`，新增 `sedentary.standUp` / `sedentary.sitDown` / `sedentary.stats`；`snooze` 仅坐着可用
+- [x] 复盘：`sedentary.stats` 返回区间统计与 byDay；宿主 `stats.ts`/`ReviewPage` 展示「次起身」主数值 + 久坐/站立分钟
+- [x] 过渡计时修复：命令处理不再提前改写 `lastTickAt`，站/坐切换按上次 tick 补记时长
+- [x] `node scripts/build-plugin.mjs sedentary`（554,867 B / `FA7168D9…`）
+- [x] `node scripts/verify-sedentary.mjs`：坐→站→坐循环 **10/10 PASS**、console error 0 — `shots/sedentary-verify/sedentary-cycle.png`
+- [x] 复盘集成检查（headless Edge `?page=review`）：出现久坐区块「0 次起身 · 久坐 0 分钟 · 站立 0 分钟」，来源含 `sedentary.stats` — `shots/sedentary-verify/review.png`
+- [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 9m55s；NSIS/MSI 完成）
+- [x] 产物哈希：`app.exe` 12,168,192 B / `F763A47B…`；NSIS 3,932,629 B / `BEDFCFB1…`；MSI 5,140,480 B / `78F5ACF6…`
+- [x] 文档：D-27、`docs/components/sedentary.md`、README、RELEASE-REPORT §17 已更新
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [x] `git status` 干净；commit / push / tag `v0.3.4`

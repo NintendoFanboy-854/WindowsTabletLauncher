@@ -139,6 +139,12 @@ function metricsOf(stat: ProviderRangeStats): Metric[] {
   if (typeof stat.focusMinutes === 'number') {
     metrics.push({ label: '专注', value: `${stat.focusMinutes} 分钟` });
   }
+  if (typeof stat.sittingMinutes === 'number') {
+    metrics.push({ label: '久坐', value: `${stat.sittingMinutes} 分钟` });
+  }
+  if (typeof stat.standingMinutes === 'number') {
+    metrics.push({ label: '站立', value: `${stat.standingMinutes} 分钟` });
+  }
   if (typeof stat.streakDays === 'number') {
     metrics.push({ label: '连续', value: `${stat.streakDays} 天` });
   }

@@ -1,14 +1,16 @@
 /**
  * 久坐提醒卡片（L0，docs/components/sedentary.md）。
  *
+ * 状态机：坐着（sitting）↔ 站立（standing），手动切换（D-27）。
+ *
  * 尺寸档位：
- * - 1×1：状态 Badge + 连续分钟（48）；无按钮，点卡体开详情；
- * - 2×1：分钟 68 + 状态点 + 距提醒文案 +「我起来了」40；
- * - 2×2：分钟 80 + 两项统计 +「我起来了」；
- * - 3×2：分钟 96 + 三项统计 +「我起来了」。
+ * - 1×1：状态 Badge + 当前状态分钟（48）；无按钮，点卡体开详情；
+ * - 2×1：分钟 68 + 状态点 + 提示文案 + 状态按钮 40；
+ * - 2×2：分钟 80 + 两项统计（今日久坐/今日站立）+ 状态按钮；
+ * - 3×2：分钟 96 + 三项统计（今日久坐/今日站立/起身次数）+ 状态按钮。
  *
  * CardRoot 负责卡片手势、键盘 Enter/Space 与内部控件过滤；快捷按钮再显式
- * stopPropagation，确保只记录起身、不打开详情。长按 / hover / 右键全部交给宿主，
+ * stopPropagation，确保只记录状态、不打开详情。长按 / hover / 右键全部交给宿主，
  * 插件不再自建菜单或设置入口。
  */
 
@@ -20,7 +22,7 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { Checkmark20Regular } from '@fluentui/react-icons';
+import { ArrowDownRegular, ArrowUpRegular } from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
 import { requestOverlay, useHostSize, useStoredConfig } from '../../_shared/host.js';
 import { useMotionTransition } from '../../_shared/motion.js';
@@ -35,7 +37,8 @@ import {
   SETTINGS_KEY,
   getEngine,
   normalizeSettings,
-  sendBreakCommand,
+  sendSitCommand,
+  sendStandCommand,
 } from './data/engine.js';
 import { useSedentaryState } from './useSedentaryState.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
@@ -44,6 +47,7 @@ const BADGE_COLOR = {
   success: 'success',
   warning: 'warning',
   danger: 'danger',
+  resting: 'informative',
   off: 'subtle',
 };
 
@@ -52,6 +56,7 @@ const STATUS_DOT_COLOR = {
   success: tokens.colorStatusSuccessForeground1,
   warning: tokens.colorStatusWarningForeground1,
   danger: tokens.colorStatusDangerForeground1,
+  resting: tokens.colorBrandForeground1,
   off: tokens.colorNeutralForeground4,
 };
 
@@ -191,18 +196,21 @@ export default function SedentaryApp({ fallbackSizeKey }) {
 
   const openDetail = useCallback(() => requestOverlay('detail', '久坐详情'), []);
 
-  const standUp = useCallback(
+  const standing = snapshot.posture === 'standing';
+  const togglePosture = useCallback(
     (event) => {
       event.stopPropagation();
       if (!settings.enabled) return;
-      sendBreakCommand();
+      if (standing) sendSitCommand();
+      else sendStandCommand();
     },
-    [settings.enabled],
+    [settings.enabled, standing],
   );
 
+  const postureText = standing ? '已站立' : '已连续久坐';
   const ariaLabel = settings.enabled
-    ? `${snapshot.statusLabel}，已连续久坐 ${snapshot.currentMin} 分钟，${snapshot.hint}；点击打开详情${
-        compact ? '' : '，也可以点“我起来了”记录起身'
+    ? `${snapshot.statusLabel}，${postureText} ${snapshot.currentMin} 分钟，${snapshot.hint}；点击打开详情${
+        compact ? '' : standing ? '，也可以点“我坐下了”' : '，也可以点“我站起来了”'
       }`
     : '久坐提醒已关闭，点击打开详情';
 
@@ -218,14 +226,14 @@ export default function SedentaryApp({ fallbackSizeKey }) {
   );
 
   const stats = [
-    { key: 'today', label: '今日久坐', value: Math.round(snapshot.today.sittingMinutes), unit: '分钟' },
-    { key: 'breaks', label: '起身次数', value: snapshot.today.breaks, unit: '次' },
+    { key: 'sitting', label: '今日久坐', value: Math.round(snapshot.today.sittingMinutes), unit: '分钟' },
     {
-      key: 'longest',
-      label: '最长连续',
-      value: Math.round(snapshot.today.longestStreakMin),
+      key: 'standing',
+      label: '今日站立',
+      value: Math.round(snapshot.today.standingMinutes),
       unit: '分钟',
     },
+    { key: 'breaks', label: '起身次数', value: snapshot.today.breaks, unit: '次' },
   ];
 
   const renderStat = (item) => (
@@ -247,12 +255,12 @@ export default function SedentaryApp({ fallbackSizeKey }) {
   const standButton = (
     <TouchButton
       appearance="primary"
-      icon={<Checkmark20Regular />}
-      onClick={standUp}
+      icon={standing ? <ArrowDownRegular /> : <ArrowUpRegular />}
+      onClick={togglePosture}
       disabled={!settings.enabled}
-      aria-label="我起来了，记录一次起身"
+      aria-label={standing ? '我坐下了，开始新一轮久坐' : '我站起来了，记录一次起身'}
     >
-      我起来了
+      {standing ? '我坐下了' : '我站起来了'}
     </TouchButton>
   );
 
@@ -304,7 +312,7 @@ export default function SedentaryApp({ fallbackSizeKey }) {
         className={mergeClasses(styles.root, styles.rootWide)}
       >
         <div className={styles.wideMain}>
-          <CardHeader title="连续久坐" trailing={statusBadge} />
+          <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={statusBadge} />
           <Metric value={snapshot.currentMin} unit="分钟" size={96} />
           <Text size={300} className={styles.hint} style={motionStyle}>
             {snapshot.hint}
@@ -322,7 +330,7 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       onActivate={openDetail}
       className={mergeClasses(styles.root, styles.rootMedium)}
     >
-      <CardHeader title="连续久坐" trailing={statusBadge} />
+      <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={statusBadge} />
       <Metric value={snapshot.currentMin} unit="分钟" size={80} />
       <Text size={300} className={styles.hint} style={motionStyle}>
         {snapshot.hint}

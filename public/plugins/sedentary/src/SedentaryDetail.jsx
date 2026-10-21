@@ -1,19 +1,20 @@
 /**
  * 久坐详情（L1，宿主 ?view=detail 浮层，docs/components/sedentary.md）。
  *
- * - header：当前状态 16 semibold + 辅助说明 12 fg3，右侧「设置…」（只发
- *   `requestHostSettings()`，宿主负责先收起浮层再导航）；
- * - 操作：「我起来了」primary；到阈值且未稍后时出现「稍后 5 分钟」；
- * - 今日统计：一行四列（今日累计久坐 / 起身次数 / 最长连续 / 距上次起身）；
- * - 最近 7 天：44 高列表行（日期 14 fg2 + 久坐分钟 16 semibold + 起身次数 12 fg3）；
- * - 空态：还没有今天的记录 + primary「我起来了」。
+ * - 状态机：坐着 ↔ 站立，全部手动切换（D-27）；
+ * - header：当前状态 + 辅助说明，右侧「设置…」；
+ * - 操作：坐着时「我站起来了」primary / 站立时「我坐下了」primary；
+ *   到阈值且未稍后时出现「稍后 5 分钟」（仅坐着）；
+ * - 今日统计：今日久坐 / 今日站立 / 起身次数 / 最长连续坐；
+ * - 最近 7 天：久坐分钟 + 站立分钟 + 起身次数；
+ * - 空态：还没有今天的记录 + primary 状态按钮。
  *
  * 该插件没有 L2 子页：没有需要编辑的内容条目，设置统一在宿主设置页。
  */
 
 import { useCallback } from 'react';
 import { Text, makeStyles, tokens } from '@fluentui/react-components';
-import { Checkmark20Regular } from '@fluentui/react-icons';
+import { ArrowDownRegular, ArrowUpRegular, Timer20Regular } from '@fluentui/react-icons';
 import { requestHostSettings, useStoredConfig } from '../../_shared/host.js';
 import { CrossFade } from '../../_shared/motion.js';
 import {
@@ -29,8 +30,9 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
   normalizeSettings,
-  sendBreakCommand,
+  sendSitCommand,
   sendSnoozeCommand,
+  sendStandCommand,
 } from './data/engine.js';
 import { useSedentaryState } from './useSedentaryState.js';
 
@@ -120,13 +122,17 @@ export default function SedentaryDetail() {
   const [settings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
   const snapshot = useSedentaryState(settings);
 
-  const standUp = useCallback(
+  const standing = snapshot.posture === 'standing';
+  const sitting = snapshot.posture === 'sitting';
+
+  const togglePosture = useCallback(
     (event) => {
       event?.stopPropagation?.();
       if (!settings.enabled) return;
-      sendBreakCommand();
+      if (standing) sendSitCommand();
+      else sendStandCommand();
     },
-    [settings.enabled],
+    [settings.enabled, standing],
   );
 
   const snooze = useCallback(
@@ -137,7 +143,6 @@ export default function SedentaryDetail() {
     [],
   );
 
-  const sitting = Boolean(snapshot.runtime.sittingSince);
   const snoozedUntil = snapshot.runtime.snoozedUntil
     ? new Date(snapshot.runtime.snoozedUntil)
     : null;
@@ -146,24 +151,27 @@ export default function SedentaryDetail() {
     ? '久坐提醒已关闭'
     : sitting
       ? `已连续久坐 ${snapshot.currentMin} 分钟`
-      : '久坐计时未开始';
+      : standing
+        ? `站立休息中 ${snapshot.currentMin} 分钟`
+        : '久坐计时未开始';
 
   let hint = snapshot.hint;
   if (!settings.enabled) hint = '在设置里重新启用后，后台会继续计时与提醒';
-  else if (!sitting) hint = '后台会自动开始计时；也可以手动记一次起身';
+  else if (!sitting && !standing) hint = '后台会自动开始计时；也可以手动记录状态';
+  else if (standing) hint = '休息中，坐下后开始新一轮久坐';
   else if (snapshot.status === 'danger' && !snoozed) {
     hint = `已超过提醒阈值 ${settings.thresholdMin} 分钟，起身活动一下`;
   }
 
-  const standButton = (
+  const postureButton = (
     <ActionButton
       appearance="primary"
-      icon={<Checkmark20Regular />}
-      onClick={standUp}
+      icon={standing ? <ArrowDownRegular /> : <ArrowUpRegular />}
+      onClick={togglePosture}
       disabled={!settings.enabled}
-      aria-label="我起来了，记录一次起身"
+      aria-label={standing ? '我坐下了，开始新一轮久坐' : '我站起来了，记录一次起身'}
     >
-      我起来了
+      {standing ? '我坐下了' : '我站起来了'}
     </ActionButton>
   );
 
@@ -188,7 +196,7 @@ export default function SedentaryDetail() {
 
       {snapshot.hasData ? (
         <DetailToolbar>
-          {standButton}
+          {postureButton}
           {snapshot.snoozable ? <ActionButton onClick={snooze}>稍后 5 分钟</ActionButton> : null}
         </DetailToolbar>
       ) : null}
@@ -207,13 +215,17 @@ export default function SedentaryDetail() {
                     value={Math.round(snapshot.today.sittingMinutes)}
                     unit="分钟"
                   />
+                  <Stat
+                    label="今日站立"
+                    value={Math.round(snapshot.today.standingMinutes)}
+                    unit="分钟"
+                  />
                   <Stat label="起身次数" value={snapshot.today.breaks} unit="次" />
                   <Stat
-                    label="最长连续"
+                    label="最长连续坐"
                     value={Math.round(snapshot.today.longestStreakMin)}
                     unit="分钟"
                   />
-                  <Stat label="距上次起身" value={snapshot.lastBreakText} />
                 </div>
               </section>
 
@@ -226,13 +238,13 @@ export default function SedentaryDetail() {
                     <ListRow
                       key={day.date}
                       title={<span className={styles.dayLabel}>{day.label}</span>}
-                      subtitle={`${day.breaks} 次起身`}
+                      subtitle={`站立 ${Math.round(day.standingMinutes)} 分钟 · 起身 ${day.breaks} 次`}
                       trailing={
                         <Text size={400} weight="semibold" className={styles.statValue}>
                           {Math.round(day.sittingMinutes)} 分钟
                         </Text>
                       }
-                      aria-label={`${day.label}：久坐 ${Math.round(day.sittingMinutes)} 分钟，起身 ${day.breaks} 次`}
+                      aria-label={`${day.label}：久坐 ${Math.round(day.sittingMinutes)} 分钟，站立 ${Math.round(day.standingMinutes)} 分钟，起身 ${day.breaks} 次`}
                     />
                   ))}
                 </div>
@@ -241,10 +253,10 @@ export default function SedentaryDetail() {
           ) : (
             <div className={styles.emptyWrap}>
               <EmptyState
-                icon={<Checkmark20Regular />}
+                icon={<Timer20Regular />}
                 title="还没有今天的记录"
-                description="后台会自动开始计时；也可以现在记一次起身"
-                action={standButton}
+                description="后台会自动开始计时；也可以现在记录一次状态"
+                action={postureButton}
               />
             </div>
           )}

@@ -5,7 +5,7 @@
 
 ![桌面](docs/images/v030/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.3.3 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
+<p align="center"><sub>v0.3.4 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -93,7 +93,7 @@
 
 ### 直接安装
 
-从构建产物安装 `Windows Tablet Launcher 0.3.3`（NSIS 中文安装包，或 MSI zh-CN）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
+从构建产物安装 `Windows Tablet Launcher 0.3.4`（NSIS 中文安装包，或 MSI zh-CN）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
 
 首次启动后：
 
@@ -163,18 +163,19 @@ docs/                   # 需求/设计/组件契约/发布报告
 - [MOTION.md](docs/MOTION.md) / [AGENT-SURFACE-CONTRACT.md](docs/AGENT-SURFACE-CONTRACT.md) —— 动效与 Agent 浮空界面契约
 - [components/agent.md](docs/components/agent.md) / [components/weather.md](docs/components/weather.md) —— Agent 与天气组件规格
 - [PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) / [DECISIONS.md](docs/DECISIONS.md) —— 插件协议与关键决策
-- [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16）
+- [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17）
 
-## 验证状态（v0.3.3）
+## 验证状态（v0.3.4）
 
-- v0.3.3 增量：久坐**移除免打扰（quietHours）**——设置页不再有该分组、到阈值就提醒；旧配置字段由迁移自动删除。`scripts/verify-sedentary.mjs` 7/7 PASS、console error 0；`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
-- v0.3.2 增量：久坐改为**连续计时**（去掉「键鼠空闲判定起身」）：点「我起来了」后立即从 0 继续计时，不再出现「刚起身，计时未开始」一直等输入；休眠/退出应用的空档不计入且不重置。验证 `node scripts/verify-sedentary.mjs`（独立预览 + 真实按钮点击）7/7 PASS、console error 0。
-- v0.3.1 增量：`npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0；headless Edge 交互冒烟 **24/24 PASS、console error 0**（桌面右键菜单 → 设置页 / Agent 菜单边界、半高窗控制条 + peek + 展开、朗读总开关持久化、录音中收起停麦且无新消息），脚本 `scripts/smoke-v031-ui.mjs`。
+- v0.3.4 增量：久坐改为手动**「坐着 ↔ 站立」循环**——坐着点「我站起来了」、站立点「我坐下了」；久坐只累计坐姿，站立单独统计；提醒只在坐着时出现。Agent 新增 `standUp` / `sitDown` / `stats`（移除 `takeBreak`），复盘页按「起身次数」为主数值、久坐/站立分钟为次要指标。验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 **10/10 PASS**；复盘页集成检查 PASS（`sedentary.stats` 被发现并渲染）；`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
+- v0.3.3 增量：久坐**移除免打扰（quietHours）**——设置页不再有该分组、到阈值就提醒；旧配置字段由迁移自动删除。
+- v0.3.2 增量：久坐改为**连续计时**（去掉「键鼠空闲判定起身」）；v0.3.4 起由「坐/站状态机」取代其中的连续计数口径。
+- v0.3.1 增量：headless Edge 交互冒烟 **24/24 PASS、console error 0**（桌面右键菜单 → 设置页 / Agent 菜单边界、半高窗控制条 + peek + 展开、朗读总开关持久化、录音中收起停麦且无新消息），脚本 `scripts/smoke-v031-ui.mjs`。
 - v0.3.0 基线：Agent 浮空界面独立 E2E 107/108（1 项判定测试采样时序），P1/P2 两个交互 bug 修复后复测 PASS；既有插件/浮层/plug-and-play/密度脚本全部 PASS。
 - 天气 3×2：横向连续空白 166px → 16px（1024 下 12px），内容带/今日指标/Secondary/断点门禁通过。
 - 真实 MiMo 音频冒烟：TTS 合成 → chat `input_audio`（HTTP 200，`audio_tokens` 与时长相符）→ ASR 回读与原文 100% 一致 → 后续纯文字请求无 `input_audio`。
 - release exe + WebView2 CDP：v0.3.1 真窗口（标题 2.8s / 全屏 / `--webview-exe-version=0.3.1`）；升级种子 `.seed-version` 0.3.0 → 0.3.1、天气产物哈希与仓库一致；6 卡、8 iframe、无 dock/机器人、console 0；右键菜单→设置、未播放时的常驻朗读开关在真实 WebView2 内 16/16 checks PASS。
-- 安装包（本机自用，含本地 Key，不外发）：v0.3.3 — NSIS 3,931,048 B / `547BDCC6…`；MSI 5,136,384 B / `2B688750…`；`app.exe` 12,164,608 B / `B24C1254…`（v0.3.2 / v0.3.1 产物分别在对应 `release/` 目录）。
+- 安装包（本机自用，含本地 Key，不外发）：v0.3.4 — NSIS 3,932,629 B / `BEDFCFB1…`；MSI 5,140,480 B / `78F5ACF6…`；`app.exe` 12,168,192 B / `F763A47B…`（旧版本产物在对应 `release/` 目录）。
 
 ## 已知限制与安全
 

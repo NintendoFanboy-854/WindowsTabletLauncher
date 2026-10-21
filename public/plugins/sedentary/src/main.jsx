@@ -26,8 +26,10 @@ import {
   describeState,
   getEngine,
   migrateSettings,
+  readDays,
   readSettings,
   seedDemoData,
+  statsForRange,
   toolStatus,
   toolToday,
   updateSettings,
@@ -46,23 +48,45 @@ const AGENT_TOOLS = [
   {
     name: 'sedentary.status',
     description:
-      '读取久坐状态：是否在久坐、当前连续分钟、提醒阈值、距提醒还有多久、是否已稍后',
+      '读取久坐状态：当前是坐着还是站立、当前状态持续分钟、今日久坐/站立分钟、起身次数、提醒阈值与距提醒时间',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'sedentary.today',
-    description: '读取今日累计久坐、最长连续、起身次数与最近 7 天记录',
+    description: '读取今日久坐/站立分钟、最长连续、起身次数与最近 7 天记录',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
-    name: 'sedentary.takeBreak',
-    description: '结算当前一轮久坐并记一次起身（UI：卡片 / 详情「我起来了」）',
+    name: 'sedentary.standUp',
+    description: '记录一次起身：坐着→站立，结算本轮久坐并暂停久坐计时（UI：坐着时的「我站起来了」）',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'sedentary.sitDown',
+    description: '记录坐下：站立→坐着，结算站立时长并开始新一轮久坐（UI：站立时的「我坐下了」）',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'sedentary.snooze',
-    description: '把已到阈值的久坐提醒推迟 5 分钟（UI：详情「稍后 5 分钟」）',
+    description: '把已到阈值的久坐提醒推迟 5 分钟（仅坐着时可用；UI：详情「稍后 5 分钟」）',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'sedentary.stats',
+    description: '复盘用：按区间汇总久坐分钟、站立分钟、起身次数、最长连续坐与按天起身次数',
+    parameters: {
+      type: 'object',
+      properties: {
+        range: {
+          type: 'string',
+          enum: ['today', 'week', 'month'],
+          description: '统计范围，默认 today',
+        },
+        from: { type: 'string', description: '自定义开始时间（ISO），可选' },
+        to: { type: 'string', description: '自定义结束时间（ISO），可选' },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'sedentary.settings.get',
@@ -122,20 +146,29 @@ function BackgroundRunner() {
   useAgentTools(AGENT_TOOLS, {
     'sedentary.status': async () => toolStatus(await readSettings()),
     'sedentary.today': () => toolToday(),
-    'sedentary.takeBreak': async () => {
+    'sedentary.standUp': async () => {
       const settings = await readSettings();
       if (!settings.enabled) throw new Error('久坐提醒已关闭');
-      const today = await getEngine().takeBreak('agent');
-      return { recorded: true, today, status: toolStatus(settings) };
+      const outcome = await getEngine().standUp('agent');
+      if (!outcome.changed) throw new Error('当前已经是站立状态');
+      return { posture: 'standing', today: outcome.day, status: toolStatus(settings) };
+    },
+    'sedentary.sitDown': async () => {
+      const settings = await readSettings();
+      if (!settings.enabled) throw new Error('久坐提醒已关闭');
+      const outcome = await getEngine().sitDown('agent');
+      if (!outcome.changed) throw new Error('当前已经是坐着状态');
+      return { posture: 'sitting', today: outcome.day, status: toolStatus(settings) };
     },
     'sedentary.snooze': async () => {
       const settings = await readSettings();
       if (!settings.enabled) throw new Error('久坐提醒已关闭');
       if (!describeState(settings).snoozable) throw new Error('当前没有可推迟的提醒');
       const outcome = await getEngine().snooze();
-      if (!outcome) throw new Error('当前没有进行中的久坐计时');
+      if (!outcome) throw new Error('当前不在久坐计时中');
       return { snoozedUntil: outcome.snoozedUntil, status: toolStatus(settings) };
     },
+    'sedentary.stats': async (args = {}) => statsForRange(readDays(), args.range, new Date(), args.from, args.to),
     'sedentary.settings.get': async () => ({ settings: await readSettings() }),
     'sedentary.settings.set': async (args) => ({ settings: await updateSettings(args) }),
   });

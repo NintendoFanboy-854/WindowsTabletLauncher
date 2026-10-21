@@ -333,3 +333,16 @@
   3. UI：卡片/详情的 `quiet` 状态色与文案删除。
 - 兼容：旧存档里的 `quietHours` / `quietSkip` 字段被忽略并在迁移时删除；设置页不再显示该分组。
 - 验证：`node scripts/build-plugin.mjs sedentary`；`scripts/verify-sedentary.mjs` 聚焦验证 PASS；typecheck/build/tauri build exit 0。
+
+## D-27 久坐改为手动「坐 ↔ 站」循环（2026-10-21，v0.3.4）
+
+- 背景：用户要求久坐插件体现「坐着—起来—坐着」循环（旧版只记录「我起来了」一个动作，且 v0.3.2 为了修 bug 变成按「站起来」后立即从 0 继续、站立时间也计入久坐）。明确不做番茄钟联动、不做插件间能力图；Agent 需要能操作两个动作；复盘要能看到新数据。
+- 决策（v0.3.4）：
+  1. **状态机**：`sitting` ↔ `standing`，全部手动。坐着 →「我站起来了」：结算本轮久坐、`breaks + 1`、更新最长连续，进入站立并暂停久坐计时；站立 →「我坐下了」：结算站立时长，回到坐着开新一轮。没有自动判定（不碰键鼠空闲/摄像头）。
+  2. **数据**：`sedentary.days` 增加 `standingMinutes`；`longestStreakMin` 只统计坐姿；`runtime` 改为 `posture + postureSince`（旧 `sittingSince` 迁移成 sitting）。
+  3. **提醒**：只在坐着时提醒；强提醒动作改为「我站起来了」/「稍后 5 分钟」（snooze 仅坐着可用）。
+  4. **Agent 工具**：删除 `sedentary.takeBreak`，新增 `sedentary.standUp` / `sedentary.sitDown`；新增 `sedentary.stats` 给复盘。
+  5. **复盘**：`sedentary.stats` 返回区间久坐/站立分钟、起身次数、最长连续与按天起身次数；复盘页主数值 = 起身次数（单位「次起身」），次要指标 = 久坐/站立分钟，热力图按每天起身次数。
+  6. 休眠/退出空档只顺延时间，不切换姿态、不记 break（沿用 D-25）。
+- 迁移：旧 runtime `sittingSince` → 坐着继续；旧 days 无 `standingMinutes` 视为 0；旧 `takeBreak` 工具不再提供（Agent 自然语言适配为新工具）。
+- 验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 10/10 PASS；复盘页集成检查 PASS（`sedentary.stats` 被宿主发现并渲染）；typecheck/build/tauri build exit 0。

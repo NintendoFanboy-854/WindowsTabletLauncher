@@ -574,3 +574,44 @@ npx tauri build                    # release + 安装包
 
 - 旧存档 `plugin.sedentary.settings.quietHours`、`sedentary.runtime.quietSkip`：被忽略并在首次迁移时删除；不需要手动清数据。
 - 按用户要求未跑完整 release CDP 回归；本次只改插件与版本号，宿主代码未动。
+
+## 17. v0.3.4 久坐「坐 ↔ 站」循环 + 复盘接入（2026-10-21）
+
+> 代码提交：本次功能提交（版本 0.3.4 + 文档）；分支 `main`；tag `v0.3.4`。
+> 证据：`shots/sedentary-verify/`、`scripts/verify-sedentary.mjs`；复盘集成检查（headless Edge）。
+
+### 17.1 背景
+
+用户要求久坐插件有「坐着—起来—坐着」循环（旧版只有「我起来了」一个动作）；同时要 Agent 能操作两个动作、复盘页要反映新数据。明确砍掉番茄钟联动与插件间能力图。
+
+### 17.2 决策与实现（D-27）
+
+1. **状态机**：`sitting` ↔ `standing`，手动切换。`我站起来了`：结算久坐、`breaks+1`、更新最长连续、进入站立（久坐暂停）；`我坐下了`：结算站立时长、回到坐着开新一轮。
+2. **数据**：`sedentary.days` 增加 `standingMinutes`；`longestStreakMin` 只算坐姿；`runtime` 改 `posture + postureSince`（旧 `sittingSince` 迁移为 sitting）；旧 days 无站立字段按 0。
+3. **提醒**：只在坐着时提醒；强提醒动作「我站起来了 / 稍后 5 分钟」，snooze 仅坐着可用。
+4. **Agent 工具**：移除 `sedentary.takeBreak`；新增 `sedentary.standUp` / `sedentary.sitDown` / `sedentary.stats`。
+5. **复盘**：`sedentary.stats` 返回区间 `sittingMinutes/standingMinutes/breaks/completed/longestStreakMin/byDay`；宿主的 `stats.ts`/`ReviewPage` 识别久坐字段——主数值「次起身」，次要指标「久坐/站立分钟」，热力图按每天起身次数。
+6. 休眠/退出空档只顺延时间、不切姿态、不记 break（沿用 D-25）。
+
+### 17.3 验证
+
+- 独立预览 + headless Edge 真实点击循环：**10/10 PASS** — 首屏坐着计时、按钮「我站起来了」；点按后 breaks 3→4、进入 standing、按钮变「我坐下了」、提示「休息中」；再点回到 sitting、站立分钟 24→24.025 被累计、按钮恢复；无旧文案；console error 0。截图 `shots/sedentary-verify/sedentary-cycle.png`。
+- 复盘集成：headless Edge 打开 `?page=review`，8 个插件 iframe 就绪后，页面出现「久坐提醒 0 次起身 · 久坐 0 分钟 · 站立 0 分钟」，来源包含 `sedentary.stats`；无加载错误。截图 `shots/sedentary-verify/review.png`。
+- `node scripts/build-plugin.mjs sedentary`（554,867 B / `FA7168D9…`）、`npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0。
+- 修复过程中发现并修掉一个过渡期计时 bug：命令处理曾提前改写 `lastTickAt`，导致姿态切换时把上一次 tick 到本次操作的时长丢掉；现在只记 `commandId`，姿态切换按上次 tick 时间戳补记。
+
+### 17.4 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,168,192 B | `F763A47B5F5EEB268E769B928E355F8B0CC660F140AB699AB7D861928467E142` |
+| NSIS `Windows Tablet Launcher_0.3.4_x64-setup.exe` | 3,932,629 B | `BEDFCFB1FA5615063CF9B1FEF39F144DD5CC1049B397B016AA6F956A975E07F1` |
+| MSI `Windows Tablet Launcher_0.3.4_x64_zh-CN.msi` | 5,140,480 B | `78F5ACF693DCE7737576F3B5E0E1949AF12834E82CC6AA2A07B57B158A900313` |
+
+- 插件产物：`public/plugins/sedentary/app/app.js` 554,867 B / `FA7168D97501C3032C6AFE6151AB479D01E162B26EA073087BB563BF7FE964A7`；升级时 `.seed-version` 0.3.3 → 0.3.4 自动重种。
+- 安装包内含本地 `public/secrets.json`，仅本机自用。
+
+### 17.5 范围外（本次明确不做）
+
+- 番茄钟联动、插件间能力图/互调（用户已砍掉）。
+- 自动坐/站检测、键鼠空闲推断、免打扰时段。

@@ -33,6 +33,9 @@ export interface ProviderRangeStats {
   created?: number;
   focusMinutes?: number;
   streakDays?: number;
+  /** 久坐插件：区间内久坐/站立分钟（复盘次要指标） */
+  sittingMinutes?: number;
+  standingMinutes?: number;
 }
 
 export interface ProviderDailyStats {
@@ -113,7 +116,7 @@ export function providerLabel(provider: string, pluginNames?: Record<string, str
 const PROVIDER_UNITS: Record<string, string> = {
   todo: '项任务',
   pomodoro: '轮专注',
-  sedentary: '次',
+  sedentary: '次起身',
   countdown: '个事件',
 };
 
@@ -287,6 +290,8 @@ export async function loadReviewSnapshot(
         created: readNumber(record, ['created', 'added']),
         focusMinutes: readNumber(record, ['focusMinutes', 'focusMinutesTotal', 'minutes']),
         streakDays: readNumber(record, ['streakDays', 'streak']),
+        sittingMinutes: readNumber(record, ['sittingMinutes']),
+        standingMinutes: readNumber(record, ['standingMinutes']),
       };
     });
   }
