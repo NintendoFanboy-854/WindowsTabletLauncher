@@ -19,7 +19,7 @@
       {
         "id": "reminders",
         "title": "提醒",
-        "hint": "后台每 10 秒检查一次系统输入；修改后立即生效。",
+        "hint": "连续计时，只有点「我起来了」或休眠/退出应用才会重置；修改后立即生效。",
         "fields": [
           {
             "key": "enabled",
@@ -63,17 +63,6 @@
             "max": 60,
             "step": 1,
             "default": 10
-          },
-          {
-            "key": "idleResetMin",
-            "type": "number",
-            "label": "空闲判定起身",
-            "description": "无输入超过该时长即视为起身，锁屏与休眠同样处理",
-            "unit": "分钟",
-            "min": 1,
-            "max": 30,
-            "step": 1,
-            "default": 5
           }
         ]
       },

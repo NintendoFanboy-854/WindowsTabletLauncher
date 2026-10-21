@@ -82,4 +82,19 @@
 - [x] 文档：DECISIONS D-23/D-24、契约 §13、`docs/components/agent.md`、README、RELEASE-REPORT §13 已更新
 - [x] 安装包不外发（内含本地 `public/secrets.json`；仅本机安装）
 - [ ] NSIS/MSI 实际安装/卸载/注册表路径：未执行（与 v0.3.0 口径相同，需手动验证）
+
+## 9. v0.3.2 增量检查（2026-10-21）
+
+> 背景：久坐第一次还能计时，点「我起来了」后不再计时。根因与修复见 D-25、RELEASE-REPORT §15。§1–§8 继续有效。
+
+- [x] 版本号 0.3.2 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
+- [x] `node scripts/build-plugin.mjs sedentary` 重新打包（538 KB，SHA-256 `3F55A28C…`）
+- [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m14s；NSIS/MSI 完成）
+- [x] Node 状态机模拟 5/5 PASS（连续计时 / 起了立即重启 / 长空档顺延不记 break）
+- [x] 聚焦浏览器验证 `node scripts/verify-sedentary.mjs`：**7/7 PASS**、console error 0（首屏开始计时、点「我起来了」breaks+1、`sittingSince` 立即重置、显示 0 分钟继续）— `shots/sedentary-verify/`
+- [x] 产物哈希：`app.exe` 12,166,144 B / `801DDB11…`；NSIS 3,930,622 B / `2FCE1F0B…`；MSI 5,140,480 B / `D7C7B312…`
+- [x] 文档：D-25、`docs/components/sedentary.md`、README、RELEASE-REPORT §15 已更新
+- [x] 按用户要求未跑完整 release CDP 回归；本次只改插件与版本号，宿主代码未动
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [x] `git status` 干净；commit / push / tag `v0.3.2`
 - [x] `git status` 干净；commit / push / tag `v0.3.1`

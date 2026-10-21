@@ -1,6 +1,6 @@
 # 久坐提醒（sedentary）
 
-后台盯着久坐时长，到点提醒起身。纯输入活动判定，不碰摄像头。
+后台盯着久坐时长，到点提醒起身。**连续计时**：只有「我起来了」/ 休眠 / 退出应用会截断本轮，不按键鼠空闲判定起身（v0.3.2 起，见 D-25）。
 
 ## 数据模型
 
@@ -16,14 +16,12 @@ interface Settings {
   enabled: boolean;
   thresholdMin: number;        // 默认 45
   remindEveryMin: number;      // 默认 10
-  idleResetMin: number;        // 默认 5
   strongReminder: boolean;     // 默认 true
   quietHours: { start: string; end: string } | null;
 }
 
 interface Runtime {
-  sittingSince: string | null;
-  lastInputAt: string;
+  sittingSince: string | null;  // 本轮连续计时起点；「起来了」后立即重置为新起点
   lastRemindAt?: string;
   snoozedUntil?: string;
 }
@@ -65,8 +63,7 @@ interface Runtime {
     ]},
     { "title": "计时", "fields": [
       { "key": "thresholdMin", "type": "number", "label": "提醒阈值", "unit": "分钟", "min": 5, "max": 120, "default": 45 },
-      { "key": "remindEveryMin", "type": "number", "label": "未起身再催", "unit": "分钟", "min": 1, "max": 60, "default": 10 },
-      { "key": "idleResetMin", "type": "number", "label": "空闲判定起身", "unit": "分钟", "min": 1, "max": 30, "default": 5 }
+      { "key": "remindEveryMin", "type": "number", "label": "未起身再催", "unit": "分钟", "min": 1, "max": 60, "default": 10 }
     ]},
     { "title": "免打扰", "fields": [
       { "key": "quietHours", "type": "timeRange", "label": "免打扰时段", "default": { "start": "22:00", "end": "08:00" } }
@@ -85,19 +82,22 @@ interface Runtime {
 | 强提醒·稍后 5 分钟 | `sedentary.snooze` |
 | 宿主设置页·久坐 | `sedentary.settings.get` / `sedentary.settings.set` |
 
-## 判定逻辑（不变）
+## 判定逻辑（v0.3.2 连续计时）
 
-- 每 10 秒轮询 `host.getIdleSeconds()`；有输入时累加本轮久坐。
+- 后台每 10 秒 tick 一次；隐藏 iframe 的定时器可能被浏览器节流到约 60 秒，久坐分钟按 tick 时间戳增量累加，不受间隔影响。
+- 会话开始后持续累加，显示 = 当前时间 − `sittingSince`。
 - 达阈值→提醒（`strongReminder` 开则 `showReminder`，否则 `notify`）；未起身按 `remindEveryMin` 再催。
-- `idleSeconds ≥ idleResetMin×60`（含锁屏/休眠）→ 判定起身，记录 breaks、结束本轮。
+- 「我起来了」（卡片/详情/强提醒确认/`sedentary.takeBreak`）→ 结算本轮、breaks +1，**立即开始新一轮**（计时从 0 继续，不等待输入）。
+- tick 间隔 > 5 分钟（休眠唤醒 / 应用退出 / 系统时钟突变）→ 空档不计入久坐，把 `sittingSince` 顺延同样时长，回来后接着计时；不记 break。
 - 免打扰时段继续计时但不提醒，时段结束补一次。
 - 跨零点结算前一天；重启从 runtime 恢复。
 
 ## 边界与异常
 
 - 提醒单写者 + `navigator.locks` 抢锁（见 D-12），不会重复弹。
-- 休眠唤醒、系统时钟突变按“已起身”处理。
+- 休眠唤醒、系统时钟突变、应用退出：空档不计入，计时顺延（v0.3.2 起不再判为起身）。
 - 独立预览（无宿主）由卡片实例兜底启动引擎。
+- 已知取舍：桌面摆件式使用（长时间只是看屏幕、不触碰）按连续久坐计；离开位置请按「我起来了」或关闭应用，否则离开时间也会计入本轮。
 
 ## 不做什么
 

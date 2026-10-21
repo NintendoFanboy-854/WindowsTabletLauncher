@@ -308,3 +308,17 @@
 - **关闭 = 结束当前任务**：录音中点 X / 点外部先 `cancelRecording()`（旧版会留下后台麦克风）；转写中收起后 `suppressVoiceReveal` 阻止 ASR 完成把窗口弹回 chat。
 - **播报状态常驻、动作按需**：`tts.autoRead` 总开关（默认 true）+ header/composer 常驻扬声器开关（图标开/关，aria-pressed；切换即持久化并先停当前播报）；「停止朗读」只在播报中出现。文字提问是否朗读降为次级项，总开关关闭时禁用（HIG：依赖项应禁用并解释，而不是让用户设一个不生效的选项）。
 - 验收：`scripts/smoke-v031-ui.mjs` D–G PASS（40×40 控件、peek 可展开、未播放也有朗读开关、reload 持久化、录音中收起 voice idle + mic ended + 无新消息）。
+
+## D-25 久坐计时改为连续计时：去掉「键鼠空闲判定起身」（2026-10-21，v0.3.2 反馈）
+
+- 背景：用户反馈「久坐第一次还能正常计时，按了卡片上的『我起来了』之后就再也不计时了」。查代码 + 用户机器上的 `sedentary.runtime` 存档：
+  - 引擎在隐藏 iframe 里，定时器被浏览器节流到约 60 秒（存档 `lastTickAt` 全是整 60 秒间隔，而代码写 10 秒），但显示按 `sittingSince` 计算，所以第一次看着像正常计时；
+  - 旧逻辑：`idleSeconds ≥ idleResetMin×60`（默认 5 分钟无键鼠输入）→ 判定起身、记 break、`sittingSince=null`；之后必须等一次 tick 恰好采样到「最近 60 秒内有输入」才重新开始。桌面摆件式使用（人在桌前、只是看屏幕不摸）根本不会产生这种输入 → 一直停在 0 分钟 /「刚起身，计时未开始」。
+  - 存档实证：只有 1 条手动 break 命令，但当天 breaks 记到 3 次；两次 idle 自动结算（21:59、22:05）把计时反复清零。
+- 决策：**改为连续计时**（v0.3.2）：
+  1. 去掉 `plugin.getIdleSeconds()` 空闲判定与 `idleResetMin` 设置项（宿主设置页、manifest schema、Agent `sedentary.settings.set` 同步移除；旧存储里的字段忽略）。
+  2. 会话开始后一直累加，显示 = now − `sittingSince`；只有「我起来了」（卡片/详情/强提醒/Agent 工具）会结算并 `breaks+1`。
+  3. 结算后**立即开始新一轮**（`sittingSince = now`），不再出现等待输入的 0 分钟空窗。
+  4. tick 间隔 > 5 分钟（休眠/应用退出/时钟突变）→ 空档不计入，把 `sittingSince` 顺延同样时长；不记 break、不清零。
+- 取舍：桌面摆件场景下「长时间不碰屏但人在」按久坐计；离开位置需要按「我起来了」或关闭应用，否则离开时间也计入本轮（docs/components/sedentary.md「已知取舍」）。
+- 验证：`node scripts/build-plugin.mjs sedentary` 重新打包；typecheck/build；dev 冒烟覆盖「点我起来了 → 计时从 0 立即继续、不再等输入」。

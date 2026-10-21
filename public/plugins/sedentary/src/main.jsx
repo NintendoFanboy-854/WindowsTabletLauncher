@@ -73,7 +73,7 @@ const AGENT_TOOLS = [
   {
     name: 'sedentary.settings.set',
     description:
-      '修改久坐提醒设置（只改传入的字段）：enabled、strongReminder、thresholdMin、remindEveryMin、idleResetMin、quietHours',
+      '修改久坐提醒设置（只改传入的字段）：enabled、strongReminder、thresholdMin、remindEveryMin、quietHours',
     parameters: {
       type: 'object',
       properties: {
@@ -90,12 +90,6 @@ const AGENT_TOOLS = [
           minimum: 1,
           maximum: 60,
           description: '提醒后仍未起身的再催间隔',
-        },
-        idleResetMin: {
-          type: 'number',
-          minimum: 1,
-          maximum: 30,
-          description: '无输入超过该分钟数即视为起身',
         },
         quietHours: {
           type: 'object',

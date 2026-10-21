@@ -2,8 +2,13 @@
  * 久坐提醒数据层（纯 JS，不依赖 React）。
  *
  * - `background: true` 的隐藏 iframe 里跑 `SedentaryEngine`，每 10 秒轮询
- *   `plugin.getIdleSeconds()` 计时/提醒，是 `sedentary.runtime` / `sedentary.days`
- *   的唯一写者；
+ *   一次 tick 计时/提醒，是 `sedentary.runtime` / `sedentary.days` 的唯一写者；
+ *   隐藏 iframe 的定时器可能被浏览器节流到约 60 秒，计数据 tick 时间戳增量
+ *   累加，不依赖 tick 间隔，因此不受影响；
+ * - 计时模型：**连续计时**。`sittingSince` 是本轮久坐的起点，只由「我起来了」
+ *   （卡片/详情/强提醒/Agent 工具）或长时间 tick 空档（休眠/退出）截断；
+ *   不再按「键鼠空闲」判定起身——桌面摆件场景下用户经常只是看着不摸屏，
+ *   旧逻辑会把这种坐着判成离开，导致按「起来了」后一直停在 0；
  * - 卡片与 L1 详情只读这两个 key 并订阅 storage 事件（跨 iframe 同步），
  *   「我起来了 / 稍后 5 分钟」通过 `sedentary.command` 交给引擎执行；
  * - 每个引擎 tick、命令与工具写操作都套 `navigator.locks`（`wtsl.sedentary.engine`），
@@ -14,7 +19,7 @@
  *
  * 存储键与结构沿用 docs/components/sedentary.md：
  *   sedentary.days    { [YYYY-MM-DD]: { date, sittingMinutes, longestStreakMin, breaks } }
- *   sedentary.runtime { sittingSince, lastInputAt, lastRemindAt, lastRemindMinute,
+ *   sedentary.runtime { sittingSince, lastRemindAt, lastRemindMinute,
  *                       snoozedUntil, lastTickAt, lastBreakAt, quietSkip, commandId }
  *   sedentary.command { id, type: 'break'|'snooze', at, minutes? }
  */
@@ -30,11 +35,9 @@ export const COMMAND_KEY = 'sedentary.command';
 const ENGINE_TICK_MS = 10000;
 /** 启动后先补一拍，避免刚打开桌面时状态是空的 */
 const FIRST_TICK_MS = 500;
-/** 规格：idle < 60 秒算有输入 */
-const ACTIVE_IDLE_SECONDS = 60;
 /** 强提醒的「稍后 5 分钟」 */
 export const SNOOZE_MINUTES = 5;
-/** 单次 tick 间隔超过该分钟数，按休眠唤醒 / 系统时钟突变处理为“已起身” */
+/** 单次 tick 间隔超过该分钟数，按休眠唤醒 / 系统时钟突变 / 应用退出处理：空档不计入 */
 const CLOCK_JUMP_MINUTES = 5;
 /** 日统计保留一年，避免 localStorage 无限增长 */
 const DAY_KEEP_DAYS = 400;
@@ -51,7 +54,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   thresholdMin: 45,
   remindEveryMin: 10,
-  idleResetMin: 5,
   strongReminder: true,
   quietHours: DEFAULT_QUIET_HOURS,
 });
@@ -59,7 +61,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
 const NUMBER_LIMITS = {
   thresholdMin: [5, 120],
   remindEveryMin: [1, 60],
-  idleResetMin: [1, 30],
 };
 
 const STATUS_LABELS = {
@@ -164,11 +165,6 @@ export function normalizeSettings(raw) {
       source.remindEveryMin ?? DEFAULT_SETTINGS.remindEveryMin,
       NUMBER_LIMITS.remindEveryMin,
       DEFAULT_SETTINGS.remindEveryMin,
-    ),
-    idleResetMin: clampInt(
-      source.idleResetMin ?? DEFAULT_SETTINGS.idleResetMin,
-      NUMBER_LIMITS.idleResetMin,
-      DEFAULT_SETTINGS.idleResetMin,
     ),
     strongReminder:
       typeof source.strongReminder === 'boolean'
@@ -386,7 +382,7 @@ export function hintOf(settings, runtime, now = new Date()) {
   if (status === 'quiet') return '免打扰时段，仍在计时';
   const snoozed = safeDate(runtime.snoozedUntil);
   if (snoozed && snoozed > now) return `提醒已推迟到 ${formatClock(snoozed)}`;
-  if (!runtime.sittingSince) return '刚起身，计时未开始';
+  if (!runtime.sittingSince) return '计时准备中';
   const remaining = settings.thresholdMin - currentStreakMin(runtime, now.getTime());
   if (remaining <= 0) return '已超过提醒阈值';
   return `距提醒还有 ${Math.max(1, Math.ceil(remaining))} 分钟`;
@@ -691,54 +687,34 @@ export class SedentaryEngine {
         return null;
       }
 
-      return plugin
-        .getIdleSeconds()
-        .then((value) => Number(value) || 0)
-        .catch(() => 0)
-        .then((idleSeconds) => {
-          const active = idleSeconds < ACTIVE_IDLE_SECONDS;
-          const idleResetSeconds = Math.max(1, settings.idleResetMin) * 60;
-          const lastTick = safeDate(runtime.lastTickAt);
-          const deltaMin = lastTick ? Math.max(0, (now - lastTick) / 60000) : 0;
+      const lastTick = safeDate(runtime.lastTickAt);
+      const deltaMin = lastTick ? Math.max(0, (now - lastTick) / 60000) : 0;
 
-          if (active && lastTick && deltaMin > CLOCK_JUMP_MINUTES) {
-            // 休眠唤醒 / 系统时钟突变：按已起身处理，不把不可信的空档计入久坐
-            if (!runtime.sittingSince) {
-              runtime.lastTickAt = now.toISOString();
-              writeRuntime(runtime);
-              return null;
-            }
-            this.#takeBreak('clock-jump');
-            return null;
-          }
+      if (lastTick && deltaMin > CLOCK_JUMP_MINUTES) {
+        // 休眠 / 应用退出 / 系统时钟突变：这段空档不计入久坐，也不判起身。
+        // 把本轮起点顺延同样的时长，回来后计时仍在原来的进度上继续。
+        const since = safeDate(runtime.sittingSince);
+        const shiftMs = now.getTime() - lastTick.getTime();
+        runtime.sittingSince = since
+          ? new Date(since.getTime() + shiftMs).toISOString()
+          : now.toISOString();
+        runtime.lastTickAt = now.toISOString();
+        writeRuntime(runtime);
+        writeDays(trimDays(days));
+        return null;
+      }
 
-          if (active) {
-            if (!runtime.sittingSince) runtime.sittingSince = now.toISOString();
-            day.sittingMinutes += deltaMin;
-            const streak = currentStreakMin(runtime, now.getTime());
-            if (streak > day.longestStreakMin) day.longestStreakMin = Math.round(streak);
-            runtime.lastInputAt = now.toISOString();
-            runtime.lastTickAt = now.toISOString();
-            const plan = this.#claimReminder(now, streak, settings, runtime);
-            writeRuntime(runtime);
-            writeDays(trimDays(days));
-            return plan;
-          }
-
-          if (idleSeconds >= idleResetSeconds) {
-            if (runtime.sittingSince) {
-              this.#takeBreak('idle');
-            } else {
-              runtime.lastTickAt = now.toISOString();
-              writeRuntime(runtime);
-            }
-            return null;
-          }
-
-          runtime.lastTickAt = now.toISOString();
-          writeRuntime(runtime);
-          return null;
-        });
+      // 连续计时：会话一旦开始就持续累加，直到「我起来了」/ 强提醒确认。
+      // 不再依赖键鼠空闲——桌面摆件场景下用户常常只是看着屏幕。
+      if (!runtime.sittingSince) runtime.sittingSince = now.toISOString();
+      day.sittingMinutes += deltaMin;
+      const streak = currentStreakMin(runtime, now.getTime());
+      if (streak > day.longestStreakMin) day.longestStreakMin = Math.round(streak);
+      runtime.lastTickAt = now.toISOString();
+      const plan = this.#claimReminder(now, streak, settings, runtime);
+      writeRuntime(runtime);
+      writeDays(trimDays(days));
+      return plan;
     });
   }
 
@@ -814,7 +790,9 @@ export class SedentaryEngine {
       if (streak > day.longestStreakMin) day.longestStreakMin = Math.round(streak);
     }
     day.breaks += 1;
-    runtime.sittingSince = null;
+    // 结算后立刻开始新一轮：按「我起来了」之后计时从 0 继续，
+    // 不会出现「刚起身，计时未开始」一直等输入的空窗。
+    runtime.sittingSince = now.toISOString();
     runtime.lastRemindAt = null;
     runtime.lastRemindMinute = null;
     runtime.snoozedUntil = null;

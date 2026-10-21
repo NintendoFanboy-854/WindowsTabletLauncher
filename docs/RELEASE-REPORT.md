@@ -491,3 +491,48 @@ npx tauri build                    # release + 安装包
 ## 14. 结论（v0.3.1）
 
 **v0.3.1 可发布**：v0.3.1 增量（半高窗出口/peek、常驻朗读开关 + autoRead 总开关、关闭即取消录音、鼠标右键设置入口）在 dev 与真实 release WebView2 中均验证通过；v0.3.0 基线回归结论继续有效。P0=0 / P1=0，console error 0，安装包与 exe 哈希稳定。
+
+## 15. v0.3.2 久坐计时修复（2026-10-21）
+
+> 代码提交：本次修复提交（版本 0.3.2 + 文档）；分支 `main`；tag `v0.3.2`。
+> 证据：`shots/sedentary-verify/`（聚焦验证）、`scripts/verify-sedentary.mjs`、用户机器 `sedentary.runtime` 存档分析。
+
+### 15.1 问题
+
+用户反馈：久坐卡片第一次还能正常计时，但点了卡片上的「我起来了」之后再也不计时。
+
+### 15.2 根因（代码 + 用户存档）
+
+- 引擎在隐藏 iframe 中运行，10 秒定时器被浏览器节流到约 60 秒（用户 `sedentary.runtime` 存档里的 `lastTickAt` 全部是整 60 秒间隔）；显示按 `sittingSince` 计算，所以第一轮看起来「正常计时」。
+- 旧逻辑 `idleSeconds ≥ idleResetMin×60`（默认 5 分钟无键鼠输入）→ 判定「已起身」、记一次 break、`sittingSince=null`；之后必须等某个 tick 恰好采样到「最近 60 秒内有输入」才重新开始。
+- 桌面摆件式使用（人在桌前看屏幕、不摸屏）没有输入 → 点「我起来了」后一直停在「0 分钟 / 刚起身，计时未开始」；而 5 分钟无输入又会再次判起身，计数反复清零。
+- 存档实证：只有 1 条手动 break 命令，但当天 breaks 记到 3 次；两次 idle 自动结算（21:59、22:05）把计时反复清零。
+
+### 15.3 修复（D-25）
+
+1. 去掉 `getIdleSeconds` 空闲判定与 `idleResetMin` 设置项（宿主设置页 schema、`sedentary.settings.set` tool schema 同步移除；旧存储字段忽略）。
+2. 连续计时：会话开始后持续累加，显示 = now − `sittingSince`；只有「我起来了」（卡片/详情/强提醒/Agent）才结算并 `breaks+1`。
+3. 结算后**立即开始新一轮**（`sittingSince = now`），计时从 0 继续，不再等待输入。
+4. tick 间隔 > 5 分钟（休眠/退出应用/时钟突变）→ 空档不计入，`sittingSince` 顺延同样时长，回来后接着计时；不记 break、不清零。
+
+### 15.4 验证
+
+- Node 状态机模拟（替换 plugin stub）：首 tick 建立会话；2 分钟累加；点「起来了」→ breaks+1 且 sittingSince 立即重置；结算后 tick 立即继续；60 分钟空档 → 只顺延不进累计、不记 break。5/5 PASS。
+- `node scripts/verify-sedentary.mjs`（独立预览页 + headless Edge + 真实点击「我起来了」，demo=1 注入演示数据）：7/7 PASS — 首屏开始计时、无「刚起身」旧文案、breaks 3→4、`sittingSince` 立即重置、显示 0 分钟继续、console error 0。截图 `shots/sedentary-verify/sedentary-fix.png`。
+- `npm run typecheck` / `npm run build` / `npx tauri build` 均 exit 0。
+- 说明：按用户要求未跑完整 release CDP 回归；v0.3.2 仅包含 sedentary 插件与版本号变更，宿主代码未改。
+
+### 15.5 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,166,144 B | `801DDB1185DA8A9C64BD8165A52F8CBB68F165FA62F91D05773CCAFB210337A3` |
+| NSIS `Windows Tablet Launcher_0.3.2_x64-setup.exe` | 3,930,622 B | `2FCE1F0B2AFDBCDBED3CEA46D1C83E574FC7B678210C244EB676EFDE5395EF68` |
+| MSI `Windows Tablet Launcher_0.3.2_x64_zh-CN.msi` | 5,140,480 B | `D7C7B312162ECC2F28D03F7E64426DB736E7A759193B63F841BA730D3F8139E2` |
+
+- 插件产物：`public/plugins/sedentary/app/app.js` 538 KB / SHA-256 `3F55A28C8FDF33E4A64F9A2A84601F52E27C9B9669420FDA280AE15E5D912668`；升级时 `.seed-version` 0.3.1 → 0.3.2 自动重种。
+- 安装包内含本地 `public/secrets.json`，仅本机自用，不外发。
+
+### 15.6 已知取舍
+
+- 桌面摆件场景下「长时间不碰屏但人在」按连续久坐计；离开位置请按「我起来了」或关闭应用，否则离开时间也计入本轮（`docs/components/sedentary.md`「已知取舍」）。
