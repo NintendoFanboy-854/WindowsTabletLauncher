@@ -17,7 +17,6 @@ interface Settings {
   thresholdMin: number;        // 默认 45
   remindEveryMin: number;      // 默认 10
   strongReminder: boolean;     // 默认 true
-  quietHours: { start: string; end: string } | null;
 }
 
 interface Runtime {
@@ -64,13 +63,12 @@ interface Runtime {
     { "title": "计时", "fields": [
       { "key": "thresholdMin", "type": "number", "label": "提醒阈值", "unit": "分钟", "min": 5, "max": 120, "default": 45 },
       { "key": "remindEveryMin", "type": "number", "label": "未起身再催", "unit": "分钟", "min": 1, "max": 60, "default": 10 }
-    ]},
-    { "title": "免打扰", "fields": [
-      { "key": "quietHours", "type": "timeRange", "label": "免打扰时段", "default": { "start": "22:00", "end": "08:00" } }
     ]}
   ]
 }
 ```
+
+- **免打扰（quietHours）已移除**（v0.3.3，D-26）：旧配置里的 `quietHours` 由 `migrateSettings` 自动删除；设置页不再出现该分组。
 
 ## Agent 工具（UI 路径 ↔ 工具）
 
@@ -82,14 +80,14 @@ interface Runtime {
 | 强提醒·稍后 5 分钟 | `sedentary.snooze` |
 | 宿主设置页·久坐 | `sedentary.settings.get` / `sedentary.settings.set` |
 
-## 判定逻辑（v0.3.2 连续计时）
+## 判定逻辑（v0.3.2 连续计时 / v0.3.3 去掉免打扰）
 
 - 后台每 10 秒 tick 一次；隐藏 iframe 的定时器可能被浏览器节流到约 60 秒，久坐分钟按 tick 时间戳增量累加，不受间隔影响。
 - 会话开始后持续累加，显示 = 当前时间 − `sittingSince`。
 - 达阈值→提醒（`strongReminder` 开则 `showReminder`，否则 `notify`）；未起身按 `remindEveryMin` 再催。
 - 「我起来了」（卡片/详情/强提醒确认/`sedentary.takeBreak`）→ 结算本轮、breaks +1，**立即开始新一轮**（计时从 0 继续，不等待输入）。
 - tick 间隔 > 5 分钟（休眠唤醒 / 应用退出 / 系统时钟突变）→ 空档不计入久坐，把 `sittingSince` 顺延同样时长，回来后接着计时；不记 break。
-- 免打扰时段继续计时但不提醒，时段结束补一次。
+- 无免打扰时段：到阈值就提醒（v0.3.3 起）。
 - 跨零点结算前一天；重启从 runtime 恢复。
 
 ## 边界与异常

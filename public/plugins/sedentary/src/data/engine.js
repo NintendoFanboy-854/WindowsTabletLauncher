@@ -20,7 +20,7 @@
  * 存储键与结构沿用 docs/components/sedentary.md：
  *   sedentary.days    { [YYYY-MM-DD]: { date, sittingMinutes, longestStreakMin, breaks } }
  *   sedentary.runtime { sittingSince, lastRemindAt, lastRemindMinute,
- *                       snoozedUntil, lastTickAt, lastBreakAt, quietSkip, commandId }
+ *                       snoozedUntil, lastTickAt, lastBreakAt, commandId }
  *   sedentary.command { id, type: 'break'|'snooze', at, minutes? }
  */
 
@@ -47,15 +47,12 @@ const RECENT_DAYS = 7;
 const ENGINE_LOCK = 'wtsl.sedentary.engine';
 const COMMAND_EVENT = 'sedentary:command';
 
-export const DEFAULT_QUIET_HOURS = Object.freeze({ start: '22:00', end: '08:00' });
-
 /** manifest.settings 的默认值；schema 的 default 必须与此保持一致 */
 export const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   thresholdMin: 45,
   remindEveryMin: 10,
   strongReminder: true,
-  quietHours: DEFAULT_QUIET_HOURS,
 });
 
 const NUMBER_LIMITS = {
@@ -67,11 +64,9 @@ const STATUS_LABELS = {
   success: '正常',
   warning: '接近阈值',
   danger: '已超阈值',
-  quiet: '免打扰',
   off: '已关闭',
 };
 
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /* ------------------------------------------------------------------ */
@@ -128,26 +123,6 @@ function nonNegative(value) {
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
-function isTimeValue(value) {
-  return typeof value === 'string' && TIME_PATTERN.test(value);
-}
-
-/**
- * quietHours 归一化：
- * - 缺失 / 坏结构 → schema 默认 22:00–08:00；
- * - 两端空字符串 → null（关闭免打扰）；
- * - 两端合法 HH:MM → 原样保留。
- */
-function normalizeQuietHours(value) {
-  if (value === null) return null;
-  if (value === undefined) return { ...DEFAULT_QUIET_HOURS };
-  if (typeof value !== 'object' || Array.isArray(value)) return { ...DEFAULT_QUIET_HOURS };
-  const { start, end } = value;
-  if (start === '' && end === '') return null;
-  if (isTimeValue(start) && isTimeValue(end)) return { start, end };
-  return { ...DEFAULT_QUIET_HOURS };
-}
-
 /* ------------------------------------------------------------------ */
 /* 设置                                                                */
 /* ------------------------------------------------------------------ */
@@ -170,7 +145,6 @@ export function normalizeSettings(raw) {
       typeof source.strongReminder === 'boolean'
         ? source.strongReminder
         : DEFAULT_SETTINGS.strongReminder,
-    quietHours: normalizeQuietHours(source.quietHours),
   };
 }
 
@@ -194,31 +168,20 @@ function pickSettingsPatch(patch) {
   for (const key of Object.keys(NUMBER_LIMITS)) {
     if (typeof source[key] === 'number' && Number.isFinite(source[key])) next[key] = source[key];
   }
-  if (source.quietHours === null) {
-    next.quietHours = null;
-  } else if (source.quietHours && typeof source.quietHours === 'object') {
-    const { start, end } = source.quietHours;
-    if (typeof start === 'string' && typeof end === 'string') next.quietHours = { start, end };
-  }
+  return next;
+}
+
+/** 去掉旧配置里已经废弃的字段（免打扰时段），其余未知字段保留 */
+function stripLegacySettings(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const next = { ...raw };
+  delete next.quietHours;
   return next;
 }
 
 /**
- * 宿主 timeRange 用空字符串两端表示“关闭”，与内部的 quietHours:null 互转。
- * 写配置时统一存 `{ start: '', end: '' }`，设置页才会显示空输入框而不是 schema 默认值。
- */
-export function storedSettings(settings) {
-  return {
-    ...settings,
-    quietHours: settings.quietHours
-      ? { start: settings.quietHours.start, end: settings.quietHours.end }
-      : { start: '', end: '' },
-  };
-}
-
-/**
- * 旧配置迁移：把 `quietHours: null` / 越界数字等收敛成 schema 可渲染的值，
- * 同时保留 schema 之外的未知字段。只在确实有差异时写回。
+ * 旧配置迁移：收敛越界数字，删掉已废弃的 quietHours，同时保留 schema 之外的未知字段。
+ * 只在确实有差异时写回。
  */
 export async function migrateSettings() {
   let raw = null;
@@ -228,7 +191,7 @@ export async function migrateSettings() {
     return null;
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const next = { ...raw, ...storedSettings(normalizeSettings(raw)) };
+  const next = { ...stripLegacySettings(raw), ...normalizeSettings(raw) };
   if (JSON.stringify(next) === JSON.stringify(raw)) return next;
   try {
     await plugin.setConfig(SETTINGS_KEY, next);
@@ -248,16 +211,13 @@ export async function updateSettings(patch) {
   }
   const current = normalizeSettings(raw);
   const merged = normalizeSettings({ ...current, ...pickSettingsPatch(patch) });
-  const stored = {
-    ...(raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}),
-    ...storedSettings(merged),
-  };
+  const stored = { ...stripLegacySettings(raw), ...merged };
   try {
     await plugin.setConfig(SETTINGS_KEY, stored);
   } catch {
     /* 宿主不可用时保持返回值，调用方拿到的仍是规范化后的设置 */
   }
-  return storedSettings(merged);
+  return merged;
 }
 
 /* ------------------------------------------------------------------ */
@@ -317,7 +277,6 @@ export function readRuntime() {
     snoozedUntil: typeof runtime.snoozedUntil === 'string' ? runtime.snoozedUntil : null,
     lastTickAt: typeof runtime.lastTickAt === 'string' ? runtime.lastTickAt : null,
     lastBreakAt: typeof runtime.lastBreakAt === 'string' ? runtime.lastBreakAt : null,
-    quietSkip: Boolean(runtime.quietSkip),
     commandId: typeof runtime.commandId === 'string' ? runtime.commandId : null,
   };
 }
@@ -346,22 +305,8 @@ export function currentStreakMin(runtime, nowMs = Date.now()) {
   return Math.max(0, (nowMs - since.getTime()) / 60000);
 }
 
-export function isQuiet(now, quietHours) {
-  if (!quietHours) return false;
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const [startHour, startMinute] = quietHours.start.split(':').map(Number);
-  const [endHour, endMinute] = quietHours.end.split(':').map(Number);
-  const start = startHour * 60 + startMinute;
-  const end = endHour * 60 + endMinute;
-  if (start === end) return false;
-  if (start < end) return minutes >= start && minutes < end;
-  // 22:00–08:00 这类跨零点时段
-  return minutes >= start || minutes < end;
-}
-
 export function statusOf(settings, runtime, now = new Date()) {
   if (!settings.enabled) return 'off';
-  if (isQuiet(now, settings.quietHours)) return 'quiet';
   const streak = currentStreakMin(runtime, now.getTime());
   if (streak >= settings.thresholdMin) return 'danger';
   if (streak >= settings.thresholdMin * 0.6) return 'warning';
@@ -374,12 +319,11 @@ export function statusLabelOf(status) {
 
 /**
  * 卡片/详情副文案（V-12）：不重复主数值，只讲下一步或状态。
- * 正常/接近阈值给“距提醒还有”，到阈值给动作提示，免打扰与稍后各自说明。
+ * 正常/接近阈值给“距提醒还有”，到阈值给动作提示，稍后单独说明。
  */
 export function hintOf(settings, runtime, now = new Date()) {
   const status = statusOf(settings, runtime, now);
   if (status === 'off') return '久坐提醒已关闭';
-  if (status === 'quiet') return '免打扰时段，仍在计时';
   const snoozed = safeDate(runtime.snoozedUntil);
   if (snoozed && snoozed > now) return `提醒已推迟到 ${formatClock(snoozed)}`;
   if (!runtime.sittingSince) return '计时准备中';
@@ -388,10 +332,9 @@ export function hintOf(settings, runtime, now = new Date()) {
   return `距提醒还有 ${Math.max(1, Math.ceil(remaining))} 分钟`;
 }
 
-/** 「稍后 5 分钟」只在到阈值、未免打扰、没在稍后的状态出现 */
+/** 「稍后 5 分钟」只在到阈值、没在稍后的状态出现 */
 export function canSnooze(settings, runtime, now = new Date()) {
   if (!settings.enabled || !runtime.sittingSince) return false;
-  if (isQuiet(now, settings.quietHours)) return false;
   const snoozed = safeDate(runtime.snoozedUntil);
   if (snoozed && snoozed > now) return false;
   return currentStreakMin(runtime, now.getTime()) >= settings.thresholdMin;
@@ -462,7 +405,6 @@ export function toolStatus(settings, now = new Date()) {
       settings.enabled && runtime.sittingSince
         ? Math.max(0, settings.thresholdMin - Math.round(currentStreakMin(runtime, now.getTime())))
         : null,
-    quiet: isQuiet(now, settings.quietHours),
     snoozable: canSnooze(settings, runtime, now),
     snoozedUntil: runtime.snoozedUntil,
     lastBreakAt: runtime.lastBreakAt,
@@ -620,7 +562,6 @@ export class SedentaryEngine {
       next.snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString();
       next.lastRemindAt = null;
       next.lastRemindMinute = null;
-      next.quietSkip = false;
       writeRuntime(next);
       return `${minutes} 分钟后再提醒你`;
     }
@@ -644,7 +585,6 @@ export class SedentaryEngine {
       runtime.snoozedUntil = new Date(Date.now() + value * 60000).toISOString();
       runtime.lastRemindAt = null;
       runtime.lastRemindMinute = null;
-      runtime.quietSkip = false;
       writeRuntime(runtime);
       return { minutes: value, snoozedUntil: runtime.snoozedUntil };
     });
@@ -680,7 +620,6 @@ export class SedentaryEngine {
         runtime.lastRemindAt = null;
         runtime.lastRemindMinute = null;
         runtime.snoozedUntil = null;
-        runtime.quietSkip = false;
         runtime.lastTickAt = now.toISOString();
         writeRuntime(runtime);
         writeDays(trimDays(days));
@@ -723,14 +662,7 @@ export class SedentaryEngine {
    * 弹窗等待用户操作不占锁；其他实例读到的已是“本分钟已提醒”。
    */
   #claimReminder(now, streakMin, settings, runtime) {
-    if (streakMin < settings.thresholdMin) {
-      runtime.quietSkip = false;
-      return null;
-    }
-    if (isQuiet(now, settings.quietHours)) {
-      runtime.quietSkip = true;
-      return null;
-    }
+    if (streakMin < settings.thresholdMin) return null;
     const snoozed = safeDate(runtime.snoozedUntil);
     if (snoozed && snoozed > now) return null;
 
@@ -739,11 +671,9 @@ export class SedentaryEngine {
 
     const lastRemind = safeDate(runtime.lastRemindAt);
     const everyMs = Math.max(1, settings.remindEveryMin) * 60000;
-    const due =
-      !lastRemind || now.getTime() - lastRemind.getTime() >= everyMs || runtime.quietSkip;
+    const due = !lastRemind || now.getTime() - lastRemind.getTime() >= everyMs;
     if (!due) return null;
 
-    runtime.quietSkip = false;
     runtime.lastRemindAt = now.toISOString();
     runtime.lastRemindMinute = minute;
     runtime.snoozedUntil = null;
@@ -796,7 +726,6 @@ export class SedentaryEngine {
     runtime.lastRemindAt = null;
     runtime.lastRemindMinute = null;
     runtime.snoozedUntil = null;
-    runtime.quietSkip = false;
     runtime.lastBreakAt = now.toISOString();
     runtime.lastTickAt = now.toISOString();
     writeRuntime(runtime);
@@ -833,13 +762,11 @@ export async function seedDemoData() {
     snoozedUntil: null,
     lastTickAt: now.toISOString(),
     lastBreakAt: new Date(now.getTime() - 96 * 60000).toISOString(),
-    quietSkip: false,
     commandId: null,
   });
-  // 演示默认关掉免打扰，避免验证时间落在 22:00–08:00 时状态变成“免打扰”
   const settingsKey = `plugin.${plugin.pluginId}.${SETTINGS_KEY}`;
   if (readJson(settingsKey, null) == null) {
-    writeJson(settingsKey, { ...DEFAULT_SETTINGS, quietHours: { start: '', end: '' } });
+    writeJson(settingsKey, { ...DEFAULT_SETTINGS });
   }
 }
 

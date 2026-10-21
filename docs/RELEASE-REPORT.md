@@ -536,3 +536,41 @@ npx tauri build                    # release + 安装包
 ### 15.6 已知取舍
 
 - 桌面摆件场景下「长时间不碰屏但人在」按连续久坐计；离开位置请按「我起来了」或关闭应用，否则离开时间也计入本轮（`docs/components/sedentary.md`「已知取舍」）。
+
+## 16. v0.3.3 久坐移除免打扰（2026-10-21）
+
+> 代码提交：本次修复提交（版本 0.3.3 + 文档）；分支 `main`；tag `v0.3.3`。
+> 证据：`shots/sedentary-verify/`、`scripts/verify-sedentary.mjs`。
+
+### 16.1 背景
+
+用户要求直接去掉久坐的免打扰功能。`quietHours` 来自久坐插件最初接入（ede04b6）与 E3.3 重构（9a14a0b）时带下来的早期设计 schema，不是近期新增；但它让「到阈值提醒」多了一条隐藏分支（`quietSkip`、`status='quiet'`、`isQuiet`），与「到点就提醒」的预期冲突。
+
+### 16.2 改动（D-26）
+
+1. **engine**：删除 `DEFAULT_QUIET_HOURS`、`normalizeQuietHours`、`isQuiet`、`quietSkip`、`status='quiet'` 与免打扰提示文案；`migrateSettings` 用 `stripLegacySettings` 删除旧配置里的 `quietHours`。
+2. **manifest 设置 schema**：删除「免打扰」group；`sedentary.settings.set` Agent tool schema 移除 `quietHours`。
+3. **UI**：卡片/详情删除 `quiet` 状态色与文案；`sedentary.status` 工具描述去掉「是否免打扰」。
+4. 保留「稍后 5 分钟」（snooze）——它是「本次提醒推迟」，不是时段免打扰。
+
+### 16.3 验证
+
+- `node scripts/build-plugin.mjs sedentary` → 548,521 B / SHA-256 `774A37211E5B7C5DA10CFCBE1596F4E558B76DEAD61D1E6E5BD305594F230F41`。
+- `node scripts/verify-sedentary.mjs`（独立预览 + headless Edge + 真实点击）：**7/7 PASS**、console error 0（首屏计时、点「我起来了」breaks+1、`sittingSince` 立即重置、显示 0 分钟继续）。
+- `npm run typecheck` / `npm run build` / `npx tauri build` 均 exit 0（cargo release 6m55s）。
+- 插件产物全文扫描：无 `免打扰` / `quietHours` / `quietSkip` 逻辑残留（仅 `stripLegacySettings` 的删除旧字段代码）。
+
+### 16.4 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,164,608 B | `B24C12548A071BC4DF408E6716AF4BE3D0AD8BF647DDA9AB1440FFCD3E8CA049` |
+| NSIS `Windows Tablet Launcher_0.3.3_x64-setup.exe` | 3,931,048 B | `547BDCC60DBEE2B24FE47BCB74F57F361CCB4B0DC6DA0F2294ABB2D2E3E2ED93` |
+| MSI `Windows Tablet Launcher_0.3.3_x64_zh-CN.msi` | 5,136,384 B | `2B6887500C5812E70976A03783E231617CA4EADB854BEBAAAD6B736CAB2FC175` |
+
+- 升级时 `.seed-version` 0.3.2 → 0.3.3 自动重种；安装包内含本地 `public/secrets.json`，仅本机自用。
+
+### 16.5 兼容
+
+- 旧存档 `plugin.sedentary.settings.quietHours`、`sedentary.runtime.quietSkip`：被忽略并在首次迁移时删除；不需要手动清数据。
+- 按用户要求未跑完整 release CDP 回归；本次只改插件与版本号，宿主代码未动。

@@ -150,7 +150,6 @@ export default function SedentaryDetail() {
 
   let hint = snapshot.hint;
   if (!settings.enabled) hint = '在设置里重新启用后，后台会继续计时与提醒';
-  else if (snapshot.status === 'quiet') hint = '免打扰时段，仍在计时；时段结束后补一次提醒';
   else if (!sitting) hint = '后台会自动开始计时；也可以手动记一次起身';
   else if (snapshot.status === 'danger' && !snoozed) {
     hint = `已超过提醒阈值 ${settings.thresholdMin} 分钟，起身活动一下`;

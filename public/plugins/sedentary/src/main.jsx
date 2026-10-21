@@ -28,7 +28,6 @@ import {
   migrateSettings,
   readSettings,
   seedDemoData,
-  storedSettings,
   toolStatus,
   toolToday,
   updateSettings,
@@ -47,7 +46,7 @@ const AGENT_TOOLS = [
   {
     name: 'sedentary.status',
     description:
-      '读取久坐状态：是否在久坐、当前连续分钟、提醒阈值、距提醒还有多久、是否免打扰或已稍后',
+      '读取久坐状态：是否在久坐、当前连续分钟、提醒阈值、距提醒还有多久、是否已稍后',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -73,7 +72,7 @@ const AGENT_TOOLS = [
   {
     name: 'sedentary.settings.set',
     description:
-      '修改久坐提醒设置（只改传入的字段）：enabled、strongReminder、thresholdMin、remindEveryMin、quietHours',
+      '修改久坐提醒设置（只改传入的字段）：enabled、strongReminder、thresholdMin、remindEveryMin',
     parameters: {
       type: 'object',
       properties: {
@@ -90,16 +89,6 @@ const AGENT_TOOLS = [
           minimum: 1,
           maximum: 60,
           description: '提醒后仍未起身的再催间隔',
-        },
-        quietHours: {
-          type: 'object',
-          description: '免打扰时段 { start, end }；两端都传空字符串即关闭',
-          properties: {
-            start: { type: 'string', description: 'HH:MM' },
-            end: { type: 'string', description: 'HH:MM' },
-          },
-          required: ['start', 'end'],
-          additionalProperties: false,
         },
       },
       additionalProperties: false,
@@ -125,7 +114,7 @@ function BackgroundRunner() {
   useEffect(() => {
     const engine = getEngine();
     engine.start();
-    // 旧配置（quietHours:null / 越界数字）先收敛成设置页可渲染的形状
+    // 旧配置（越界数字 / 已删除的免打扰字段）先收敛成设置页可渲染的形状
     void migrateSettings();
     return () => engine.stop();
   }, []);
@@ -147,7 +136,7 @@ function BackgroundRunner() {
       if (!outcome) throw new Error('当前没有进行中的久坐计时');
       return { snoozedUntil: outcome.snoozedUntil, status: toolStatus(settings) };
     },
-    'sedentary.settings.get': async () => ({ settings: storedSettings(await readSettings()) }),
+    'sedentary.settings.get': async () => ({ settings: await readSettings() }),
     'sedentary.settings.set': async (args) => ({ settings: await updateSettings(args) }),
   });
 

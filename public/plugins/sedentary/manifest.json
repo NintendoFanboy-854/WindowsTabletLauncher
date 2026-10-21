@@ -65,19 +65,6 @@
             "default": 10
           }
         ]
-      },
-      {
-        "id": "quiet",
-        "title": "免打扰",
-        "hint": "时段内不提醒但继续计时，时段结束后补一次提醒；两端都清空即关闭。",
-        "fields": [
-          {
-            "key": "quietHours",
-            "type": "timeRange",
-            "label": "免打扰时段",
-            "default": { "start": "22:00", "end": "08:00" }
-          }
-        ]
       }
     ]
   }

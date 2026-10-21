@@ -322,3 +322,14 @@
   4. tick 间隔 > 5 分钟（休眠/应用退出/时钟突变）→ 空档不计入，把 `sittingSince` 顺延同样时长；不记 break、不清零。
 - 取舍：桌面摆件场景下「长时间不碰屏但人在」按久坐计；离开位置需要按「我起来了」或关闭应用，否则离开时间也计入本轮（docs/components/sedentary.md「已知取舍」）。
 - 验证：`node scripts/build-plugin.mjs sedentary` 重新打包；typecheck/build；dev 冒烟覆盖「点我起来了 → 计时从 0 立即继续、不再等输入」。
+
+## D-26 移除久坐「免打扰」时段（2026-10-21，v0.3.3）
+
+- 背景：用户明确要求去掉久坐的免打扰功能（「你直接给我去掉免打扰功能，谁加上去的」）。
+- 来源：`quietHours` 是久坐插件最初接入宿主（ede04b6）与 E3.3 重构（9a14a0b）时从早期设计 schema 带下来的配置项，不是近期新加的；但它让「到阈值提醒」这条核心行为多了一个隐藏分支（`quietSkip`、`status='quiet'`、`isQuiet`），与产品「到点就提醒」的预期不一致。
+- 决策（v0.3.3）：完整移除
+  1. engine：删除 `DEFAULT_QUIET_HOURS`、`normalizeQuietHours`、`isQuiet`、`quietSkip`、`status='quiet'`、免打扰提示文案；`migrateSettings` 删除旧配置里的 `quietHours` 字段。
+  2. manifest 设置 schema：删除「免打扰」group；`sedentary.settings.set` Agent tool schema 同步去掉 `quietHours`。
+  3. UI：卡片/详情的 `quiet` 状态色与文案删除。
+- 兼容：旧存档里的 `quietHours` / `quietSkip` 字段被忽略并在迁移时删除；设置页不再显示该分组。
+- 验证：`node scripts/build-plugin.mjs sedentary`；`scripts/verify-sedentary.mjs` 聚焦验证 PASS；typecheck/build/tauri build exit 0。

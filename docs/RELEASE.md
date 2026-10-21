@@ -82,6 +82,7 @@
 - [x] 文档：DECISIONS D-23/D-24、契约 §13、`docs/components/agent.md`、README、RELEASE-REPORT §13 已更新
 - [x] 安装包不外发（内含本地 `public/secrets.json`；仅本机安装）
 - [ ] NSIS/MSI 实际安装/卸载/注册表路径：未执行（与 v0.3.0 口径相同，需手动验证）
+- [x] `git status` 干净；commit / push / tag `v0.3.1`
 
 ## 9. v0.3.2 增量检查（2026-10-21）
 
@@ -97,4 +98,18 @@
 - [x] 按用户要求未跑完整 release CDP 回归；本次只改插件与版本号，宿主代码未动
 - [x] 安装包不外发（内含本地 `public/secrets.json`）
 - [x] `git status` 干净；commit / push / tag `v0.3.2`
-- [x] `git status` 干净；commit / push / tag `v0.3.1`
+
+## 10. v0.3.3 增量检查（2026-10-21）
+
+> 背景：用户要求去掉久坐的免打扰功能。改动见 D-26、RELEASE-REPORT §16。§1–§9 继续有效。
+
+- [x] 版本号 0.3.3 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
+- [x] 免打扰完整移除：engine（`quietHours`/`isQuiet`/`quietSkip`/`quiet` 状态与文案）、manifest 设置 schema 的「免打扰」分组、`sedentary.settings.set` tool schema、卡片/详情 `quiet` 状态
+- [x] 旧配置迁移：`migrateSettings` 删除旧 `quietHours` 字段（`stripLegacySettings`），设置页不再显示该分组
+- [x] `node scripts/build-plugin.mjs sedentary` 重新打包（548,521 B / `774A3721…`）
+- [x] `node scripts/verify-sedentary.mjs` **7/7 PASS**、console error 0 — `shots/sedentary-verify/`
+- [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 6m55s；NSIS/MSI 完成）
+- [x] 产物哈希：`app.exe` 12,164,608 B / `B24C1254…`；NSIS 3,931,048 B / `547BDCC6…`；MSI 5,136,384 B / `2B688750…`
+- [x] 文档：D-26、`docs/components/sedentary.md`、README、RELEASE-REPORT §16 已更新
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [x] `git status` 干净；commit / push / tag `v0.3.3`

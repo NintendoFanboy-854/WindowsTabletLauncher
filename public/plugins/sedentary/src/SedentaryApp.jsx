@@ -44,7 +44,6 @@ const BADGE_COLOR = {
   success: 'success',
   warning: 'warning',
   danger: 'danger',
-  quiet: 'informative',
   off: 'subtle',
 };
 
@@ -53,7 +52,6 @@ const STATUS_DOT_COLOR = {
   success: tokens.colorStatusSuccessForeground1,
   warning: tokens.colorStatusWarningForeground1,
   danger: tokens.colorStatusDangerForeground1,
-  quiet: tokens.colorBrandForeground1,
   off: tokens.colorNeutralForeground4,
 };
 
