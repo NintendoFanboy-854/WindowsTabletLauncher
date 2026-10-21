@@ -1,6 +1,7 @@
-# 发布前检查清单（v0.3.0）
+# 发布前检查清单（v0.3.0 → v0.3.1）
 
 > v0.3.0（2026-10-20）：Agent 改为右下角浮空三段界面（按钮 → 半高输入窗 → 全高浮栏，点按/空格立即录音）；语音本轮原生音频只发一次、ASR 回填文字入库、上下文零音频；删除人脸/全屏/dock/机器人；天气 3×2 三带式重排 + 横向空洞门禁。
+> v0.3.1（2026-10-21）：半高窗补顶部控制条与 peek、录音中收起取消录音、转写中收起不自动弹回；新增 `tts.autoRead` 总开关与常驻朗读开关；宿主设置改由桌面右键进入（不放进 Agent）。增量检查见 §8。
 > 证据根：`shots/v030-dev/`（Phase 1，dev server）、`shots/v030-final/`（Phase 2，release exe/安装包）；脚本冒烟 `scripts/smoke-mimo-audio.mjs` 输出。
 > 勾选口径：`[x]` = 实际执行并通过；`[ ]` = 未执行/未验证，原因写在行内。
 
@@ -65,3 +66,20 @@
 - 真实 MiMo 音频链路只在 Node 冒烟 + mock 浏览器链路验证；真实浏览器内“录音→原生音频对话→出声播报”仍需用户实测（无头 fake mic 只能验证状态机）。
 - `public/secrets.json` 仍会被打进 `dist`/安装包（个人自用 P2；对外分发前需排除或改为运行时录入）。
 - 天气自动定位、和风天气 Key、联网搜索开通等沿用 v0.2.2 限制。
+
+## 8. v0.3.1 增量检查（2026-10-21）
+
+> 背景：用户反馈半高窗死路、不能默认静音、全高 header 不播放时没有语音控件、鼠标无设置入口；并质疑把宿主设置放进 Agent（HIG 层级）。改动见 D-23/D-24、契约 §13。§1–§7 为 v0.3.0 基线，继续有效。
+
+- [x] 版本号 0.3.1 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
+- [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m18s；NSIS/MSI 完成）
+- [x] dev 冒烟 `scripts/smoke-v031-ui.mjs`：**24/24 PASS**、console error 0（右键菜单/设置页、半高控制条 + peek + 展开、朗读总开关持久化、录音中收起停麦、Agent 菜单边界）— `shots/v031-dev/`
+- [x] release 真窗口：`.seed-version` 0.3.0 → 0.3.1、6 manifest、天气产物哈希与仓库一致；WebView2 `--webview-exe-version=0.3.1` — `shots/v031-final/seed-upgrade.json`、`genuine-window.json`
+- [x] WebView2 CDP（patched 副本，仅 62 字节参数替换）：6 卡 / 8 iframe / 无 dock / 无加载文案 / 无溢出 / Agent 入口 56×56；console.error/exception/log.error = 0；**16/16 checks PASS** — `shots/v031-final/checks.json`、`webview2-cdp.json`
+- [x] v0.3.1 新交互真实 WebView2 复验：右键菜单三项（无「桌面设置」）→ 设置页；设置→入口→打开 Agent→ chat；未播放有「关闭自动朗读」、无「停止朗读」、点击写 `tts.autoRead=false` 再点回 true；⋯ 菜单无宿主设置 — `shots/v031-final/REPORT.md`
+- [x] 产物哈希稳定：
+      `app.exe` 12,166,656 B / `27D66C29…`；NSIS 3,932,235 B / `43B19EF9…`；MSI 5,140,480 B / `CD84C56B…`
+- [x] 文档：DECISIONS D-23/D-24、契约 §13、`docs/components/agent.md`、README、RELEASE-REPORT §13 已更新
+- [x] 安装包不外发（内含本地 `public/secrets.json`；仅本机安装）
+- [ ] NSIS/MSI 实际安装/卸载/注册表路径：未执行（与 v0.3.0 口径相同，需手动验证）
+- [x] `git status` 干净；commit / push / tag `v0.3.1`

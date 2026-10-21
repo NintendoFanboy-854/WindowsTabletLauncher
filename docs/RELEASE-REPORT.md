@@ -1,10 +1,10 @@
-# 发布验证报告（v0.3.0）
+# 发布验证报告（v0.3.0 → v0.3.1）
 
-> 生成时间：2026-10-20（+08:00）
-> 代码提交：v0.3.0 发布提交（见 `git log -1`）；v0.2.1 热修见 §10；v0.2.2 交互/定位热修见 §11；v0.3.0 语音优先重构见 §12
-> 分支：`main`；版本：`0.3.0`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `Cargo.lock`）
+> 生成时间：2026-10-20（v0.3.0）、2026-10-21（v0.3.1 增量）
+> 代码提交：v0.3.0 发布提交（见 `git log`）；v0.2.1 热修见 §10；v0.2.2 交互/定位热修见 §11；v0.3.0 语音优先重构见 §12；v0.3.1 半高窗出口/朗读总开关/鼠标设置入口见 §13
+> 分支：`main`；版本：`0.3.1`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / 两个 lockfile）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
-> 证据根：`shots/e7/`、`shots/v022-final/`、`shots/v030-dev/`（Phase 1）、`shots/v030-final/`（Phase 2）；逐项矩阵见 `shots/e7/REPORT.md`、`shots/v022-final/REPORT.md`、`shots/v030-dev/REPORT.md`
+> 证据根：`shots/e7/`、`shots/v022-final/`、`shots/v030-dev/`、`shots/v030-final/`、`shots/v031-dev/`、`shots/v031-final/`；逐项矩阵见各目录 `REPORT.md`
 
 ## 0. 结论
 
@@ -427,3 +427,67 @@ npx tauri build                    # release + 安装包
 - `public/secrets.json` 仍打进 `dist`/安装包（个人自用 P2；对外分发前应排除或改为运行时录入）。
 - 和风天气 Key/自动定位、联网搜索开通等沿用 v0.2.2 限制。
 - 旧 `wtsl.layout` 若有 2 页（第二页空）会显示 2 个页码点：v0.2.2 持久化状态，允许；需要时用设置页「重置布局」恢复单页（P3）。
+
+## 13. v0.3.1 半高窗出口 / 常驻朗读开关 / 鼠标设置入口（2026-10-21）
+
+> 代码：界面与设置修正提交 `2b13729`；本版发布提交（版本号 0.3.1 + 文档）；分支 `main`；tag `v0.3.1`。
+> 证据根：`shots/v031-dev/`（Phase 1，dev server）、`shots/v031-final/`（Phase 2，release exe/安装包）。
+
+### 13.1 背景与改动
+
+用户反馈四条 + 一次设计质疑：①半高形态 bug 多；②不能调整默认朗读/经常需要静音；③全高窗不播放时右上角空、一播放才出现语音控件；④鼠标状态下没有进设置的路径（"真就全触屏了是吗"）；⑤质疑"把桌面设置放进 Agent"是否符合 HIG。
+
+修正原则（`docs/DECISIONS.md` D-23/D-24）：
+- **半高窗补出口**：顶部控制条（⌃ 展开 / 朗读开关 / ✕ 收起）+ 最近 3 条消息 peek；录音/转写时这两块暂隐、展开禁用。半高窗不再必须"先发一条"才能升级。
+- **关闭 = 结束当前任务**：录音中收起先 `cancelRecording()`（旧版会留下后台麦克风）；转写中收起用 `suppressVoiceReveal` 阻止 ASR 完成后把窗口弹回。
+- **播报状态常驻、动作按需**：新增 `tts.autoRead` 总开关（默认 true，持久化）与 header/composer 常驻扬声器 ToggleButton；「停止朗读」只在播报中出现；文字提问朗读降为依赖项，总开关关闭时禁用。
+- **设置入口分层**：宿主设置 **不** 进 Agent ⋯ 菜单；鼠标路径 = 桌面空白右键 →「设置」（Fluent Menu 虚拟 target 定位），键盘 `Ctrl+,`、触控长按空白保留。Agent ⋯ 只保留 Agent 自己的设置。
+- 契约 §1/§2/§4/§5/§11 更新 + 新增 §13 修订；`docs/components/agent.md`、README 同步。
+
+### 13.2 Phase 1：dev 冒烟 — PASS
+
+`scripts/smoke-v031-ui.mjs`（headless Edge 155 + 假麦克风）最终 run6：**24/24 PASS，0 FAIL，50s，console.error/exception/log.error = 0**。
+
+| 项 | 实测 |
+|---|---|
+| A 桌面真实右键 | `[role=menu]` = 打开 Agent / 编辑桌面 / 设置；无「桌面设置」；虚拟 target 无 console 告警 |
+| B 菜单「设置」 | 设置页出现 + `.host-desktop-layer[data-active=false]` |
+| C 打开 Agent | `data-stage=chat`；⋯ 菜单 = 新建对话 / Agent 设置 / 删除当前对话 / 标题，无宿主设置入口 |
+| D 半高窗 | 控制条 3 控件均 40×40；录音态展开禁用；Esc 取消后 peek 394×224 可展开；无横向溢出（surface 1px 为边框亚像素舍入，见 `overflow-probe.log`） |
+| E 展开 | 点「展开对话」→ chat；未播放时 header 已有「关闭自动朗读」，无「停止朗读」 |
+| F 静音持久化 | 点击 → aria 变「开启自动朗读」+ `agent.settings.tts.autoRead=false`；reload 保持；再点恢复 true |
+| G 录音中收起 | stage=collapsed、voice-stage=idle、mic 轨道全 `ended`、无新语音消息、录音 UI 消失 |
+| H 控制台 | console.error/exception=0；log.error=0（唯一 raw 为 dev `/favicon.ico` 404，非产品） |
+
+### 13.3 构建 — PASS
+
+- `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0；cargo release `Finished in 8m 18s`；NSIS/MSI bundling 完成。
+- 版本号 0.3.1 五处一致：`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`。
+- 产物（验证前后哈希未变）：
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,166,656 B | `27D66C291C9AEAAEB05975A486D9D26FABF74764F514E378FBE14E359D1CB1D7` |
+| NSIS `Windows Tablet Launcher_0.3.1_x64-setup.exe` | 3,932,235 B | `43B19EF98D3F317CB849BFB496C3E4C15863D615107C48244C20735DE41B936C` |
+| MSI `Windows Tablet Launcher_0.3.1_x64_zh-CN.msi` | 5,140,480 B | `CD84C56B59570017EFE8DD5C72675D844E99C4388F98FF819A8E54AF73068247` |
+
+### 13.4 Phase 2：release exe + 安装包验证 — PASS
+
+- **真实 exe 真窗口**（`shots/v031-final/genuine-window.json/.png`）：标题 2.8s、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.1`。
+- **升级重种**（`seed-upgrade.json`）：appdata `.seed-version` **0.3.0 → 0.3.1**；6 个 manifest 合法；`weather/app/app.js` 931,293 B / SHA-256 `49E47718…` 与仓库 `public` 产物一致，mtime 已更新；旧布局/会话/插件配置保留。
+- **WebView2 CDP**（patched 副本仅替换 app.exe 内 62 字节 wry 默认 WebView2 参数串开 CDP，offset 9,185,640，原产物未动、哈希不变）：页面 `http://tauri.localhost/` complete；**6 卡**、**8 iframe**（2 background + 6 widget，均 `wtsl.localhost`）；无 dock/机器人/头像/麦克风图标、无加载文案、无横向溢出；Agent 入口唯一、collapsed 56×56、圆角 12；console.error/exception/log.error **全 0**（连接后 reload 一次覆盖首屏）。**16/16 checks PASS**（`checks.json`、`webview2-cdp.json`）。
+- **新交互在真实 WebView2 内复验**：A 真实 CDP 右键三项菜单、无「桌面设置」；B 菜单「设置」→ `data-active=false` + 设置页；C 设置→入口→「打开 Agent」→ chat，header 未播放即有「关闭自动朗读」、无「停止朗读」，点击写 `tts.autoRead=false`、再点回 true；D ⋯ 菜单无宿主设置入口、Esc 关菜单不收起 Agent。
+- 截图：`app-cdp-window.png`（2880×1920）、`context-menu.png`、`settings-page.png`、`agent-chat-header.png`、`genuine-window.png`。
+- **安全**：首次取证 JSON 因脚本只脱敏 settings 顶层 apiKey，曾包含 localStorage 中 mimo/weather 两个本地 key；已立即脱敏并把脚本改为深层脱敏（任意层级 apiKey/token/secret），重新生成证据并对 `shots/v031-final` 18 个文件全量扫描：0 泄漏。证据 JSON 不含对话内容；chat 截图含本机既有对话界面内容，仅本地证据。
+- 未覆盖：NSIS/MSI 实际安装/注册表/升级路径（按任务不安装）；release 内真实麦克风录音链路未自动化（同 v0.3.0，fake mic 仅 dev）。
+
+### 13.5 已知风险 / 限制（v0.3.1）
+
+- **安装包内含 `public/secrets.json`**（本地 MiMo / 和风天气 Key）：仅限本机自用；对外分发前必须移除或改运行时录入。
+- release 内「录音→原生音频对话→出声播报」真实链路未自动化，留待用户日常验证。
+- UIA 首帧只暴露 2 张卡（a11y 采样时序）；DOM/交互结论以 WebView2 CDP 为准。
+- patched CDP 副本仅用于取证，位于 `%TEMP%`，不代表发布产物。
+
+## 14. 结论（v0.3.1）
+
+**v0.3.1 可发布**：v0.3.1 增量（半高窗出口/peek、常驻朗读开关 + autoRead 总开关、关闭即取消录音、鼠标右键设置入口）在 dev 与真实 release WebView2 中均验证通过；v0.3.0 基线回归结论继续有效。P0=0 / P1=0，console error 0，安装包与 exe 哈希稳定。
