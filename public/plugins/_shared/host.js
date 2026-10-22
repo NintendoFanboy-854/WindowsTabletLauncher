@@ -169,12 +169,40 @@ export function useHostSize(sizeKeyOf, defaultSizeKey) {
 /* ------------------------------------------------------------------ */
 
 /**
- * 插件配置读写：初始化时先吃 init 快照，再按需从宿主捞一次；写入同时回传宿主。
+ * 两份配置值是否语义相同（用于丢弃“自己写盘后宿主再推回来”的重复推送）。
+ * 配置值都是 JSON 数据；序列化失败时保守返回 false（照常应用）。
+ */
+function sameConfigValue(left, right) {
+  if (left === right) return true;
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 插件配置读写：初始化先吃 init 快照（首帧不白屏），随后做三件事：
+ *
+ * 1. 向宿主 `getConfig` 重读一次最新值——`host:init` 的快照可能是宿主渲染时
+ *    缓存的旧值（浮层 iframe 尤其明显），不能因为“init 里有值”就跳过重读；
+ * 2. 订阅 `plugin.onConfig` 接收宿主主动推送的增量。**这是 Tauri 打包版里唯一
+ *    可靠的配置同步通道**：宿主页（`http://tauri.localhost`）与插件 iframe
+ *    （`http://wtsl.localhost`）不同 origin，宿主写 localStorage 不会给插件文档
+ *    派发 `storage` 事件；
+ * 3. 保留 `storage` 监听作为 dev 同源模式（HTTP 插件源）与外部直接写
+ *    localStorage 的兼容兜底。
+ *
+ * 写入路径不变：本地状态先更新，再回传宿主；宿主写盘后会把同值推回来。
+ * 用读取序号丢弃晚到的旧 `getConfig` 响应，避免慢返回的旧快照覆盖新写入。
+ *
  * @returns [value, setValue, loaded]
  */
 export function useStoredConfig(key, fallback, normalize) {
   const normalizeRef = useRef(normalize);
   normalizeRef.current = normalize;
+  const fallbackRef = useRef(fallback);
+  fallbackRef.current = fallback;
 
   const [value, setValueState] = useState(() => {
     const fromInit = initialConfigValue(key);
@@ -182,62 +210,88 @@ export function useStoredConfig(key, fallback, normalize) {
   });
   const [loaded, setLoaded] = useState(() => initialConfigValue(key) !== undefined);
 
-  useEffect(() => {
-    // init 可能晚于首帧（iframe load 事件晚于 React 挂载）：按“此刻”的 init 再读一次，
-    // 避免首帧拿到 fallback、又因提前 return 而不去 getConfig。
-    const fromInit = initialConfigValue(key);
-    if (fromInit !== undefined) {
-      setValueState(normalizeRef.current ? normalizeRef.current(fromInit) : fromInit);
-      setLoaded(true);
-      return undefined;
-    }
-    let alive = true;
+  /** 最新值的同步镜像：setValue 的 updater 形式读它，onConfig 也用它丢弃同值回推 */
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  /** 读取序号：本地写入 / 宿主推送都会让仍在途的旧 getConfig 失效 */
+  const readSeq = useRef(0);
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    [],
+  );
+
+  const applyValue = useCallback((raw) => {
+    setValueState(normalizeRef.current ? normalizeRef.current(raw) : raw ?? fallbackRef.current);
+  }, []);
+
+  const readFromHost = useCallback(() => {
+    const seq = ++readSeq.current;
     plugin
       .getConfig(key)
       .then((stored) => {
-        if (!alive) return;
-        setValueState(normalizeRef.current ? normalizeRef.current(stored) : stored ?? fallback);
+        if (!aliveRef.current || seq !== readSeq.current) return;
+        applyValue(stored);
         setLoaded(true);
       })
       .catch(() => {
-        if (alive) setLoaded(true);
+        if (aliveRef.current && seq === readSeq.current) setLoaded(true);
       });
+  }, [applyValue, key]);
+
+  useEffect(() => {
+    // 即使 init 快照里有值也要重读：init 可能落后于宿主 localStorage 的最新值。
+    readFromHost();
+  }, [readFromHost]);
+
+  // 宿主推送的配置增量（跨 origin 的正确通道）
+  useEffect(() => {
+    /**
+     * onConfig 注册时 SDK 会把 host:init 的配置快照同步重放一遍。这部分值只是
+     * “首帧可能没等到 init”的补位，**权威性低于 mount 时的 getConfig 重读**
+     * （init 快照可能落后于宿主 localStorage），所以重放期间不能作废在途读取；
+     * 只有注册完成后的真实推送才需要作废旧读，避免慢返回的旧值覆盖新写入。
+     */
+    let replaying = true;
+    const off = plugin.onConfig?.((changedKey, next) => {
+      if (changedKey !== key) return;
+      if (!replaying) readSeq.current += 1;
+      setLoaded(true);
+      // 宿主会把新值推给该插件的所有 iframe（含写入者自己）；同值回推直接丢弃，
+      // 否则 places / cache 每次写盘都会多触发一轮无意义的状态更新（天气会多一轮请求）。
+      if (sameConfigValue(next, valueRef.current)) return;
+      applyValue(next);
+    });
+    replaying = false;
     return () => {
-      alive = false;
+      off?.();
     };
-    // fallback 只在首次使用，不参与依赖
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [applyValue, key]);
 
-  const setValue = useCallback(
-    (next) => {
-      setValueState((previous) => {
-        const resolved = typeof next === 'function' ? next(previous) : next;
-        plugin.setConfig(key, resolved).catch(() => {});
-        return resolved;
-      });
-    },
-    [key],
-  );
-
-  // 设置视图（宿主全窗口浮层）改了配置后，卡片视图要跟着更新：
-  // 宿主把配置写在同源 localStorage 的 `plugin.<pluginId>.<key>`，
-  // 另一个 iframe 文档会收到 storage 事件，这里据此重新读一次。
+  // dev 同源模式 / 外部直接写 localStorage 的兜底（Tauri 跨 origin 下不会触发）
   useEffect(() => {
     const storageKey = `plugin.${plugin.pluginId}.${key}`;
     const onStorage = (event) => {
-      if (event.key !== storageKey && event.key !== null) return;
-      plugin
-        .getConfig(key)
-        .then((stored) => {
-          setValueState(normalizeRef.current ? normalizeRef.current(stored) : stored ?? fallback);
-        })
-        .catch(() => {});
+      if (event.key !== null && event.key !== storageKey) return;
+      readFromHost();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, readFromHost]);
+
+  const setValue = useCallback(
+    (next) => {
+      const resolved = typeof next === 'function' ? next(valueRef.current) : next;
+      readSeq.current += 1;
+      valueRef.current = resolved;
+      setValueState(resolved);
+      plugin.setConfig(key, resolved).catch(() => {});
+    },
+    [key],
+  );
 
   return [value, setValue, loaded];
 }

@@ -17805,52 +17805,66 @@ function Ep(t, n) {
 		};
 	}, []), i;
 }
-function Dp(t, n, r) {
+function Dp(e, t) {
+	if (e === t) return !0;
+	try {
+		return JSON.stringify(e) === JSON.stringify(t);
+	} catch {
+		return !1;
+	}
+}
+function Op(t, n, r) {
 	let i = (0, M.useRef)(r);
 	i.current = r;
-	let [a, o] = (0, M.useState)(() => {
+	let a = (0, M.useRef)(n);
+	a.current = n;
+	let [o, s] = (0, M.useState)(() => {
 		let e = Sp(t);
 		return i.current ? i.current(e) : e ?? n;
-	}), [s, c] = (0, M.useState)(() => Sp(t) !== void 0);
-	(0, M.useEffect)(() => {
-		let r = Sp(t);
-		if (r !== void 0) {
-			o(i.current ? i.current(r) : r), c(!0);
-			return;
-		}
-		let a = !0;
-		return e.getConfig(t).then((e) => {
-			a && (o(i.current ? i.current(e) : e ?? n), c(!0));
+	}), [c, l] = (0, M.useState)(() => Sp(t) !== void 0), u = (0, M.useRef)(o);
+	u.current = o;
+	let d = (0, M.useRef)(0), f = (0, M.useRef)(!0);
+	(0, M.useEffect)(() => () => {
+		f.current = !1;
+	}, []);
+	let p = (0, M.useCallback)((e) => {
+		s(i.current ? i.current(e) : e ?? a.current);
+	}, []), m = (0, M.useCallback)(() => {
+		let n = ++d.current;
+		e.getConfig(t).then((e) => {
+			f.current && n === d.current && (p(e), l(!0));
 		}).catch(() => {
-			a && c(!0);
-		}), () => {
-			a = !1;
-		};
-	}, [t]);
-	let l = (0, M.useCallback)((n) => {
-		o((r) => {
-			let i = typeof n == "function" ? n(r) : n;
-			return e.setConfig(t, i).catch(() => {}), i;
+			f.current && n === d.current && l(!0);
 		});
-	}, [t]);
+	}, [p, t]);
 	return (0, M.useEffect)(() => {
-		let r = `plugin.${e.pluginId}.${t}`, a = (a) => {
-			(a.key === r || a.key === null) && e.getConfig(t).then((e) => {
-				o(i.current ? i.current(e) : e ?? n);
-			}).catch(() => {});
+		m();
+	}, [m]), (0, M.useEffect)(() => {
+		let n = !0, r = e.onConfig?.((e, r) => {
+			e === t && (n || (d.current += 1), l(!0), !Dp(r, u.current) && p(r));
+		});
+		return n = !1, () => {
+			r?.();
 		};
-		return window.addEventListener("storage", a), () => window.removeEventListener("storage", a);
-	}, [t]), [
-		a,
-		l,
-		s
+	}, [p, t]), (0, M.useEffect)(() => {
+		let n = `plugin.${e.pluginId}.${t}`, r = (e) => {
+			(e.key === null || e.key === n) && m();
+		};
+		return window.addEventListener("storage", r), () => window.removeEventListener("storage", r);
+	}, [t, m]), [
+		o,
+		(0, M.useCallback)((n) => {
+			let r = typeof n == "function" ? n(u.current) : n;
+			d.current += 1, u.current = r, s(r), e.setConfig(t, r).catch(() => {});
+		}, [t]),
+		c
 	];
 }
-function Op() {
+function kp() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function kp(e, t) {
+function Ap(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -17859,10 +17873,10 @@ function kp(e, t) {
 		}
 	}, "*");
 }
-function Ap() {
+function jp() {
 	window.parent.postMessage({ type: "plugin:request-host-settings" }, "*");
 }
-var jp = 500, Mp = 8, Np = [
+var Mp = 500, Np = 8, Pp = [
 	"button",
 	"input",
 	"textarea",
@@ -17876,16 +17890,16 @@ var jp = 500, Mp = 8, Np = [
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function Pp(e, t) {
+function Fp(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(Np);
+	let n = t.closest(Pp);
 	return !!(n && n !== e && e.contains(n));
 }
-function Fp() {
+function Ip() {
 	let t = (0, M.useRef)(null);
 	return (0, M.useEffect)(() => {
 		let n = t.current;
-		if (!n || !e.inHost || Op()) return;
+		if (!n || !e.inHost || kp()) return;
 		let r = null, i = 0, a = 0, o = 0, s = !1, c = !1, l = 0, u = !1, d = (e) => e === "mouse" || e === "pen", f = (e, t) => {
 			window.parent.postMessage({
 				type: "plugin:card-pointer",
@@ -17906,15 +17920,15 @@ function Fp() {
 		}, _ = () => {
 			u && (l && window.clearTimeout(l), l = window.setTimeout(h, 1e3));
 		}, v = (e) => {
-			e.button === 0 && (Pp(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
+			e.button === 0 && (Fp(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
 				o = 0, s = !0, g(), window.parent.postMessage({ type: "plugin:request-edit-mode" }, "*");
-			}, jp)));
+			}, Mp)));
 		}, y = (e) => {
 			if (d(e.pointerType)) {
-				let t = !Pp(n, e.target);
+				let t = !Fp(n, e.target);
 				t !== c && (c = t, f(t ? "hover-enter" : "hover-leave", e.pointerType));
 			}
-			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= Mp || (p(), !s && (r = null, f("cancel", e.pointerType))));
+			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= Np || (p(), !s && (r = null, f("cancel", e.pointerType))));
 		}, b = (e) => {
 			r !== null && e.pointerId === r && (r = null, p(), f("up", e.pointerType), s && _());
 		}, x = (e) => {
@@ -17927,10 +17941,10 @@ function Fp() {
 		};
 	}, []), { ref: t };
 }
-typeof window < "u" && Op() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && kp() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function Ip(t, n) {
+function Lp(t, n) {
 	let r = (0, M.useRef)(n);
 	r.current = n;
 	let i = (0, M.useRef)(t);
@@ -17951,20 +17965,20 @@ function Ip(t, n) {
 }
 //#endregion
 //#region public/plugins/_shared/motion.js
-var Lp = "(prefers-reduced-motion: reduce)", Rp = "8px", zp = "4px", Bp = "48px";
-function Vp() {
-	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(Lp);
-}
+var Rp = "(prefers-reduced-motion: reduce)", zp = "8px", Bp = "4px", Vp = "48px";
 function Hp() {
-	let [e, t] = (0, M.useState)(() => !!Vp()?.matches);
+	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(Rp);
+}
+function Up() {
+	let [e, t] = (0, M.useState)(() => !!Hp()?.matches);
 	return (0, M.useEffect)(() => {
-		let e = Vp();
+		let e = Hp();
 		if (!e) return;
 		let n = () => t(e.matches);
 		return n(), typeof e.addEventListener == "function" ? (e.addEventListener("change", n), () => e.removeEventListener("change", n)) : (e.addListener(n), () => e.removeListener(n));
 	}, []), e;
 }
-function Up(e, t) {
+function Wp(e, t) {
 	switch (e) {
 		case "down": return `0px -${t}`;
 		case "left": return `${t} 0px`;
@@ -17972,12 +17986,12 @@ function Up(e, t) {
 		default: return `0px ${t}`;
 	}
 }
-function Wp(e, t = U.durationFaster, n = U.curveAccelerateMin) {
+function Gp(e, t = U.durationFaster, n = U.curveAccelerateMin) {
 	return ({ direction: r = "up" }) => ({
 		enter: {
 			keyframes: [{
 				opacity: 0,
-				translate: Up(r, e)
+				translate: Wp(r, e)
 			}, {
 				opacity: 1,
 				translate: "0px 0px"
@@ -18010,8 +18024,8 @@ function Wp(e, t = U.durationFaster, n = U.curveAccelerateMin) {
 		}
 	});
 }
-ec(Wp(Rp));
-var Gp = ec(Wp(zp, U.durationFast, U.curveAccelerateMid)), Kp = ec(({ element: e }) => {
+ec(Gp(zp));
+var Kp = ec(Gp(Bp, U.durationFast, U.curveAccelerateMid)), qp = ec(({ element: e }) => {
 	let t = `${e.scrollHeight}px`;
 	return {
 		enter: {
@@ -18063,7 +18077,7 @@ var Gp = ec(Wp(zp, U.durationFast, U.curveAccelerateMid)), Kp = ec(({ element: e
 		}
 	};
 });
-function qp({ value: e, direction: t = "up", children: n, className: r, style: i }) {
+function Jp({ value: e, direction: t = "up", children: n, className: r, style: i }) {
 	let a = e == null ? "default" : String(e);
 	return (0, M.createElement)("div", {
 		className: r,
@@ -18073,7 +18087,7 @@ function qp({ value: e, direction: t = "up", children: n, className: r, style: i
 			...i
 		},
 		"data-cross-fade": a
-	}, (0, M.createElement)(oc, null, (0, M.createElement)(Gp, {
+	}, (0, M.createElement)(oc, null, (0, M.createElement)(Kp, {
 		key: a,
 		direction: t
 	}, (0, M.createElement)("div", { style: {
@@ -18081,8 +18095,8 @@ function qp({ value: e, direction: t = "up", children: n, className: r, style: i
 		minWidth: 0
 	} }, n))));
 }
-var Jp = ec(({ direction: e = "forward" }) => {
-	let t = e === "back", n = t ? `-${Bp} 0px` : `${Bp} 0px`, r = t ? `${Bp} 0px` : `-${Bp} 0px`;
+var Yp = ec(({ direction: e = "forward" }) => {
+	let t = e === "back", n = t ? `-${Vp} 0px` : `${Vp} 0px`, r = t ? `${Vp} 0px` : `-${Vp} 0px`;
 	return {
 		enter: {
 			keyframes: [{
@@ -18119,7 +18133,7 @@ var Jp = ec(({ direction: e = "forward" }) => {
 			}
 		}
 	};
-}), Yp = {
+}), Xp = {
 	press: ["durationUltraFast", "curveAccelerateMin"],
 	hoverEnter: ["durationFaster", "curveDecelerateMin"],
 	hoverLeave: ["durationFaster", "curveAccelerateMin"],
@@ -18129,23 +18143,23 @@ var Jp = ec(({ direction: e = "forward" }) => {
 	slow: ["durationSlow", "curveDecelerateMid"],
 	longPress: ["durationUltraSlow", "curveLinear"]
 };
-function Xp(e = "normal") {
-	let [t, n] = Yp[e] ?? Yp.normal;
+function Zp(e = "normal") {
+	let [t, n] = Xp[e] ?? Xp.normal;
 	return {
 		transitionDuration: `${U[t]}ms`,
 		transitionTimingFunction: U[n]
 	};
 }
-function Zp(e = "normal") {
-	let t = Hp();
+function Qp(e = "normal") {
+	let t = Up();
 	return (0, M.useMemo)(() => t ? {
 		transitionDuration: `${U.durationFaster}ms`,
 		transitionTimingFunction: U.curveDecelerateMin
-	} : Xp(e), [e, t]);
+	} : Zp(e), [e, t]);
 }
 //#endregion
 //#region public/plugins/_shared/typography.js
-var Qp = {
+var $p = {
 	48: {
 		fontSize: "48px",
 		lineHeight: "56px"
@@ -18163,15 +18177,15 @@ var Qp = {
 		lineHeight: "124px"
 	}
 };
-function $p(e) {
-	let t = Qp[e];
+function em(e) {
+	let t = $p[e];
 	if (!t) throw Error(`Display XL 只定义了 48/80/96/112，收到 ${String(e)}`);
 	return t;
 }
-var em = { fontVariantNumeric: "tabular-nums" }, tm = 40, nm = 44, rm = 56, im = 48, am = 40, om = 56, sm = {
-	minWidth: tm,
-	minHeight: tm
-}, cm = [
+var tm = { fontVariantNumeric: "tabular-nums" }, nm = 40, rm = 44, im = 56, am = 48, om = 40, sm = 56, cm = {
+	minWidth: nm,
+	minHeight: nm
+}, lm = [
 	"button",
 	"input",
 	"textarea",
@@ -18185,12 +18199,12 @@ var em = { fontVariantNumeric: "tabular-nums" }, tm = 40, nm = 44, rm = 56, im =
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function lm(e, t) {
+function um(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(cm);
+	let n = t.closest(lm);
 	return !!(n && n !== e && e.contains(n));
 }
-var um = Jn({ root: {
+var dm = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -18203,11 +18217,11 @@ var um = Jn({ root: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function dm({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = um(), s = Fp(), c = (0, M.useCallback)((t) => {
-		lm(t.currentTarget, t.target) || e?.(t);
+function fm({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = dm(), s = Ip(), c = (0, M.useCallback)((t) => {
+		um(t.currentTarget, t.target) || e?.(t);
 	}, [e]), l = (0, M.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (lm(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (um(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		...a,
@@ -18258,19 +18272,19 @@ Jn({
 		minWidth: 0
 	},
 	value: {
-		...em,
+		...tm,
 		fontWeight: "600",
 		color: V.colorNeutralForeground1,
 		whiteSpace: "nowrap"
 	},
-	size48: $p(48),
+	size48: em(48),
 	size68: {
 		fontSize: V.fontSizeHero1000,
 		lineHeight: V.lineHeightHero1000
 	},
-	size80: $p(80),
-	size96: $p(96),
-	size112: $p(112),
+	size80: em(80),
+	size96: em(96),
+	size112: em(112),
 	unit: { color: V.colorNeutralForeground2 },
 	meta: {
 		display: "flex",
@@ -18281,13 +18295,13 @@ Jn({
 	label: { color: V.colorNeutralForeground2 },
 	caption: { color: V.colorNeutralForeground3 }
 });
-var fm = Jn({
+var pm = Jn({
 	row: {
 		display: "flex",
 		alignItems: "center",
 		gap: V.spacingHorizontalS,
 		width: "100%",
-		minHeight: `${nm}px`,
+		minHeight: `${rm}px`,
 		boxSizing: "border-box",
 		paddingInline: 0,
 		border: "none",
@@ -18331,8 +18345,8 @@ var fm = Jn({
 		gap: V.spacingHorizontalXS
 	}
 });
-function pm({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = fm(), d = (e) => {
+function mm({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = pm(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -18375,7 +18389,7 @@ function pm({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var mm = Jn({
+var hm = Jn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -18396,8 +18410,8 @@ var mm = Jn({
 	},
 	action: { marginTop: V.spacingVerticalS }
 });
-function hm({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
-	let o = mm();
+function gm({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
+	let o = hm();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(o.root, i),
 		style: a,
@@ -18425,11 +18439,11 @@ function hm({ icon: e, title: t, description: n, action: r, className: i, style:
 		]
 	});
 }
-var gm = Jn({ button: {
-	minWidth: `${tm}px`,
-	minHeight: `${tm}px`
-} }), _m = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = gm();
+var _m = Jn({ button: {
+	minWidth: `${nm}px`,
+	minHeight: `${nm}px`
+} }), vm = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = _m();
 	return /* @__PURE__ */ (0, N.jsx)(zd, {
 		...i,
 		ref: a,
@@ -18440,7 +18454,7 @@ var gm = Jn({ button: {
 		style: n,
 		children: r
 	});
-}), vm = _m, ym = Jn({ root: {
+}), ym = vm, bm = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -18454,8 +18468,8 @@ var gm = Jn({ button: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function bm({ children: e, className: t, style: n }) {
-	let r = ym();
+function xm({ children: e, className: t, style: n }) {
+	let r = bm();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.root, t),
 		style: n,
@@ -18463,14 +18477,14 @@ function bm({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var xm = Jn({
+var Sm = Jn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: V.spacingHorizontalM,
-		minHeight: `${rm}px`,
+		minHeight: `${im}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -18488,8 +18502,8 @@ var xm = Jn({
 		gap: V.spacingHorizontalS
 	}
 });
-function Sm({ children: e, trailing: t, className: n, style: r }) {
-	let i = xm();
+function Cm({ children: e, trailing: t, className: n, style: r }) {
+	let i = Sm();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(i.header, n),
 		style: r,
@@ -18503,17 +18517,17 @@ function Sm({ children: e, trailing: t, className: n, style: r }) {
 		}) : null]
 	});
 }
-var Cm = Jn({ toolbar: {
+var wm = Jn({ toolbar: {
 	display: "flex",
 	flexShrink: 0,
 	alignItems: "center",
 	gap: V.spacingHorizontalS,
-	minHeight: `${im}px`,
+	minHeight: `${am}px`,
 	paddingInline: V.spacingHorizontalXXL,
 	boxSizing: "border-box"
 } });
-function wm({ children: e, className: t, style: n }) {
-	let r = Cm();
+function Tm({ children: e, className: t, style: n }) {
+	let r = wm();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.toolbar, t),
 		style: n,
@@ -18524,20 +18538,20 @@ function wm({ children: e, className: t, style: n }) {
 Jn({
 	tabs: {
 		flexShrink: 0,
-		height: `${am}px`,
-		minHeight: `${am}px`,
+		height: `${om}px`,
+		minHeight: `${om}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${am}px`,
-		minHeight: `${am}px`,
+		height: `${om}px`,
+		minHeight: `${om}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: V.spacingHorizontalXS }
 });
-var Tm = Jn({
+var Em = Jn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -18568,7 +18582,7 @@ var Tm = Jn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function Em(e) {
+function Dm(e) {
 	let [t, n] = (0, M.useState)(!1);
 	return (0, M.useEffect)(() => {
 		let t = e.current;
@@ -18592,8 +18606,8 @@ function Em(e) {
 		};
 	}, [e]), t;
 }
-function Dm({ children: e, className: t, style: n }) {
-	let r = Tm(), i = (0, M.useRef)(null), a = Em(i);
+function Om({ children: e, className: t, style: n }) {
+	let r = Em(), i = (0, M.useRef)(null), a = Dm(i);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -18610,11 +18624,11 @@ function Dm({ children: e, className: t, style: n }) {
 		})]
 	});
 }
-var Om = (0, M.createContext)(null);
-function km() {
-	return (0, M.useContext)(Om);
+var km = (0, M.createContext)(null);
+function Am() {
+	return (0, M.useContext)(km);
 }
-var Am = Jn({
+var jm = Jn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -18634,7 +18648,7 @@ var Am = Jn({
 		flexShrink: 0,
 		alignItems: "center",
 		gap: V.spacingHorizontalS,
-		minHeight: `${om}px`,
+		minHeight: `${sm}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -18689,17 +18703,17 @@ var Am = Jn({
 		boxSizing: "border-box"
 	}
 });
-function jm({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = Am(), l = (0, M.useRef)(null), u = Em(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
+function Mm({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = jm(), l = (0, M.useRef)(null), u = Dm(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
 		_.current || (_.current = !0, m("back"), f(!1));
 	}, []), y = (0, M.useCallback)((e, t) => {
 		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
 	if (!h) return null;
 	let b = typeof n == "function" ? n(v) : n;
-	return /* @__PURE__ */ (0, N.jsx)(Om.Provider, {
+	return /* @__PURE__ */ (0, N.jsx)(km.Provider, {
 		value: v,
-		children: /* @__PURE__ */ (0, N.jsx)(Jp, {
+		children: /* @__PURE__ */ (0, N.jsx)(Yp, {
 			visible: d,
 			appear: !0,
 			direction: p,
@@ -18721,7 +18735,7 @@ function jm({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								"aria-label": a,
 								title: a,
 								onClick: v,
-								style: sm
+								style: cm
 							}),
 							/* @__PURE__ */ (0, N.jsx)(Z, {
 								size: 400,
@@ -18759,7 +18773,7 @@ function jm({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 		})
 	});
 }
-function Mm(e = 1e3) {
+function Nm(e = 1e3) {
 	let [t, n] = (0, M.useState)(() => Date.now()), [r, i] = (0, M.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, M.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -18774,26 +18788,26 @@ function Mm(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/sizes.js
-var Nm = {
+var Pm = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function Pm(e) {
+function Fm(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return Nm[t] ? t : "2x1";
+	return Pm[t] ? t : "2x1";
 }
-function Fm() {
+function Im() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return Nm[n] ? n : null;
+	return Pm[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/pomodoro/src/data/audio.js
-var Im = .3, Lm = .25, Rm = [
+var Lm = .3, Rm = .25, zm = [
 	{
 		id: "none",
 		label: "无"
@@ -18810,28 +18824,28 @@ var Im = .3, Lm = .25, Rm = [
 		id: "fan",
 		label: "风扇"
 	}
-], zm = {
+], Bm = {
 	ctx: null,
 	gain: null,
 	nodes: [],
 	kind: "none"
 };
-function Bm() {
+function Vm() {
 	try {
-		if (!zm.ctx) {
+		if (!Bm.ctx) {
 			let e = window.AudioContext || window.webkitAudioContext;
 			if (!e) return null;
-			zm.ctx = new e();
+			Bm.ctx = new e();
 		}
-		return zm.ctx.state === "suspended" && zm.ctx.resume().catch(() => {}), zm.ctx;
+		return Bm.ctx.state === "suspended" && Bm.ctx.resume().catch(() => {}), Bm.ctx;
 	} catch {
 		return null;
 	}
 }
-function Vm() {
-	Bm();
+function Hm() {
+	Vm();
 }
-function Hm(e, t) {
+function Um(e, t) {
 	let n = Math.floor(e.sampleRate * 2), r = e.createBuffer(1, n, e.sampleRate), i = r.getChannelData(0), a = 0;
 	for (let e = 0; e < n; e += 1) {
 		let n = Math.random() * 2 - 1;
@@ -18839,27 +18853,27 @@ function Hm(e, t) {
 	}
 	return r;
 }
-function Um(e = !1) {
-	if (!zm.gain || !zm.ctx) return;
-	let t = zm.ctx, n = zm.gain, r = zm.nodes, i = e ? .02 : Lm;
+function Wm(e = !1) {
+	if (!Bm.gain || !Bm.ctx) return;
+	let t = Bm.ctx, n = Bm.gain, r = Bm.nodes, i = e ? .02 : Rm;
 	try {
 		let e = t.currentTime;
 		n.gain.cancelScheduledValues(e), n.gain.setValueAtTime(Math.max(n.gain.value, 1e-4), e), n.gain.linearRampToValueAtTime(1e-4, e + i);
 	} catch {}
-	zm.gain = null, zm.nodes = [], zm.kind = "none", window.setTimeout(() => {
+	Bm.gain = null, Bm.nodes = [], Bm.kind = "none", window.setTimeout(() => {
 		for (let e of r) try {
 			e.stop?.(), e.disconnect?.();
 		} catch {}
 	}, e ? 60 : 330);
 }
-function Wm(e, t) {
+function Gm(e, t) {
 	if (e === "none") return;
-	let n = Bm();
+	let n = Vm();
 	if (n) {
-		Um(!0);
+		Wm(!0);
 		try {
 			let r = n.createBufferSource();
-			r.buffer = Hm(n, e), r.loop = !0;
+			r.buffer = Um(n, e), r.loop = !0;
 			let i = n.createGain();
 			i.gain.value = 1e-4;
 			let a = r;
@@ -18877,23 +18891,23 @@ function Wm(e, t) {
 			}
 			a.connect(i), i.connect(n.destination);
 			let o = n.currentTime;
-			i.gain.setValueAtTime(1e-4, o), i.gain.linearRampToValueAtTime(t / 100 * .25, o + Im), r.start(), zm.nodes = [r], zm.gain = i, zm.kind = e;
+			i.gain.setValueAtTime(1e-4, o), i.gain.linearRampToValueAtTime(t / 100 * .25, o + Lm), r.start(), Bm.nodes = [r], Bm.gain = i, Bm.kind = e;
 		} catch {
-			Um(!0);
+			Wm(!0);
 		}
 	}
 }
-function Gm() {
-	Um(!1);
+function Km() {
+	Wm(!1);
 }
-function Km(e) {
-	if (zm.gain && zm.ctx) try {
-		let t = zm.ctx.currentTime;
-		zm.gain.gain.cancelScheduledValues(t), zm.gain.gain.setTargetAtTime(e / 100 * .25, t, .12);
+function qm(e) {
+	if (Bm.gain && Bm.ctx) try {
+		let t = Bm.ctx.currentTime;
+		Bm.gain.gain.cancelScheduledValues(t), Bm.gain.gain.setTargetAtTime(e / 100 * .25, t, .12);
 	} catch {}
 }
-function qm() {
-	let e = Bm();
+function Jm() {
+	let e = Vm();
 	if (e) try {
 		let t = e.currentTime;
 		for (let n of [{
@@ -18912,11 +18926,11 @@ function qm() {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/data/timer.js
-var Jm = "settings", Ym = "pomodoro.sessions", Xm = "pomodoro.runtime", Zm = "pomodoro.command", Qm = "pomodoro:command", $m = 250, eh = 5e3, th = {
+var Ym = "settings", Xm = "pomodoro.sessions", Zm = "pomodoro.runtime", Qm = "pomodoro.command", $m = "pomodoro:command", eh = 250, th = 5e3, nh = {
 	focus: 180,
 	break: 60,
 	rounds: 12
-}, nh = {
+}, rh = {
 	focus: {
 		label: "专注",
 		minutesKey: "focusMin"
@@ -18929,7 +18943,7 @@ var Jm = "settings", Ym = "pomodoro.sessions", Xm = "pomodoro.runtime", Zm = "po
 		label: "长休",
 		minutesKey: "longBreakMin"
 	}
-}, rh = {
+}, ih = {
 	focusMin: 25,
 	shortBreakMin: 5,
 	longBreakMin: 15,
@@ -18939,8 +18953,8 @@ var Jm = "settings", Ym = "pomodoro.sessions", Xm = "pomodoro.runtime", Zm = "po
 	keepAwake: !0,
 	whiteNoise: "none",
 	whiteNoiseVolume: 40
-}, ih = new Map(Rm.map((e) => [e.id, e])), ah = (e) => String(e).padStart(2, "0");
-function oh(e, t) {
+}, ah = new Map(zm.map((e) => [e.id, e])), oh = (e) => String(e).padStart(2, "0");
+function sh(e, t) {
 	try {
 		let n = localStorage.getItem(e);
 		return n == null ? t : JSON.parse(n);
@@ -18948,52 +18962,52 @@ function oh(e, t) {
 		return t;
 	}
 }
-function sh(e, t) {
+function ch(e, t) {
 	try {
 		localStorage.setItem(e, JSON.stringify(t));
 	} catch {}
 }
-function ch(e, t, n, r) {
+function lh(e, t, n, r) {
 	let i = Number(e);
 	return Number.isFinite(i) ? Math.min(n, Math.max(t, Math.round(i))) : r;
 }
-function lh(e) {
+function uh(e) {
 	if (typeof e != "string") return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function uh(e) {
-	let t = lh(e);
+function dh(e) {
+	let t = uh(e);
 	return t ? t.toISOString() : null;
 }
-function dh(e) {
+function fh(e) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
 }
-function fh(e) {
-	return `${e.getFullYear()}-${ah(e.getMonth() + 1)}-${ah(e.getDate())}`;
-}
 function ph(e) {
-	let t = Math.max(0, Math.ceil(e / 1e3)), n = Math.floor(t / 3600), r = Math.floor(t % 3600 / 60), i = t % 60;
-	return n > 0 ? `${n}:${ah(r)}:${ah(i)}` : `${ah(r)}:${ah(i)}`;
+	return `${e.getFullYear()}-${oh(e.getMonth() + 1)}-${oh(e.getDate())}`;
 }
 function mh(e) {
+	let t = Math.max(0, Math.ceil(e / 1e3)), n = Math.floor(t / 3600), r = Math.floor(t % 3600 / 60), i = t % 60;
+	return n > 0 ? `${n}:${oh(r)}:${oh(i)}` : `${oh(r)}:${oh(i)}`;
+}
+function hh(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {
-		...rh,
+		...ih,
 		...t
 	};
-	return t.roundsBeforeLongBreak === void 0 && t.longBreakEvery !== void 0 && (n.roundsBeforeLongBreak = t.longBreakEvery), t.autoStartNext === void 0 && (t.autoStartFocus === void 0 ? t.autoStartBreak !== void 0 && (n.autoStartNext = t.autoStartBreak) : n.autoStartNext = t.autoStartFocus), t.sound === void 0 && t.notify !== void 0 && (n.sound = t.notify), n.focusMin = ch(n.focusMin, 1, th.focus, rh.focusMin), n.shortBreakMin = ch(n.shortBreakMin, 1, th.break, rh.shortBreakMin), n.longBreakMin = ch(n.longBreakMin, 1, th.break, rh.longBreakMin), n.roundsBeforeLongBreak = ch(n.roundsBeforeLongBreak, 1, th.rounds, rh.roundsBeforeLongBreak), n.whiteNoiseVolume = ch(n.whiteNoiseVolume, 0, 100, rh.whiteNoiseVolume), n.autoStartNext = !!n.autoStartNext, n.sound = !!n.sound, n.keepAwake = !!n.keepAwake, ih.has(n.whiteNoise) || (n.whiteNoise = rh.whiteNoise), n;
+	return t.roundsBeforeLongBreak === void 0 && t.longBreakEvery !== void 0 && (n.roundsBeforeLongBreak = t.longBreakEvery), t.autoStartNext === void 0 && (t.autoStartFocus === void 0 ? t.autoStartBreak !== void 0 && (n.autoStartNext = t.autoStartBreak) : n.autoStartNext = t.autoStartFocus), t.sound === void 0 && t.notify !== void 0 && (n.sound = t.notify), n.focusMin = lh(n.focusMin, 1, nh.focus, ih.focusMin), n.shortBreakMin = lh(n.shortBreakMin, 1, nh.break, ih.shortBreakMin), n.longBreakMin = lh(n.longBreakMin, 1, nh.break, ih.longBreakMin), n.roundsBeforeLongBreak = lh(n.roundsBeforeLongBreak, 1, nh.rounds, ih.roundsBeforeLongBreak), n.whiteNoiseVolume = lh(n.whiteNoiseVolume, 0, 100, ih.whiteNoiseVolume), n.autoStartNext = !!n.autoStartNext, n.sound = !!n.sound, n.keepAwake = !!n.keepAwake, ah.has(n.whiteNoise) || (n.whiteNoise = ih.whiteNoise), n;
 }
-function hh(e, t) {
-	return e[nh[t].minutesKey];
+function gh(e, t) {
+	return e[rh[t].minutesKey];
 }
-function gh(e) {
+function _h(e) {
 	if (!Array.isArray(e)) return [];
 	let t = [];
 	for (let n of e) {
-		if (!n || typeof n != "object" || !nh[n.phase]) continue;
-		let e = uh(n.startedAt), r = Number(n.durationMin);
+		if (!n || typeof n != "object" || !rh[n.phase]) continue;
+		let e = dh(n.startedAt), r = Number(n.durationMin);
 		if (!e || !Number.isFinite(r) || r <= 0) continue;
-		let i = uh(n.endedAt);
+		let i = dh(n.endedAt);
 		t.push({
 			id: typeof n.id == "string" && n.id ? n.id : `ps-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 			startedAt: e,
@@ -19008,22 +19022,22 @@ function gh(e) {
 	}
 	return t;
 }
-function _h() {
-	return gh(oh(Ym, []));
+function vh() {
+	return _h(sh(Xm, []));
 }
-function vh(e, t) {
+function yh(e, t) {
 	return !e || typeof e != "object" ? null : {
 		id: typeof e.id == "string" && e.id ? e.id : `ps-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-		startedAt: uh(e.startedAt) ?? (/* @__PURE__ */ new Date()).toISOString(),
-		phase: nh[e.phase] ? e.phase : t,
+		startedAt: dh(e.startedAt) ?? (/* @__PURE__ */ new Date()).toISOString(),
+		phase: rh[e.phase] ? e.phase : t,
 		durationMin: Math.max(1, Math.round(Number(e.durationMin) || 1)),
 		actualMs: Math.max(0, Number(e.actualMs) || 0),
 		taskId: typeof e.taskId == "string" && e.taskId ? e.taskId : null,
 		taskTitle: typeof e.taskTitle == "string" && e.taskTitle ? e.taskTitle : null
 	};
 }
-function yh(e) {
-	let t = hh(e, "focus") * 6e4;
+function bh(e) {
+	let t = gh(e, "focus") * 6e4;
 	return {
 		phase: "focus",
 		running: !1,
@@ -19039,10 +19053,10 @@ function yh(e) {
 		roundsBeforeLongBreak: e.roundsBeforeLongBreak
 	};
 }
-function bh(e = rh) {
-	let t = oh(Xm, null);
-	if (!t || typeof t != "object" || !nh[t.phase]) return yh(e);
-	let n = t.phase, r = Number(t.totalMs) > 0 ? Number(t.totalMs) : hh(e, n) * 6e4, i = vh(t.session, n), a = !!t.running && !!t.endsAt && !!i, o = Number(t.remainingMs), s = Number.isFinite(o) ? Math.max(0, o) : r;
+function xh(e = ih) {
+	let t = sh(Zm, null);
+	if (!t || typeof t != "object" || !rh[t.phase]) return bh(e);
+	let n = t.phase, r = Number(t.totalMs) > 0 ? Number(t.totalMs) : gh(e, n) * 6e4, i = yh(t.session, n), a = !!t.running && !!t.endsAt && !!i, o = Number(t.remainingMs), s = Number.isFinite(o) ? Math.max(0, o) : r;
 	return a && (s = Math.max(0, Number(t.endsAt) - Date.now())), {
 		phase: n,
 		running: a,
@@ -19058,31 +19072,31 @@ function bh(e = rh) {
 		roundsBeforeLongBreak: Number.isFinite(Number(t.roundsBeforeLongBreak)) && Number(t.roundsBeforeLongBreak) > 0 ? Math.round(Number(t.roundsBeforeLongBreak)) : e.roundsBeforeLongBreak
 	};
 }
-function xh(e, t) {
+function Sh(e, t) {
 	return e.running && e.endsAt > 0 ? Math.max(0, e.endsAt - t) : Math.max(0, e.remainingMs);
 }
-function Sh(e, t) {
+function Ch(e, t) {
 	let n = e.roundsBeforeLongBreak ?? t.roundsBeforeLongBreak;
 	return e.phase === "longBreak" ? n : e.phase === "shortBreak" ? Math.min(n, Math.max(1, e.focusRound)) : Math.min(n, e.focusRound + 1);
 }
-function Ch(e) {
-	let t = dh(e), n = (t.getDay() + 6) % 7;
+function wh(e) {
+	let t = fh(e), n = (t.getDay() + 6) % 7;
 	return t.setDate(t.getDate() - n), t;
 }
-function wh(e) {
+function Th(e) {
 	return new Date(e.getFullYear(), e.getMonth(), 1);
 }
-function Th(e, t = /* @__PURE__ */ new Date()) {
-	return e === "week" ? [Ch(t), t] : e === "month" ? [wh(t), t] : [dh(t), t];
+function Eh(e, t = /* @__PURE__ */ new Date()) {
+	return e === "week" ? [wh(t), t] : e === "month" ? [Th(t), t] : [fh(t), t];
 }
-function Eh(e, t, n) {
+function Dh(e, t, n) {
 	let r = {}, i = 0, a = 0;
 	for (let o of e) {
 		if (o.phase !== "focus") continue;
-		let e = lh(o.endedAt);
+		let e = uh(o.endedAt);
 		if (!e || e < t || e > n || (a += Number(o.actualMin) || 0, !o.completed)) continue;
 		i += 1;
-		let s = fh(e);
+		let s = ph(e);
 		r[s] = (r[s] || 0) + 1;
 	}
 	return {
@@ -19091,39 +19105,39 @@ function Eh(e, t, n) {
 		byDay: r
 	};
 }
-function Dh(e, t = "today", n = /* @__PURE__ */ new Date()) {
-	let [r, i] = Th(t, n), { completed: a, focusMinutes: o } = Eh(e, r, i);
+function Oh(e, t = "today", n = /* @__PURE__ */ new Date()) {
+	let [r, i] = Eh(t, n), { completed: a, focusMinutes: o } = Dh(e, r, i);
 	return {
 		range: t,
 		completed: a,
 		focusMinutes: o
 	};
 }
-function Oh(e, t = /* @__PURE__ */ new Date()) {
+function kh(e, t = /* @__PURE__ */ new Date()) {
 	let n = new Set(e.filter((e) => e.phase === "focus" && e.completed && e.endedAt).map((e) => {
-		let t = lh(e.endedAt);
-		return t ? fh(t) : null;
-	}).filter(Boolean)), r = dh(t);
-	n.has(fh(r)) || r.setDate(r.getDate() - 1);
+		let t = uh(e.endedAt);
+		return t ? ph(t) : null;
+	}).filter(Boolean)), r = fh(t);
+	n.has(ph(r)) || r.setDate(r.getDate() - 1);
 	let i = 0;
-	for (; n.has(fh(r));) i += 1, r.setDate(r.getDate() - 1);
+	for (; n.has(ph(r));) i += 1, r.setDate(r.getDate() - 1);
 	return i;
 }
-function kh(e = rh, t = Date.now()) {
-	let n = bh(e), r = xh(n, t), i = Dh(_h(), "today", new Date(t));
+function Ah(e = ih, t = Date.now()) {
+	let n = xh(e), r = Sh(n, t), i = Oh(vh(), "today", new Date(t));
 	return {
 		phase: n.phase,
-		phaseLabel: nh[n.phase].label,
+		phaseLabel: rh[n.phase].label,
 		running: n.running,
 		remainingMs: r,
-		remainingText: ph(r),
+		remainingText: mh(r),
 		totalMs: n.totalMs,
 		progress: n.totalMs > 0 ? 1 - Math.min(1, r / Math.max(1, n.totalMs)) : 0,
 		taskId: n.taskId,
 		taskTitle: n.taskTitle,
 		focusRound: n.focusRound,
 		roundsBeforeLongBreak: n.roundsBeforeLongBreak,
-		roundInCycle: Sh(n, e),
+		roundInCycle: Ch(n, e),
 		whiteNoise: e.whiteNoise,
 		whiteNoiseVolume: e.whiteNoiseVolume,
 		sound: e.sound,
@@ -19131,20 +19145,20 @@ function kh(e = rh, t = Date.now()) {
 		today: i
 	};
 }
-function Ah(e, t = {}) {
+function jh(e, t = {}) {
 	let n = {
 		id: `pc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
 		type: e,
 		args: t && typeof t == "object" ? t : {},
 		at: (/* @__PURE__ */ new Date()).toISOString()
 	};
-	sh(Zm, n);
+	ch(Qm, n);
 	try {
-		window.dispatchEvent(new CustomEvent(Qm, { detail: n }));
+		window.dispatchEvent(new CustomEvent($m, { detail: n }));
 	} catch {}
 	return n;
 }
-function jh(e, t, n, r) {
+function Mh(e, t, n, r) {
 	return {
 		id: `ps-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 		startedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -19155,38 +19169,38 @@ function jh(e, t, n, r) {
 		taskTitle: r ?? null
 	};
 }
-var Mh = class {
+var Nh = class {
 	constructor() {
-		this.listeners = /* @__PURE__ */ new Set(), this.snapshot = null, this.ticker = 0, this.started = !1, this.lastPersistAt = 0, this.lastKeepAwake = null, this.ticking = !1, this.commandDisposer = null, this.settings = mh(null), this.sessions = _h(), this.lastCommandId = null, this.runtime = this.#s(), this.#p();
+		this.listeners = /* @__PURE__ */ new Set(), this.snapshot = null, this.ticker = 0, this.started = !1, this.lastPersistAt = 0, this.lastKeepAwake = null, this.ticking = !1, this.commandDisposer = null, this.settings = hh(null), this.sessions = vh(), this.lastCommandId = null, this.runtime = this.#s(), this.#p();
 	}
 	subscribe = (e) => (this.listeners.add(e), () => this.listeners.delete(e));
 	getSnapshot = () => this.snapshot;
 	startEngine() {
-		this.started || (this.started = !0, this.commandDisposer = this.#d(), this.ticker = window.setInterval(() => this.#e(), $m), this.#f(oh(Zm, null)), this.#m());
+		this.started || (this.started = !0, this.commandDisposer = this.#d(), this.ticker = window.setInterval(() => this.#e(), eh), this.#f(sh(Qm, null)), this.#m());
 	}
 	stopEngine() {
 		this.started = !1, window.clearInterval(this.ticker), this.ticker = 0, this.commandDisposer?.(), this.commandDisposer = null, this.#l(!1);
 	}
 	setSettings(e) {
-		let t = mh(e), n = this.settings;
+		let t = hh(e), n = this.settings;
 		this.settings = t;
 		let r = this.runtime;
-		!r.running && !r.session && (r.totalMs = hh(t, r.phase) * 6e4, r.remainingMs = r.totalMs), r.roundsBeforeLongBreak = t.roundsBeforeLongBreak, r.running && (n.whiteNoise === t.whiteNoise ? n.whiteNoiseVolume !== t.whiteNoiseVolume && Km(t.whiteNoiseVolume) : t.whiteNoise === "none" ? Gm() : Wm(t.whiteNoise, t.whiteNoiseVolume)), this.#l(), this.#c(), this.#m();
+		!r.running && !r.session && (r.totalMs = gh(t, r.phase) * 6e4, r.remainingMs = r.totalMs), r.roundsBeforeLongBreak = t.roundsBeforeLongBreak, r.running && (n.whiteNoise === t.whiteNoise ? n.whiteNoiseVolume !== t.whiteNoiseVolume && qm(t.whiteNoiseVolume) : t.whiteNoise === "none" ? Km() : Gm(t.whiteNoise, t.whiteNoiseVolume)), this.#l(), this.#c(), this.#m();
 	}
 	remainingMs() {
-		return xh(this.runtime, Date.now());
+		return Sh(this.runtime, Date.now());
 	}
 	status() {
-		let e = this.runtime, t = Dh(this.sessions, "today");
+		let e = this.runtime, t = Oh(this.sessions, "today");
 		return {
 			phase: e.phase,
-			phaseLabel: nh[e.phase].label,
+			phaseLabel: rh[e.phase].label,
 			running: e.running,
 			remainingSec: Math.ceil(this.remainingMs() / 1e3),
 			totalSec: Math.round(e.totalMs / 1e3),
 			roundsDone: e.focusRound,
 			roundsBeforeLongBreak: e.roundsBeforeLongBreak ?? this.settings.roundsBeforeLongBreak,
-			roundInCycle: Sh(e, this.settings),
+			roundInCycle: Ch(e, this.settings),
 			taskId: e.taskId ?? null,
 			taskTitle: e.taskTitle ?? null,
 			whiteNoise: this.settings.whiteNoise,
@@ -19194,51 +19208,51 @@ var Mh = class {
 			startedAt: e.session?.startedAt ?? null,
 			endsAt: e.running && e.endsAt > 0 ? new Date(e.endsAt).toISOString() : null,
 			today: {
-				date: fh(/* @__PURE__ */ new Date()),
+				date: ph(/* @__PURE__ */ new Date()),
 				completed: t.completed,
 				focusMinutes: t.focusMinutes
 			}
 		};
 	}
 	stats(e = {}) {
-		let t = e && typeof e == "object" ? e : {}, n = t.range === "week" || t.range === "month" ? t.range : "today", r = lh(t.from), i = lh(t.to), a, o;
-		r && i && r <= i ? (a = r, o = i) : [a, o] = Th(n, /* @__PURE__ */ new Date());
-		let s = Eh(this.sessions, a, o);
+		let t = e && typeof e == "object" ? e : {}, n = t.range === "week" || t.range === "month" ? t.range : "today", r = uh(t.from), i = uh(t.to), a, o;
+		r && i && r <= i ? (a = r, o = i) : [a, o] = Eh(n, /* @__PURE__ */ new Date());
+		let s = Dh(this.sessions, a, o);
 		return {
 			range: n,
 			from: a.toISOString(),
 			to: o.toISOString(),
 			completed: s.completed,
 			focusMinutes: s.focusMinutes,
-			streakDays: Oh(this.sessions),
+			streakDays: kh(this.sessions),
 			byDay: s.byDay
 		};
 	}
 	toggle() {
-		Vm(), this.runtime.running ? this.pause() : this.remainingMs() <= 0 ? this.#a() : this.#t();
+		Hm(), this.runtime.running ? this.pause() : this.remainingMs() <= 0 ? this.#a() : this.#t();
 	}
 	start(e = {}) {
-		Vm();
+		Hm();
 		let t = this.runtime, n = Object.prototype.hasOwnProperty.call(e, "taskId") || Object.prototype.hasOwnProperty.call(e, "taskTitle");
-		return n && this.#n(e), t.running ? (n && (this.#c(), this.#m()), this.status()) : (!t.session && t.phase === "focus" && Number(e.minutes) > 0 && (t.totalMs = ch(e.minutes, 1, th.focus, this.settings.focusMin) * 6e4, t.remainingMs = t.totalMs), this.#t(), this.status());
+		return n && this.#n(e), t.running ? (n && (this.#c(), this.#m()), this.status()) : (!t.session && t.phase === "focus" && Number(e.minutes) > 0 && (t.totalMs = lh(e.minutes, 1, nh.focus, this.settings.focusMin) * 6e4, t.remainingMs = t.totalMs), this.#t(), this.status());
 	}
 	pause() {
 		let e = this.runtime;
 		if (!e.running) return;
 		let t = Date.now();
-		e.remainingMs = Math.max(0, e.endsAt - t), e.session && e.segmentStartedAt && (e.session.actualMs += Math.max(0, t - e.segmentStartedAt)), e.running = !1, e.endsAt = 0, e.segmentStartedAt = 0, Gm(), this.#l(), this.#c(), this.#m();
+		e.remainingMs = Math.max(0, e.endsAt - t), e.session && e.segmentStartedAt && (e.session.actualMs += Math.max(0, t - e.segmentStartedAt)), e.running = !1, e.endsAt = 0, e.segmentStartedAt = 0, Km(), this.#l(), this.#c(), this.#m();
 	}
 	skip() {
 		let e = this.runtime.phase;
-		Gm(), this.#o(!1);
+		Km(), this.#o(!1);
 		let t = "focus";
 		e === "focus" ? (t = "shortBreak", this.#u("已跳过专注，进入短休")) : (e === "longBreak" && (this.runtime.focusRound = 0), this.#u("已跳过休息，回到专注")), this.#r(t, this.settings.autoStartNext);
 	}
 	reset() {
-		Gm(), this.#o(!1), this.runtime.focusRound = 0, this.#u("已重置番茄钟"), this.#r("focus", !1);
+		Km(), this.#o(!1), this.runtime.focusRound = 0, this.#u("已重置番茄钟"), this.#r("focus", !1);
 	}
 	stop() {
-		Gm();
+		Km();
 		let e = this.#o(!1), t = this.runtime.phase;
 		return this.#u("已结束本轮"), this.#r(t, !1), e;
 	}
@@ -19249,24 +19263,24 @@ var Mh = class {
 		}), this.#c(), this.#m(), this.status();
 	}
 	clearStats(e = "today") {
-		let t = e === "all" ? "all" : "today", n = _h(), r = fh(/* @__PURE__ */ new Date()), i = t === "all" ? [] : n.filter((e) => {
-			let t = lh(e.endedAt);
-			return !t || fh(t) !== r;
+		let t = e === "all" ? "all" : "today", n = vh(), r = ph(/* @__PURE__ */ new Date()), i = t === "all" ? [] : n.filter((e) => {
+			let t = uh(e.endedAt);
+			return !t || ph(t) !== r;
 		}), a = n.length - i.length;
-		return this.sessions = i, sh(Ym, i), this.#u(a > 0 ? `已清空 ${a} 条专注记录` : "没有可清空的专注记录"), this.#m(), {
+		return this.sessions = i, ch(Xm, i), this.#u(a > 0 ? `已清空 ${a} 条专注记录` : "没有可清空的专注记录"), this.#m(), {
 			scope: t,
 			cleared: a,
 			remaining: i.length
 		};
 	}
 	async updateSettings(t) {
-		let n = mh({
+		let n = hh({
 			...this.settings,
 			...t || {}
 		});
 		this.setSettings(n);
 		try {
-			await e.setConfig(Jm, n);
+			await e.setConfig(Ym, n);
 		} catch {}
 		return n;
 	}
@@ -19279,7 +19293,7 @@ var Mh = class {
 					this.#a();
 					return;
 				}
-				e - this.lastPersistAt >= eh && this.#c(), this.#m();
+				e - this.lastPersistAt >= th && this.#c(), this.#m();
 			} finally {
 				this.ticking = !1;
 			}
@@ -19287,17 +19301,17 @@ var Mh = class {
 	}
 	#t() {
 		let e = this.runtime;
-		e.session ||= jh(e.phase, Math.round(e.totalMs / 6e4), e.taskId, e.taskTitle);
+		e.session ||= Mh(e.phase, Math.round(e.totalMs / 6e4), e.taskId, e.taskTitle);
 		let t = Date.now();
-		e.running = !0, e.segmentStartedAt = t, e.endsAt = t + Math.max(0, e.remainingMs), this.settings.whiteNoise !== "none" && Wm(this.settings.whiteNoise, this.settings.whiteNoiseVolume), this.#l(), this.#c(), this.#m();
+		e.running = !0, e.segmentStartedAt = t, e.endsAt = t + Math.max(0, e.remainingMs), this.settings.whiteNoise !== "none" && Gm(this.settings.whiteNoise, this.settings.whiteNoiseVolume), this.#l(), this.#c(), this.#m();
 	}
 	#n(e) {
 		let t = this.runtime;
 		Object.prototype.hasOwnProperty.call(e, "taskId") && (t.taskId = typeof e.taskId == "string" && e.taskId ? e.taskId : null), Object.prototype.hasOwnProperty.call(e, "taskTitle") && (t.taskTitle = typeof e.taskTitle == "string" && e.taskTitle.trim() ? e.taskTitle.trim() : null), t.session && (t.session.taskId = t.taskId, t.session.taskTitle = t.taskTitle);
 	}
 	#r(e, t) {
-		Gm();
-		let n = this.runtime, r = hh(this.settings, e);
+		Km();
+		let n = this.runtime, r = gh(this.settings, e);
 		n.phase = e, n.totalMs = r * 6e4, n.remainingMs = n.totalMs, n.running = !1, n.endsAt = 0, n.segmentStartedAt = 0, n.session = null, this.#l(), this.#c(), this.#m(), t && this.#t();
 	}
 	#i(e) {
@@ -19306,9 +19320,9 @@ var Mh = class {
 	}
 	#a() {
 		let e = this.runtime.phase;
-		Gm(), this.#o(!0, !0);
-		let t = this.#i(e), n = hh(this.settings, t);
-		this.#u(e === "focus" ? `专注完成，${nh[t].label} ${n} 分钟` : `${nh[e].label}结束，开始专注 ${n} 分钟`), this.settings.sound && qm(), this.#r(t, this.settings.autoStartNext);
+		Km(), this.#o(!0, !0);
+		let t = this.#i(e), n = gh(this.settings, t);
+		this.#u(e === "focus" ? `专注完成，${rh[t].label} ${n} 分钟` : `${rh[e].label}结束，开始专注 ${n} 分钟`), this.settings.sound && Jm(), this.#r(t, this.settings.autoStartNext);
 	}
 	#o(e, t = !0) {
 		let n = this.runtime, r = n.session;
@@ -19326,12 +19340,12 @@ var Mh = class {
 			...r.taskId ? { taskId: r.taskId } : {},
 			...r.taskTitle ? { taskTitle: r.taskTitle } : {}
 		};
-		return this.sessions.push(s), sh(Ym, this.sessions), s;
+		return this.sessions.push(s), ch(Xm, this.sessions), s;
 	}
 	#s() {
-		let e = oh(Xm, null);
-		if (!e || typeof e != "object" || !nh[e.phase]) return yh(this.settings);
-		let t = e.phase, n = Number(e.totalMs) > 0 ? Number(e.totalMs) : hh(this.settings, t) * 6e4, r = vh(e.session, t), i = {
+		let e = sh(Zm, null);
+		if (!e || typeof e != "object" || !rh[e.phase]) return bh(this.settings);
+		let t = e.phase, n = Number(e.totalMs) > 0 ? Number(e.totalMs) : gh(this.settings, t) * 6e4, r = yh(e.session, t), i = {
 			phase: t,
 			running: !!e.running && !!e.endsAt && !!r,
 			totalMs: n,
@@ -19362,7 +19376,7 @@ var Mh = class {
 	#c() {
 		this.lastPersistAt = Date.now();
 		let e = this.runtime;
-		sh(Xm, {
+		ch(Zm, {
 			phase: e.phase,
 			running: e.running,
 			totalMs: e.totalMs,
@@ -19386,10 +19400,10 @@ var Mh = class {
 	}
 	#d() {
 		let e = (e) => {
-			(e.key === "pomodoro.command" || e.key === null) && this.#f(oh(Zm, null));
+			(e.key === "pomodoro.command" || e.key === null) && this.#f(sh(Qm, null));
 		}, t = (e) => this.#f(e.detail);
-		return window.addEventListener("storage", e), window.addEventListener(Qm, t), () => {
-			window.removeEventListener("storage", e), window.removeEventListener(Qm, t);
+		return window.addEventListener("storage", e), window.addEventListener($m, t), () => {
+			window.removeEventListener("storage", e), window.removeEventListener($m, t);
 		};
 	}
 	#f(e) {
@@ -19426,20 +19440,20 @@ var Mh = class {
 		this.#c();
 	}
 	#p() {
-		let e = this.runtime, t = this.remainingMs(), n = Dh(this.sessions, "today");
+		let e = this.runtime, t = this.remainingMs(), n = Oh(this.sessions, "today");
 		this.snapshot = {
 			phase: e.phase,
-			phaseLabel: nh[e.phase].label,
+			phaseLabel: rh[e.phase].label,
 			running: e.running,
 			remainingMs: t,
-			remainingText: ph(t),
+			remainingText: mh(t),
 			totalMs: e.totalMs,
 			progress: e.totalMs > 0 ? 1 - Math.min(1, t / Math.max(1, e.totalMs)) : 0,
 			taskId: e.taskId,
 			taskTitle: e.taskTitle || (e.taskId ? e.taskId : null),
 			focusRound: e.focusRound,
 			roundsBeforeLongBreak: this.settings.roundsBeforeLongBreak,
-			roundInCycle: Sh(e, this.settings),
+			roundInCycle: Ch(e, this.settings),
 			whiteNoise: this.settings.whiteNoise,
 			whiteNoiseVolume: this.settings.whiteNoiseVolume,
 			sound: this.settings.sound,
@@ -19451,11 +19465,11 @@ var Mh = class {
 		this.#p();
 		for (let e of this.listeners) e();
 	}
-}, Nh = null;
-function Ph() {
-	return Nh ??= new Mh(), Nh;
+}, Ph = null;
+function Fh() {
+	return Ph ??= new Nh(), Ph;
 }
-var Fh = [
+var Ih = [
 	{
 		name: "pomodoro.start",
 		description: "开始一轮专注；暂停后调用可继续。可带本轮分钟数、关联待办任务",
@@ -19638,7 +19652,7 @@ var Fh = [
 		}
 	}
 ];
-function Ih(e) {
+function Lh(e) {
 	return {
 		"pomodoro.start": (t) => e.start(t || {}),
 		"pomodoro.pause": () => (e.pause(), e.status()),
@@ -19653,18 +19667,18 @@ function Ih(e) {
 		"pomodoro.status": () => e.status(),
 		"pomodoro.stats": (t) => e.stats(t || {}),
 		"pomodoro.clearStats": (t) => e.clearStats(t?.scope),
-		"pomodoro.settings.get": () => mh(e.settings),
+		"pomodoro.settings.get": () => hh(e.settings),
 		"pomodoro.settings.set": (t) => e.updateSettings(t || {})
 	};
 }
-function Lh(e, t, n, r) {
+function Rh(e, t, n, r) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate() + t, n, r, 0, 0);
 }
-async function Rh() {
-	let e = oh(Ym, null);
+async function zh() {
+	let e = sh(Xm, null);
 	if (Array.isArray(e) && e.length) return;
 	let t = /* @__PURE__ */ new Date(), n = (e, n, r, i, a, o, s) => {
-		let c = Lh(t, n, r, i), l = new Date(c.getTime() + a * 6e4);
+		let c = Rh(t, n, r, i), l = new Date(c.getTime() + a * 6e4);
 		return {
 			id: e,
 			startedAt: c.toISOString(),
@@ -19679,7 +19693,7 @@ async function Rh() {
 			} : {}
 		};
 	};
-	sh(Ym, [
+	ch(Xm, [
 		n("demo-session-today-1", 0, 9, 30, 25, !0, "写周报"),
 		n("demo-session-today-2", 0, 10, 30, 25, !0, "写周报"),
 		n("demo-session-today-3", 0, 14, 10, 18, !1, "读文档"),
@@ -19688,7 +19702,7 @@ async function Rh() {
 		n("demo-session-week-1", -3, 11, 0, 25, !0, "写周报")
 	]);
 	let r = Date.now() - 72e4;
-	sh(Xm, {
+	ch(Zm, {
 		phase: "focus",
 		running: !0,
 		totalMs: 15e5,
@@ -19711,12 +19725,12 @@ async function Rh() {
 		roundsBeforeLongBreak: 4
 	});
 	try {
-		localStorage.removeItem(Zm);
+		localStorage.removeItem(Qm);
 	} catch {}
 }
 //#endregion
 //#region public/plugins/pomodoro/src/PomodoroApp.jsx
-var zh = Jn({
+var Bh = Jn({
 	root: {
 		userSelect: "none",
 		cursor: "pointer"
@@ -19787,18 +19801,18 @@ var zh = Jn({
 		minWidth: 0
 	},
 	time: {
-		...em,
+		...tm,
 		fontWeight: "600",
 		color: V.colorNeutralForeground1,
 		whiteSpace: "nowrap"
 	},
-	time48: $p(48),
+	time48: em(48),
 	time68: {
 		fontSize: V.fontSizeHero1000,
 		lineHeight: V.lineHeightHero1000
 	},
-	time80: $p(80),
-	time96: $p(96),
+	time80: em(80),
+	time96: em(96),
 	phase: { minWidth: 0 },
 	task: {
 		maxWidth: "100%",
@@ -19829,20 +19843,20 @@ var zh = Jn({
 	},
 	progressBottom: { width: "72%" }
 });
-function Bh(e) {
+function Vh(e) {
 	return e === "focus" ? V.colorBrandForeground1 : V.colorNeutralForeground2;
 }
-function Vh(e) {
+function Hh(e) {
 	return e.running ? "暂停" : e.progress > 0 ? "继续" : "开始";
 }
-function Hh({ styles: e, snapshot: t, onToggle: n, onReset: r, centered: i = !1 }) {
-	let a = Vh(t);
+function Uh({ styles: e, snapshot: t, onToggle: n, onReset: r, centered: i = !1 }) {
+	let a = Hh(t);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(e.actions, i && e.actionsCenter),
 		children: [/* @__PURE__ */ (0, N.jsx)(Cd, {
 			content: a,
 			relationship: "label",
-			children: /* @__PURE__ */ (0, N.jsx)(_m, {
+			children: /* @__PURE__ */ (0, N.jsx)(vm, {
 				appearance: "primary",
 				icon: t.running ? /* @__PURE__ */ (0, N.jsx)(Ds, {}) : /* @__PURE__ */ (0, N.jsx)(Ss, {}),
 				"aria-label": a,
@@ -19852,7 +19866,7 @@ function Hh({ styles: e, snapshot: t, onToggle: n, onReset: r, centered: i = !1 
 		}), /* @__PURE__ */ (0, N.jsx)(Cd, {
 			content: "重置本轮",
 			relationship: "label",
-			children: /* @__PURE__ */ (0, N.jsx)(_m, {
+			children: /* @__PURE__ */ (0, N.jsx)(vm, {
 				icon: /* @__PURE__ */ (0, N.jsx)(Es, {}),
 				"aria-label": "重置本轮",
 				"data-pomodoro-action": "reset",
@@ -19861,17 +19875,17 @@ function Hh({ styles: e, snapshot: t, onToggle: n, onReset: r, centered: i = !1 
 		})]
 	});
 }
-function Uh({ fallbackSizeKey: e }) {
-	let t = zh(), n = Ep(Pm, e || "2x1"), [r] = Dp(Jm, rh, mh), i = Ph(), a = (0, M.useSyncExternalStore)(i.subscribe, i.getSnapshot), o = Zp("exit"), s = n === "1x1", c = n === "2x1", l = n === "3x2";
+function Wh({ fallbackSizeKey: e }) {
+	let t = Bh(), n = Ep(Fm, e || "2x1"), [r] = Op(Ym, ih, hh), i = Fh(), a = (0, M.useSyncExternalStore)(i.subscribe, i.getSnapshot), o = Qp("exit"), s = n === "1x1", c = n === "2x1", l = n === "3x2";
 	(0, M.useEffect)(() => (i.startEngine(), () => i.stopEngine()), [i]), (0, M.useEffect)(() => {
 		i.setSettings(r);
-	}, [i, r]), Ip(Fh, (0, M.useMemo)(() => Ih(i), [i]));
+	}, [i, r]), Lp(Ih, (0, M.useMemo)(() => Lh(i), [i]));
 	let u = (0, M.useCallback)((e) => {
 		e.stopPropagation(), i.toggle();
 	}, [i]), d = (0, M.useCallback)((e) => {
 		e.stopPropagation(), i.reset();
-	}, [i]), f = (0, M.useCallback)(() => kp("detail", "专注详情"), []), p = {
-		color: Bh(a.phase),
+	}, [i]), f = (0, M.useCallback)(() => Ap("detail", "专注详情"), []), p = {
+		color: Vh(a.phase),
 		transitionProperty: "color",
 		...o
 	}, m = /* @__PURE__ */ (0, N.jsx)(Z, {
@@ -19881,13 +19895,13 @@ function Uh({ fallbackSizeKey: e }) {
 		style: p,
 		"data-pomodoro-phase-label": !0,
 		children: a.phaseLabel
-	}), h = a.taskTitle || "未关联任务", g = Vh(a), _ = `${a.phaseLabel} ${a.remainingText}，${a.running ? "计时中" : "已暂停"}；点击卡片打开详情${s ? "" : `，卡内可${g}或重置`}`, v = /* @__PURE__ */ (0, N.jsx)(Hh, {
+	}), h = a.taskTitle || "未关联任务", g = Hh(a), _ = `${a.phaseLabel} ${a.remainingText}，${a.running ? "计时中" : "已暂停"}；点击卡片打开详情${s ? "" : `，卡内可${g}或重置`}`, v = /* @__PURE__ */ (0, N.jsx)(Uh, {
 		styles: t,
 		snapshot: a,
 		onToggle: u,
 		onReset: d
 	});
-	return s ? /* @__PURE__ */ (0, N.jsxs)(dm, {
+	return s ? /* @__PURE__ */ (0, N.jsxs)(fm, {
 		ariaLabel: _,
 		onActivate: f,
 		className: D(t.root, t.root1),
@@ -19908,7 +19922,7 @@ function Uh({ fallbackSizeKey: e }) {
 				"aria-label": "本轮进度"
 			})
 		]
-	}) : c ? /* @__PURE__ */ (0, N.jsxs)(dm, {
+	}) : c ? /* @__PURE__ */ (0, N.jsxs)(fm, {
 		ariaLabel: _,
 		onActivate: f,
 		className: D(t.root, t.root21),
@@ -19923,7 +19937,7 @@ function Uh({ fallbackSizeKey: e }) {
 				children: a.remainingText
 			}), m]
 		}), v]
-	}) : l ? /* @__PURE__ */ (0, N.jsxs)(dm, {
+	}) : l ? /* @__PURE__ */ (0, N.jsxs)(fm, {
 		ariaLabel: _,
 		onActivate: f,
 		className: D(t.root, t.root32),
@@ -19991,7 +20005,7 @@ function Uh({ fallbackSizeKey: e }) {
 				]
 			})]
 		})]
-	}) : /* @__PURE__ */ (0, N.jsxs)(dm, {
+	}) : /* @__PURE__ */ (0, N.jsxs)(fm, {
 		ariaLabel: _,
 		onActivate: f,
 		className: D(t.root, t.root22),
@@ -20022,7 +20036,7 @@ function Uh({ fallbackSizeKey: e }) {
 					" 分钟"
 				]
 			}),
-			/* @__PURE__ */ (0, N.jsx)(Hh, {
+			/* @__PURE__ */ (0, N.jsx)(Uh, {
 				styles: t,
 				snapshot: a,
 				onToggle: u,
@@ -20034,23 +20048,23 @@ function Uh({ fallbackSizeKey: e }) {
 }
 //#endregion
 //#region public/plugins/pomodoro/src/data/tasks.js
-var Wh = "todo.tasks", Gh = /* @__PURE__ */ new Set([Wh, null]);
-function Kh(e) {
+var Gh = "todo.tasks", Kh = /* @__PURE__ */ new Set([Gh, null]);
+function qh(e) {
 	if (e == null || e === "") return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function qh(e) {
+function Jh(e) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
 }
-function Jh(e) {
-	let t = qh(e);
+function Yh(e) {
+	let t = Jh(e);
 	return t.setDate(t.getDate() + 1), /* @__PURE__ */ new Date(t.getTime() - 1);
 }
-function Yh() {
+function Xh() {
 	let e;
 	try {
-		e = localStorage.getItem(Wh);
+		e = localStorage.getItem(Gh);
 	} catch {
 		return [];
 	}
@@ -20065,7 +20079,7 @@ function Yh() {
 	let n = [];
 	for (let e of t) {
 		if (!e || typeof e != "object" || typeof e.title != "string" || !e.title.trim() || e.done) continue;
-		let t = Kh(e.dueAt);
+		let t = qh(e.dueAt);
 		n.push({
 			id: typeof e.id == "string" && e.id ? e.id : `todo-${n.length}`,
 			title: e.title.trim(),
@@ -20076,17 +20090,17 @@ function Yh() {
 	}
 	return n.sort((e, t) => e.dueAt && t.dueAt ? e.dueAt - t.dueAt : e.dueAt ? -1 : t.dueAt ? 1 : e.order - t.order), n;
 }
-function Xh(e, t = /* @__PURE__ */ new Date()) {
-	let n = Jh(t), r = [], i = [];
+function Zh(e, t = /* @__PURE__ */ new Date()) {
+	let n = Yh(t), r = [], i = [];
 	for (let t of e) t.dueAt && t.dueAt <= n ? r.push(t) : i.push(t);
 	return {
 		today: r,
 		later: i
 	};
 }
-function Zh(e, t = /* @__PURE__ */ new Date()) {
+function Qh(e, t = /* @__PURE__ */ new Date()) {
 	if (!e.dueAt) return "没有截止日期";
-	let n = qh(t), r = qh(e.dueAt), i = Math.round((r - n) / 864e5), a = new Intl.DateTimeFormat("zh-CN", {
+	let n = Jh(t), r = Jh(e.dueAt), i = Math.round((r - n) / 864e5), a = new Intl.DateTimeFormat("zh-CN", {
 		hour: "2-digit",
 		minute: "2-digit"
 	}).format(e.dueAt);
@@ -20100,22 +20114,22 @@ function Zh(e, t = /* @__PURE__ */ new Date()) {
 		minute: "2-digit"
 	}).format(e.dueAt);
 }
-function Qh(e) {
+function $h(e) {
 	let t = (t) => {
-		Gh.has(t.key) && e();
+		Kh.has(t.key) && e();
 	};
 	return window.addEventListener("storage", t), () => window.removeEventListener("storage", t);
 }
 //#endregion
 //#region public/plugins/pomodoro/src/PomodoroDetail.jsx
-var $h = new Intl.DateTimeFormat("zh-CN", {
+var eg = new Intl.DateTimeFormat("zh-CN", {
 	month: "long",
 	day: "numeric",
 	weekday: "short"
-}), eg = new Intl.DateTimeFormat("zh-CN", {
+}), tg = new Intl.DateTimeFormat("zh-CN", {
 	hour: "2-digit",
 	minute: "2-digit"
-}), tg = Jn({
+}), ng = Jn({
 	headerMain: {
 		display: "flex",
 		flexWrap: "wrap",
@@ -20259,14 +20273,14 @@ var $h = new Intl.DateTimeFormat("zh-CN", {
 		minHeight: "40px"
 	}
 });
-function ng(e) {
+function rg(e) {
 	let t = new Date(e);
 	return `${t.getFullYear()}-${t.getMonth() + 1}-${t.getDate()}`;
 }
-function rg(e) {
+function ig(e) {
 	let t = e.filter((e) => e.endedAt).sort((e, t) => new Date(t.endedAt) - new Date(e.endedAt)), n = [], r = null;
 	for (let e of t) {
-		let t = ng(e.endedAt);
+		let t = rg(e.endedAt);
 		(!r || r.key !== t) && (r = {
 			key: t,
 			date: new Date(e.endedAt),
@@ -20275,14 +20289,14 @@ function rg(e) {
 	}
 	return n;
 }
-function ig(e) {
-	let t = /* @__PURE__ */ new Date(), n = ng(t.toISOString()), r = ng(e.toISOString());
-	return r === n ? "今天" : r === ng(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1).toISOString()) ? "昨天" : $h.format(e);
-}
 function ag(e) {
-	return e.endedAt ? `${eg.format(new Date(e.startedAt))}–${eg.format(new Date(e.endedAt))}` : "进行中";
+	let t = /* @__PURE__ */ new Date(), n = rg(t.toISOString()), r = rg(e.toISOString());
+	return r === n ? "今天" : r === rg(new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1).toISOString()) ? "昨天" : eg.format(e);
 }
-function og({ completed: e }) {
+function og(e) {
+	return e.endedAt ? `${tg.format(new Date(e.startedAt))}–${tg.format(new Date(e.endedAt))}` : "进行中";
+}
+function sg({ completed: e }) {
 	return e ? /* @__PURE__ */ (0, N.jsx)(bc, {
 		appearance: "tint",
 		color: "success",
@@ -20295,8 +20309,8 @@ function og({ completed: e }) {
 		children: "中断"
 	});
 }
-function sg({ statKey: e, label: t, value: n, unit: r }) {
-	let i = tg();
+function cg({ statKey: e, label: t, value: n, unit: r }) {
+	let i = ng();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: i.statBlock,
 		"data-stat": e,
@@ -20319,8 +20333,8 @@ function sg({ statKey: e, label: t, value: n, unit: r }) {
 		})]
 	});
 }
-function cg({ sessions: e }) {
-	let t = tg(), n = rg(e);
+function lg({ sessions: e }) {
+	let t = ng(), n = ig(e);
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: t.section,
 		children: n.map((e) => /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -20329,16 +20343,16 @@ function cg({ sessions: e }) {
 				className: t.dayHeading,
 				children: /* @__PURE__ */ (0, N.jsx)(Z, {
 					size: 200,
-					children: ig(e.date)
+					children: ag(e.date)
 				})
-			}), e.sessions.map((e) => /* @__PURE__ */ (0, N.jsx)(pm, {
+			}), e.sessions.map((e) => /* @__PURE__ */ (0, N.jsx)(mm, {
 				"data-session-id": e.id,
 				leading: /* @__PURE__ */ (0, N.jsx)(Z, {
 					size: 300,
 					className: t.rowTime,
-					children: ag(e)
+					children: og(e)
 				}),
-				title: e.taskTitle || nh[e.phase]?.label || "专注",
+				title: e.taskTitle || rh[e.phase]?.label || "专注",
 				trailing: /* @__PURE__ */ (0, N.jsxs)("div", {
 					className: t.rowTrailing,
 					children: [/* @__PURE__ */ (0, N.jsxs)(Z, {
@@ -20346,22 +20360,22 @@ function cg({ sessions: e }) {
 						weight: "semibold",
 						className: t.rowDuration,
 						children: [e.actualMin, " 分钟"]
-					}), /* @__PURE__ */ (0, N.jsx)(og, { completed: e.completed })]
+					}), /* @__PURE__ */ (0, N.jsx)(sg, { completed: e.completed })]
 				})
 			}, e.id))]
 		}, e.key))
 	});
 }
-function lg({ currentTaskId: e, onSelect: t }) {
-	let n = tg(), r = km(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(() => Yh());
+function ug({ currentTaskId: e, onSelect: t }) {
+	let n = ng(), r = Am(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(() => Xh());
 	(0, M.useEffect)(() => {
-		let e = () => s(Yh());
-		return e(), Qh(e);
+		let e = () => s(Xh());
+		return e(), $h(e);
 	}, []);
 	let c = (0, M.useMemo)(() => {
 		let e = i.trim().toLowerCase();
 		return e ? o.filter((t) => t.title.toLowerCase().includes(e)) : o;
-	}, [o, i]), { today: l, later: u } = (0, M.useMemo)(() => Xh(c, /* @__PURE__ */ new Date()), [c]), d = (0, M.useCallback)((e, n) => {
+	}, [o, i]), { today: l, later: u } = (0, M.useMemo)(() => Zh(c, /* @__PURE__ */ new Date()), [c]), d = (0, M.useCallback)((e, n) => {
 		t(e, n), r();
 	}, [r, t]), f = (t, r) => r.length === 0 ? null : /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: n.pickerGroup,
@@ -20373,7 +20387,7 @@ function lg({ currentTaskId: e, onSelect: t }) {
 			})
 		}), r.map((t) => {
 			let r = e === t.id;
-			return /* @__PURE__ */ (0, N.jsx)(pm, {
+			return /* @__PURE__ */ (0, N.jsx)(mm, {
 				"data-task-id": t.id,
 				selected: r,
 				onClick: () => d(t.id, t.title),
@@ -20387,7 +20401,7 @@ function lg({ currentTaskId: e, onSelect: t }) {
 					})
 				}),
 				title: t.title,
-				subtitle: Zh(t),
+				subtitle: Qh(t),
 				trailing: r ? /* @__PURE__ */ (0, N.jsx)(Z, {
 					size: 200,
 					children: "已关联"
@@ -20406,7 +20420,7 @@ function lg({ currentTaskId: e, onSelect: t }) {
 				contentBefore: /* @__PURE__ */ (0, N.jsx)(bs, {}),
 				onChange: (e, t) => a(t.value)
 			}),
-			/* @__PURE__ */ (0, N.jsx)(pm, {
+			/* @__PURE__ */ (0, N.jsx)(mm, {
 				selected: !e,
 				onClick: () => d(null, null),
 				leading: /* @__PURE__ */ (0, N.jsx)("span", {
@@ -20433,36 +20447,36 @@ function lg({ currentTaskId: e, onSelect: t }) {
 		]
 	});
 }
-function ug() {
-	let e = tg(), [t] = Dp(Jm, rh, mh), n = Mm(500), [r, i] = (0, M.useState)(0), [a, o] = (0, M.useState)(() => _h()), [s, c] = (0, M.useState)(!1), [l, u] = (0, M.useState)(!1), [d, f] = (0, M.useState)("");
+function dg() {
+	let e = ng(), [t] = Op(Ym, ih, hh), n = Nm(500), [r, i] = (0, M.useState)(0), [a, o] = (0, M.useState)(() => vh()), [s, c] = (0, M.useState)(!1), [l, u] = (0, M.useState)(!1), [d, f] = (0, M.useState)("");
 	(0, M.useEffect)(() => {
 		let e = () => {
-			o(_h()), i((e) => e + 1);
+			o(vh()), i((e) => e + 1);
 		}, t = (t) => {
 			(t.key === "pomodoro.sessions" || t.key === "pomodoro.runtime" || t.key === "pomodoro.command" || t.key === null) && e();
 		};
 		return window.addEventListener("storage", t), e(), () => window.removeEventListener("storage", t);
 	}, []);
-	let p = (0, M.useMemo)(() => kh(t, n), [
+	let p = (0, M.useMemo)(() => Ah(t, n), [
 		t,
 		n,
 		r
-	]), m = (0, M.useMemo)(() => Dh(a, "today", new Date(n)), [a, n]), h = (0, M.useMemo)(() => Dh(a, "week", new Date(n)), [a, n]), g = (0, M.useMemo)(() => Oh(a, new Date(n)), [a, n]), _ = a.length > 0, v = p.running ? "暂停" : p.progress > 0 ? "继续" : "开始", y = p.taskTitle || "未关联任务", b = (0, M.useCallback)(() => {
-		Ah(p.running ? "pause" : "start");
-	}, [p.running]), x = (0, M.useCallback)(() => Ah("reset"), []), S = (0, M.useCallback)(() => Ah("skip"), []), C = (0, M.useCallback)((e, t) => {
-		Ah("task", {
+	]), m = (0, M.useMemo)(() => Oh(a, "today", new Date(n)), [a, n]), h = (0, M.useMemo)(() => Oh(a, "week", new Date(n)), [a, n]), g = (0, M.useMemo)(() => kh(a, new Date(n)), [a, n]), _ = a.length > 0, v = p.running ? "暂停" : p.progress > 0 ? "继续" : "开始", y = p.taskTitle || "未关联任务", b = (0, M.useCallback)(() => {
+		jh(p.running ? "pause" : "start");
+	}, [p.running]), x = (0, M.useCallback)(() => jh("reset"), []), S = (0, M.useCallback)(() => jh("skip"), []), C = (0, M.useCallback)((e, t) => {
+		jh("task", {
 			taskId: e,
 			taskTitle: t
 		});
 	}, []), w = (0, M.useCallback)((e) => {
-		let t = e === "all" ? a.length : a.filter((e) => ng(e.endedAt) === ng((/* @__PURE__ */ new Date()).toISOString())).length;
-		Ah("clearStats", { scope: e }), f(`已清空 ${t} 条记录`), u(!1);
+		let t = e === "all" ? a.length : a.filter((e) => rg(e.endedAt) === rg((/* @__PURE__ */ new Date()).toISOString())).length;
+		jh("clearStats", { scope: e }), f(`已清空 ${t} 条记录`), u(!1);
 	}, [a]);
-	return /* @__PURE__ */ (0, N.jsxs)(bm, { children: [
-		/* @__PURE__ */ (0, N.jsx)(Sm, {
-			trailing: /* @__PURE__ */ (0, N.jsx)(vm, {
+	return /* @__PURE__ */ (0, N.jsxs)(xm, { children: [
+		/* @__PURE__ */ (0, N.jsx)(Cm, {
+			trailing: /* @__PURE__ */ (0, N.jsx)(ym, {
 				icon: /* @__PURE__ */ (0, N.jsx)(xs, {}),
-				onClick: () => Ap(),
+				onClick: () => jp(),
 				"data-detail-action": "settings",
 				children: "设置…"
 			}),
@@ -20497,29 +20511,29 @@ function ug() {
 				]
 			})
 		}),
-		/* @__PURE__ */ (0, N.jsxs)(wm, {
+		/* @__PURE__ */ (0, N.jsxs)(Tm, {
 			className: e.toolbar,
 			children: [
-				/* @__PURE__ */ (0, N.jsx)(vm, {
+				/* @__PURE__ */ (0, N.jsx)(ym, {
 					appearance: "primary",
 					icon: p.running ? /* @__PURE__ */ (0, N.jsx)(Ds, {}) : /* @__PURE__ */ (0, N.jsx)(Ss, {}),
 					onClick: b,
 					"data-detail-action": "toggle",
 					children: v
 				}),
-				/* @__PURE__ */ (0, N.jsx)(vm, {
+				/* @__PURE__ */ (0, N.jsx)(ym, {
 					icon: /* @__PURE__ */ (0, N.jsx)(Es, {}),
 					onClick: x,
 					"data-detail-action": "reset",
 					children: "重置"
 				}),
-				/* @__PURE__ */ (0, N.jsx)(vm, {
+				/* @__PURE__ */ (0, N.jsx)(ym, {
 					icon: /* @__PURE__ */ (0, N.jsx)(Ts, {}),
 					onClick: S,
 					"data-detail-action": "skip",
 					children: "跳过阶段"
 				}),
-				/* @__PURE__ */ (0, N.jsx)(vm, {
+				/* @__PURE__ */ (0, N.jsx)(ym, {
 					icon: /* @__PURE__ */ (0, N.jsx)(As, {}),
 					className: e.taskButton,
 					onClick: () => c(!0),
@@ -20538,7 +20552,7 @@ function ug() {
 				})
 			]
 		}),
-		/* @__PURE__ */ (0, N.jsx)(Dm, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
+		/* @__PURE__ */ (0, N.jsx)(Om, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: e.stack,
 			children: [
 				/* @__PURE__ */ (0, N.jsxs)("section", {
@@ -20551,25 +20565,25 @@ function ug() {
 					}), /* @__PURE__ */ (0, N.jsxs)("div", {
 						className: e.statGrid,
 						children: [
-							/* @__PURE__ */ (0, N.jsx)(sg, {
+							/* @__PURE__ */ (0, N.jsx)(cg, {
 								statKey: "today-completed",
 								label: "今日完成",
 								value: m.completed,
 								unit: "轮"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(sg, {
+							/* @__PURE__ */ (0, N.jsx)(cg, {
 								statKey: "today-minutes",
 								label: "今日专注",
 								value: m.focusMinutes,
 								unit: "分钟"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(sg, {
+							/* @__PURE__ */ (0, N.jsx)(cg, {
 								statKey: "week-completed",
 								label: "本周完成",
 								value: h.completed,
 								unit: "轮"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(sg, {
+							/* @__PURE__ */ (0, N.jsx)(cg, {
 								statKey: "streak-days",
 								label: "连续天数",
 								value: g,
@@ -20591,16 +20605,16 @@ function ug() {
 							intent: "success",
 							children: /* @__PURE__ */ (0, N.jsx)(fp, { children: d })
 						}) : null,
-						/* @__PURE__ */ (0, N.jsx)(qp, {
+						/* @__PURE__ */ (0, N.jsx)(Jp, {
 							value: _ ? "records" : "empty",
-							children: _ ? /* @__PURE__ */ (0, N.jsx)(cg, { sessions: a }) : /* @__PURE__ */ (0, N.jsx)(hm, {
+							children: _ ? /* @__PURE__ */ (0, N.jsx)(lg, { sessions: a }) : /* @__PURE__ */ (0, N.jsx)(gm, {
 								icon: /* @__PURE__ */ (0, N.jsx)(Cs, {}),
 								title: "还没有专注记录",
 								description: "开始一轮专注，完成的番茄会出现在这里",
-								action: /* @__PURE__ */ (0, N.jsx)(vm, {
+								action: /* @__PURE__ */ (0, N.jsx)(ym, {
 									appearance: "primary",
 									icon: /* @__PURE__ */ (0, N.jsx)(Ss, {}),
-									onClick: () => Ah("start"),
+									onClick: () => jh("start"),
 									"data-detail-action": "start-focus",
 									children: "开始专注"
 								})
@@ -20611,17 +20625,17 @@ function ug() {
 				_ ? /* @__PURE__ */ (0, N.jsxs)("section", {
 					className: e.section,
 					"aria-label": "清空记录",
-					children: [/* @__PURE__ */ (0, N.jsx)(pm, {
+					children: [/* @__PURE__ */ (0, N.jsx)(mm, {
 						className: e.clearRow,
 						title: "清空记录",
 						subtitle: "删除历史专注记录；进行中的一轮不受影响",
-						trailing: /* @__PURE__ */ (0, N.jsx)(vm, {
+						trailing: /* @__PURE__ */ (0, N.jsx)(ym, {
 							onClick: () => u((e) => !e),
 							"aria-expanded": l,
 							"data-detail-action": "clear",
 							children: "清空…"
 						})
-					}), /* @__PURE__ */ (0, N.jsx)(Kp, {
+					}), /* @__PURE__ */ (0, N.jsx)(qp, {
 						visible: l,
 						children: /* @__PURE__ */ (0, N.jsxs)("div", {
 							className: e.confirm,
@@ -20632,17 +20646,17 @@ function ug() {
 							}), /* @__PURE__ */ (0, N.jsxs)("div", {
 								className: e.confirmActions,
 								children: [
-									/* @__PURE__ */ (0, N.jsx)(vm, {
+									/* @__PURE__ */ (0, N.jsx)(ym, {
 										onClick: () => w("today"),
 										"data-detail-action": "clear-today",
 										children: "清空今日"
 									}),
-									/* @__PURE__ */ (0, N.jsx)(vm, {
+									/* @__PURE__ */ (0, N.jsx)(ym, {
 										onClick: () => w("all"),
 										"data-detail-action": "clear-all",
 										children: "清空全部"
 									}),
-									/* @__PURE__ */ (0, N.jsx)(vm, {
+									/* @__PURE__ */ (0, N.jsx)(ym, {
 										onClick: () => u(!1),
 										"data-detail-action": "clear-cancel",
 										children: "取消"
@@ -20654,10 +20668,10 @@ function ug() {
 				}) : null
 			]
 		}) }),
-		s ? /* @__PURE__ */ (0, N.jsx)(jm, {
+		s ? /* @__PURE__ */ (0, N.jsx)(Mm, {
 			title: "选择任务",
 			onClosed: () => c(!1),
-			children: /* @__PURE__ */ (0, N.jsx)(lg, {
+			children: /* @__PURE__ */ (0, N.jsx)(ug, {
 				currentTaskId: p.taskId,
 				onSelect: C
 			})
@@ -20667,15 +20681,15 @@ function ug() {
 //#endregion
 //#region public/plugins/pomodoro/src/main.jsx
 yp();
-var dg = new URLSearchParams(location.search), fg = Op(), pg = Fm();
-function mg(t = 2500) {
+var fg = new URLSearchParams(location.search), pg = kp(), mg = Im();
+function hg(t = 2500) {
 	return !e.inHost || bp() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(bp() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function hg() {
+function gg() {
 	let { theme: t } = Tp(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
 	return /* @__PURE__ */ (0, N.jsx)($o, {
 		theme: t,
@@ -20685,12 +20699,12 @@ function hg() {
 			background: n,
 			colorScheme: "normal"
 		},
-		children: fg === "detail" ? /* @__PURE__ */ (0, N.jsx)(ug, {}) : /* @__PURE__ */ (0, N.jsx)(Uh, { fallbackSizeKey: pg })
+		children: pg === "detail" ? /* @__PURE__ */ (0, N.jsx)(dg, {}) : /* @__PURE__ */ (0, N.jsx)(Wh, { fallbackSizeKey: mg })
 	});
 }
-async function gg() {
+async function _g() {
 	let e = document.getElementById("root");
-	e && (await mg(), dg.get("demo") === "1" && await Rh(), (0, pp.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(hg, {})));
+	e && (await hg(), fg.get("demo") === "1" && await zh(), (0, pp.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(gg, {})));
 }
-gg();
+_g();
 //#endregion

@@ -356,3 +356,38 @@
   3. **文案做减法**：删掉「休息中，坐下后开始新一轮」这类状态机说明、工具描述里的「（UI：…）」提示、每次点按后的「已记录…」通知；站立时 `hintOf` 返回空串，状态交给标题/Badge/按钮。Agent 提示词新增“工具成功后只回一句短确认，不要教用户点按钮”。
 - 兼容：`phrases` 是可选项，未声明的插件行为不变；旧会话/旧设置不受影响。
 - 验证：短语匹配单测 10/10；真实 MiMo + headless Edge 端到端 12/12（说“我站起来了/我坐下了”→ 插件 runtime 立即切换、卡片按钮同步、工具卡出现、回复短确认、无防御性文案、console 0）；`scripts/verify-agent-surface.mjs` 语音链路回归。
+
+## D-29 插件配置同步改为宿主主动 `host:config` 推送（2026-10-22，v0.3.6 修复）
+
+- 背景：用户反馈「设置里打开天气自动定位后，详情页自动有了信息，但桌面 widget 不同步，必须重启」。
+  根因：Tauri 打包版宿主页是 `http://tauri.localhost`、插件 iframe 是 `http://wtsl.localhost`
+  （`src-tauri/src/protocol.rs`），两者不同 origin；`HostBridge.setConfig` 写的是宿主文档的
+  localStorage，而 `window 'storage'` 事件只在同源文档之间派发，插件 iframe 永远收不到。此前
+  `useStoredConfig`、天气、倒数日都假设「另一个 iframe 文档会收到 storage 事件」——dev 浏览器
+  （HTTP 插件源，同源）成立，打包版不成立。WebView2 LevelDB 实测：`plugin.weather.*` 记录归属
+  `_http://tauri.localhost`，插件 iframe 自己写的 `sedentary.*` 归属 `_http://wtsl.localhost`，
+  证实是两个存储区。
+- 决策：
+  1. 宿主 → 插件新增 `host:config`（`{ key, value }` 增量），协议版本 2。`HostBridge.setConfig`
+     写盘后经 `src/host/bridge/configBus.ts` 广播，每个 `PluginWidgetFrame`（卡片 / 详情浮层 /
+     后台）按 pluginId 订阅并各自 post 给自己的 iframe。
+  2. `plugin-sdk.js` 新增 `plugin.onConfig(fn)`：记忆最近配置快照、注册时重放；`host:init` 的
+     `config` 也记入快照。
+  3. `_shared/host.js` 的 `useStoredConfig`：mount 时向宿主 `getConfig` 重读一次（init 快照可能
+     过期），订阅 `onConfig` 应用增量；`storage` 监听降级为 dev 同源兜底。读取序号防止晚到的
+     旧响应覆盖新写入。
+  4. 浮层 iframe 的 init 快照改为现取（`PluginWidgetFrame.configSnapshot` 供应商），不再依赖父
+     组件渲染时缓存的旧配置。
+  5. 宿主设置页表单订阅 configBus：插件 / Agent 写配置后，打开中的设置表单同步。
+- 兼容：`host:config` 是可选增量，旧插件忽略未知消息即可，不依赖回包；只升级宿主的旧构建
+  第三方插件会退化为修复前表现（需要重新打包才享受推送），但不会崩；`storage` 兜底保留，
+  dev HTTP 同源模式行为不变。发布时需递增版本号，安装版升级才会因 `.seed-version` 变化重种
+  内置插件产物（`src-tauri/src/plugins.rs`）。
+- 验证：跨 origin harness（宿主页 `http://localhost:4300`、插件 iframe `http://127.0.0.1:4300`，
+  模拟 tauri.localhost/wtsl.localhost；`.tmp/config-sync-harness/`，一条命令可复跑）：
+  - before（HEAD 5f098fe）：宿主 localStorage 已写入 `unit:"f"` / places 上海，但已挂载卡片 2s 窗口内
+    仍是 北京 23°（iframe 收到 `host:config` 0 条）——bug 复现；
+  - after（本修复，最终产物 sha 48c8b86e…）：iframe 收到 `host:config` 6 条；settings push 34ms 生效
+    （23°→73°F），places push 58ms 生效（北京→上海），iframe console error 0。
+  - `npm run typecheck` / `npm run build` / 六插件产物重建通过（产物已完成，与源码一致）。
+  - release 真窗口（patched CDP 副本，`shots/v036-final/`，38 PASS / 0 FAIL）：升级重种 0.3.5→0.3.6；真实 WebView2 里设置页切时钟 12 小时制/天气自动定位开关后，跨 origin 卡片 360ms 内可见更新、iframe 71ms 收到 `host:config`（天气双向 75/60ms）、timeOrigin/探针证明未 reload、console 0。

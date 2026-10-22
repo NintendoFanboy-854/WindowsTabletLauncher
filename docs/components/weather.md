@@ -155,6 +155,10 @@ interface Settings {
 - 分钟级降水仅在有数据时显示。
 - 定位：Windows Geolocator 优先 → ip.cn 网络归属地兜底（D-16）→ 失败保留上次城市并提示手动搜索；
   无 API Key 时自动定位跳过（GeoAPI 换坐标需要 Key）。
+- 同步：卡片与详情（L1/L2，同一插件的不同 iframe）通过宿主 `host:config` 推送同步
+  `plugin.weather.*`（设置 / places / cache / location）。**不依赖 storage 事件**：Tauri 打包版
+  宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）不同 origin，storage 事件到不了插件
+  （D-29）；打开自动定位后宿主写 `settings` / 定位结果，已挂载卡片会立即跟随，无需重启。
 - 自动定位成功即应用：定位城市加入城市列表并设为当前（卡片/详情随之切换）；
   已是当前城市时只更新「当前位置」，不重复写配置。
 

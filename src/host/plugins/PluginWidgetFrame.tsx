@@ -4,7 +4,8 @@
  * 宿主这一侧只做三件事：
  * 1. iframe 加载完成后发 `host:init`（协议、尺寸、主题、配置）；
  * 2. 尺寸 / 主题变化时发 `host:resize` / `host:theme`；
- * 3. 把插件发来的消息按协议分发给宿主（桥接层 / 桌面层）。
+ * 3. 配置写入后发 `host:config`（跨 origin 里 storage 事件到不了插件 iframe），
+ *    并把插件发来的消息按协议分发给宿主（桥接层 / 桌面层）。
  *
  * 8 个宿主 API 的 `host:reply` 由桥接层（A5）通过 `onApiCall` 注入；没注入时
  * 直接回 `ok:false`，免得插件 await 一个永远不来的响应。
@@ -33,6 +34,7 @@ import type {
   ThemePayload,
   WidgetSize,
 } from '../bridge/types';
+import { onPluginConfigChange } from '../bridge/configBus';
 import { readFluentThemePayload } from './theme';
 import { captureOverlaySource } from './overlayMotion';
 import type { OverlaySource } from './overlayMotion';
@@ -58,6 +60,12 @@ export interface PluginWidgetFrameProps {
   theme?: ThemePayload;
   /** 该插件的配置快照（桥接层负责持久化） */
   config?: Record<string, unknown>;
+  /**
+   * 配置快照的"现取"函数（可选）。`host:init` 只用一次，浮层 iframe 是后挂载的：
+   * 如果只传 `config` prop，打开浮层时可能拿到父组件上次渲染的旧快照。
+   * 传了这个函数就每次 init 时现取（桌面层传 `bridge.configSnapshot`）。
+   */
+  configSnapshot?: () => Record<string, unknown>;
   /** iframe 的 accessible name */
   title?: string;
   className?: string;
@@ -174,6 +182,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       size,
       theme,
       config,
+      configSnapshot,
       title,
       className,
       style,
@@ -246,8 +255,8 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     }, [overlay, src]);
 
     // init 要拿“加载那一刻”的最新 props，用 ref 避免把 init 绑死到首次渲染
-    const latest = useRef({ pluginId, widgetId, size, theme, config });
-    latest.current = { pluginId, widgetId, size, theme, config };
+    const latest = useRef({ pluginId, widgetId, size, theme, config, configSnapshot });
+    latest.current = { pluginId, widgetId, size, theme, config, configSnapshot };
 
     const post = useCallback((message: HostToPluginMessage) => {
       frameRef.current?.contentWindow?.postMessage(message, '*');
@@ -270,7 +279,8 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
           widgetId: current.widgetId,
           size: current.size,
           theme: nextTheme,
-          config: current.config ?? {},
+          // 现取快照：浮层 iframe 后挂载时不能读到父组件渲染时缓存下来的旧配置
+          config: current.configSnapshot?.() ?? current.config ?? {},
         },
       });
       lastSize.current = nextSize;
@@ -298,6 +308,18 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       lastTheme.current = theme;
       post({ type: 'host:theme', payload: { theme } });
     }, [loadedAt, theme, post]);
+
+    // 配置写入 → 推给本 iframe。
+    // 不能依赖 storage 事件：Tauri 里宿主页（tauri.localhost）与插件 iframe
+    // （wtsl.localhost）不同 origin，宿主写 localStorage 不会向 iframe 派发事件。
+    // 每个实例（卡片 / 详情浮层 / 后台）各订阅一份，各自转给自己的 contentWindow；
+    // iframe 尚未加载完成时消息会丢，加载后的 host:init 快照会补上最新值。
+    useEffect(() => {
+      return onPluginConfigChange((changedPluginId, key, value) => {
+        if (changedPluginId !== pluginId) return;
+        post({ v: PROTOCOL_VERSION, type: 'host:config', payload: { key, value } });
+      });
+    }, [pluginId, post]);
 
     // 插件 → 宿主
     useEffect(() => {
@@ -443,6 +465,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
                 size={size}
                 theme={theme}
                 config={config}
+                configSnapshot={configSnapshot}
                 title={`${title ?? pluginId} ${overlay.title}`}
                 className={settingsStyles.frame}
                 onApiCall={onApiCall}

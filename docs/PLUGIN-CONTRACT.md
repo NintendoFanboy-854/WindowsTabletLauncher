@@ -21,6 +21,7 @@
 | 卡片内交互 | 插件在 iframe 内实现：主体点击 → `requestOverlay('detail', title)`；快捷控件自己 `stopPropagation` | 只负责卡片手势层（长按进编辑、拖拽）与浮层容器 |
 | 详情 | 同一插件页面的 `?view=detail` | 收到 `plugin:request-overlay` 后开宿主全窗口 Fluent Dialog，标题由插件给 |
 | 设置 | `manifest.json` 的 `settings` schema（分组 + 字段 + 默认值） | 通用表单渲染器生成设置页，读写走 `getConfig/setConfig` |
+| 配置同步 | 监听 `host:config`（增量 `{ key, value }`） | `setConfig` 写盘后向该插件所有 iframe 推送；不依赖 storage 事件 |
 | 设置入口 | 任意视图发 `plugin:request-host-settings` | 导航到设置页对应插件分区（按消息来源 pluginId） |
 | Agent 工具 | `plugin.ready(tools)` 声明 + `onToolCall` 处理 | 注册、路由、交给 Agent；不解释工具语义 |
 | 通知/强提醒 | 调桥接 API `notify` / `showReminder` | 宿主统一 Toaster / 遮罩 |
@@ -33,6 +34,12 @@
 > 加载的 `init` 之后会立即补发一次幂等的 `host:resize` / `host:theme`，SDK 也会在插件注册监听时
 > 重放最近一次消息；插件应通过 `useHostSize` / `useHostTheme`（或 `plugin.onInit` / `onResize` /
 > `onTheme`）读取，不要在首帧假设 init 已到达，也不要自己缓存布局/主题。
+>
+> **配置更新时序（D-29）**：`host:init` 只带一次配置快照；之后宿主每次 `setConfig` 都会给该插件
+> **所有 iframe**（卡片 / 详情浮层 / 后台）发 `host:config`（`{ key, value }` 增量）。插件用
+> `useStoredConfig` 或 `plugin.onConfig` 消费即可，**不能依赖 `window 'storage'` 事件**：Tauri 打包版
+> 宿主页（`http://tauri.localhost`）与插件 iframe（`http://wtsl.localhost`）不同 origin，storage 事件
+> 不会派发到插件文档；dev 浏览器（HTTP 插件源）同源只是巧合。
 
 ## 2. manifest 声明
 
@@ -98,8 +105,9 @@
 - 每插件分区提供「恢复默认」（取 schema 的 `default`）。
 - 未知字段类型：宿主跳过并显示“该设置项暂不支持”，不写坏配置。
 - 校验（类型/范围/枚举）由宿主做，插件读配置时再做一次 normalize 兜底。
-- 配置存储：`plugin.<pluginId>.<settings.key>`，由宿主 `setConfig` 写入；插件用 `useStoredConfig`
-  监听 storage 事件即时同步。
+- 配置存储：`plugin.<pluginId>.<settings.key>`，由宿主 `setConfig` 写入；写入后宿主向该插件的
+  所有 iframe 推 `host:config`，插件用 `useStoredConfig`（或自定义 hook 里的 `plugin.onConfig`）
+  即时同步。**不要用 storage 事件**（跨 origin 失效，见 §1 配置更新时序）。
 
 ## 3. 卡片交互契约（触控优先）
 

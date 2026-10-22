@@ -7,7 +7,11 @@
  * - 插件可以脱离宿主单独打开（开发时），此时 SDK 有自己的兜底行为。
  */
 
-export const PROTOCOL_VERSION = 1;
+/**
+ * 2：新增 `host:config`（宿主写配置后主动推送增量）。
+ * 旧的 1 版插件不认识这条消息、直接忽略即可；宿主不依赖插件回包。
+ */
+export const PROTOCOL_VERSION = 2;
 
 /** 宿主注入给插件的主题：直接给 Fluent token 的最终颜色值 */
 export interface ThemePayload {
@@ -65,6 +69,26 @@ export interface HostFocusMessage {
   type: 'host:focus';
 }
 
+/**
+ * 插件配置被写入后的增量推送。
+ *
+ * 不能靠 localStorage 的 `storage` 事件：Tauri 运行时宿主页是
+ * `http://tauri.localhost`、插件 iframe 是 `http://wtsl.localhost`（不同 origin，
+ * 见 `src-tauri/src/protocol.rs`），`HostBridge.setConfig` 写的宿主存储区不会
+ * 向插件文档派发 storage 事件。宿主写入后必须主动把新值发给该插件的每个 iframe
+ * （卡片 / 详情浮层 / 后台），插件用 `plugin.onConfig` / `useStoredConfig` 消费。
+ */
+export interface HostConfigMessage {
+  v: number;
+  type: 'host:config';
+  payload: {
+    /** 配置键（不含 `plugin.<pluginId>.` 前缀） */
+    key: string;
+    /** 新值（与 `getConfig` 读到的 JSON 值同形） */
+    value: unknown;
+  };
+}
+
 /** 宿主替 Agent 调用插件的工具 */
 export interface HostToolCallMessage {
   type: 'host:tool-call';
@@ -79,6 +103,7 @@ export type HostToPluginMessage =
   | HostResizeMessage
   | HostThemeMessage
   | HostFocusMessage
+  | HostConfigMessage
   | HostToolCallMessage;
 
 // ---------- 插件 → 宿主 ----------

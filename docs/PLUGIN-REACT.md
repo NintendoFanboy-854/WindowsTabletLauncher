@@ -80,13 +80,39 @@ createRoot(document.getElementById('root')).render(<Root />);
    - 卡片里长按 / 设置入口 → `requestSettings('时钟设置')`；详情入口 → `requestOverlay('detail', '天气详情')`；
    - 宿主用 `?view=<name>` 重新加载同一页面的对应视图（全窗口 Fluent Dialog，自带主题）；
    - `main.jsx` 用 `getOverlayView()` 分支渲染：`'settings'` → 设置视图，`'detail'` → 详情视图，`null` → 卡片视图；
-   - 浮层里用 `useStoredConfig` / `plugin.setConfig` 持久化，改完自动生效（卡片视图通过 storage 事件同步）。
+   - 浮层里用 `useStoredConfig` / `plugin.setConfig` 持久化，改完自动生效（宿主 `host:config`
+     推送，卡片/详情 iframe 即时同步；**不要再假设 storage 事件**）。
 7. **Agent 工具**：`useAgentTools([{ name, description, parameters }], { 'x.y': fn })`。
 8. **尺寸**：`useHostSize(sizeKeyOf, '2x1')`；按档位决定显示层级（信息预算见
    `docs/DENSITY.md`），小档位优先保主信息。`useHostSize` 同时消费 `host:init` 与
    `host:resize`，所以 reload 后用户保存的非默认档位也会立即对齐。
 9. **等待态**：按 `docs/FLUENT2.md §12`：<1s 不显示；1–3s Spinner；>3s 进度/文案。
 10. **空态**：Fluent 排版 + 一个主操作，不用两套空态文案。
+
+## 配置同步（跨 origin，D-29）
+
+宿主写插件配置有三个入口：插件自己 `plugin.setConfig`、宿主设置页表单、Agent 工具。
+无论哪个入口，宿主写完后都会通过 **`host:config`**（`{ key, value }` 增量）推给该插件的
+**所有 iframe**（卡片 / 详情浮层 / 后台常驻）。
+
+- `useStoredConfig` 已封装全部逻辑：mount 时向宿主 `getConfig` 重读一次、订阅
+  `plugin.onConfig` 应用推送、`storage` 事件仅作 dev 同源兜底。直接用即可。
+- **不要自己监听 `window 'storage'` 来同步宿主配置**：Tauri 打包版宿主页是
+  `http://tauri.localhost`、插件 iframe 是 `http://wtsl.localhost`（不同 origin，
+  见 `src-tauri/src/protocol.rs`），`storage` 事件只在同源文档之间派发，插件收不到；
+  dev 浏览器（HTTP 插件源）下同源才会触发，不能依赖。
+- 自定义配置 hook（如 countdown 的 `usePluginConfig`）必须同时处理
+  `plugin.onConfig((key, value) => …)`，并保留 mount 重读（`host:init` 快照可能过期）。
+- 插件写配置后宿主会把同值再推回来；本地状态按序号丢弃晚到的旧 `getConfig` 响应，
+  避免慢返回覆盖新写入（`useStoredConfig` 已处理）。
+- **旧构建的第三方插件需要重新打包**才会走 `host:config`：只升级宿主时它们行为退化为
+  修复前（设置页/详情改了配置，已挂载卡片要等重载才更新），不会崩；`plugin-sdk.js` 与
+  共享 hook 是随宿主/插件包分发的新代码。
+- 维护不变式（P2-11）：SDK `plugin.onConfig` **注册时的快照重放是同步的**
+  （`plugin-sdk.js` 在 `onConfig` 里同步 `forEach`）；`useStoredConfig` 依赖这一点用
+  `replaying` 标志区分「注册重放」与「注册完成后的真实推送」。如果以后把重放改成异步
+  （队列/微任务），必须同步改 `_shared/host.js` 的这段逻辑，否则慢加载 iframe 可能在
+  重放与权威 `getConfig` 之间读到旧值。
 
 ## 卡片手势（`useHostCardGesture`）
 

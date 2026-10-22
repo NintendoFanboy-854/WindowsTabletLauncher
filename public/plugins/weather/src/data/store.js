@@ -150,7 +150,7 @@ export function addPlaceToList(places, place) {
  * 应用一次定位结果：不存在则加入并设为当前，已存在则切换为当前。
  *
  * 当前城市已经是它时返回原数组引用，调用方据此跳过写配置（避免无意义写盘与
- * storage 事件）。useWeather 的自动定位 effect 与 weather.locate 工具共用，
+ * 多轮 `host:config` 推送）。useWeather 的自动定位 effect 与 weather.locate 工具共用，
  * 保证两条路径语义一致。
  */
 export function applyLocatedPlace(places, place) {

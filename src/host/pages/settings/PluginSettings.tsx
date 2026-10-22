@@ -28,6 +28,7 @@ import {
 import { Eye20Regular, EyeOff20Regular } from '@fluentui/react-icons';
 
 import type { HostBridge } from '../../bridge';
+import { onPluginConfigChange } from '../../bridge/configBus';
 import type {
   NormalizedBooleanSetting,
   NormalizedEnumSetting,
@@ -224,16 +225,26 @@ function PluginSettingsForm({ plugin, schema, bridge, notify }: PluginSettingsFo
 
   const merged = useMemo(() => mergeSettingsValues(schema, raw), [schema, raw]);
 
-  // 插件自己写了设置（例如卡片上的快捷操作）时同步到宿主表单：
-  // storage 事件只在其它文档改动时触发，宿主自己写不会回环。
+  // 插件自己写了设置（例如卡片上的快捷操作 / Agent 工具）时同步到宿主表单。
+  // 不能依赖 storage 事件：Tauri 里宿主页和插件 iframe 不同 origin，插件 iframe
+  // 经桥接写到宿主 localStorage 时不会给宿主文档派发 storage 事件；改订阅宿主内
+  // 配置总线（bridge.setConfig → emitPluginConfigChange）。storage 监听保留给
+  // dev 同源模式 / 外部直接写 localStorage 的情况。
   useEffect(() => {
     const storageKey = `plugin.${plugin.id}.${schema.key}`;
     const onStorage = (event: StorageEvent) => {
       if (event.key !== null && event.key !== storageKey) return;
       setRaw(readStoredSettings(bridge, plugin.id, schema.key));
     };
+    const offConfig = onPluginConfigChange((pluginId, key) => {
+      if (pluginId !== plugin.id || key !== schema.key) return;
+      setRaw(readStoredSettings(bridge, plugin.id, schema.key));
+    });
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      offConfig();
+    };
   }, [bridge, plugin.id, schema.key]);
 
   // 防御性兜底：组件若被复用（例如分区切换但调用方漏了 key），raw 也必须属于当前插件；

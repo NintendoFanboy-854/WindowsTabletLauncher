@@ -25137,52 +25137,66 @@ function wx(t, n) {
 		};
 	}, []), i;
 }
-function Tx(t, n, r) {
+function Tx(e, t) {
+	if (e === t) return !0;
+	try {
+		return JSON.stringify(e) === JSON.stringify(t);
+	} catch {
+		return !1;
+	}
+}
+function Ex(t, n, r) {
 	let i = (0, P.useRef)(r);
 	i.current = r;
-	let [a, o] = (0, P.useState)(() => {
+	let a = (0, P.useRef)(n);
+	a.current = n;
+	let [o, s] = (0, P.useState)(() => {
 		let e = bx(t);
 		return i.current ? i.current(e) : e ?? n;
-	}), [s, c] = (0, P.useState)(() => bx(t) !== void 0);
-	(0, P.useEffect)(() => {
-		let r = bx(t);
-		if (r !== void 0) {
-			o(i.current ? i.current(r) : r), c(!0);
-			return;
-		}
-		let a = !0;
-		return e.getConfig(t).then((e) => {
-			a && (o(i.current ? i.current(e) : e ?? n), c(!0));
+	}), [c, l] = (0, P.useState)(() => bx(t) !== void 0), u = (0, P.useRef)(o);
+	u.current = o;
+	let d = (0, P.useRef)(0), f = (0, P.useRef)(!0);
+	(0, P.useEffect)(() => () => {
+		f.current = !1;
+	}, []);
+	let p = (0, P.useCallback)((e) => {
+		s(i.current ? i.current(e) : e ?? a.current);
+	}, []), m = (0, P.useCallback)(() => {
+		let n = ++d.current;
+		e.getConfig(t).then((e) => {
+			f.current && n === d.current && (p(e), l(!0));
 		}).catch(() => {
-			a && c(!0);
-		}), () => {
-			a = !1;
-		};
-	}, [t]);
-	let l = (0, P.useCallback)((n) => {
-		o((r) => {
-			let i = typeof n == "function" ? n(r) : n;
-			return e.setConfig(t, i).catch(() => {}), i;
+			f.current && n === d.current && l(!0);
 		});
-	}, [t]);
+	}, [p, t]);
 	return (0, P.useEffect)(() => {
-		let r = `plugin.${e.pluginId}.${t}`, a = (a) => {
-			(a.key === r || a.key === null) && e.getConfig(t).then((e) => {
-				o(i.current ? i.current(e) : e ?? n);
-			}).catch(() => {});
+		m();
+	}, [m]), (0, P.useEffect)(() => {
+		let n = !0, r = e.onConfig?.((e, r) => {
+			e === t && (n || (d.current += 1), l(!0), !Tx(r, u.current) && p(r));
+		});
+		return n = !1, () => {
+			r?.();
 		};
-		return window.addEventListener("storage", a), () => window.removeEventListener("storage", a);
-	}, [t]), [
-		a,
-		l,
-		s
+	}, [p, t]), (0, P.useEffect)(() => {
+		let n = `plugin.${e.pluginId}.${t}`, r = (e) => {
+			(e.key === null || e.key === n) && m();
+		};
+		return window.addEventListener("storage", r), () => window.removeEventListener("storage", r);
+	}, [t, m]), [
+		o,
+		(0, P.useCallback)((n) => {
+			let r = typeof n == "function" ? n(u.current) : n;
+			d.current += 1, u.current = r, s(r), e.setConfig(t, r).catch(() => {});
+		}, [t]),
+		c
 	];
 }
-function Ex() {
+function Dx() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function Dx(e, t) {
+function Ox(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -25191,10 +25205,10 @@ function Dx(e, t) {
 		}
 	}, "*");
 }
-function Ox() {
+function kx() {
 	window.parent.postMessage({ type: "plugin:request-host-settings" }, "*");
 }
-var kx = 500, Ax = 8, jx = [
+var Ax = 500, jx = 8, Mx = [
 	"button",
 	"input",
 	"textarea",
@@ -25208,16 +25222,16 @@ var kx = 500, Ax = 8, jx = [
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function Mx(e, t) {
+function Nx(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(jx);
+	let n = t.closest(Mx);
 	return !!(n && n !== e && e.contains(n));
 }
-function Nx() {
+function Px() {
 	let t = (0, P.useRef)(null);
 	return (0, P.useEffect)(() => {
 		let n = t.current;
-		if (!n || !e.inHost || Ex()) return;
+		if (!n || !e.inHost || Dx()) return;
 		let r = null, i = 0, a = 0, o = 0, s = !1, c = !1, l = 0, u = !1, d = (e) => e === "mouse" || e === "pen", f = (e, t) => {
 			window.parent.postMessage({
 				type: "plugin:card-pointer",
@@ -25238,15 +25252,15 @@ function Nx() {
 		}, _ = () => {
 			u && (l && window.clearTimeout(l), l = window.setTimeout(h, 1e3));
 		}, v = (e) => {
-			e.button === 0 && (Mx(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
+			e.button === 0 && (Nx(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
 				o = 0, s = !0, g(), window.parent.postMessage({ type: "plugin:request-edit-mode" }, "*");
-			}, kx)));
+			}, Ax)));
 		}, y = (e) => {
 			if (d(e.pointerType)) {
-				let t = !Mx(n, e.target);
+				let t = !Nx(n, e.target);
 				t !== c && (c = t, f(t ? "hover-enter" : "hover-leave", e.pointerType));
 			}
-			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= Ax || (p(), !s && (r = null, f("cancel", e.pointerType))));
+			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= jx || (p(), !s && (r = null, f("cancel", e.pointerType))));
 		}, b = (e) => {
 			r !== null && e.pointerId === r && (r = null, p(), f("up", e.pointerType), s && _());
 		}, x = (e) => {
@@ -25259,10 +25273,10 @@ function Nx() {
 		};
 	}, []), { ref: t };
 }
-typeof window < "u" && Ex() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && Dx() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function Px(t, n) {
+function Fx(t, n) {
 	let r = (0, P.useRef)(n);
 	r.current = n;
 	let i = (0, P.useRef)(t);
@@ -25281,10 +25295,10 @@ function Px(t, n) {
 		}
 	})), []);
 }
-function Fx() {
+function Ix() {
 	e.exitFocus();
 }
-var Ix = 864e5;
+var Lx = 864e5;
 function Q(e) {
 	if (e instanceof Date) return Number.isNaN(e.getTime()) ? null : e;
 	if (typeof e == "string" && e.trim()) {
@@ -25293,58 +25307,58 @@ function Q(e) {
 	}
 	return typeof e == "number" && Number.isFinite(e) ? new Date(e) : null;
 }
-function Lx(e) {
+function Rx(e) {
 	return String(e).padStart(2, "0");
 }
-function Rx(e) {
-	let t = Q(e);
-	return t ? `${t.getFullYear()}-${Lx(t.getMonth() + 1)}-${Lx(t.getDate())}` : "";
-}
 function zx(e) {
+	let t = Q(e);
+	return t ? `${t.getFullYear()}-${Rx(t.getMonth() + 1)}-${Rx(t.getDate())}` : "";
+}
+function Bx(e) {
 	let t = Q(e) || /* @__PURE__ */ new Date();
 	return new Date(t.getFullYear(), t.getMonth(), t.getDate(), 0, 0, 0, 0);
 }
-function Bx(e, t) {
+function Vx(e, t) {
 	let n = Q(e) || /* @__PURE__ */ new Date(), r = new Date(n);
 	return r.setDate(r.getDate() + t), r;
 }
-function Vx(e, t) {
+function Hx(e, t) {
 	let n = Q(e) || /* @__PURE__ */ new Date(), r = n.getDate(), i = new Date(n);
 	i.setDate(1), i.setMonth(i.getMonth() + t);
 	let a = new Date(i.getFullYear(), i.getMonth() + 1, 0).getDate();
 	return i.setDate(Math.min(r, a)), i;
 }
-function Hx(e, t) {
+function Ux(e, t) {
 	let n = Q(e) || /* @__PURE__ */ new Date(), r = n.getDate(), i = new Date(n);
 	i.setDate(1), i.setFullYear(i.getFullYear() + t);
 	let a = new Date(i.getFullYear(), i.getMonth() + 1, 0).getDate();
 	return i.setDate(Math.min(r, a)), i;
 }
-function Ux(e, t = 1) {
-	let n = zx(e);
-	return Bx(n, -((n.getDay() - t + 7) % 7));
+function Wx(e, t = 1) {
+	let n = Bx(e);
+	return Vx(n, -((n.getDay() - t + 7) % 7));
 }
-function Wx(e) {
+function Gx(e) {
 	let t = Q(e) || /* @__PURE__ */ new Date();
 	return new Date(t.getFullYear(), t.getMonth(), 1, 0, 0, 0, 0);
 }
-function Gx(e, t) {
+function Kx(e, t) {
 	let n = Q(e), r = Q(t);
 	return !n || !r ? !1 : n.getFullYear() === r.getFullYear() && n.getMonth() === r.getMonth() && n.getDate() === r.getDate();
 }
-function Kx(e, t) {
-	let n = zx(e), r = zx(t);
-	return Math.round((r.getTime() - n.getTime()) / Ix);
-}
-function qx(e) {
-	let t = Q(e);
-	return t ? `${Lx(t.getHours())}:${Lx(t.getMinutes())}` : "";
+function qx(e, t) {
+	let n = Bx(e), r = Bx(t);
+	return Math.round((r.getTime() - n.getTime()) / Lx);
 }
 function Jx(e) {
 	let t = Q(e);
-	return t ? `${t.getFullYear()}-${Lx(t.getMonth() + 1)}-${Lx(t.getDate())}T${Lx(t.getHours())}:${Lx(t.getMinutes())}` : "";
+	return t ? `${Rx(t.getHours())}:${Rx(t.getMinutes())}` : "";
 }
-function Yx(e, t) {
+function Yx(e) {
+	let t = Q(e);
+	return t ? `${t.getFullYear()}-${Rx(t.getMonth() + 1)}-${Rx(t.getDate())}T${Rx(t.getHours())}:${Rx(t.getMinutes())}` : "";
+}
+function Xx(e, t) {
 	if (!e) return null;
 	let [n, r, i] = e.split("-").map(Number), a = 23, o = 59;
 	if (t) {
@@ -25353,26 +25367,26 @@ function Yx(e, t) {
 	}
 	return new Date(n, r - 1, i, a, o, 0, 0).toISOString();
 }
-function Xx(e, t = /* @__PURE__ */ new Date()) {
-	let n = Q(e);
-	if (!n) return "";
-	let r = Kx(t, n);
-	return r === 0 ? "今天" : r === 1 ? "明天" : r === 2 ? "后天" : r === -1 ? "昨天" : n.getFullYear() === t.getFullYear() ? `${n.getMonth() + 1}月${n.getDate()}日` : `${n.getFullYear()}年${n.getMonth() + 1}月${n.getDate()}日`;
-}
 function Zx(e, t = /* @__PURE__ */ new Date()) {
 	let n = Q(e);
 	if (!n) return "";
-	let r = Rx(n), i = Rx(t), a = Rx(Bx(t, 1)), o = n.getHours() !== 23 || n.getMinutes() !== 59;
+	let r = qx(t, n);
+	return r === 0 ? "今天" : r === 1 ? "明天" : r === 2 ? "后天" : r === -1 ? "昨天" : n.getFullYear() === t.getFullYear() ? `${n.getMonth() + 1}月${n.getDate()}日` : `${n.getFullYear()}年${n.getMonth() + 1}月${n.getDate()}日`;
+}
+function Qx(e, t = /* @__PURE__ */ new Date()) {
+	let n = Q(e);
+	if (!n) return "";
+	let r = zx(n), i = zx(t), a = zx(Vx(t, 1)), o = n.getHours() !== 23 || n.getMinutes() !== 59;
 	if (r < i) {
-		let e = Kx(n, t);
+		let e = qx(n, t);
 		return e <= 1 ? "已逾期" : `逾期 ${e} 天`;
 	}
-	if (r === i) return o ? `今天 ${qx(n)}` : "今天";
-	if (r === a) return o ? `明天 ${qx(n)}` : "明天";
-	let s = Xx(n, t);
-	return o ? `${s} ${qx(n)}` : s;
+	if (r === i) return o ? `今天 ${Jx(n)}` : "今天";
+	if (r === a) return o ? `明天 ${Jx(n)}` : "明天";
+	let s = Zx(n, t);
+	return o ? `${s} ${Jx(n)}` : s;
 }
-var Qx = [
+var $x = [
 	"日",
 	"一",
 	"二",
@@ -25381,10 +25395,10 @@ var Qx = [
 	"五",
 	"六"
 ];
-function $x(e = 1) {
-	return Array.from({ length: 7 }, (t, n) => Qx[(e + n) % 7]);
+function eS(e = 1) {
+	return Array.from({ length: 7 }, (t, n) => $x[(e + n) % 7]);
 }
-function eS(e) {
+function tS(e) {
 	if (e == null || e === "") return null;
 	if (typeof e == "string") {
 		let t = e.trim();
@@ -25396,7 +25410,7 @@ function eS(e) {
 	let t = Q(e);
 	return t ? t.toISOString() : null;
 }
-var tS = [
+var nS = [
 	{
 		value: "daily",
 		label: "每天"
@@ -25414,17 +25428,17 @@ var tS = [
 		label: "每年"
 	}
 ];
-function nS(e, t) {
+function rS(e, t) {
 	let n = Q(e) || /* @__PURE__ */ new Date();
 	switch (t) {
-		case "daily": return Bx(n, 1);
-		case "weekly": return Bx(n, 7);
-		case "monthly": return Vx(n, 1);
-		case "yearly": return Hx(n, 1);
+		case "daily": return Vx(n, 1);
+		case "weekly": return Vx(n, 7);
+		case "monthly": return Hx(n, 1);
+		case "yearly": return Ux(n, 1);
 		default: return null;
 	}
 }
-var rS = [
+var iS = [
 	{
 		value: 0,
 		label: "无",
@@ -25450,17 +25464,17 @@ var rS = [
 		color: "var(--colorPaletteRedForeground2)"
 	}
 ];
-function iS(e) {
-	return rS.find((t) => t.value === e) || rS[0];
+function aS(e) {
+	return iS.find((t) => t.value === e) || iS[0];
 }
 //#endregion
 //#region public/plugins/todo/js/store.js
-var aS = {
+var oS = {
 	lists: "todo.lists",
 	tasks: "todo.tasks",
 	tags: "todo.tags",
 	settings: "todo.settings"
-}, oS = [
+}, sS = [
 	"colorPaletteBlueForeground2",
 	"colorPaletteGreenForeground2",
 	"colorPaletteMarigoldForeground2",
@@ -25469,7 +25483,7 @@ var aS = {
 	"colorPalettePurpleForeground2",
 	"colorPaletteDarkOrangeForeground2",
 	"colorPaletteCranberryForeground2"
-], sS = [
+], cS = [
 	{
 		value: "manual",
 		label: "手动"
@@ -25486,7 +25500,7 @@ var aS = {
 		value: "created",
 		label: "创建时间"
 	}
-], cS = {
+], lS = {
 	defaultListId: null,
 	showCompleted: !0,
 	defaultSort: "manual",
@@ -25494,15 +25508,15 @@ var aS = {
 	weekStart: 1,
 	reminders: {}
 };
-function lS() {
+function uS() {
 	try {
 		return globalThis.localStorage || null;
 	} catch {
 		return null;
 	}
 }
-function uS(e, t) {
-	let n = lS();
+function dS(e, t) {
+	let n = uS();
 	if (!n) return t;
 	try {
 		let r = n.getItem(e);
@@ -25511,42 +25525,42 @@ function uS(e, t) {
 		return t;
 	}
 }
-function dS(e, t) {
-	let n = lS();
+function fS(e, t) {
+	let n = uS();
 	if (n) try {
 		n.setItem(e, JSON.stringify(t));
 	} catch (t) {
 		console.error("[todo] 保存失败", e, t);
 	}
 }
-function fS() {
-	let e = uS(aS.settings, null);
+function pS() {
+	let e = dS(oS.settings, null);
 	if (!e || typeof e != "object") return {};
 	let t = e.reminders;
 	return t && typeof t == "object" && !Array.isArray(t) ? { ...t } : {};
 }
-function pS(e) {
+function mS(e) {
 	let t = Q(e);
 	return t ? Math.floor(t.getTime() / 6e4) : null;
 }
-function mS(e, t) {
-	let n = pS(e);
-	return n !== null && n === pS(t);
-}
-function hS() {
-	return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+function hS(e, t) {
+	let n = mS(e);
+	return n !== null && n === mS(t);
 }
 function gS() {
+	return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+function _S() {
 	return (/* @__PURE__ */ new Date()).toISOString();
 }
-function _S(e) {
+function vS(e) {
 	return Number.isInteger(e) && e >= 0 && e <= 3;
 }
-function vS(e, t) {
+function yS(e, t) {
 	if (!e || typeof e != "object" || typeof e.title != "string") return null;
-	let n = Q(e.createdAt)?.toISOString() || gS();
+	let n = Q(e.createdAt)?.toISOString() || _S();
 	return {
-		id: typeof e.id == "string" && e.id ? e.id : hS(),
+		id: typeof e.id == "string" && e.id ? e.id : gS(),
 		listId: typeof e.listId == "string" && e.listId ? e.listId : t,
 		title: e.title,
 		note: typeof e.note == "string" && e.note ? e.note : void 0,
@@ -25555,13 +25569,13 @@ function vS(e, t) {
 		createdAt: n,
 		updatedAt: Q(e.updatedAt)?.toISOString() || n,
 		order: Number.isFinite(e.order) ? e.order : 0,
-		priority: _S(e.priority) ? e.priority : 0,
+		priority: vS(e.priority) ? e.priority : 0,
 		dueAt: Q(e.dueAt)?.toISOString() || void 0,
 		remindAt: Q(e.remindAt)?.toISOString() || void 0,
-		recurrence: tS.some((t) => t.value === e.recurrence) ? e.recurrence : void 0,
+		recurrence: nS.some((t) => t.value === e.recurrence) ? e.recurrence : void 0,
 		tags: Array.isArray(e.tags) ? e.tags.filter((e) => typeof e == "string" && e.trim()).map((e) => e.trim()) : [],
 		subtasks: Array.isArray(e.subtasks) ? e.subtasks.filter((e) => e && typeof e.title == "string").map((e, t) => ({
-			id: typeof e.id == "string" && e.id ? e.id : hS(),
+			id: typeof e.id == "string" && e.id ? e.id : gS(),
 			title: e.title,
 			done: !!e.done,
 			order: Number.isFinite(e.order) ? e.order : t
@@ -25575,32 +25589,32 @@ var $ = new class {
 			tasks: [],
 			tags: [],
 			settings: {
-				...cS,
+				...lS,
 				reminders: {}
 			}
 		}, this.listeners = /* @__PURE__ */ new Set(), this.storageBound = !1;
 	}
 	load() {
-		let e = uS(aS.lists, null), t = Array.isArray(e) && e.length ? e.filter((e) => e && typeof e.name == "string").map((e, t) => ({
-			id: typeof e.id == "string" && e.id ? e.id : hS(),
+		let e = dS(oS.lists, null), t = Array.isArray(e) && e.length ? e.filter((e) => e && typeof e.name == "string").map((e, t) => ({
+			id: typeof e.id == "string" && e.id ? e.id : gS(),
 			name: e.name,
-			color: typeof e.color == "string" && e.color ? e.color : oS[t % oS.length],
+			color: typeof e.color == "string" && e.color ? e.color : sS[t % sS.length],
 			order: Number.isFinite(e.order) ? e.order : t
 		})).sort((e, t) => e.order - t.order) : [];
 		t.length || t.push({
-			id: hS(),
+			id: gS(),
 			name: "我的待办",
-			color: oS[0],
+			color: sS[0],
 			order: 0
 		});
-		let n = new Set(t.map((e) => e.id)), r = t[0].id, i = uS(aS.tasks, []), a = (Array.isArray(i) ? i : []).map((e) => vS(e, r)).filter(Boolean).map((e) => n.has(e.listId) ? e : {
+		let n = new Set(t.map((e) => e.id)), r = t[0].id, i = dS(oS.tasks, []), a = (Array.isArray(i) ? i : []).map((e) => yS(e, r)).filter(Boolean).map((e) => n.has(e.listId) ? e : {
 			...e,
 			listId: r
-		}), o = uS(aS.tags, []), s = Array.isArray(o) ? o.filter((e) => typeof e == "string") : [], c = uS(aS.settings, {}), l = {
-			...cS,
+		}), o = dS(oS.tags, []), s = Array.isArray(o) ? o.filter((e) => typeof e == "string") : [], c = dS(oS.settings, {}), l = {
+			...lS,
 			...c && typeof c == "object" ? c : {}
 		};
-		return (!l.reminders || typeof l.reminders != "object") && (l.reminders = {}), sS.some((e) => e.value === l.defaultSort) || (l.defaultSort = "manual"), l.weekStart !== 0 && l.weekStart !== 1 && (l.weekStart = 1), t.some((e) => e.id === l.defaultListId) || (l.defaultListId = r), this.state = {
+		return (!l.reminders || typeof l.reminders != "object") && (l.reminders = {}), cS.some((e) => e.value === l.defaultSort) || (l.defaultSort = "manual"), l.weekStart !== 0 && l.weekStart !== 1 && (l.weekStart = 1), t.some((e) => e.id === l.defaultListId) || (l.defaultListId = r), this.state = {
 			lists: t,
 			tasks: a,
 			tags: s,
@@ -25609,7 +25623,7 @@ var $ = new class {
 	}
 	bindStorageSync() {
 		this.storageBound || typeof window > "u" || (this.storageBound = !0, window.addEventListener("storage", (e) => {
-			e.key && Object.values(aS).includes(e.key) && (this.load(), this.emit());
+			e.key && Object.values(oS).includes(e.key) && (this.load(), this.emit());
 		}));
 	}
 	subscribe(e) {
@@ -25624,21 +25638,21 @@ var $ = new class {
 	}
 	persistAll() {
 		this.state.settings.reminders = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
-		}, dS(aS.lists, this.state.lists), dS(aS.tasks, this.state.tasks), dS(aS.tags, this.state.tags), dS(aS.settings, this.state.settings);
+		}, fS(oS.lists, this.state.lists), fS(oS.tasks, this.state.tasks), fS(oS.tags, this.state.tags), fS(oS.settings, this.state.settings);
 	}
 	persistTasks() {
-		dS(aS.tasks, this.state.tasks);
+		fS(oS.tasks, this.state.tasks);
 	}
 	persistLists() {
-		dS(aS.lists, this.state.lists);
+		fS(oS.lists, this.state.lists);
 	}
 	persistTags() {
-		dS(aS.tags, this.state.tags);
+		fS(oS.tags, this.state.tags);
 	}
 	persistSettings() {
-		dS(aS.settings, this.state.settings);
+		fS(oS.settings, this.state.settings);
 	}
 	get lists() {
 		return [...this.state.lists].sort((e, t) => e.order - t.order);
@@ -25656,7 +25670,7 @@ var $ = new class {
 		return this.state.tasks.find((t) => t.id === e) || null;
 	}
 	listColor(e) {
-		return this.listById(e)?.color || oS[0];
+		return this.listById(e)?.color || sS[0];
 	}
 	nextOrder(e) {
 		let t = this.state.tasks.filter((t) => t.listId === e);
@@ -25696,7 +25710,7 @@ var $ = new class {
 		return this.state.tasks.filter((e) => {
 			if (e.done || !e.dueAt) return !1;
 			let r = Q(e.dueAt);
-			return Gx(r, n) ? !0 : t && r < zx(n);
+			return Kx(r, n) ? !0 : t && r < Bx(n);
 		});
 	}
 	dueCountOn(e) {
@@ -25713,8 +25727,8 @@ var $ = new class {
 		return this.sortTasks(i, "due");
 	}
 	completionStats(e = 84, { weighted: t = !1 } = {}) {
-		let n = zx(/* @__PURE__ */ new Date()), r = Bx(n, -(e - 1)), i = /* @__PURE__ */ new Map();
-		for (let t = 0; t < e; t++) i.set(Rx(Bx(r, t)), {
+		let n = Bx(/* @__PURE__ */ new Date()), r = Vx(n, -(e - 1)), i = /* @__PURE__ */ new Map();
+		for (let t = 0; t < e; t++) i.set(zx(Vx(r, t)), {
 			count: 0,
 			weight: 0
 		});
@@ -25723,14 +25737,14 @@ var $ = new class {
 			if (!e.done || !e.doneAt) continue;
 			let t = Q(e.doneAt);
 			if (!t || t < r) continue;
-			let n = i.get(Rx(t));
+			let n = i.get(zx(t));
 			n && (n.count += 1, n.weight += e.priority === 3 ? 3 : e.priority === 2 ? 2 : 1, a += 1, o += e.priority === 3 ? 3 : e.priority === 2 ? 2 : 1);
 		}
 		let s = (() => {
 			let e = n;
-			(i.get(Rx(n))?.count || 0) === 0 && (e = Bx(n, -1));
+			(i.get(zx(n))?.count || 0) === 0 && (e = Vx(n, -1));
 			let t = 0;
-			for (; i.has(Rx(e)) && (i.get(Rx(e))?.count || 0) > 0;) t += 1, e = Bx(e, -1);
+			for (; i.has(zx(e)) && (i.get(zx(e))?.count || 0) > 0;) t += 1, e = Vx(e, -1);
 			return t;
 		})();
 		return {
@@ -25745,18 +25759,18 @@ var $ = new class {
 		};
 	}
 	touch(e) {
-		e.updatedAt = gS();
+		e.updatedAt = _S();
 	}
 	addTask(e = {}) {
 		let t = typeof e.title == "string" ? e.title.trim() : "";
 		if (!t) throw Error("title 不能为空");
 		if (e.listId !== void 0 && e.listId !== null && !this.state.lists.some((t) => t.id === e.listId)) throw Error(`找不到清单 ${e.listId}`);
 		let n = e.listId || this.settings.defaultListId || this.state.lists[0].id;
-		if (e.priority !== void 0 && e.priority !== null && !_S(e.priority)) throw Error("priority 必须是 0–3");
+		if (e.priority !== void 0 && e.priority !== null && !vS(e.priority)) throw Error("priority 必须是 0–3");
 		let r = e.recurrence ?? void 0;
-		if (r && !tS.some((e) => e.value === r)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
-		let i = gS(), a = {
-			id: hS(),
+		if (r && !nS.some((e) => e.value === r)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
+		let i = _S(), a = {
+			id: gS(),
 			listId: n,
 			title: t,
 			note: typeof e.note == "string" && e.note.trim() ? e.note.trim() : void 0,
@@ -25764,13 +25778,13 @@ var $ = new class {
 			createdAt: i,
 			updatedAt: i,
 			order: this.nextOrder(n),
-			priority: _S(e.priority) ? e.priority : 0,
-			dueAt: eS(e.dueAt) || void 0,
-			remindAt: eS(e.remindAt) || void 0,
+			priority: vS(e.priority) ? e.priority : 0,
+			dueAt: tS(e.dueAt) || void 0,
+			remindAt: tS(e.remindAt) || void 0,
 			recurrence: r || void 0,
 			tags: Array.isArray(e.tags) ? e.tags.filter((e) => typeof e == "string" && e.trim()).map((e) => e.trim()) : [],
 			subtasks: Array.isArray(e.subtasks) ? e.subtasks.filter((e) => e && typeof (e.title ?? e) == "string" && String(e.title ?? e).trim()).map((e, t) => ({
-				id: hS(),
+				id: gS(),
 				title: String(e.title ?? e).trim(),
 				done: !!e.done,
 				order: t
@@ -25788,15 +25802,15 @@ var $ = new class {
 			n.title = e;
 		}
 		if (r.note !== void 0 && (n.note = (typeof r.note == "string" ? r.note.trim() : "") || void 0), r.priority !== void 0) {
-			if (!_S(r.priority)) throw Error("priority 必须是 0–3");
+			if (!vS(r.priority)) throw Error("priority 必须是 0–3");
 			n.priority = r.priority;
 		}
-		if (r.dueAt !== void 0 && (n.dueAt = eS(r.dueAt) || void 0), r.remindAt !== void 0) {
-			let e = n.remindAt, t = eS(r.remindAt) || void 0;
-			n.remindAt = t, mS(e, t) || this.clearFiredReminder(n);
+		if (r.dueAt !== void 0 && (n.dueAt = tS(r.dueAt) || void 0), r.remindAt !== void 0) {
+			let e = n.remindAt, t = tS(r.remindAt) || void 0;
+			n.remindAt = t, hS(e, t) || this.clearFiredReminder(n);
 		}
 		if (r.recurrence !== void 0) {
-			if (r.recurrence && !tS.some((e) => e.value === r.recurrence)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
+			if (r.recurrence && !nS.some((e) => e.value === r.recurrence)) throw Error("recurrence 必须是 daily / weekly / monthly / yearly");
 			n.recurrence = r.recurrence || void 0;
 		}
 		if (r.tags !== void 0) {
@@ -25815,15 +25829,15 @@ var $ = new class {
 		return this.setDoneInternal(n, !!t), this.touch(n), this.persistTasks(), this.emit(), n;
 	}
 	setDoneInternal(e, t) {
-		e.done !== t && (e.done = t, e.doneAt = t ? gS() : void 0, t && e.recurrence && this.spawnNextOccurrence(e));
+		e.done !== t && (e.done = t, e.doneAt = t ? _S() : void 0, t && e.recurrence && this.spawnNextOccurrence(e));
 	}
 	spawnNextOccurrence(e) {
-		let t = Q(e.dueAt) || /* @__PURE__ */ new Date(), n = nS(t, e.recurrence);
+		let t = Q(e.dueAt) || /* @__PURE__ */ new Date(), n = rS(t, e.recurrence);
 		if (!n) return null;
 		let r = /* @__PURE__ */ new Date(), i = 0;
-		for (; n <= r && i < 1e3;) n = nS(n, e.recurrence), i += 1;
-		let a = n.getTime() - t.getTime(), o = gS(), s = {
-			id: hS(),
+		for (; n <= r && i < 1e3;) n = rS(n, e.recurrence), i += 1;
+		let a = n.getTime() - t.getTime(), o = _S(), s = {
+			id: gS(),
 			listId: e.listId,
 			title: e.title,
 			note: e.note,
@@ -25837,7 +25851,7 @@ var $ = new class {
 			recurrence: e.recurrence,
 			tags: [...e.tags],
 			subtasks: e.subtasks.map((e, t) => ({
-				id: hS(),
+				id: gS(),
 				title: e.title,
 				done: !1,
 				order: t
@@ -25849,7 +25863,7 @@ var $ = new class {
 		let t = this.state.tasks.findIndex((t) => t.id === e);
 		if (t < 0) throw Error(`找不到任务 ${e}`);
 		let [n] = this.state.tasks.splice(t, 1), r = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		};
 		return delete r[e], this.state.settings.reminders = r, this.persistTasks(), this.persistSettings(), this.emit(), {
@@ -25863,7 +25877,7 @@ var $ = new class {
 		if (t.length === 0) return 0;
 		this.state.tasks = this.state.tasks.filter((e) => !t.includes(e.id));
 		let n = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		};
 		for (let e of t) delete n[e];
@@ -25880,9 +25894,9 @@ var $ = new class {
 		let n = String(e ?? "").trim();
 		if (!n) throw Error("清单名不能为空");
 		let r = {
-			id: hS(),
+			id: gS(),
 			name: n,
-			color: t || oS[this.state.lists.length % oS.length],
+			color: t || sS[this.state.lists.length % sS.length],
 			order: this.nextListOrder()
 		};
 		return this.state.lists.push(r), this.persistLists(), this.emit(), r;
@@ -25900,7 +25914,7 @@ var $ = new class {
 		let n = this.state.tasks.filter((t) => t.listId === e).map((e) => e.id);
 		this.state.tasks = this.state.tasks.filter((t) => t.listId !== e);
 		let r = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		};
 		for (let e of n) delete r[e];
@@ -25918,7 +25932,7 @@ var $ = new class {
 		if (!r) throw Error("子任务标题不能为空");
 		let i = n.subtasks.length ? Math.max(...n.subtasks.map((e) => e.order)) + 1 : 0;
 		return n.subtasks.push({
-			id: hS(),
+			id: gS(),
 			title: r,
 			done: !1,
 			order: i
@@ -25944,23 +25958,23 @@ var $ = new class {
 	}
 	updateSettings(e = {}) {
 		return Object.assign(this.state.settings, e), this.state.settings.reminders = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		}, this.state.lists.some((e) => e.id === this.state.settings.defaultListId) || (this.state.settings.defaultListId = this.state.lists[0]?.id ?? null), this.persistSettings(), this.emit(), this.state.settings;
 	}
 	claimDueReminders(e = /* @__PURE__ */ new Date()) {
-		let t = [], n = uS(aS.settings, null), r = n && typeof n == "object" ? n : {}, i = fS();
+		let t = [], n = dS(oS.settings, null), r = n && typeof n == "object" ? n : {}, i = pS();
 		for (let n of this.state.tasks) {
 			if (n.done || !n.remindAt) continue;
 			let r = Q(n.remindAt);
-			!r || r > e || i[n.id] !== void 0 && mS(i[n.id], n.remindAt) || (i[n.id] = n.remindAt, t.push(n));
+			!r || r > e || i[n.id] !== void 0 && hS(i[n.id], n.remindAt) || (i[n.id] = n.remindAt, t.push(n));
 		}
 		if (t.length) {
 			let e = {
 				...r,
 				reminders: i
 			};
-			dS(aS.settings, e), this.state.settings = {
+			fS(oS.settings, e), this.state.settings = {
 				...this.state.settings,
 				...e,
 				reminders: i
@@ -25970,7 +25984,7 @@ var $ = new class {
 	}
 	clearFiredReminder(e) {
 		let t = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		};
 		e.id in t && (delete t[e.id], this.state.settings.reminders = t, this.persistSettings());
@@ -25980,13 +25994,13 @@ var $ = new class {
 		if (!n) return null;
 		n.remindAt = new Date(Date.now() + t).toISOString();
 		let r = {
-			...fS(),
+			...pS(),
 			...this.state.settings.reminders || {}
 		};
 		return delete r[n.id], this.state.settings.reminders = r, this.persistSettings(), this.persistTasks(), this.emit(), n;
 	}
 	statsRange({ from: e, to: t } = {}) {
-		let n = Q(e) || Bx(zx(/* @__PURE__ */ new Date()), -30), r = Q(t) || /* @__PURE__ */ new Date(), i = this.state.tasks.filter((e) => {
+		let n = Q(e) || Vx(Bx(/* @__PURE__ */ new Date()), -30), r = Q(t) || /* @__PURE__ */ new Date(), i = this.state.tasks.filter((e) => {
 			if (!e.done || !e.doneAt) return !1;
 			let t = Q(e.doneAt);
 			return t >= n && t <= r;
@@ -25997,7 +26011,7 @@ var $ = new class {
 			3: 0
 		};
 		for (let e of i) {
-			let t = Rx(e.doneAt);
+			let t = zx(e.doneAt);
 			a[t] = (a[t] || 0) + 1, o[e.listId] = (o[e.listId] || 0) + 1, s[e.priority] += 1;
 		}
 		return {
@@ -26017,7 +26031,7 @@ var $ = new class {
 }();
 //#endregion
 //#region public/plugins/todo/js/demo.js
-function yS(e) {
+function bS(e) {
 	let t = e >>> 0;
 	return () => {
 		t = t + 1831565813 >>> 0;
@@ -26025,15 +26039,15 @@ function yS(e) {
 		return e = Math.imul(e ^ e >>> 15, e | 1), e ^= e + Math.imul(e ^ e >>> 7, e | 61), ((e ^ e >>> 14) >>> 0) / 4294967296;
 	};
 }
-function bS(e, t, n = 0) {
-	let r = Bx(zx(/* @__PURE__ */ new Date()), e);
+function xS(e, t, n = 0) {
+	let r = Vx(Bx(/* @__PURE__ */ new Date()), e);
 	return new Date(r.getFullYear(), r.getMonth(), r.getDate(), t, n, 0, 0).toISOString();
 }
-function xS() {
+function SS() {
 	return new URLSearchParams(location.search).get("demo") === "1" && $.state.tasks.length === 0;
 }
-function SS() {
-	let e = yS(20261018), [t, n, r] = [
+function CS() {
+	let e = bS(20261018), [t, n, r] = [
 		{
 			name: "工作",
 			color: "colorPaletteBlueForeground2"
@@ -26061,7 +26075,7 @@ function SS() {
 		title: "整理产品周报，把本周评审结论同步给设计组",
 		listId: i.工作,
 		priority: 3,
-		dueAt: bS(0, 17, 0),
+		dueAt: xS(0, 17, 0),
 		status: "todo",
 		tags: ["工作", "重要"],
 		subtasks: [
@@ -26072,43 +26086,43 @@ function SS() {
 		note: "周五 17:00 前发出，抄送产品负责人。"
 	});
 	let o = $.state.tasks[$.state.tasks.length - 1];
-	o && ($.completeSubtask(o.id, o.subtasks[0].id, !0), $.updateTask(o.id, { remindAt: bS(1, 9, 30) })), a({
+	o && ($.completeSubtask(o.id, o.subtasks[0].id, !0), $.updateTask(o.id, { remindAt: xS(1, 9, 30) })), a({
 		title: "和设计评审 Fluent 动效 token",
 		listId: i.工作,
 		priority: 2,
-		dueAt: bS(0, 10, 30),
+		dueAt: xS(0, 10, 30),
 		tags: ["工作"],
 		subtasks: ["准备动效示例", "确认 duration 档位"]
 	}), a({
 		title: "提交上周差旅报销单",
 		listId: i.工作,
 		priority: 2,
-		dueAt: bS(-1, 23, 59),
+		dueAt: xS(-1, 23, 59),
 		tags: ["工作"]
 	}), a({
 		title: "买牛奶和面包",
 		listId: i.生活,
 		priority: 1,
-		dueAt: bS(0, 20, 0),
+		dueAt: xS(0, 20, 0),
 		tags: ["生活"]
 	}), a({
 		title: "背单词 20 个（每日）",
 		listId: i.学习,
 		priority: 1,
-		dueAt: bS(0, 22, 0),
+		dueAt: xS(0, 22, 0),
 		recurrence: "daily",
 		tags: ["学习", "健康"]
 	}), a({
 		title: "给妈妈打电话",
 		listId: i.生活,
 		priority: 0,
-		dueAt: bS(0, 19, 30),
+		dueAt: xS(0, 19, 30),
 		tags: ["生活"]
 	}), a({
 		title: "准备下周一的方案初稿",
 		listId: i.工作,
 		priority: 3,
-		dueAt: bS(1, 11, 0),
+		dueAt: xS(1, 11, 0),
 		tags: ["工作", "重要"],
 		subtasks: [
 			"列大纲",
@@ -26119,50 +26133,50 @@ function SS() {
 		title: "健身房练腿",
 		listId: i.生活,
 		priority: 1,
-		dueAt: bS(1, 18, 30),
+		dueAt: xS(1, 18, 30),
 		tags: ["健康"]
 	}), a({
 		title: "读完《设计中的设计》第三章",
 		listId: i.学习,
 		priority: 0,
-		dueAt: bS(1, 21, 0),
+		dueAt: xS(1, 21, 0),
 		tags: ["学习"]
 	}), a({
 		title: "每周复盘（每周）",
 		listId: i.工作,
 		priority: 2,
-		dueAt: bS(1, 20, 0),
+		dueAt: xS(1, 20, 0),
 		recurrence: "weekly",
 		tags: ["工作"]
 	}), a({
 		title: "预约牙医",
 		listId: i.生活,
 		priority: 1,
-		dueAt: bS(3, 9, 0),
+		dueAt: xS(3, 9, 0),
 		tags: ["健康"]
 	}), a({
 		title: "季度目标对齐会",
 		listId: i.工作,
 		priority: 2,
-		dueAt: bS(4, 14, 0),
+		dueAt: xS(4, 14, 0),
 		tags: ["工作"]
 	}), a({
 		title: "整理书桌和文件",
 		listId: i.生活,
 		priority: 0,
-		dueAt: bS(6, 10, 0),
+		dueAt: xS(6, 10, 0),
 		tags: ["生活"]
 	}), a({
 		title: "学习 CSS Container Queries",
 		listId: i.学习,
 		priority: 1,
-		dueAt: bS(8, 20, 0),
+		dueAt: xS(8, 20, 0),
 		tags: ["学习"]
 	}), a({
 		title: "给桌面插件写使用说明",
 		listId: i.工作,
 		priority: 2,
-		dueAt: bS(12, 16, 0),
+		dueAt: xS(12, 16, 0),
 		tags: ["工作"]
 	}), a({
 		title: "整理插件截图，更新 README",
@@ -26197,7 +26211,7 @@ function SS() {
 		"整理待办清单"
 	];
 	for (let t = -83; t <= 0; t += 1) {
-		let n = Bx(zx(/* @__PURE__ */ new Date()), t), r = e(), o = 0;
+		let n = Vx(Bx(/* @__PURE__ */ new Date()), t), r = e(), o = 0;
 		r > .4 && (o = 1), r > .75 && (o = 2), r > .92 && (o = 3), r > .985 && (o = 4);
 		for (let r = 0; r < o; r += 1) {
 			let r = s[Math.floor(e() * s.length)], o = [
@@ -26209,7 +26223,7 @@ function SS() {
 				listId: i[c],
 				priority: e() > .82 ? 3 : e() > .55 ? 2 : +(e() > .4),
 				tags: l,
-				dueAt: bS(t, 9 + Math.floor(e() * 10), 0)
+				dueAt: xS(t, 9 + Math.floor(e() * 10), 0)
 			});
 			if (u) {
 				let t = 8 + Math.floor(e() * 14), r = Math.floor(e() * 60);
@@ -26227,42 +26241,42 @@ function SS() {
 	$.updateSettings({
 		defaultListId: t.id,
 		weekStart: 1
-	}), $.emit(), console.info("[todo] 演示数据已注入：", $.state.tasks.length, "条任务，", Rx(/* @__PURE__ */ new Date()));
+	}), $.emit(), console.info("[todo] 演示数据已注入：", $.state.tasks.length, "条任务，", zx(/* @__PURE__ */ new Date()));
 }
 //#endregion
 //#region public/plugins/todo/js/reminders.js
-var CS = 5e3, wS = "wtsl.todo.reminders.claim", TS = /* @__PURE__ */ new Set();
-function ES(e) {
-	return `${e.id}@${pS(e.remindAt)}`;
+var wS = 5e3, TS = "wtsl.todo.reminders.claim", ES = /* @__PURE__ */ new Set();
+function DS(e) {
+	return `${e.id}@${mS(e.remindAt)}`;
 }
-async function DS() {
+async function OS() {
 	let e = typeof navigator < "u" ? navigator.locks : null;
 	if (!e || typeof e.request != "function") return $.claimDueReminders(/* @__PURE__ */ new Date());
 	try {
-		return await e.request(wS, { ifAvailable: !0 }, async (e) => e ? $.claimDueReminders(/* @__PURE__ */ new Date()) : null) ?? [];
+		return await e.request(TS, { ifAvailable: !0 }, async (e) => e ? $.claimDueReminders(/* @__PURE__ */ new Date()) : null) ?? [];
 	} catch (e) {
 		return console.warn("[todo] 提醒锁不可用，回退到 localStorage 标记", e), $.claimDueReminders(/* @__PURE__ */ new Date());
 	}
 }
-function OS() {
+function kS() {
 	let e = !1, t = !1, n = async () => {
 		let e = [];
 		try {
-			e = await DS();
+			e = await OS();
 		} catch (e) {
 			console.error("[todo] 提醒检查失败", e);
 			return;
 		}
 		for (let t of e) {
-			let e = ES(t);
-			if (!TS.has(e)) {
-				TS.add(e);
+			let e = DS(t);
+			if (!ES.has(e)) {
+				ES.add(e);
 				try {
-					await kS(t);
+					await AS(t);
 				} catch (e) {
 					console.error("[todo] 提醒弹出失败", e);
 				} finally {
-					TS.delete(e);
+					ES.delete(e);
 				}
 			}
 		}
@@ -26279,13 +26293,13 @@ function OS() {
 		document.hidden || r();
 	};
 	r();
-	let a = setInterval(r, CS);
+	let a = setInterval(r, wS);
 	return document.addEventListener("visibilitychange", i), window.addEventListener("focus", i), () => {
 		e = !0, clearInterval(a), document.removeEventListener("visibilitychange", i), window.removeEventListener("focus", i);
 	};
 }
-async function kS(t) {
-	let n = $.listById(t.listId), r = n ? `待办提醒 · ${n.name}` : "待办提醒", i = `${t.title}${t.dueAt ? `（${Zx(t.dueAt)}）` : ""}`, a = await e.showReminder({
+async function AS(t) {
+	let n = $.listById(t.listId), r = n ? `待办提醒 · ${n.name}` : "待办提醒", i = `${t.title}${t.dueAt ? `（${Qx(t.dueAt)}）` : ""}`, a = await e.showReminder({
 		title: r,
 		message: i,
 		actions: [{
@@ -26304,57 +26318,57 @@ async function kS(t) {
 }
 //#endregion
 //#region public/plugins/todo/js/config.js
-var AS = "settings", jS = {
+var jS = "settings", MS = {
 	showCompleted: !0,
 	defaultSort: "manual",
 	fontSize: "default",
 	weekStart: 1
-}, MS = sS.map((e) => ({
+}, NS = cS.map((e) => ({
 	value: e.value,
 	label: e.label
-})), NS = new Set(MS.map((e) => e.value));
-function PS(e) {
+})), PS = new Set(NS.map((e) => e.value));
+function FS(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		showCompleted: typeof t.showCompleted == "boolean" ? t.showCompleted : jS.showCompleted,
-		defaultSort: NS.has(t.defaultSort) ? t.defaultSort : jS.defaultSort,
+		showCompleted: typeof t.showCompleted == "boolean" ? t.showCompleted : MS.showCompleted,
+		defaultSort: PS.has(t.defaultSort) ? t.defaultSort : MS.defaultSort,
 		fontSize: t.fontSize === "large" ? "large" : "default",
 		weekStart: t.weekStart === 0 ? 0 : 1
 	};
 }
-function FS(e, t) {
+function IS(e, t) {
 	switch (e) {
 		case "showCompleted": return typeof t == "boolean" ? null : "showCompleted 需要是布尔值";
-		case "defaultSort": return NS.has(t) ? null : `defaultSort 只能是 ${[...NS].join(" / ")}`;
+		case "defaultSort": return PS.has(t) ? null : `defaultSort 只能是 ${[...PS].join(" / ")}`;
 		case "fontSize": return t === "default" || t === "large" ? null : "fontSize 只能是 default / large";
 		case "weekStart": return t === 0 || t === 1 ? null : "weekStart 只能是 0（周日）或 1（周一）";
 		default: return `未知设置项 ${e}`;
 	}
 }
-function IS(e, t) {
+function LS(e, t) {
 	let n = e?.fontSize === "large" ? 100 : 0;
 	return Math.min(600, t + n);
 }
-async function LS() {
+async function RS() {
 	let t;
 	try {
-		t = await e.getConfig(AS);
+		t = await e.getConfig(jS);
 	} catch {
 		t = void 0;
 	}
-	return PS(t);
+	return FS(t);
 }
-async function RS(t) {
+async function zS(t) {
 	if (!t || typeof t != "object" || Array.isArray(t)) throw Error("settings.set 需要对象参数");
 	let n = Object.keys(t);
 	if (n.length === 0) throw Error("没有要修改的设置项");
 	for (let e of n) {
-		let n = FS(e, t[e]);
+		let n = IS(e, t[e]);
 		if (n) throw Error(n);
 	}
 	let r = {};
 	try {
-		let t = await e.getConfig(AS);
+		let t = await e.getConfig(jS);
 		t && typeof t == "object" && !Array.isArray(t) && (r = t);
 	} catch {
 		r = {};
@@ -26363,14 +26377,14 @@ async function RS(t) {
 		...r,
 		...t
 	};
-	return await e.setConfig(AS, i), PS(i);
+	return await e.setConfig(jS, i), FS(i);
 }
 //#endregion
 //#region public/plugins/todo/js/tools.js
-function zS(e) {
+function BS(e) {
 	if (e !== void 0) return e === null || e === "" ? null : String(e);
 }
-function BS(e) {
+function VS(e) {
 	let t = $.state.tasks.filter((t) => t.listId === e.id), n = t.filter((e) => e.done).length;
 	return {
 		...e,
@@ -26380,7 +26394,7 @@ function BS(e) {
 		done: n
 	};
 }
-function VS(e) {
+function HS(e) {
 	if (!e) return null;
 	let t = $.listById(e.listId);
 	return {
@@ -26389,7 +26403,7 @@ function VS(e) {
 		listColor: t?.color
 	};
 }
-function HS(e = {}) {
+function US(e = {}) {
 	if (e.patch && typeof e.patch == "object" && !Array.isArray(e.patch)) return e.patch;
 	let t = {};
 	for (let n of [
@@ -26400,7 +26414,7 @@ function HS(e = {}) {
 	]) Object.prototype.hasOwnProperty.call(e, n) && (t[n] = e[n]);
 	return t;
 }
-var US = [
+var WS = [
 	{
 		name: "todo.lists",
 		description: "列出所有待办清单（含未完成/已完成数量、哪个是默认清单）",
@@ -26683,9 +26697,9 @@ var US = [
 		}
 	}
 ];
-async function WS(e, t = {}) {
+async function GS(e, t = {}) {
 	switch (e) {
-		case "todo.lists": return $.lists.map(BS);
+		case "todo.lists": return $.lists.map(VS);
 		case "todo.list": {
 			let e = $.state.tasks;
 			if (t.listId) {
@@ -26698,60 +26712,60 @@ async function WS(e, t = {}) {
 				let r = /^\d{4}-\d{2}-\d{2}$/.test(t.dueBefore) ? new Date(n.getFullYear(), n.getMonth(), n.getDate(), 23, 59, 59) : n;
 				e = e.filter((e) => e.dueAt && new Date(e.dueAt) <= r);
 			}
-			return t.tag && (e = e.filter((e) => e.tags.includes(t.tag))), t.query && (e = e.filter((e) => $.matchesQuery(e, t.query))), $.sortTasks(e, "due").map(VS);
+			return t.tag && (e = e.filter((e) => e.tags.includes(t.tag))), t.query && (e = e.filter((e) => $.matchesQuery(e, t.query))), $.sortTasks(e, "due").map(HS);
 		}
 		case "todo.add":
 			if (!t.title || !String(t.title).trim()) throw Error("title 不能为空");
-			return VS($.addTask({
+			return HS($.addTask({
 				title: t.title,
 				listId: t.listId,
 				priority: t.priority,
-				dueAt: zS(t.dueAt),
+				dueAt: BS(t.dueAt),
 				note: t.note,
-				remindAt: zS(t.remindAt),
+				remindAt: BS(t.remindAt),
 				recurrence: t.recurrence,
 				tags: t.tags,
 				subtasks: t.subtasks
 			}));
 		case "todo.update": {
 			let e = { ...t };
-			return delete e.id, "dueAt" in e && (e.dueAt = zS(e.dueAt)), "remindAt" in e && (e.remindAt = zS(e.remindAt)), VS($.updateTask(t.id, e));
+			return delete e.id, "dueAt" in e && (e.dueAt = BS(e.dueAt)), "remindAt" in e && (e.remindAt = BS(e.remindAt)), HS($.updateTask(t.id, e));
 		}
 		case "todo.remove": return $.removeTask(t.id);
-		case "todo.complete": return VS($.setDone(t.id, typeof t.done != "boolean" || t.done));
-		case "todo.search": return $.searchTasks(t.query).map(VS);
-		case "todo.addSubtask": return VS($.addSubtask(t.taskId, t.title));
-		case "todo.completeSubtask": return VS($.completeSubtask(t.taskId, t.subtaskId, typeof t.done != "boolean" || t.done));
-		case "todo.removeSubtask": return VS($.removeSubtask(t.taskId, t.subtaskId));
-		case "todo.addList": return BS($.addList(t.name, t.color));
+		case "todo.complete": return HS($.setDone(t.id, typeof t.done != "boolean" || t.done));
+		case "todo.search": return $.searchTasks(t.query).map(HS);
+		case "todo.addSubtask": return HS($.addSubtask(t.taskId, t.title));
+		case "todo.completeSubtask": return HS($.completeSubtask(t.taskId, t.subtaskId, typeof t.done != "boolean" || t.done));
+		case "todo.removeSubtask": return HS($.removeSubtask(t.taskId, t.subtaskId));
+		case "todo.addList": return VS($.addList(t.name, t.color));
 		case "todo.renameList":
 			if (!t.name || !String(t.name).trim()) throw Error("清单名不能为空");
-			return BS($.updateList(t.id, { name: t.name }));
+			return VS($.updateList(t.id, { name: t.name }));
 		case "todo.removeList": return $.removeList(t.id);
 		case "todo.setDefaultList": {
 			let e = $.listById(t.id);
 			if (!e) throw Error(`找不到清单 ${t.id}`);
-			return $.updateSettings({ defaultListId: e.id }), BS(e);
+			return $.updateSettings({ defaultListId: e.id }), VS(e);
 		}
 		case "todo.clearCompleted": return { removed: $.clearCompleted({ listId: t.listId }) };
 		case "todo.stats": return $.statsRange({
 			from: t.from,
 			to: t.to
 		});
-		case "todo.settings.get": return LS();
+		case "todo.settings.get": return RS();
 		case "todo.settings.set": {
-			let e = HS(t);
+			let e = US(t);
 			if (Object.keys(e).length === 0) throw Error("没有要修改的设置项");
-			return RS(e);
+			return zS(e);
 		}
 		default: throw Error(`未知工具 ${e}`);
 	}
 }
-async function GS(e, t) {
+async function KS(e, t) {
 	try {
 		return {
 			ok: !0,
-			result: await WS(e, t || {})
+			result: await GS(e, t || {})
 		};
 	} catch (e) {
 		return {
@@ -26762,33 +26776,33 @@ async function GS(e, t) {
 }
 //#endregion
 //#region public/plugins/todo/src/todoData.js
-var KS = !1, qS = 0;
+var qS = !1, JS = 0;
 $.subscribe(() => {
-	qS += 1;
+	JS += 1;
 });
-function JS({ startReminders: e = !0 } = {}) {
-	if (KS) return $;
-	KS = !0, $.load();
+function YS({ startReminders: e = !0 } = {}) {
+	if (qS) return $;
+	qS = !0, $.load();
 	try {
-		xS() && SS();
+		SS() && CS();
 	} catch (e) {
 		console.warn("[todo] 演示数据注入失败", e);
 	}
-	return $.bindStorageSync(), e && OS(), $;
-}
-function YS() {
-	return (0, P.useSyncExternalStore)((e) => $.subscribe(e), () => qS, () => qS), $;
+	return $.bindStorageSync(), e && kS(), $;
 }
 function XS() {
-	Dx("detail", "待办详情");
+	return (0, P.useSyncExternalStore)((e) => $.subscribe(e), () => JS, () => JS), $;
 }
 function ZS() {
-	Ox();
+	Ox("detail", "待办详情");
 }
 function QS() {
+	kx();
+}
+function $S() {
 	let e = {};
-	for (let t of US) e[t.name] = async (e) => {
-		let { ok: n, result: r, error: i } = await GS(t.name, e);
+	for (let t of WS) e[t.name] = async (e) => {
+		let { ok: n, result: r, error: i } = await KS(t.name, e);
 		if (!n) throw Error(i);
 		return r;
 	};
@@ -26796,14 +26810,14 @@ function QS() {
 }
 //#endregion
 //#region public/plugins/todo/src/sizes.js
-var $S = {
+var eC = {
 	"1x1": [1, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2],
 	"3x3": [3, 3],
 	"4x2": [4, 2]
 };
-function eC(e) {
+function tC(e) {
 	switch (e) {
 		case "1x1": return "summary";
 		case "2x2": return "mini";
@@ -26812,7 +26826,7 @@ function eC(e) {
 		default: return "full";
 	}
 }
-function tC(e) {
+function nC(e) {
 	switch (e) {
 		case "2x2": return 4;
 		case "3x2": return 5;
@@ -26821,20 +26835,20 @@ function tC(e) {
 		default: return 0;
 	}
 }
-function nC(e) {
+function rC(e) {
 	if (!e) return null;
 	let t = /^(\d+)\s*[x×,]\s*(\d+)$/i.exec(String(e).trim());
 	return t ? [Number(t[1]), Number(t[2])] : null;
 }
-function rC(e) {
+function iC(e) {
 	if (!Array.isArray(e) || e.length < 2) return "3x3";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	if ($S[t]) return t;
+	if (eC[t]) return t;
 	let n = Number(e[0]), r = Number(e[1]);
 	return n <= 1 && r <= 1 ? "1x1" : r >= 3 ? "3x3" : n >= 4 ? "4x2" : n >= 3 ? "3x2" : "2x2";
 }
-function iC(e) {
-	let t = $S[e] || $S["3x3"];
+function aC(e) {
+	let t = eC[e] || eC["3x3"];
 	return {
 		width: t[0] * 180,
 		height: t[1] * 180
@@ -26842,20 +26856,20 @@ function iC(e) {
 }
 //#endregion
 //#region public/plugins/_shared/motion.js
-var aC = "(prefers-reduced-motion: reduce)", oC = "8px", sC = "4px", cC = "48px";
-function lC() {
-	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(aC);
-}
+var oC = "(prefers-reduced-motion: reduce)", sC = "8px", cC = "4px", lC = "48px";
 function uC() {
-	let [e, t] = (0, P.useState)(() => !!lC()?.matches);
+	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(oC);
+}
+function dC() {
+	let [e, t] = (0, P.useState)(() => !!uC()?.matches);
 	return (0, P.useEffect)(() => {
-		let e = lC();
+		let e = uC();
 		if (!e) return;
 		let n = () => t(e.matches);
 		return n(), typeof e.addEventListener == "function" ? (e.addEventListener("change", n), () => e.removeEventListener("change", n)) : (e.addListener(n), () => e.removeListener(n));
 	}, []), e;
 }
-function dC(e, t) {
+function fC(e, t) {
 	switch (e) {
 		case "down": return `0px -${t}`;
 		case "left": return `${t} 0px`;
@@ -26863,12 +26877,12 @@ function dC(e, t) {
 		default: return `0px ${t}`;
 	}
 }
-function fC(e, t = Y.durationFaster, n = Y.curveAccelerateMin) {
+function pC(e, t = Y.durationFaster, n = Y.curveAccelerateMin) {
 	return ({ direction: r = "up" }) => ({
 		enter: {
 			keyframes: [{
 				opacity: 0,
-				translate: dC(r, e)
+				translate: fC(r, e)
 			}, {
 				opacity: 1,
 				translate: "0px 0px"
@@ -26901,7 +26915,7 @@ function fC(e, t = Y.durationFaster, n = Y.curveAccelerateMin) {
 		}
 	});
 }
-var pC = bd(fC(oC)), mC = bd(fC(sC, Y.durationFast, Y.curveAccelerateMid)), hC = bd(({ element: e }) => {
+var mC = bd(pC(sC)), hC = bd(pC(cC, Y.durationFast, Y.curveAccelerateMid)), gC = bd(({ element: e }) => {
 	let t = `${e.scrollHeight}px`;
 	return {
 		enter: {
@@ -26953,7 +26967,7 @@ var pC = bd(fC(oC)), mC = bd(fC(sC, Y.durationFast, Y.curveAccelerateMid)), hC =
 		}
 	};
 });
-function gC({ value: e, direction: t = "up", children: n, className: r, style: i }) {
+function _C({ value: e, direction: t = "up", children: n, className: r, style: i }) {
 	let a = e == null ? "default" : String(e);
 	return (0, P.createElement)("div", {
 		className: r,
@@ -26963,7 +26977,7 @@ function gC({ value: e, direction: t = "up", children: n, className: r, style: i
 			...i
 		},
 		"data-cross-fade": a
-	}, (0, P.createElement)(Ed, null, (0, P.createElement)(mC, {
+	}, (0, P.createElement)(Ed, null, (0, P.createElement)(hC, {
 		key: a,
 		direction: t
 	}, (0, P.createElement)("div", { style: {
@@ -26971,8 +26985,8 @@ function gC({ value: e, direction: t = "up", children: n, className: r, style: i
 		minWidth: 0
 	} }, n))));
 }
-var _C = bd(({ direction: e = "forward" }) => {
-	let t = e === "back", n = t ? `-${cC} 0px` : `${cC} 0px`, r = t ? `${cC} 0px` : `-${cC} 0px`;
+var vC = bd(({ direction: e = "forward" }) => {
+	let t = e === "back", n = t ? `-${lC} 0px` : `${lC} 0px`, r = t ? `${lC} 0px` : `-${lC} 0px`;
 	return {
 		enter: {
 			keyframes: [{
@@ -27009,7 +27023,7 @@ var _C = bd(({ direction: e = "forward" }) => {
 			}
 		}
 	};
-}), vC = {
+}), yC = {
 	press: ["durationUltraFast", "curveAccelerateMin"],
 	hoverEnter: ["durationFaster", "curveDecelerateMin"],
 	hoverLeave: ["durationFaster", "curveAccelerateMin"],
@@ -27019,23 +27033,23 @@ var _C = bd(({ direction: e = "forward" }) => {
 	slow: ["durationSlow", "curveDecelerateMid"],
 	longPress: ["durationUltraSlow", "curveLinear"]
 };
-function yC(e = "normal") {
-	let [t, n] = vC[e] ?? vC.normal;
+function bC(e = "normal") {
+	let [t, n] = yC[e] ?? yC.normal;
 	return {
 		transitionDuration: `${Y[t]}ms`,
 		transitionTimingFunction: Y[n]
 	};
 }
-function bC(e = "normal") {
-	let t = uC();
+function xC(e = "normal") {
+	let t = dC();
 	return (0, P.useMemo)(() => t ? {
 		transitionDuration: `${Y.durationFaster}ms`,
 		transitionTimingFunction: Y.curveDecelerateMin
-	} : yC(e), [e, t]);
+	} : bC(e), [e, t]);
 }
 //#endregion
 //#region public/plugins/_shared/typography.js
-var xC = {
+var SC = {
 	48: {
 		fontSize: "48px",
 		lineHeight: "56px"
@@ -27053,15 +27067,15 @@ var xC = {
 		lineHeight: "124px"
 	}
 };
-function SC(e) {
-	let t = xC[e];
+function CC(e) {
+	let t = SC[e];
 	if (!t) throw Error(`Display XL 只定义了 48/80/96/112，收到 ${String(e)}`);
 	return t;
 }
-var CC = { fontVariantNumeric: "tabular-nums" }, wC = 40, TC = 44, EC = 56, DC = 48, OC = 40, kC = 56, AC = {
-	minWidth: wC,
-	minHeight: wC
-}, jC = [
+var wC = { fontVariantNumeric: "tabular-nums" }, TC = 40, EC = 44, DC = 56, OC = 48, kC = 40, AC = 56, jC = {
+	minWidth: TC,
+	minHeight: TC
+}, MC = [
 	"button",
 	"input",
 	"textarea",
@@ -27075,12 +27089,12 @@ var CC = { fontVariantNumeric: "tabular-nums" }, wC = 40, TC = 44, EC = 56, DC =
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function MC(e, t) {
+function NC(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(jC);
+	let n = t.closest(MC);
 	return !!(n && n !== e && e.contains(n));
 }
-var NC = Kn({ root: {
+var PC = Kn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -27093,11 +27107,11 @@ var NC = Kn({ root: {
 	color: G.colorNeutralForeground1,
 	fontFamily: G.fontFamilyBase
 } });
-function PC({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = NC(), s = Nx(), c = (0, P.useCallback)((t) => {
-		MC(t.currentTarget, t.target) || e?.(t);
+function FC({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = PC(), s = Px(), c = (0, P.useCallback)((t) => {
+		NC(t.currentTarget, t.target) || e?.(t);
 	}, [e]), l = (0, P.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (MC(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (NC(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		...a,
@@ -27113,7 +27127,7 @@ function PC({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, 
 		children: i
 	});
 }
-var FC = Kn({
+var IC = Kn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
@@ -27134,8 +27148,8 @@ var FC = Kn({
 		gap: G.spacingHorizontalXS
 	}
 });
-function IC({ title: e, trailing: t, className: n, style: r }) {
-	let i = FC();
+function LC({ title: e, trailing: t, className: n, style: r }) {
+	let i = IC();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(i.header, n),
 		style: r,
@@ -27152,7 +27166,7 @@ function IC({ title: e, trailing: t, className: n, style: r }) {
 		}) : null]
 	});
 }
-var LC = Kn({
+var RC = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -27167,19 +27181,19 @@ var LC = Kn({
 		minWidth: 0
 	},
 	value: {
-		...CC,
+		...wC,
 		fontWeight: "600",
 		color: G.colorNeutralForeground1,
 		whiteSpace: "nowrap"
 	},
-	size48: SC(48),
+	size48: CC(48),
 	size68: {
 		fontSize: G.fontSizeHero1000,
 		lineHeight: G.lineHeightHero1000
 	},
-	size80: SC(80),
-	size96: SC(96),
-	size112: SC(112),
+	size80: CC(80),
+	size96: CC(96),
+	size112: CC(112),
 	unit: { color: G.colorNeutralForeground2 },
 	meta: {
 		display: "flex",
@@ -27189,15 +27203,15 @@ var LC = Kn({
 	},
 	label: { color: G.colorNeutralForeground2 },
 	caption: { color: G.colorNeutralForeground3 }
-}), RC = {
+}), zC = {
 	48: "size48",
 	68: "size68",
 	80: "size80",
 	96: "size96",
 	112: "size112"
 };
-function zC({ value: e, unit: t, label: n, caption: r, size: i = 48, className: a, style: o }) {
-	let s = LC(), c = s[RC[i] ?? "size48"];
+function BC({ value: e, unit: t, label: n, caption: r, size: i = 48, className: a, style: o }) {
+	let s = RC(), c = s[zC[i] ?? "size48"];
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(s.root, a),
 		style: o,
@@ -27225,13 +27239,13 @@ function zC({ value: e, unit: t, label: n, caption: r, size: i = 48, className: 
 		}) : null]
 	});
 }
-var BC = Kn({
+var VC = Kn({
 	row: {
 		display: "flex",
 		alignItems: "center",
 		gap: G.spacingHorizontalS,
 		width: "100%",
-		minHeight: `${TC}px`,
+		minHeight: `${EC}px`,
 		boxSizing: "border-box",
 		paddingInline: 0,
 		border: "none",
@@ -27275,8 +27289,8 @@ var BC = Kn({
 		gap: G.spacingHorizontalXS
 	}
 });
-function VC({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = BC(), d = (e) => {
+function HC({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = VC(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
@@ -27319,7 +27333,7 @@ function VC({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var HC = Kn({
+var UC = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -27340,8 +27354,8 @@ var HC = Kn({
 	},
 	action: { marginTop: G.spacingVerticalS }
 });
-function UC({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
-	let o = HC();
+function WC({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
+	let o = UC();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(o.root, i),
 		style: a,
@@ -27369,11 +27383,11 @@ function UC({ icon: e, title: t, description: n, action: r, className: i, style:
 		]
 	});
 }
-var WC = Kn({ button: {
-	minWidth: `${wC}px`,
-	minHeight: `${wC}px`
-} }), GC = (0, P.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = WC();
+var GC = Kn({ button: {
+	minWidth: `${TC}px`,
+	minHeight: `${TC}px`
+} }), KC = (0, P.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = GC();
 	return /* @__PURE__ */ (0, F.jsx)(Lh, {
 		...i,
 		ref: a,
@@ -27384,7 +27398,7 @@ var WC = Kn({ button: {
 		style: n,
 		children: r
 	});
-}), KC = GC, qC = Kn({ root: {
+}), qC = KC, JC = Kn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -27398,8 +27412,8 @@ var WC = Kn({ button: {
 	color: G.colorNeutralForeground1,
 	fontFamily: G.fontFamilyBase
 } });
-function JC({ children: e, className: t, style: n }) {
-	let r = qC();
+function YC({ children: e, className: t, style: n }) {
+	let r = JC();
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: A(r.root, t),
 		style: n,
@@ -27407,14 +27421,14 @@ function JC({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var YC = Kn({
+var XC = Kn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: G.spacingHorizontalM,
-		minHeight: `${EC}px`,
+		minHeight: `${DC}px`,
 		paddingInline: G.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -27432,8 +27446,8 @@ var YC = Kn({
 		gap: G.spacingHorizontalS
 	}
 });
-function XC({ children: e, trailing: t, className: n, style: r }) {
-	let i = YC();
+function ZC({ children: e, trailing: t, className: n, style: r }) {
+	let i = XC();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(i.header, n),
 		style: r,
@@ -27447,17 +27461,17 @@ function XC({ children: e, trailing: t, className: n, style: r }) {
 		}) : null]
 	});
 }
-var ZC = Kn({ toolbar: {
+var QC = Kn({ toolbar: {
 	display: "flex",
 	flexShrink: 0,
 	alignItems: "center",
 	gap: G.spacingHorizontalS,
-	minHeight: `${DC}px`,
+	minHeight: `${OC}px`,
 	paddingInline: G.spacingHorizontalXXL,
 	boxSizing: "border-box"
 } });
-function QC({ children: e, className: t, style: n }) {
-	let r = ZC();
+function $C({ children: e, className: t, style: n }) {
+	let r = QC();
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: A(r.toolbar, t),
 		style: n,
@@ -27465,24 +27479,24 @@ function QC({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var $C = Kn({
+var ew = Kn({
 	tabs: {
 		flexShrink: 0,
-		height: `${OC}px`,
-		minHeight: `${OC}px`,
+		height: `${kC}px`,
+		minHeight: `${kC}px`,
 		paddingInline: G.spacingHorizontalXXL,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${OC}px`,
-		minHeight: `${OC}px`,
+		height: `${kC}px`,
+		minHeight: `${kC}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: G.spacingHorizontalXS }
 });
-function ew({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style: a }) {
-	let o = $C();
+function tw({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style: a }) {
+	let o = ew();
 	return !e || e.length === 0 ? null : /* @__PURE__ */ (0, F.jsx)(Py, {
 		size: "medium",
 		selectedValue: t,
@@ -27505,7 +27519,7 @@ function ew({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style
 		}, e.value))
 	});
 }
-var tw = Kn({
+var nw = Kn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -27536,7 +27550,7 @@ var tw = Kn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function nw(e) {
+function rw(e) {
 	let [t, n] = (0, P.useState)(!1);
 	return (0, P.useEffect)(() => {
 		let t = e.current;
@@ -27560,8 +27574,8 @@ function nw(e) {
 		};
 	}, [e]), t;
 }
-function rw({ children: e, className: t, style: n }) {
-	let r = tw(), i = (0, P.useRef)(null), a = nw(i);
+function iw({ children: e, className: t, style: n }) {
+	let r = nw(), i = (0, P.useRef)(null), a = rw(i);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -27578,7 +27592,7 @@ function rw({ children: e, className: t, style: n }) {
 		})]
 	});
 }
-var iw = (0, P.createContext)(null), aw = Kn({
+var aw = (0, P.createContext)(null), ow = Kn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -27598,7 +27612,7 @@ var iw = (0, P.createContext)(null), aw = Kn({
 		flexShrink: 0,
 		alignItems: "center",
 		gap: G.spacingHorizontalS,
-		minHeight: `${kC}px`,
+		minHeight: `${AC}px`,
 		paddingInline: G.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -27653,17 +27667,17 @@ var iw = (0, P.createContext)(null), aw = Kn({
 		boxSizing: "border-box"
 	}
 });
-function ow({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = aw(), l = (0, P.useRef)(null), u = nw(l), [d, f] = (0, P.useState)(!0), [p, m] = (0, P.useState)("forward"), [h, g] = (0, P.useState)(!0), _ = (0, P.useRef)(!1), v = (0, P.useCallback)(() => {
+function sw({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = ow(), l = (0, P.useRef)(null), u = rw(l), [d, f] = (0, P.useState)(!0), [p, m] = (0, P.useState)("forward"), [h, g] = (0, P.useState)(!0), _ = (0, P.useRef)(!1), v = (0, P.useCallback)(() => {
 		_.current || (_.current = !0, m("back"), f(!1));
 	}, []), y = (0, P.useCallback)((e, t) => {
 		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
 	if (!h) return null;
 	let b = typeof n == "function" ? n(v) : n;
-	return /* @__PURE__ */ (0, F.jsx)(iw.Provider, {
+	return /* @__PURE__ */ (0, F.jsx)(aw.Provider, {
 		value: v,
-		children: /* @__PURE__ */ (0, F.jsx)(_C, {
+		children: /* @__PURE__ */ (0, F.jsx)(vC, {
 			visible: d,
 			appear: !0,
 			direction: p,
@@ -27685,7 +27699,7 @@ function ow({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								"aria-label": a,
 								title: a,
 								onClick: v,
-								style: AC
+								style: jC
 							}),
 							/* @__PURE__ */ (0, F.jsx)(Z, {
 								size: 400,
@@ -27725,7 +27739,7 @@ function ow({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 }
 //#endregion
 //#region public/plugins/todo/src/parts.jsx
-var sw = 40, cw = Kn({
+var cw = 40, lw = Kn({
 	ellipsis: {
 		display: "block",
 		minWidth: 0,
@@ -27770,8 +27784,8 @@ var sw = 40, cw = Kn({
 		display: "inline-flex",
 		alignItems: "center",
 		justifyContent: "center",
-		minWidth: `${sw}px`,
-		minHeight: `${sw}px`
+		minWidth: `${cw}px`,
+		minHeight: `${cw}px`
 	},
 	flag: { flexShrink: 0 },
 	flagHigh: { color: G.colorPaletteRedForeground1 },
@@ -27789,8 +27803,8 @@ var sw = 40, cw = Kn({
 		gap: G.spacingHorizontalXS
 	},
 	iconButton: {
-		minWidth: `${sw}px`,
-		minHeight: `${sw}px`
+		minWidth: `${cw}px`,
+		minHeight: `${cw}px`
 	},
 	confirmRow: {
 		display: "flex",
@@ -27827,29 +27841,29 @@ var sw = 40, cw = Kn({
 		flexShrink: 0
 	}
 });
-function lw(e) {
+function uw(e) {
 	return `var(--${e || "colorPaletteBlueForeground2"})`;
 }
-function uw({ children: e }) {
-	let t = cw();
+function dw({ children: e }) {
+	let t = lw();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		className: t.ellipsis,
 		children: e
 	});
 }
-function dw({ priority: e, className: t }) {
-	let n = cw();
+function fw({ priority: e, className: t }) {
+	let n = lw();
 	if (!e) return null;
-	let r = iS(e), i = e >= 3 ? n.flagHigh : e === 2 ? n.flagMedium : n.flagLow;
+	let r = aS(e), i = e >= 3 ? n.flagHigh : e === 2 ? n.flagMedium : n.flagLow;
 	return /* @__PURE__ */ (0, F.jsx)(Bu, {
 		"aria-label": `优先级：${r.label}`,
 		className: A(n.flag, i, t)
 	});
 }
-function fw({ task: e, now: t, className: n }) {
-	let r = cw(), i = Q(e.dueAt);
+function pw({ task: e, now: t, className: n }) {
+	let r = lw(), i = Q(e.dueAt);
 	if (!i) return null;
-	let a = i < zx(t), o = a ? `已逾期 · ${Xx(i, t)}` : Zx(i, t);
+	let a = i < Bx(t), o = a ? `已逾期 · ${Zx(i, t)}` : Qx(i, t);
 	return /* @__PURE__ */ (0, F.jsx)(Z, {
 		size: 200,
 		truncate: !0,
@@ -27857,8 +27871,8 @@ function fw({ task: e, now: t, className: n }) {
 		children: o
 	});
 }
-function pw({ task: e, onToggle: t }) {
-	let n = cw();
+function mw({ task: e, onToggle: t }) {
+	let n = lw();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		className: n.checkCell,
 		children: /* @__PURE__ */ (0, F.jsx)(Sg, {
@@ -27870,8 +27884,8 @@ function pw({ task: e, onToggle: t }) {
 		})
 	});
 }
-function mw({ label: e, count: t, trailing: n }) {
-	let r = cw();
+function hw({ label: e, count: t, trailing: n }) {
+	let r = lw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: r.groupHead,
 		children: [
@@ -27894,8 +27908,8 @@ function mw({ label: e, count: t, trailing: n }) {
 		]
 	});
 }
-function hw({ task: e, now: t, settings: n, onOpen: r, onToggle: i, onRemove: a }) {
-	let o = cw(), [s, c] = (0, P.useState)(!1), l = bC("normal"), u = e.done ? .55 : 1;
+function gw({ task: e, now: t, settings: n, onOpen: r, onToggle: i, onRemove: a }) {
+	let o = lw(), [s, c] = (0, P.useState)(!1), l = xC("normal"), u = e.done ? .55 : 1;
 	return s ? /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: o.confirmRow,
 		role: "group",
@@ -27904,18 +27918,18 @@ function hw({ task: e, now: t, settings: n, onOpen: r, onToggle: i, onRemove: a 
 			/* @__PURE__ */ (0, F.jsx)(Z, {
 				size: 300,
 				className: o.confirmText,
-				children: /* @__PURE__ */ (0, F.jsxs)(uw, { children: [
+				children: /* @__PURE__ */ (0, F.jsxs)(dw, { children: [
 					"删除「",
 					e.title,
 					"」？删除后不可恢复"
 				] })
 			}),
-			/* @__PURE__ */ (0, F.jsx)(GC, {
+			/* @__PURE__ */ (0, F.jsx)(KC, {
 				appearance: "secondary",
 				onClick: () => c(!1),
 				children: "取消"
 			}),
-			/* @__PURE__ */ (0, F.jsx)(GC, {
+			/* @__PURE__ */ (0, F.jsx)(KC, {
 				appearance: "primary",
 				onClick: () => {
 					c(!1), a?.(e.id);
@@ -27923,20 +27937,20 @@ function hw({ task: e, now: t, settings: n, onOpen: r, onToggle: i, onRemove: a 
 				children: "删除"
 			})
 		]
-	}) : /* @__PURE__ */ (0, F.jsx)(VC, {
+	}) : /* @__PURE__ */ (0, F.jsx)(HC, {
 		className: o.row,
 		leading: /* @__PURE__ */ (0, F.jsxs)("span", {
 			className: o.leading,
-			children: [/* @__PURE__ */ (0, F.jsx)(pw, {
+			children: [/* @__PURE__ */ (0, F.jsx)(mw, {
 				task: e,
 				onToggle: i
-			}), /* @__PURE__ */ (0, F.jsx)(dw, { priority: e.priority })]
+			}), /* @__PURE__ */ (0, F.jsx)(fw, { priority: e.priority })]
 		}),
-		title: /* @__PURE__ */ (0, F.jsx)(uw, { children: e.title }),
-		titleSize: IS(n, 400),
+		title: /* @__PURE__ */ (0, F.jsx)(dw, { children: e.title }),
+		titleSize: LS(n, 400),
 		trailing: /* @__PURE__ */ (0, F.jsxs)("span", {
 			className: o.rowTrailing,
-			children: [/* @__PURE__ */ (0, F.jsx)(fw, {
+			children: [/* @__PURE__ */ (0, F.jsx)(pw, {
 				task: e,
 				now: t
 			}), /* @__PURE__ */ (0, F.jsxs)(fv, { children: [/* @__PURE__ */ (0, F.jsx)(Qv, {
@@ -27974,8 +27988,8 @@ function hw({ task: e, now: t, settings: n, onOpen: r, onToggle: i, onRemove: a 
 		}
 	});
 }
-function gw({ task: e, onOpen: t, onToggle: n }) {
-	let r = cw();
+function _w({ task: e, onOpen: t, onToggle: n }) {
+	let r = lw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: r.miniRow,
 		role: "button",
@@ -27985,25 +27999,25 @@ function gw({ task: e, onOpen: t, onToggle: n }) {
 		onKeyDown: (n) => {
 			n.target === n.currentTarget && (n.key === "Enter" || n.key === " ") && (n.preventDefault(), t?.(e.id));
 		},
-		children: [/* @__PURE__ */ (0, F.jsx)(pw, {
+		children: [/* @__PURE__ */ (0, F.jsx)(mw, {
 			task: e,
 			onToggle: n
 		}), /* @__PURE__ */ (0, F.jsx)(Z, {
 			size: 200,
 			className: r.miniTitle,
-			children: /* @__PURE__ */ (0, F.jsx)(uw, { children: e.title })
+			children: /* @__PURE__ */ (0, F.jsx)(dw, { children: e.title })
 		})]
 	});
 }
-function _w({ color: e }) {
-	let t = cw();
+function vw({ color: e }) {
+	let t = lw();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		className: t.dot,
-		style: { backgroundColor: lw(e) },
+		style: { backgroundColor: uw(e) },
 		"aria-hidden": "true"
 	});
 }
-function vw(e) {
+function yw(e) {
 	let t = (0, P.useRef)(null), n = e.join("|"), r = (0, P.useMemo)(() => {
 		if (t.current === null) return /* @__PURE__ */ new Set();
 		let n = t.current;
@@ -28015,7 +28029,7 @@ function vw(e) {
 }
 //#endregion
 //#region public/plugins/todo/src/TodoCard.jsx
-var yw = Kn({
+var bw = Kn({
 	summary: {
 		padding: G.spacingVerticalS,
 		gap: G.spacingVerticalXS,
@@ -28074,16 +28088,16 @@ var yw = Kn({
 	emptyText: { color: G.colorNeutralForeground3 },
 	row: { minWidth: 0 }
 });
-function bw(e) {
-	let t = Bx(zx(e), 1);
+function xw(e) {
+	let t = Vx(Bx(e), 1);
 	return $.state.tasks.filter((n) => {
 		if (n.done || !n.dueAt) return !1;
 		let r = Q(n.dueAt);
-		return r ? r < t || Gx(r, e) : !1;
+		return r ? r < t || Kx(r, e) : !1;
 	});
 }
-function xw({ task: e, onToggle: t }) {
-	let n = yw();
+function Sw({ task: e, onToggle: t }) {
+	let n = bw();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		className: n.checkCell,
 		children: /* @__PURE__ */ (0, F.jsx)(Sg, {
@@ -28095,16 +28109,16 @@ function xw({ task: e, onToggle: t }) {
 		})
 	});
 }
-function Sw({ defaultSizeKey: t = "3x3" }) {
-	let n = yw();
-	YS();
-	let r = wx(rC, t), i = eC(r), a = tC(r), [o] = Tx(AS, jS, PS), s = /* @__PURE__ */ new Date(), c = $.sortTasks(bw(s), o.defaultSort), l = c.filter((e) => Q(e.dueAt) < zx(s)).length, u = a > 0 ? c.slice(0, a) : [];
-	Px(US, (0, P.useMemo)(() => QS(), [])), (0, P.useEffect)(() => e.onFocus(() => {
+function Cw({ defaultSizeKey: t = "3x3" }) {
+	let n = bw();
+	XS();
+	let r = wx(iC, t), i = tC(r), a = nC(r), [o] = Ex(jS, MS, FS), s = /* @__PURE__ */ new Date(), c = $.sortTasks(xw(s), o.defaultSort), l = c.filter((e) => Q(e.dueAt) < Bx(s)).length, u = a > 0 ? c.slice(0, a) : [];
+	Fx(WS, (0, P.useMemo)(() => $S(), [])), (0, P.useEffect)(() => e.onFocus(() => {
 		let e = document.querySelector("[data-card-root]");
 		(e?.querySelector("input[type=\"checkbox\"], button") || e)?.focus?.();
 	}), []), (0, P.useEffect)(() => {
 		let e = (e) => {
-			e.key === "Escape" && (e.preventDefault(), Fx());
+			e.key === "Escape" && (e.preventDefault(), Ix());
 		};
 		return window.addEventListener("keydown", e), () => window.removeEventListener("keydown", e);
 	}, []);
@@ -28112,11 +28126,11 @@ function Sw({ defaultSizeKey: t = "3x3" }) {
 		let t = $.taskById(e);
 		t && $.setDone(e, !t.done);
 	}, f = `今日待办 ${c.length} 项${l ? `，已逾期 ${l} 项` : ""}，点击打开详情`;
-	if (i === "summary") return /* @__PURE__ */ (0, F.jsxs)(PC, {
+	if (i === "summary") return /* @__PURE__ */ (0, F.jsxs)(FC, {
 		ariaLabel: f,
-		onActivate: XS,
+		onActivate: ZS,
 		className: n.summary,
-		children: [/* @__PURE__ */ (0, F.jsx)(zC, {
+		children: [/* @__PURE__ */ (0, F.jsx)(BC, {
 			value: c.length,
 			label: "今日待办",
 			size: 48,
@@ -28128,11 +28142,11 @@ function Sw({ defaultSizeKey: t = "3x3" }) {
 		}) : null]
 	});
 	let p = i === "mini" ? n.mini : i === "full" ? n.full : n.medium;
-	return /* @__PURE__ */ (0, F.jsxs)(PC, {
+	return /* @__PURE__ */ (0, F.jsxs)(FC, {
 		ariaLabel: f,
-		onActivate: XS,
+		onActivate: ZS,
 		className: p,
-		children: [/* @__PURE__ */ (0, F.jsx)(IC, { title: `今日 · ${c.length}` }), u.length === 0 ? /* @__PURE__ */ (0, F.jsx)("div", {
+		children: [/* @__PURE__ */ (0, F.jsx)(LC, { title: `今日 · ${c.length}` }), u.length === 0 ? /* @__PURE__ */ (0, F.jsx)("div", {
 			className: n.empty,
 			children: /* @__PURE__ */ (0, F.jsx)(Z, {
 				size: 300,
@@ -28141,18 +28155,18 @@ function Sw({ defaultSizeKey: t = "3x3" }) {
 			})
 		}) : /* @__PURE__ */ (0, F.jsx)("div", {
 			className: n.rows,
-			children: u.map((e) => /* @__PURE__ */ (0, F.jsx)(VC, {
+			children: u.map((e) => /* @__PURE__ */ (0, F.jsx)(HC, {
 				className: n.row,
 				leading: /* @__PURE__ */ (0, F.jsxs)("span", {
 					className: n.leading,
-					children: [/* @__PURE__ */ (0, F.jsx)(xw, {
+					children: [/* @__PURE__ */ (0, F.jsx)(Sw, {
 						task: e,
 						onToggle: d
-					}), /* @__PURE__ */ (0, F.jsx)(dw, { priority: e.priority })]
+					}), /* @__PURE__ */ (0, F.jsx)(fw, { priority: e.priority })]
 				}),
-				title: /* @__PURE__ */ (0, F.jsx)(uw, { children: e.title }),
-				titleSize: IS(o, 400),
-				trailing: /* @__PURE__ */ (0, F.jsx)(fw, {
+				title: /* @__PURE__ */ (0, F.jsx)(dw, { children: e.title }),
+				titleSize: LS(o, 400),
+				trailing: /* @__PURE__ */ (0, F.jsx)(pw, {
 					task: e,
 					now: s
 				})
@@ -28162,7 +28176,7 @@ function Sw({ defaultSizeKey: t = "3x3" }) {
 }
 //#endregion
 //#region public/plugins/todo/src/ListView.jsx
-var Cw = Kn({
+var ww = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -28191,12 +28205,12 @@ var Cw = Kn({
 	},
 	confirmText: { color: G.colorNeutralForeground3 }
 });
-function ww(e, t) {
+function Tw(e, t) {
 	return $.sortTasks(e, t.defaultSort);
 }
-function Tw({ tasks: e, settings: t, now: n, newIds: r, removingId: i, onOpen: a, onToggle: o, onRequestRemove: s, onRemoved: c }) {
-	let l = Cw();
-	return e.map((e) => /* @__PURE__ */ (0, F.jsx)(pC, {
+function Ew({ tasks: e, settings: t, now: n, newIds: r, removingId: i, onOpen: a, onToggle: o, onRequestRemove: s, onRemoved: c }) {
+	let l = ww();
+	return e.map((e) => /* @__PURE__ */ (0, F.jsx)(mC, {
 		visible: i !== e.id,
 		appear: r.has(e.id),
 		unmountOnExit: !0,
@@ -28207,7 +28221,7 @@ function Tw({ tasks: e, settings: t, now: n, newIds: r, removingId: i, onOpen: a
 			className: l.rowWrap,
 			"data-task-id": e.id,
 			"data-removing": i === e.id ? "true" : "false",
-			children: /* @__PURE__ */ (0, F.jsx)(hw, {
+			children: /* @__PURE__ */ (0, F.jsx)(gw, {
 				task: e,
 				now: n,
 				settings: t,
@@ -28218,8 +28232,8 @@ function Tw({ tasks: e, settings: t, now: n, newIds: r, removingId: i, onOpen: a
 		})
 	}, e.id));
 }
-function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a, onToggleTask: o, onAddTask: s, onClearSearch: c }) {
-	let l = Cw(), [u, d] = (0, P.useState)(null), [f, p] = (0, P.useState)(!1), [m, h] = (0, P.useState)(!1), g = t.trim(), _ = g ? $.searchTasks(g).filter((e) => i === "all" || e.listId === i) : [], v = zx(r), y = Bx(v, 1), b = e.filter((e) => !e.done), x = e.filter((e) => e.done), S = [
+function Dw({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a, onToggleTask: o, onAddTask: s, onClearSearch: c }) {
+	let l = ww(), [u, d] = (0, P.useState)(null), [f, p] = (0, P.useState)(!1), [m, h] = (0, P.useState)(!1), g = t.trim(), _ = g ? $.searchTasks(g).filter((e) => i === "all" || e.listId === i) : [], v = Bx(r), y = Vx(v, 1), b = e.filter((e) => !e.done), x = e.filter((e) => e.done), S = [
 		{
 			key: "overdue",
 			label: "已逾期",
@@ -28248,22 +28262,22 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 	], C = Object.fromEntries(S.map((e) => [e.key, e]));
 	for (let e of b) {
 		let t = Q(e.dueAt);
-		t ? t < v ? C.overdue.tasks.push(e) : Gx(t, r) ? C.today.tasks.push(e) : Gx(t, y) ? C.tomorrow.tasks.push(e) : C.later.tasks.push(e) : C.nodate.tasks.push(e);
+		t ? t < v ? C.overdue.tasks.push(e) : Kx(t, r) ? C.today.tasks.push(e) : Kx(t, y) ? C.tomorrow.tasks.push(e) : C.later.tasks.push(e) : C.nodate.tasks.push(e);
 	}
-	for (let e of S) e.tasks = ww(e.tasks, n);
-	let w = $.sortTasks(x, "created").slice().sort((e, t) => (Q(t.doneAt)?.getTime() || 0) - (Q(e.doneAt)?.getTime() || 0)), T = S.filter((e) => e.tasks.length > 0), E = vw(g ? _.map((e) => e.id) : T.flatMap((e) => e.tasks.map((e) => e.id)).concat(w.map((e) => e.id)));
+	for (let e of S) e.tasks = Tw(e.tasks, n);
+	let w = $.sortTasks(x, "created").slice().sort((e, t) => (Q(t.doneAt)?.getTime() || 0) - (Q(e.doneAt)?.getTime() || 0)), T = S.filter((e) => e.tasks.length > 0), E = yw(g ? _.map((e) => e.id) : T.flatMap((e) => e.tasks.map((e) => e.id)).concat(w.map((e) => e.id)));
 	return g ? /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: l.root,
-		children: [/* @__PURE__ */ (0, F.jsx)(mw, { label: `搜索结果 · ${_.length}` }), _.length === 0 ? /* @__PURE__ */ (0, F.jsx)(UC, {
+		children: [/* @__PURE__ */ (0, F.jsx)(hw, { label: `搜索结果 · ${_.length}` }), _.length === 0 ? /* @__PURE__ */ (0, F.jsx)(WC, {
 			title: "没有匹配的任务",
 			description: "换个关键词，或清除搜索回到全部任务",
-			action: /* @__PURE__ */ (0, F.jsx)(KC, {
+			action: /* @__PURE__ */ (0, F.jsx)(qC, {
 				onClick: c,
 				children: "清除搜索"
 			})
 		}) : /* @__PURE__ */ (0, F.jsx)("div", {
 			className: l.rows,
-			children: /* @__PURE__ */ (0, F.jsx)(Tw, {
+			children: /* @__PURE__ */ (0, F.jsx)(Ew, {
 				tasks: _,
 				settings: n,
 				now: r,
@@ -28275,10 +28289,10 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 				onRemoved: () => d(null)
 			})
 		})]
-	}) : b.length === 0 && w.length === 0 ? /* @__PURE__ */ (0, F.jsx)(UC, {
+	}) : b.length === 0 && w.length === 0 ? /* @__PURE__ */ (0, F.jsx)(WC, {
 		title: "还没有任务",
 		description: "先加一条今天要做的事，完成后会自动收进已完成",
-		action: /* @__PURE__ */ (0, F.jsx)(KC, {
+		action: /* @__PURE__ */ (0, F.jsx)(qC, {
 			appearance: "primary",
 			onClick: s,
 			children: "添加任务"
@@ -28294,12 +28308,12 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 			T.map((e) => /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: l.group,
 				"aria-label": `${e.label}（${e.tasks.length}）`,
-				children: [/* @__PURE__ */ (0, F.jsx)(mw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(hw, {
 					label: e.label,
 					count: e.tasks.length
 				}), /* @__PURE__ */ (0, F.jsx)("div", {
 					className: l.rows,
-					children: /* @__PURE__ */ (0, F.jsx)(Tw, {
+					children: /* @__PURE__ */ (0, F.jsx)(Ew, {
 						tasks: e.tasks,
 						settings: n,
 						now: r,
@@ -28315,7 +28329,7 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 			n.showCompleted && w.length > 0 ? /* @__PURE__ */ (0, F.jsxs)("section", {
 				className: l.group,
 				"aria-label": `已完成（${w.length}）`,
-				children: [/* @__PURE__ */ (0, F.jsx)(mw, {
+				children: [/* @__PURE__ */ (0, F.jsx)(hw, {
 					label: "已完成",
 					count: w.length,
 					trailing: m ? /* @__PURE__ */ (0, F.jsxs)("span", {
@@ -28330,12 +28344,12 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 									" 条？"
 								]
 							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
+							/* @__PURE__ */ (0, F.jsx)(qC, {
 								appearance: "secondary",
 								onClick: () => h(!1),
 								children: "取消"
 							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
+							/* @__PURE__ */ (0, F.jsx)(qC, {
 								appearance: "primary",
 								onClick: () => {
 									$.clearCompleted({ listId: i === "all" ? void 0 : i }), h(!1);
@@ -28343,22 +28357,22 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 								children: "清空"
 							})
 						]
-					}) : /* @__PURE__ */ (0, F.jsxs)(F.Fragment, { children: [/* @__PURE__ */ (0, F.jsx)(KC, {
+					}) : /* @__PURE__ */ (0, F.jsxs)(F.Fragment, { children: [/* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "subtle",
 						onClick: () => p((e) => !e),
 						"aria-expanded": f,
 						children: f ? "收起" : "展开"
-					}), /* @__PURE__ */ (0, F.jsx)(KC, {
+					}), /* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "subtle",
 						onClick: () => h(!0),
 						children: "清空"
 					})] })
-				}), /* @__PURE__ */ (0, F.jsx)(hC, {
+				}), /* @__PURE__ */ (0, F.jsx)(gC, {
 					visible: f,
 					unmountOnExit: !0,
 					children: /* @__PURE__ */ (0, F.jsx)("div", {
 						className: l.rows,
-						children: /* @__PURE__ */ (0, F.jsx)(Tw, {
+						children: /* @__PURE__ */ (0, F.jsx)(Ew, {
 							tasks: w,
 							settings: n,
 							now: r,
@@ -28377,7 +28391,7 @@ function Ew({ tasks: e, query: t, settings: n, now: r, listId: i, onOpenTask: a,
 }
 //#endregion
 //#region public/plugins/todo/src/TimeViews.jsx
-var Dw = Kn({
+var Ow = Kn({
 	view: {
 		display: "flex",
 		flexDirection: "column",
@@ -28534,36 +28548,36 @@ var Dw = Kn({
 		borderRadius: G.borderRadiusSmall
 	}
 });
-function Ow(e) {
+function kw(e) {
 	let t = Q(e);
 	return t ? `${t.getMonth() + 1}月${t.getDate()}日` : "";
 }
-function kw(e) {
+function Aw(e) {
 	let t = Q(e) || /* @__PURE__ */ new Date();
 	return `${t.getFullYear()}年${t.getMonth() + 1}月`;
 }
-function Aw(e, t) {
-	let n = new Date(e.getFullYear(), e.getMonth(), 1), r = Bx(n, -((n.getDay() - t + 7) % 7));
-	return Array.from({ length: 42 }, (e, t) => Bx(r, t));
-}
 function jw(e, t) {
-	return t >= 3 ? e.dotHigh : t === 2 ? e.dotMedium : t === 1 ? e.dotLow : e.dot;
+	let n = new Date(e.getFullYear(), e.getMonth(), 1), r = Vx(n, -((n.getDay() - t + 7) % 7));
+	return Array.from({ length: 42 }, (e, t) => Vx(r, t));
 }
 function Mw(e, t) {
-	return e.filter((e) => e.dueAt && Rx(e.dueAt) === t);
+	return t >= 3 ? e.dotHigh : t === 2 ? e.dotMedium : t === 1 ? e.dotLow : e.dot;
 }
-function Nw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
-	let o = Dw(), s = $.sortTasks(e, "due");
-	return s.length === 0 ? /* @__PURE__ */ (0, F.jsx)(UC, {
+function Nw(e, t) {
+	return e.filter((e) => e.dueAt && zx(e.dueAt) === t);
+}
+function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
+	let o = Ow(), s = $.sortTasks(e, "due");
+	return s.length === 0 ? /* @__PURE__ */ (0, F.jsx)(WC, {
 		title: "这天还没有任务",
 		description: "把要做的事安排到这一天",
-		action: /* @__PURE__ */ (0, F.jsx)(KC, {
+		action: /* @__PURE__ */ (0, F.jsx)(qC, {
 			onClick: a,
 			children: "添加任务"
 		})
 	}) : /* @__PURE__ */ (0, F.jsx)("div", {
 		className: o.rows,
-		children: s.map((e) => /* @__PURE__ */ (0, F.jsx)(hw, {
+		children: s.map((e) => /* @__PURE__ */ (0, F.jsx)(gw, {
 			task: e,
 			now: t,
 			settings: n,
@@ -28573,8 +28587,8 @@ function Nw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 		}, e.id))
 	});
 }
-function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
-	let o = Dw(), [s, c] = (0, P.useState)(() => Wx(t)), [l, u] = (0, P.useState)(() => Rx(t)), d = n.weekStart, f = $x(d), p = Aw(s, d), m = /* @__PURE__ */ new Date(`${l}T00:00:00`), h = Mw(e, l), g = h.filter((e) => !e.done).length;
+function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
+	let o = Ow(), [s, c] = (0, P.useState)(() => Gx(t)), [l, u] = (0, P.useState)(() => zx(t)), d = n.weekStart, f = eS(d), p = jw(s, d), m = /* @__PURE__ */ new Date(`${l}T00:00:00`), h = Nw(e, l), g = h.filter((e) => !e.done).length;
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: o.view,
 		children: [
@@ -28593,7 +28607,7 @@ function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 						weight: "semibold",
 						className: o.toolbarTitle,
 						"aria-live": "polite",
-						children: kw(s)
+						children: Aw(s)
 					}),
 					/* @__PURE__ */ (0, F.jsx)(Lh, {
 						appearance: "subtle",
@@ -28603,11 +28617,11 @@ function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 						onClick: () => c(new Date(s.getFullYear(), s.getMonth() + 1, 1))
 					}),
 					/* @__PURE__ */ (0, F.jsx)("span", { className: o.spacer }),
-					/* @__PURE__ */ (0, F.jsx)(KC, {
+					/* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "subtle",
 						icon: /* @__PURE__ */ (0, F.jsx)(ju, {}),
 						onClick: () => {
-							c(Wx(t)), u(Rx(t));
+							c(Gx(t)), u(zx(t));
 						},
 						children: "今天"
 					})
@@ -28627,7 +28641,7 @@ function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 				role: "grid",
 				"aria-label": "日历",
 				children: p.map((n) => {
-					let r = Rx(n), i = e.filter((e) => !e.done && e.dueAt && Rx(e.dueAt) === r).length, a = n.getMonth() !== s.getMonth(), c = Gx(n, t), d = r === l;
+					let r = zx(n), i = e.filter((e) => !e.done && e.dueAt && zx(e.dueAt) === r).length, a = n.getMonth() !== s.getMonth(), c = Kx(n, t), d = r === l;
 					return /* @__PURE__ */ (0, F.jsxs)(Lh, {
 						appearance: "transparent",
 						className: A(o.dayCell, d && o.daySelected, c && o.dayToday, a && o.dayOther),
@@ -28651,14 +28665,14 @@ function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 					size: 300,
 					weight: "semibold",
 					children: [
-						Ow(m),
+						kw(m),
 						" · ",
 						g,
 						" 项"
 					]
 				})
 			}),
-			/* @__PURE__ */ (0, F.jsx)(Nw, {
+			/* @__PURE__ */ (0, F.jsx)(Pw, {
 				tasks: h,
 				now: t,
 				settings: n,
@@ -28669,8 +28683,8 @@ function Pw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 		]
 	});
 }
-function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
-	let a = Dw(), o = n.weekStart, [s, c] = (0, P.useState)(() => Ux(t, o)), l = $x(o), u = Array.from({ length: 7 }, (e, t) => Bx(s, t)), d = u.reduce((t, n) => t + Mw(e, Rx(n)).length, 0);
+function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
+	let a = Ow(), o = n.weekStart, [s, c] = (0, P.useState)(() => Wx(t, o)), l = eS(o), u = Array.from({ length: 7 }, (e, t) => Vx(s, t)), d = u.reduce((t, n) => t + Nw(e, zx(n)).length, 0);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: a.view,
 		children: [
@@ -28682,7 +28696,7 @@ function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
 						size: "large",
 						icon: /* @__PURE__ */ (0, F.jsx)(Gu, {}),
 						"aria-label": "上一周",
-						onClick: () => c(Bx(s, -7))
+						onClick: () => c(Vx(s, -7))
 					}),
 					/* @__PURE__ */ (0, F.jsxs)(Z, {
 						size: 300,
@@ -28690,9 +28704,9 @@ function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
 						className: a.toolbarTitle,
 						"aria-live": "polite",
 						children: [
-							Ow(u[0]),
+							kw(u[0]),
 							" – ",
-							Ow(u[6])
+							kw(u[6])
 						]
 					}),
 					/* @__PURE__ */ (0, F.jsx)(Lh, {
@@ -28700,13 +28714,13 @@ function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
 						size: "large",
 						icon: /* @__PURE__ */ (0, F.jsx)(Ku, {}),
 						"aria-label": "下一周",
-						onClick: () => c(Bx(s, 7))
+						onClick: () => c(Vx(s, 7))
 					}),
 					/* @__PURE__ */ (0, F.jsx)("span", { className: a.spacer }),
-					/* @__PURE__ */ (0, F.jsx)(KC, {
+					/* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "subtle",
 						icon: /* @__PURE__ */ (0, F.jsx)(ju, {}),
-						onClick: () => c(Ux(t, o)),
+						onClick: () => c(Wx(t, o)),
 						children: "今天"
 					})
 				]
@@ -28714,22 +28728,22 @@ function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
 			/* @__PURE__ */ (0, F.jsx)("div", {
 				className: a.weekGrid,
 				children: u.map((n, o) => {
-					let s = Rx(n), c = Mw(e, s).sort((e, t) => Number(e.done) - Number(t.done) || (Q(e.dueAt)?.getTime() || 0) - (Q(t.dueAt)?.getTime() || 0));
+					let s = zx(n), c = Nw(e, s).sort((e, t) => Number(e.done) - Number(t.done) || (Q(e.dueAt)?.getTime() || 0) - (Q(t.dueAt)?.getTime() || 0));
 					return /* @__PURE__ */ (0, F.jsxs)("div", {
 						className: a.weekCol,
 						children: [/* @__PURE__ */ (0, F.jsxs)("div", {
-							className: A(a.weekHead, Gx(n, t) && a.dayToday),
+							className: A(a.weekHead, Kx(n, t) && a.dayToday),
 							children: [/* @__PURE__ */ (0, F.jsx)(Z, {
 								size: 200,
 								children: l[o]
 							}), /* @__PURE__ */ (0, F.jsx)(Z, {
 								size: 300,
-								weight: Gx(n, t) ? "semibold" : "regular",
+								weight: Kx(n, t) ? "semibold" : "regular",
 								children: n.getDate()
 							})]
 						}), /* @__PURE__ */ (0, F.jsx)("div", {
 							className: a.weekTasks,
-							children: c.map((e) => /* @__PURE__ */ (0, F.jsx)(gw, {
+							children: c.map((e) => /* @__PURE__ */ (0, F.jsx)(_w, {
 								task: e,
 								onOpen: r,
 								onToggle: i
@@ -28746,8 +28760,8 @@ function Fw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i }) {
 		]
 	});
 }
-function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
-	let o = Dw(), s = n.weekStart, [c, l] = (0, P.useState)(() => Wx(t)), [u, d] = (0, P.useState)(() => Rx(t)), f = $x(s), p = Aw(c, s), m = Mw(e, u), h = m.filter((e) => !e.done).length;
+function Lw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onAddDay: a }) {
+	let o = Ow(), s = n.weekStart, [c, l] = (0, P.useState)(() => Gx(t)), [u, d] = (0, P.useState)(() => zx(t)), f = eS(s), p = jw(c, s), m = Nw(e, u), h = m.filter((e) => !e.done).length;
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: o.view,
 		children: [
@@ -28766,7 +28780,7 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 						weight: "semibold",
 						className: o.toolbarTitle,
 						"aria-live": "polite",
-						children: kw(c)
+						children: Aw(c)
 					}),
 					/* @__PURE__ */ (0, F.jsx)(Lh, {
 						appearance: "subtle",
@@ -28776,11 +28790,11 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 						onClick: () => l(new Date(c.getFullYear(), c.getMonth() + 1, 1))
 					}),
 					/* @__PURE__ */ (0, F.jsx)("span", { className: o.spacer }),
-					/* @__PURE__ */ (0, F.jsx)(KC, {
+					/* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "subtle",
 						icon: /* @__PURE__ */ (0, F.jsx)(ju, {}),
 						onClick: () => {
-							l(Wx(t)), d(Rx(t));
+							l(Gx(t)), d(zx(t));
 						},
 						children: "今天"
 					})
@@ -28800,10 +28814,10 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 				role: "grid",
 				"aria-label": "月视图",
 				children: p.map((n) => {
-					let r = Rx(n), i = e.filter((e) => !e.done && e.dueAt && Rx(e.dueAt) === r).slice(0, 2), a = n.getMonth() !== c.getMonth(), s = r === u;
+					let r = zx(n), i = e.filter((e) => !e.done && e.dueAt && zx(e.dueAt) === r).slice(0, 2), a = n.getMonth() !== c.getMonth(), s = r === u;
 					return /* @__PURE__ */ (0, F.jsxs)(Lh, {
 						appearance: "transparent",
-						className: A(o.dayCell, s && o.daySelected, Gx(n, t) && o.dayToday, a && o.dayOther),
+						className: A(o.dayCell, s && o.daySelected, Kx(n, t) && o.dayToday, a && o.dayOther),
 						"aria-label": `${n.getMonth() + 1}月${n.getDate()}日`,
 						"aria-pressed": s,
 						onClick: () => d(r),
@@ -28813,7 +28827,7 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 						}), i.length > 0 ? /* @__PURE__ */ (0, F.jsx)("span", {
 							className: o.dots,
 							"aria-hidden": "true",
-							children: i.map((e) => /* @__PURE__ */ (0, F.jsx)("span", { className: A(o.dot, jw(o, e.priority)) }, e.id))
+							children: i.map((e) => /* @__PURE__ */ (0, F.jsx)("span", { className: A(o.dot, Mw(o, e.priority)) }, e.id))
 						}) : null]
 					}, r);
 				})
@@ -28824,14 +28838,14 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 					size: 300,
 					weight: "semibold",
 					children: [
-						Ow(/* @__PURE__ */ new Date(`${u}T00:00:00`)),
+						kw(/* @__PURE__ */ new Date(`${u}T00:00:00`)),
 						" · ",
 						h,
 						" 项"
 					]
 				})
 			}),
-			/* @__PURE__ */ (0, F.jsx)(Nw, {
+			/* @__PURE__ */ (0, F.jsx)(Pw, {
 				tasks: m,
 				now: t,
 				settings: n,
@@ -28842,18 +28856,18 @@ function Iw({ tasks: e, now: t, settings: n, onOpenTask: r, onToggleTask: i, onA
 		]
 	});
 }
-function Lw({ now: e, settings: t }) {
-	let n = Dw(), r = t.weekStart, i = zx(e), a = Bx(Ux(i, r), -105), o = Array.from({ length: 112 }, (e, t) => Rx(Bx(a, t))), s = new Map(o.map((e) => [e, 0])), c = $.state.tasks;
+function Rw({ now: e, settings: t }) {
+	let n = Ow(), r = t.weekStart, i = Bx(e), a = Vx(Wx(i, r), -105), o = Array.from({ length: 112 }, (e, t) => zx(Vx(a, t))), s = new Map(o.map((e) => [e, 0])), c = $.state.tasks;
 	for (let e of c) {
 		if (!e.done || !e.doneAt) continue;
-		let t = Rx(e.doneAt);
+		let t = zx(e.doneAt);
 		s.has(t) && s.set(t, s.get(t) + 1);
 	}
 	let l = o.map((e) => s.get(e)), u = l.reduce((e, t) => e + t, 0), d = 1;
 	for (let e of l) d = Math.max(d, e);
-	let f = (e) => e <= 0 ? 0 : Math.min(4, Math.ceil(e / d * 4)), p = 0, m = s.get(Rx(i)) > 0 ? i : Bx(i, -1);
-	for (; s.has(Rx(m)) && s.get(Rx(m)) > 0;) p += 1, m = Bx(m, -1);
-	let h = $x(r);
+	let f = (e) => e <= 0 ? 0 : Math.min(4, Math.ceil(e / d * 4)), p = 0, m = s.get(zx(i)) > 0 ? i : Vx(i, -1);
+	for (; s.has(zx(m)) && s.get(zx(m)) > 0;) p += 1, m = Vx(m, -1);
+	let h = eS(r);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: n.view,
 		children: [
@@ -28924,18 +28938,18 @@ function Lw({ now: e, settings: t }) {
 }
 //#endregion
 //#region public/plugins/todo/src/TaskEditor.jsx
-var Rw = [
+var zw = [
 	0,
 	1,
 	2,
 	3
 ].map((e) => ({
 	value: e,
-	label: iS(e).label
-})), zw = [{
+	label: aS(e).label
+})), Bw = [{
 	value: "",
 	label: "不重复"
-}, ...tS], Bw = Kn({
+}, ...nS], Vw = Kn({
 	form: {
 		width: "100%",
 		maxWidth: "720px",
@@ -29007,14 +29021,14 @@ var Rw = [
 	confirmText: { color: G.colorNeutralForeground3 },
 	progress: { marginBottom: G.spacingVerticalXS }
 });
-function Vw(e, { dateOnly: t = !1 } = {}) {
-	let [n, r] = (Jx(e) || "").split("T");
+function Hw(e, { dateOnly: t = !1 } = {}) {
+	let [n, r] = (Yx(e) || "").split("T");
 	return {
 		date: n || "",
 		time: t && r === "23:59" ? "" : r || ""
 	};
 }
-function Hw(e, t) {
+function Uw(e, t) {
 	let n = $.taskById(e);
 	if (!n) return;
 	let r = new Map(t.filter((e) => e.id).map((e) => [e.id, e]));
@@ -29028,14 +29042,14 @@ function Hw(e, t) {
 		t && t.done !== n.done && $.completeSubtask(e, n.id, n.done);
 	}
 }
-function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings: i, onClosed: a }) {
-	let o = Bw(), s = e === "edit", c = s ? $.taskById(t) : null, l = n && $.listById(n) ? n : $.settings.defaultListId && $.listById($.settings.defaultListId) ? $.settings.defaultListId : $.lists[0]?.id, [u, d] = (0, P.useState)(() => c?.title || ""), [f, p] = (0, P.useState)(() => c?.note || ""), [m, h] = (0, P.useState)(() => c?.listId || l), [g, _] = (0, P.useState)(() => String(c?.priority ?? 0)), [v, y] = (0, P.useState)(() => c ? Vw(c.dueAt, { dateOnly: !0 }) : {
+function Ww({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings: i, onClosed: a }) {
+	let o = Vw(), s = e === "edit", c = s ? $.taskById(t) : null, l = n && $.listById(n) ? n : $.settings.defaultListId && $.listById($.settings.defaultListId) ? $.settings.defaultListId : $.lists[0]?.id, [u, d] = (0, P.useState)(() => c?.title || ""), [f, p] = (0, P.useState)(() => c?.note || ""), [m, h] = (0, P.useState)(() => c?.listId || l), [g, _] = (0, P.useState)(() => String(c?.priority ?? 0)), [v, y] = (0, P.useState)(() => c ? Hw(c.dueAt, { dateOnly: !0 }) : {
 		date: r || "",
 		time: ""
-	}), [b, x] = (0, P.useState)(() => c ? Vw(c.remindAt) : {
+	}), [b, x] = (0, P.useState)(() => c ? Hw(c.remindAt) : {
 		date: "",
 		time: ""
-	}), [S, C] = (0, P.useState)(() => c?.recurrence || ""), [w, T] = (0, P.useState)(() => [...c?.tags || []]), [E, D] = (0, P.useState)(""), [O, k] = (0, P.useState)(() => (c?.subtasks || []).slice().sort((e, t) => e.order - t.order).map((e) => ({ ...e }))), [ee, te] = (0, P.useState)(""), [ne, A] = (0, P.useState)(null), [re, ie] = (0, P.useState)(!1), ae = bC("normal"), oe = $.listById(m) || $.lists[0], se = O.filter((e) => e.done).length, ce = O.length ? se / O.length : 0, le = IS(i, 400), ue = () => {
+	}), [S, C] = (0, P.useState)(() => c?.recurrence || ""), [w, T] = (0, P.useState)(() => [...c?.tags || []]), [E, D] = (0, P.useState)(""), [O, k] = (0, P.useState)(() => (c?.subtasks || []).slice().sort((e, t) => e.order - t.order).map((e) => ({ ...e }))), [ee, te] = (0, P.useState)(""), [ne, A] = (0, P.useState)(null), [re, ie] = (0, P.useState)(!1), ae = xC("normal"), oe = $.listById(m) || $.lists[0], se = O.filter((e) => e.done).length, ce = O.length ? se / O.length : 0, le = LS(i, 400), ue = () => {
 		let e = E.trim();
 		e && (T((t) => t.includes(e) ? t : [...t, e]), D(""));
 	}, de = () => {
@@ -29052,7 +29066,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 			A("标题不能为空");
 			return;
 		}
-		let n = v.date ? Yx(v.date, v.time || null) : null, r = b.date ? Yx(b.date, b.time || "09:00") : null, i = {
+		let n = v.date ? Xx(v.date, v.time || null) : null, r = b.date ? Xx(b.date, b.time || "09:00") : null, i = {
 			title: t,
 			note: f.trim(),
 			priority: Number(g),
@@ -29065,7 +29079,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 		try {
 			if (s) {
 				if (!c) throw Error("任务不存在或已被删除");
-				$.updateTask(c.id, i), Hw(c.id, O);
+				$.updateTask(c.id, i), Uw(c.id, O);
 			} else $.addTask({
 				...i,
 				subtasks: O.map((e) => ({
@@ -29085,13 +29099,13 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 			A(e instanceof Error ? e.message : String(e));
 		}
 	};
-	return /* @__PURE__ */ (0, F.jsx)(ow, {
+	return /* @__PURE__ */ (0, F.jsx)(sw, {
 		title: s ? "编辑任务" : "新建任务",
 		footer: (e) => /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: o.footer,
 			children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 				className: o.footerGroup,
-				children: [s && c && !re ? /* @__PURE__ */ (0, F.jsx)(KC, {
+				children: [s && c && !re ? /* @__PURE__ */ (0, F.jsx)(qC, {
 					appearance: "subtle",
 					className: o.danger,
 					icon: /* @__PURE__ */ (0, F.jsx)(Yu, {}),
@@ -29103,22 +29117,22 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 						className: o.confirmText,
 						children: "删除后不可恢复"
 					}),
-					/* @__PURE__ */ (0, F.jsx)(KC, {
+					/* @__PURE__ */ (0, F.jsx)(qC, {
 						appearance: "primary",
 						onClick: () => pe(e),
 						children: "确认删除"
 					}),
-					/* @__PURE__ */ (0, F.jsx)(KC, {
+					/* @__PURE__ */ (0, F.jsx)(qC, {
 						onClick: () => ie(!1),
 						children: "取消"
 					})
 				] }) : null]
 			}), re ? null : /* @__PURE__ */ (0, F.jsxs)("div", {
 				className: o.footerGroup,
-				children: [/* @__PURE__ */ (0, F.jsx)(KC, {
+				children: [/* @__PURE__ */ (0, F.jsx)(qC, {
 					onClick: e,
 					children: "取消"
-				}), /* @__PURE__ */ (0, F.jsx)(KC, {
+				}), /* @__PURE__ */ (0, F.jsx)(qC, {
 					appearance: "primary",
 					onClick: () => fe(e),
 					children: "保存"
@@ -29177,7 +29191,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 						value: g,
 						"aria-label": "优先级",
 						onChange: (e, t) => _(t.value),
-						children: Rw.map((e) => /* @__PURE__ */ (0, F.jsx)(xy, {
+						children: zw.map((e) => /* @__PURE__ */ (0, F.jsx)(xy, {
 							value: String(e.value),
 							label: e.label
 						}, e.value))
@@ -29211,7 +29225,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 									time: t.value
 								}))
 							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
+							/* @__PURE__ */ (0, F.jsx)(qC, {
 								appearance: "secondary",
 								onClick: () => y({
 									date: "",
@@ -29251,7 +29265,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 									time: t.value
 								}))
 							}),
-							/* @__PURE__ */ (0, F.jsx)(KC, {
+							/* @__PURE__ */ (0, F.jsx)(qC, {
 								appearance: "secondary",
 								onClick: () => x({
 									date: "",
@@ -29267,11 +29281,11 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 					label: "重复",
 					children: /* @__PURE__ */ (0, F.jsx)(u_, {
 						size: "large",
-						value: zw.find((e) => e.value === S)?.label || "不重复",
+						value: Bw.find((e) => e.value === S)?.label || "不重复",
 						selectedOptions: S ? [S] : [],
 						"aria-label": "重复规则",
 						onOptionSelect: (e, t) => C(t.optionValue),
-						children: zw.map((e) => /* @__PURE__ */ (0, F.jsx)(qg, {
+						children: Bw.map((e) => /* @__PURE__ */ (0, F.jsx)(qg, {
 							value: e.value,
 							children: e.label
 						}, e.value))
@@ -29281,7 +29295,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 					label: "标签",
 					children: [w.length > 0 ? /* @__PURE__ */ (0, F.jsx)("div", {
 						className: o.chips,
-						children: w.map((e) => /* @__PURE__ */ (0, F.jsx)(KC, {
+						children: w.map((e) => /* @__PURE__ */ (0, F.jsx)(qC, {
 							appearance: "outline",
 							icon: /* @__PURE__ */ (0, F.jsx)(Zu, {}),
 							iconPosition: "after",
@@ -29301,7 +29315,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 							onKeyDown: (e) => {
 								e.key === "Enter" && (e.preventDefault(), ue());
 							}
-						}), /* @__PURE__ */ (0, F.jsx)(KC, {
+						}), /* @__PURE__ */ (0, F.jsx)(qC, {
 							appearance: "secondary",
 							icon: /* @__PURE__ */ (0, F.jsx)(Ru, {}),
 							onClick: ue,
@@ -29336,9 +29350,9 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 										transitionProperty: "opacity",
 										...ae
 									},
-									children: /* @__PURE__ */ (0, F.jsx)(uw, { children: e.title })
+									children: /* @__PURE__ */ (0, F.jsx)(dw, { children: e.title })
 								}),
-								/* @__PURE__ */ (0, F.jsx)(KC, {
+								/* @__PURE__ */ (0, F.jsx)(qC, {
 									appearance: "subtle",
 									className: o.iconButton,
 									icon: /* @__PURE__ */ (0, F.jsx)(Yu, {}),
@@ -29359,7 +29373,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 								onKeyDown: (e) => {
 									e.key === "Enter" && (e.preventDefault(), de());
 								}
-							}), /* @__PURE__ */ (0, F.jsx)(KC, {
+							}), /* @__PURE__ */ (0, F.jsx)(qC, {
 								appearance: "secondary",
 								icon: /* @__PURE__ */ (0, F.jsx)(Ru, {}),
 								onClick: de,
@@ -29379,7 +29393,7 @@ function Uw({ mode: e, taskId: t, initialListId: n, initialDueDate: r, settings:
 }
 //#endregion
 //#region public/plugins/todo/src/ListManager.jsx
-var Ww = Kn({
+var Gw = Kn({
 	list: {
 		display: "flex",
 		flexDirection: "column",
@@ -29450,8 +29464,8 @@ var Ww = Kn({
 		paddingBlock: G.spacingVerticalM
 	}
 });
-function Gw({ onClosed: e }) {
-	let t = Ww(), n = YS(), [r, i] = (0, P.useState)(""), [a, o] = (0, P.useState)(null), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), [d, f] = (0, P.useState)(null), p = n.lists, m = n.settings.defaultListId, h = (e) => n.state.tasks.filter((t) => t.listId === e).length, g = vw(p.map((e) => e.id)), _ = () => {
+function Kw({ onClosed: e }) {
+	let t = Gw(), n = XS(), [r, i] = (0, P.useState)(""), [a, o] = (0, P.useState)(null), [s, c] = (0, P.useState)(null), [l, u] = (0, P.useState)(null), [d, f] = (0, P.useState)(null), p = n.lists, m = n.settings.defaultListId, h = (e) => n.state.tasks.filter((t) => t.listId === e).length, g = yw(p.map((e) => e.id)), _ = () => {
 		let e = r.trim();
 		if (e) try {
 			$.addList(e), i(""), u(null);
@@ -29475,7 +29489,7 @@ function Gw({ onClosed: e }) {
 			u(e instanceof Error ? e.message : String(e));
 		}
 	};
-	return /* @__PURE__ */ (0, F.jsx)(ow, {
+	return /* @__PURE__ */ (0, F.jsx)(sw, {
 		title: "清单管理",
 		trailing: /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: t.addRow,
@@ -29489,7 +29503,7 @@ function Gw({ onClosed: e }) {
 				onKeyDown: (e) => {
 					e.key === "Enter" && (e.preventDefault(), _());
 				}
-			}), /* @__PURE__ */ (0, F.jsx)(KC, {
+			}), /* @__PURE__ */ (0, F.jsx)(qC, {
 				appearance: "primary",
 				icon: /* @__PURE__ */ (0, F.jsx)(Ru, {}),
 				onClick: _,
@@ -29512,7 +29526,7 @@ function Gw({ onClosed: e }) {
 				}) : null,
 				p.map((e) => {
 					let n = h(e.id), r = e.id === m;
-					return /* @__PURE__ */ (0, F.jsx)(pC, {
+					return /* @__PURE__ */ (0, F.jsx)(mC, {
 						visible: d !== e.id,
 						appear: g.has(e.id),
 						unmountOnExit: !0,
@@ -29536,12 +29550,12 @@ function Gw({ onClosed: e }) {
 										e.key === "Enter" && (e.preventDefault(), v());
 									}
 								}),
-								/* @__PURE__ */ (0, F.jsx)(KC, {
+								/* @__PURE__ */ (0, F.jsx)(qC, {
 									appearance: "primary",
 									onClick: v,
 									children: "保存"
 								}),
-								/* @__PURE__ */ (0, F.jsx)(KC, {
+								/* @__PURE__ */ (0, F.jsx)(qC, {
 									appearance: "secondary",
 									onClick: () => o(null),
 									children: "取消"
@@ -29555,7 +29569,7 @@ function Gw({ onClosed: e }) {
 									children: /* @__PURE__ */ (0, F.jsx)(Z, {
 										size: 200,
 										className: t.confirmText,
-										children: /* @__PURE__ */ (0, F.jsxs)(uw, { children: [
+										children: /* @__PURE__ */ (0, F.jsxs)(dw, { children: [
 											"删除「",
 											e.name,
 											"」？同时删除其中的 ",
@@ -29564,12 +29578,12 @@ function Gw({ onClosed: e }) {
 										] })
 									})
 								}),
-								/* @__PURE__ */ (0, F.jsx)(KC, {
+								/* @__PURE__ */ (0, F.jsx)(qC, {
 									appearance: "primary",
 									onClick: () => y(e),
 									children: "确认删除"
 								}),
-								/* @__PURE__ */ (0, F.jsx)(KC, {
+								/* @__PURE__ */ (0, F.jsx)(qC, {
 									appearance: "secondary",
 									onClick: () => c(null),
 									children: "取消"
@@ -29578,14 +29592,14 @@ function Gw({ onClosed: e }) {
 						}) : /* @__PURE__ */ (0, F.jsxs)("div", {
 							className: t.row,
 							children: [
-								/* @__PURE__ */ (0, F.jsx)(_w, { color: e.color }),
+								/* @__PURE__ */ (0, F.jsx)(vw, { color: e.color }),
 								/* @__PURE__ */ (0, F.jsxs)("div", {
 									className: t.main,
 									children: [/* @__PURE__ */ (0, F.jsx)(Z, {
 										size: 300,
 										className: t.name,
 										title: e.name,
-										children: /* @__PURE__ */ (0, F.jsx)(uw, { children: e.name })
+										children: /* @__PURE__ */ (0, F.jsx)(dw, { children: e.name })
 									}), /* @__PURE__ */ (0, F.jsxs)(Z, {
 										size: 200,
 										className: t.count,
@@ -29599,7 +29613,7 @@ function Gw({ onClosed: e }) {
 								/* @__PURE__ */ (0, F.jsxs)("div", {
 									className: t.actions,
 									children: [
-										/* @__PURE__ */ (0, F.jsx)(KC, {
+										/* @__PURE__ */ (0, F.jsx)(qC, {
 											appearance: "subtle",
 											className: t.iconButton,
 											icon: r ? /* @__PURE__ */ (0, F.jsx)(Iu, {}) : /* @__PURE__ */ (0, F.jsx)(Lu, {}),
@@ -29608,7 +29622,7 @@ function Gw({ onClosed: e }) {
 											disabled: r,
 											onClick: () => $.updateSettings({ defaultListId: e.id })
 										}),
-										/* @__PURE__ */ (0, F.jsx)(KC, {
+										/* @__PURE__ */ (0, F.jsx)(qC, {
 											appearance: "subtle",
 											className: t.iconButton,
 											icon: /* @__PURE__ */ (0, F.jsx)(zu, {}),
@@ -29619,7 +29633,7 @@ function Gw({ onClosed: e }) {
 												name: e.name
 											})
 										}),
-										/* @__PURE__ */ (0, F.jsx)(KC, {
+										/* @__PURE__ */ (0, F.jsx)(qC, {
 											appearance: "subtle",
 											className: t.iconButton,
 											icon: /* @__PURE__ */ (0, F.jsx)(Yu, {}),
@@ -29640,7 +29654,7 @@ function Gw({ onClosed: e }) {
 }
 //#endregion
 //#region public/plugins/todo/src/TodoDetail.jsx
-var Kw = [
+var qw = [
 	{
 		value: "list",
 		label: "列表"
@@ -29661,7 +29675,7 @@ var Kw = [
 		value: "heatmap",
 		label: "热力图"
 	}
-], qw = "__manage-lists", Jw = Kn({
+], Jw = "__manage-lists", Yw = Kn({
 	listDropdown: {
 		minWidth: "140px",
 		maxWidth: "180px",
@@ -29680,14 +29694,14 @@ var Kw = [
 		minWidth: 0
 	}
 });
-function Yw() {
+function Xw() {
 	let e = $.settings.defaultListId;
 	return e && $.listById(e) ? e : "all";
 }
-function Xw() {
-	let e = Jw();
-	YS();
-	let [t] = Tx(AS, jS, PS), [n, r] = (0, P.useState)("list"), [i, a] = (0, P.useState)(Yw), [o, s] = (0, P.useState)(""), [c, l] = (0, P.useState)(null), u = /* @__PURE__ */ new Date();
+function Zw() {
+	let e = Yw();
+	XS();
+	let [t] = Ex(jS, MS, FS), [n, r] = (0, P.useState)("list"), [i, a] = (0, P.useState)(Xw), [o, s] = (0, P.useState)(""), [c, l] = (0, P.useState)(null), u = /* @__PURE__ */ new Date();
 	(0, P.useEffect)(() => {
 		if (i !== "all" && !$.listById(i)) {
 			let e = $.settings.defaultListId;
@@ -29705,9 +29719,9 @@ function Xw() {
 		listId: g,
 		dueDate: e || null
 	}), v = () => l(null), y = c && (c.kind === "task" || c.kind === "new") ? c : null;
-	return /* @__PURE__ */ (0, F.jsxs)(JC, { children: [
-		/* @__PURE__ */ (0, F.jsxs)(XC, {
-			trailing: /* @__PURE__ */ (0, F.jsx)(KC, {
+	return /* @__PURE__ */ (0, F.jsxs)(YC, { children: [
+		/* @__PURE__ */ (0, F.jsxs)(ZC, {
+			trailing: /* @__PURE__ */ (0, F.jsx)(qC, {
 				appearance: "primary",
 				icon: /* @__PURE__ */ (0, F.jsx)(Ru, {}),
 				onClick: () => _(null),
@@ -29721,7 +29735,7 @@ function Xw() {
 				"aria-label": "筛选清单",
 				onOptionSelect: (e, t) => {
 					let n = t.optionValue;
-					n === qw ? l({ kind: "lists" }) : a(n);
+					n === Jw ? l({ kind: "lists" }) : a(n);
 				},
 				children: [
 					/* @__PURE__ */ (0, F.jsx)(qg, {
@@ -29733,7 +29747,7 @@ function Xw() {
 						children: e.name
 					}, e.id)),
 					/* @__PURE__ */ (0, F.jsx)(qg, {
-						value: qw,
+						value: Jw,
 						children: "管理清单…"
 					})
 				]
@@ -29742,7 +29756,7 @@ function Xw() {
 				className: e.search,
 				appearance: "outline",
 				contentBefore: /* @__PURE__ */ (0, F.jsx)(Mu, {}),
-				contentAfter: o ? /* @__PURE__ */ (0, F.jsx)(KC, {
+				contentAfter: o ? /* @__PURE__ */ (0, F.jsx)(qC, {
 					appearance: "transparent",
 					icon: /* @__PURE__ */ (0, F.jsx)(Qu, {}),
 					"aria-label": "清除搜索",
@@ -29754,7 +29768,7 @@ function Xw() {
 				onChange: (e, t) => s(t.value)
 			})]
 		}),
-		/* @__PURE__ */ (0, F.jsxs)(QC, { children: [
+		/* @__PURE__ */ (0, F.jsxs)($C, { children: [
 			/* @__PURE__ */ (0, F.jsxs)(Z, {
 				size: 200,
 				className: e.scopeHint,
@@ -29766,22 +29780,22 @@ function Xw() {
 				]
 			}),
 			/* @__PURE__ */ (0, F.jsx)("span", { className: e.spacer }),
-			/* @__PURE__ */ (0, F.jsx)(KC, {
+			/* @__PURE__ */ (0, F.jsx)(qC, {
 				appearance: "subtle",
 				icon: /* @__PURE__ */ (0, F.jsx)(Pu, {}),
-				onClick: ZS,
+				onClick: QS,
 				children: "设置…"
 			})
 		] }),
-		/* @__PURE__ */ (0, F.jsx)(ew, {
-			items: Kw,
+		/* @__PURE__ */ (0, F.jsx)(tw, {
+			items: qw,
 			value: n,
 			onChange: r,
 			ariaLabel: "待办视图"
 		}),
-		/* @__PURE__ */ (0, F.jsx)(rw, { children: /* @__PURE__ */ (0, F.jsx)(gC, {
+		/* @__PURE__ */ (0, F.jsx)(iw, { children: /* @__PURE__ */ (0, F.jsx)(_C, {
 			value: n,
-			children: n === "list" ? /* @__PURE__ */ (0, F.jsx)(Ew, {
+			children: n === "list" ? /* @__PURE__ */ (0, F.jsx)(Dw, {
 				tasks: f,
 				query: o,
 				settings: t,
@@ -29791,32 +29805,32 @@ function Xw() {
 				onToggleTask: h,
 				onAddTask: () => _(null),
 				onClearSearch: () => s("")
-			}) : n === "calendar" ? /* @__PURE__ */ (0, F.jsx)(Pw, {
+			}) : n === "calendar" ? /* @__PURE__ */ (0, F.jsx)(Fw, {
 				tasks: f,
 				now: u,
 				settings: t,
 				onOpenTask: m,
 				onToggleTask: h,
 				onAddDay: _
-			}) : n === "week" ? /* @__PURE__ */ (0, F.jsx)(Fw, {
+			}) : n === "week" ? /* @__PURE__ */ (0, F.jsx)(Iw, {
 				tasks: f,
 				now: u,
 				settings: t,
 				onOpenTask: m,
 				onToggleTask: h
-			}) : n === "month" ? /* @__PURE__ */ (0, F.jsx)(Iw, {
+			}) : n === "month" ? /* @__PURE__ */ (0, F.jsx)(Lw, {
 				tasks: f,
 				now: u,
 				settings: t,
 				onOpenTask: m,
 				onToggleTask: h,
 				onAddDay: _
-			}) : /* @__PURE__ */ (0, F.jsx)(Lw, {
+			}) : /* @__PURE__ */ (0, F.jsx)(Rw, {
 				now: u,
 				settings: t
 			})
 		}) }),
-		y ? /* @__PURE__ */ (0, F.jsx)(Uw, {
+		y ? /* @__PURE__ */ (0, F.jsx)(Ww, {
 			mode: y.kind === "task" ? "edit" : "new",
 			taskId: y.taskId,
 			initialListId: y.listId,
@@ -29824,13 +29838,13 @@ function Xw() {
 			settings: t,
 			onClosed: v
 		}, y.kind === "task" ? y.taskId : `new-${y.dueDate || "none"}`) : null,
-		c?.kind === "lists" ? /* @__PURE__ */ (0, F.jsx)(Gw, { onClosed: v }) : null
+		c?.kind === "lists" ? /* @__PURE__ */ (0, F.jsx)(Kw, { onClosed: v }) : null
 	] });
 }
 //#endregion
 //#region public/plugins/todo/src/main.jsx
 vx();
-var Zw = new URLSearchParams(location.search), Qw = Zw.get("background") === "1" || Zw.get("mode") === "background" || /background\.html$/.test(location.pathname), $w = Kn({
+var Qw = new URLSearchParams(location.search), $w = Qw.get("background") === "1" || Qw.get("mode") === "background" || /background\.html$/.test(location.pathname), eT = Kn({
 	page: {
 		width: "100%",
 		height: "100%",
@@ -29864,8 +29878,8 @@ var Zw = new URLSearchParams(location.search), Qw = Zw.get("background") === "1"
 		boxShadow: G.shadow16
 	}
 });
-function eT({ overlayView: e, defaultSizeKey: t, children: n }) {
-	let r = $w();
+function tT({ overlayView: e, defaultSizeKey: t, children: n }) {
+	let r = eT();
 	if (e) return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.pageOverlay,
 		children: /* @__PURE__ */ (0, F.jsx)("div", {
@@ -29873,7 +29887,7 @@ function eT({ overlayView: e, defaultSizeKey: t, children: n }) {
 			children: n
 		})
 	});
-	let i = iC(t);
+	let i = aC(t);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.page,
 		children: /* @__PURE__ */ (0, F.jsx)("div", {
@@ -29886,7 +29900,7 @@ function eT({ overlayView: e, defaultSizeKey: t, children: n }) {
 		})
 	});
 }
-var tT = class extends P.Component {
+var nT = class extends P.Component {
 	constructor(e) {
 		super(e), this.state = { error: null };
 	}
@@ -29903,8 +29917,8 @@ var tT = class extends P.Component {
 		}) : this.props.children;
 	}
 };
-function nT() {
-	let { theme: t } = Cx(), n = Ex(), r = nC(Zw.get("size")), i = r ? rC(r) : "3x3", a = !e.inHost, o = Zw.get("raw") === "1" || Zw.has("plugin") && Zw.has("widget"), s = n === "detail" ? /* @__PURE__ */ (0, F.jsx)(Xw, {}) : /* @__PURE__ */ (0, F.jsx)(Sw, { defaultSizeKey: i });
+function rT() {
+	let { theme: t } = Cx(), n = Dx(), r = rC(Qw.get("size")), i = r ? iC(r) : "3x3", a = !e.inHost, o = Qw.get("raw") === "1" || Qw.has("plugin") && Qw.has("widget"), s = n === "detail" ? /* @__PURE__ */ (0, F.jsx)(Zw, {}) : /* @__PURE__ */ (0, F.jsx)(Cw, { defaultSizeKey: i });
 	return /* @__PURE__ */ (0, F.jsx)(Nl, {
 		theme: t,
 		style: {
@@ -29913,17 +29927,17 @@ function nT() {
 			background: "transparent",
 			colorScheme: "normal"
 		},
-		children: /* @__PURE__ */ (0, F.jsx)(tT, { children: a && !o ? /* @__PURE__ */ (0, F.jsx)(eT, {
+		children: /* @__PURE__ */ (0, F.jsx)(nT, { children: a && !o ? /* @__PURE__ */ (0, F.jsx)(tT, {
 			overlayView: n,
 			defaultSizeKey: i,
 			children: s
 		}) : s })
 	});
 }
-if (Qw) {
-	JS();
-	let t = QS();
-	e.ready(US), e.onToolCall(async (n) => {
+if ($w) {
+	YS();
+	let t = $S();
+	e.ready(WS), e.onToolCall(async (n) => {
 		if (!n || typeof n.name != "string") return;
 		let r = t[n.name];
 		try {
@@ -29937,8 +29951,8 @@ if (Qw) {
 		}
 	});
 } else {
-	JS({ startReminders: !e.inHost });
+	YS({ startReminders: !e.inHost });
 	let t = document.getElementById("root");
-	t && (0, fx.createRoot)(t).render(/* @__PURE__ */ (0, F.jsx)(nT, {}));
+	t && (0, fx.createRoot)(t).render(/* @__PURE__ */ (0, F.jsx)(rT, {}));
 }
 //#endregion

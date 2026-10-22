@@ -74,7 +74,7 @@
 - [x] 版本号 0.3.1 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`）
 - [x] `npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m18s；NSIS/MSI 完成）
 - [x] dev 冒烟 `scripts/smoke-v031-ui.mjs`：**24/24 PASS**、console error 0（右键菜单/设置页、半高控制条 + peek + 展开、朗读总开关持久化、录音中收起停麦、Agent 菜单边界）— `shots/v031-dev/`
-- [x] release 真窗口：`.seed-version` 0.3.0 → 0.3.1、6 manifest、天气产物哈希与仓库一致；WebView2 `--webview-exe-version=0.3.1` — `shots/v031-final/seed-upgrade.json`、`genuine-window.json`
+- [x] release 真窗口（38 PASS / 0 FAIL）：`.seed-version` 0.3.0 → 0.3.1、6 manifest、天气产物哈希与仓库一致；WebView2 `--webview-exe-version=0.3.1` — `shots/v031-final/seed-upgrade.json`、`genuine-window.json`
 - [x] WebView2 CDP（patched 副本，仅 62 字节参数替换）：6 卡 / 8 iframe / 无 dock / 无加载文案 / 无溢出 / Agent 入口 56×56；console.error/exception/log.error = 0；**16/16 checks PASS** — `shots/v031-final/checks.json`、`webview2-cdp.json`
 - [x] v0.3.1 新交互真实 WebView2 复验：右键菜单三项（无「桌面设置」）→ 设置页；设置→入口→打开 Agent→ chat；未播放有「关闭自动朗读」、无「停止朗读」、点击写 `tts.autoRead=false` 再点回 true；⋯ 菜单无宿主设置 — `shots/v031-final/REPORT.md`
 - [x] 产物哈希稳定：
@@ -150,3 +150,22 @@
 - [x] 文档：D-28、`docs/components/sedentary.md` / `agent.md`、`AGENT-SURFACE-CONTRACT.md` §7、`PLUGIN-CONTRACT.md` §6、README、RELEASE-REPORT §18 已更新
 - [x] 安装包不外发（内含本地 `public/secrets.json`）
 - [x] `git status` 干净；commit / push / tag `v0.3.5`
+
+## 13. v0.3.6 插件配置同步修复（2026-10-22）
+
+> 背景：用户反馈「设置里打开天气自动定位后，详情页自动有了信息，但桌面 widget 不同步，必须重启」。根因：Tauri 打包版宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）跨 origin，旧的 `storage` 事件同步在打包版从未生效。修复见 D-29、RELEASE-REPORT §19。§1–§12 继续有效。
+
+- [x] 版本号 0.3.6 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`；`cargo metadata --locked` 通过；注意 Cargo.lock 只改 `name = "app"` 条目，不要全局替换版本串）
+- [x] 协议 v2：新增 `host:config` 增量推送；`HostBridge.setConfig` 写后广播；卡片/详情浮层/后台 iframe 三类实例都能收到
+- [x] 插件侧：`plugin.onConfig` + `useStoredConfig` 新时序（init 快照 → mount 重读 → 推送 → storage 兜底；seq 防旧读；同值回推丢弃；注册重放不作废在途读取）
+- [x] 浮层 init 快照现取（`configSnapshot`）+ 后台 iframe init 快照；宿主设置页表单订阅 configBus
+- [x] 顺带修：clock 旧设置迁移改走宿主配置（兼容宿主旧键）；sedentary `?demo=1` 本地种子加宿主守卫；`verify-sedentary.mjs` 3 处过期选择器更新（复跑 9/9 PASS）
+- [x] 六插件产物重建（`node scripts/build-plugin.mjs --all`）+ `npm run typecheck` / `npm run build` exit 0
+- [x] 跨 origin harness：before 复现 / after PASS（settings 34ms、places 58ms、`host:config` 6 条、console 0）— `.tmp/config-sync-harness/`
+- [x] 独立审计（`.tmp/config-sync-audit/audit.md`）与最终 diff 评审（`.tmp/config-sync-review/review.md`）：P0/P1 = 0
+- [x] 全量基线回归：verify-plugin ×6 / verify-overlays 6/6 / verify-widgets 25/25 / verify-plug-and-play 12/12 / verify-sedentary 9/9，全部 exit 0、console error 0 — `.tmp/v036-regression/report.md`、`shots/v036-dev/`
+- [x] `npx tauri build` exit 0（cargo release 16m08s；NSIS/MSI 完成）；产物：`app.exe` 12,173,312 B / `1D1BFFC3…`；NSIS 3,935,767 B / `3EB6230F…`；MSI 5,144,576 B / `7C6F51B2…`；已复制到 `release/v0.3.6/` + `SHA256SUMS.txt`
+- [x] release 真窗口：`.seed-version` 0.3.5 → 0.3.6、六插件重种哈希与仓库一致；WebView2 CDP 6 卡 / 8 iframe（wtsl 协议）/ console 0；**真实跨 origin 配置同步 PASS**（时钟 12h 设置页 UI → 卡片 2s 内切换、clock iframe 收到 host:config 1 条、timeOrigin/探针证明未 reload；天气自动定位开关双向切换收到 2→3 条）— `shots/v036-final/`
+- [x] 文档：D-29、`PLUGIN-CONTRACT.md`（配置更新时序）、`PLUGIN-REACT.md`（配置同步章节）、`components/weather.md` / `clock.md`、weather README、README、RELEASE-REPORT §19
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [ ] `git status` 干净；commit / tag `v0.3.6`

@@ -20422,52 +20422,66 @@ function f_(t, n) {
 		};
 	}, []), i;
 }
-function p_(t, n, r) {
+function p_(e, t) {
+	if (e === t) return !0;
+	try {
+		return JSON.stringify(e) === JSON.stringify(t);
+	} catch {
+		return !1;
+	}
+}
+function m_(t, n, r) {
 	let i = (0, M.useRef)(r);
 	i.current = r;
-	let [a, o] = (0, M.useState)(() => {
+	let a = (0, M.useRef)(n);
+	a.current = n;
+	let [o, s] = (0, M.useState)(() => {
 		let e = c_(t);
 		return i.current ? i.current(e) : e ?? n;
-	}), [s, c] = (0, M.useState)(() => c_(t) !== void 0);
-	(0, M.useEffect)(() => {
-		let r = c_(t);
-		if (r !== void 0) {
-			o(i.current ? i.current(r) : r), c(!0);
-			return;
-		}
-		let a = !0;
-		return e.getConfig(t).then((e) => {
-			a && (o(i.current ? i.current(e) : e ?? n), c(!0));
+	}), [c, l] = (0, M.useState)(() => c_(t) !== void 0), u = (0, M.useRef)(o);
+	u.current = o;
+	let d = (0, M.useRef)(0), f = (0, M.useRef)(!0);
+	(0, M.useEffect)(() => () => {
+		f.current = !1;
+	}, []);
+	let p = (0, M.useCallback)((e) => {
+		s(i.current ? i.current(e) : e ?? a.current);
+	}, []), m = (0, M.useCallback)(() => {
+		let n = ++d.current;
+		e.getConfig(t).then((e) => {
+			f.current && n === d.current && (p(e), l(!0));
 		}).catch(() => {
-			a && c(!0);
-		}), () => {
-			a = !1;
-		};
-	}, [t]);
-	let l = (0, M.useCallback)((n) => {
-		o((r) => {
-			let i = typeof n == "function" ? n(r) : n;
-			return e.setConfig(t, i).catch(() => {}), i;
+			f.current && n === d.current && l(!0);
 		});
-	}, [t]);
+	}, [p, t]);
 	return (0, M.useEffect)(() => {
-		let r = `plugin.${e.pluginId}.${t}`, a = (a) => {
-			(a.key === r || a.key === null) && e.getConfig(t).then((e) => {
-				o(i.current ? i.current(e) : e ?? n);
-			}).catch(() => {});
+		m();
+	}, [m]), (0, M.useEffect)(() => {
+		let n = !0, r = e.onConfig?.((e, r) => {
+			e === t && (n || (d.current += 1), l(!0), !p_(r, u.current) && p(r));
+		});
+		return n = !1, () => {
+			r?.();
 		};
-		return window.addEventListener("storage", a), () => window.removeEventListener("storage", a);
-	}, [t]), [
-		a,
-		l,
-		s
+	}, [p, t]), (0, M.useEffect)(() => {
+		let n = `plugin.${e.pluginId}.${t}`, r = (e) => {
+			(e.key === null || e.key === n) && m();
+		};
+		return window.addEventListener("storage", r), () => window.removeEventListener("storage", r);
+	}, [t, m]), [
+		o,
+		(0, M.useCallback)((n) => {
+			let r = typeof n == "function" ? n(u.current) : n;
+			d.current += 1, u.current = r, s(r), e.setConfig(t, r).catch(() => {});
+		}, [t]),
+		c
 	];
 }
-function m_() {
+function h_() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function h_(e, t) {
+function g_(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -20476,10 +20490,10 @@ function h_(e, t) {
 		}
 	}, "*");
 }
-function g_() {
+function __() {
 	window.parent.postMessage({ type: "plugin:request-host-settings" }, "*");
 }
-var __ = 500, v_ = 8, y_ = [
+var v_ = 500, y_ = 8, b_ = [
 	"button",
 	"input",
 	"textarea",
@@ -20493,16 +20507,16 @@ var __ = 500, v_ = 8, y_ = [
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function b_(e, t) {
+function x_(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(y_);
+	let n = t.closest(b_);
 	return !!(n && n !== e && e.contains(n));
 }
-function x_() {
+function S_() {
 	let t = (0, M.useRef)(null);
 	return (0, M.useEffect)(() => {
 		let n = t.current;
-		if (!n || !e.inHost || m_()) return;
+		if (!n || !e.inHost || h_()) return;
 		let r = null, i = 0, a = 0, o = 0, s = !1, c = !1, l = 0, u = !1, d = (e) => e === "mouse" || e === "pen", f = (e, t) => {
 			window.parent.postMessage({
 				type: "plugin:card-pointer",
@@ -20523,15 +20537,15 @@ function x_() {
 		}, _ = () => {
 			u && (l && window.clearTimeout(l), l = window.setTimeout(h, 1e3));
 		}, v = (e) => {
-			e.button === 0 && (b_(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
+			e.button === 0 && (x_(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
 				o = 0, s = !0, g(), window.parent.postMessage({ type: "plugin:request-edit-mode" }, "*");
-			}, __)));
+			}, v_)));
 		}, y = (e) => {
 			if (d(e.pointerType)) {
-				let t = !b_(n, e.target);
+				let t = !x_(n, e.target);
 				t !== c && (c = t, f(t ? "hover-enter" : "hover-leave", e.pointerType));
 			}
-			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= v_ || (p(), !s && (r = null, f("cancel", e.pointerType))));
+			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= y_ || (p(), !s && (r = null, f("cancel", e.pointerType))));
 		}, b = (e) => {
 			r !== null && e.pointerId === r && (r = null, p(), f("up", e.pointerType), s && _());
 		}, x = (e) => {
@@ -20544,10 +20558,10 @@ function x_() {
 		};
 	}, []), { ref: t };
 }
-typeof window < "u" && m_() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && h_() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function S_(t, n) {
+function C_(t, n) {
 	let r = (0, M.useRef)(n);
 	r.current = n;
 	let i = (0, M.useRef)(t);
@@ -20568,7 +20582,7 @@ function S_(t, n) {
 }
 //#endregion
 //#region public/plugins/_shared/typography.js
-var C_ = {
+var w_ = {
 	48: {
 		fontSize: "48px",
 		lineHeight: "56px"
@@ -20586,13 +20600,13 @@ var C_ = {
 		lineHeight: "124px"
 	}
 };
-function w_(e) {
-	let t = C_[e];
+function T_(e) {
+	let t = w_[e];
 	if (!t) throw Error(`Display XL 只定义了 48/80/96/112，收到 ${String(e)}`);
 	return t;
 }
-var T_ = { fontVariantNumeric: "tabular-nums" }, E_ = "8px", D_ = "4px", O_ = "48px";
-function k_(e, t) {
+var E_ = { fontVariantNumeric: "tabular-nums" }, D_ = "8px", O_ = "4px", k_ = "48px";
+function A_(e, t) {
 	switch (e) {
 		case "down": return `0px -${t}`;
 		case "left": return `${t} 0px`;
@@ -20600,12 +20614,12 @@ function k_(e, t) {
 		default: return `0px ${t}`;
 	}
 }
-function A_(e, t = K.durationFaster, n = K.curveAccelerateMin) {
+function j_(e, t = K.durationFaster, n = K.curveAccelerateMin) {
 	return ({ direction: r = "up" }) => ({
 		enter: {
 			keyframes: [{
 				opacity: 0,
-				translate: k_(r, e)
+				translate: A_(r, e)
 			}, {
 				opacity: 1,
 				translate: "0px 0px"
@@ -20638,9 +20652,9 @@ function A_(e, t = K.durationFaster, n = K.curveAccelerateMin) {
 		}
 	});
 }
-var j_ = Mu(A_(E_));
-Mu(A_(D_, K.durationFast, K.curveAccelerateMid));
-var M_ = Mu(({ element: e }) => {
+var M_ = Mu(j_(D_));
+Mu(j_(O_, K.durationFast, K.curveAccelerateMid));
+var N_ = Mu(({ element: e }) => {
 	let t = `${e.scrollHeight}px`;
 	return {
 		enter: {
@@ -20691,8 +20705,8 @@ var M_ = Mu(({ element: e }) => {
 			}
 		}
 	};
-}), N_ = Mu(({ direction: e = "forward" }) => {
-	let t = e === "back", n = t ? `-${O_} 0px` : `${O_} 0px`, r = t ? `${O_} 0px` : `-${O_} 0px`;
+}), P_ = Mu(({ direction: e = "forward" }) => {
+	let t = e === "back", n = t ? `-${k_} 0px` : `${k_} 0px`, r = t ? `${k_} 0px` : `-${k_} 0px`;
 	return {
 		enter: {
 			keyframes: [{
@@ -20729,10 +20743,10 @@ var M_ = Mu(({ element: e }) => {
 			}
 		}
 	};
-}), P_ = 40, F_ = 44, I_ = 56, L_ = 48, R_ = 40, z_ = 56, B_ = {
-	minWidth: P_,
-	minHeight: P_
-}, V_ = [
+}), F_ = 40, I_ = 44, L_ = 56, R_ = 48, z_ = 40, B_ = 56, V_ = {
+	minWidth: F_,
+	minHeight: F_
+}, H_ = [
 	"button",
 	"input",
 	"textarea",
@@ -20746,12 +20760,12 @@ var M_ = Mu(({ element: e }) => {
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function H_(e, t) {
+function U_(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(V_);
+	let n = t.closest(H_);
 	return !!(n && n !== e && e.contains(n));
 }
-var U_ = Jn({ root: {
+var W_ = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -20764,11 +20778,11 @@ var U_ = Jn({ root: {
 	color: W.colorNeutralForeground1,
 	fontFamily: W.fontFamilyBase
 } });
-function W_({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = U_(), s = x_(), c = (0, M.useCallback)((t) => {
-		H_(t.currentTarget, t.target) || e?.(t);
+function G_({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = W_(), s = S_(), c = (0, M.useCallback)((t) => {
+		U_(t.currentTarget, t.target) || e?.(t);
 	}, [e]), l = (0, M.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (H_(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (U_(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		...a,
@@ -20819,19 +20833,19 @@ Jn({
 		minWidth: 0
 	},
 	value: {
-		...T_,
+		...E_,
 		fontWeight: "600",
 		color: W.colorNeutralForeground1,
 		whiteSpace: "nowrap"
 	},
-	size48: w_(48),
+	size48: T_(48),
 	size68: {
 		fontSize: W.fontSizeHero1000,
 		lineHeight: W.lineHeightHero1000
 	},
-	size80: w_(80),
-	size96: w_(96),
-	size112: w_(112),
+	size80: T_(80),
+	size96: T_(96),
+	size112: T_(112),
 	unit: { color: W.colorNeutralForeground2 },
 	meta: {
 		display: "flex",
@@ -20842,13 +20856,13 @@ Jn({
 	label: { color: W.colorNeutralForeground2 },
 	caption: { color: W.colorNeutralForeground3 }
 });
-var G_ = Jn({
+var K_ = Jn({
 	row: {
 		display: "flex",
 		alignItems: "center",
 		gap: W.spacingHorizontalS,
 		width: "100%",
-		minHeight: `${F_}px`,
+		minHeight: `${I_}px`,
 		boxSizing: "border-box",
 		paddingInline: 0,
 		border: "none",
@@ -20892,8 +20906,8 @@ var G_ = Jn({
 		gap: W.spacingHorizontalXS
 	}
 });
-function K_({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = G_(), d = (e) => {
+function q_({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = K_(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -20936,7 +20950,7 @@ function K_({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var q_ = Jn({
+var J_ = Jn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -20957,8 +20971,8 @@ var q_ = Jn({
 	},
 	action: { marginTop: W.spacingVerticalS }
 });
-function J_({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
-	let o = q_();
+function Y_({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
+	let o = J_();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(o.root, i),
 		style: a,
@@ -20986,11 +21000,11 @@ function J_({ icon: e, title: t, description: n, action: r, className: i, style:
 		]
 	});
 }
-var Y_ = Jn({ button: {
-	minWidth: `${P_}px`,
-	minHeight: `${P_}px`
-} }), X_ = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = Y_();
+var X_ = Jn({ button: {
+	minWidth: `${F_}px`,
+	minHeight: `${F_}px`
+} }), Z_ = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = X_();
 	return /* @__PURE__ */ (0, N.jsx)(Dm, {
 		...i,
 		ref: a,
@@ -21001,7 +21015,7 @@ var Y_ = Jn({ button: {
 		style: n,
 		children: r
 	});
-}), Z_ = Jn({ root: {
+}), Q_ = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -21015,8 +21029,8 @@ var Y_ = Jn({ button: {
 	color: W.colorNeutralForeground1,
 	fontFamily: W.fontFamilyBase
 } });
-function Q_({ children: e, className: t, style: n }) {
-	let r = Z_();
+function $_({ children: e, className: t, style: n }) {
+	let r = Q_();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.root, t),
 		style: n,
@@ -21024,14 +21038,14 @@ function Q_({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var $_ = Jn({
+var ev = Jn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: W.spacingHorizontalM,
-		minHeight: `${I_}px`,
+		minHeight: `${L_}px`,
 		paddingInline: W.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -21049,8 +21063,8 @@ var $_ = Jn({
 		gap: W.spacingHorizontalS
 	}
 });
-function ev({ children: e, trailing: t, className: n, style: r }) {
-	let i = $_();
+function tv({ children: e, trailing: t, className: n, style: r }) {
+	let i = ev();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(i.header, n),
 		style: r,
@@ -21069,26 +21083,26 @@ Jn({ toolbar: {
 	flexShrink: 0,
 	alignItems: "center",
 	gap: W.spacingHorizontalS,
-	minHeight: `${L_}px`,
+	minHeight: `${R_}px`,
 	paddingInline: W.spacingHorizontalXXL,
 	boxSizing: "border-box"
 } }), Jn({
 	tabs: {
 		flexShrink: 0,
-		height: `${R_}px`,
-		minHeight: `${R_}px`,
+		height: `${z_}px`,
+		minHeight: `${z_}px`,
 		paddingInline: W.spacingHorizontalXXL,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${R_}px`,
-		minHeight: `${R_}px`,
+		height: `${z_}px`,
+		minHeight: `${z_}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: W.spacingHorizontalXS }
 });
-var tv = Jn({
+var nv = Jn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -21119,7 +21133,7 @@ var tv = Jn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function nv(e) {
+function rv(e) {
 	let [t, n] = (0, M.useState)(!1);
 	return (0, M.useEffect)(() => {
 		let t = e.current;
@@ -21143,8 +21157,8 @@ function nv(e) {
 		};
 	}, [e]), t;
 }
-function rv({ children: e, className: t, style: n }) {
-	let r = tv(), i = (0, M.useRef)(null), a = nv(i);
+function iv({ children: e, className: t, style: n }) {
+	let r = nv(), i = (0, M.useRef)(null), a = rv(i);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -21161,11 +21175,11 @@ function rv({ children: e, className: t, style: n }) {
 		})]
 	});
 }
-var iv = (0, M.createContext)(null);
-function av() {
-	return (0, M.useContext)(iv);
+var av = (0, M.createContext)(null);
+function ov() {
+	return (0, M.useContext)(av);
 }
-var ov = Jn({
+var sv = Jn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -21185,7 +21199,7 @@ var ov = Jn({
 		flexShrink: 0,
 		alignItems: "center",
 		gap: W.spacingHorizontalS,
-		minHeight: `${z_}px`,
+		minHeight: `${B_}px`,
 		paddingInline: W.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -21240,17 +21254,17 @@ var ov = Jn({
 		boxSizing: "border-box"
 	}
 });
-function sv({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = ov(), l = (0, M.useRef)(null), u = nv(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
+function cv({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = sv(), l = (0, M.useRef)(null), u = rv(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
 		_.current || (_.current = !0, m("back"), f(!1));
 	}, []), y = (0, M.useCallback)((e, t) => {
 		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
 	if (!h) return null;
 	let b = typeof n == "function" ? n(v) : n;
-	return /* @__PURE__ */ (0, N.jsx)(iv.Provider, {
+	return /* @__PURE__ */ (0, N.jsx)(av.Provider, {
 		value: v,
-		children: /* @__PURE__ */ (0, N.jsx)(N_, {
+		children: /* @__PURE__ */ (0, N.jsx)(P_, {
 			visible: d,
 			appear: !0,
 			direction: p,
@@ -21272,7 +21286,7 @@ function sv({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								"aria-label": a,
 								title: a,
 								onClick: v,
-								style: B_
+								style: V_
 							}),
 							/* @__PURE__ */ (0, N.jsx)(wg, {
 								size: 400,
@@ -21310,7 +21324,7 @@ function sv({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 		})
 	});
 }
-function cv(e = 1e3) {
+function lv(e = 1e3) {
 	let [t, n] = (0, M.useState)(() => Date.now()), [r, i] = (0, M.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, M.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -21325,15 +21339,15 @@ function cv(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/clock/src/settings.js
-var lv = "settings", uv = Object.freeze({
+var uv = "settings", dv = Object.freeze({
 	hour12: !1,
 	showSeconds: !0,
 	dateFormat: "zh"
-}), dv = Object.freeze([
+}), fv = Object.freeze([
 	"zh",
 	"iso",
 	"en"
-]), fv = Object.freeze({ cn: "zh" }), pv = [
+]), pv = Object.freeze({ cn: "zh" }), mv = [
 	"星期日",
 	"星期一",
 	"星期二",
@@ -21341,7 +21355,7 @@ var lv = "settings", uv = Object.freeze({
 	"星期四",
 	"星期五",
 	"星期六"
-], mv = [
+], hv = [
 	"Sun",
 	"Mon",
 	"Tue",
@@ -21349,27 +21363,37 @@ var lv = "settings", uv = Object.freeze({
 	"Thu",
 	"Fri",
 	"Sat"
-], hv = ["clock.settings", "plugin.clock.clock.settings"], gv = "plugin.clock.settings", _v = (e) => String(e).padStart(2, "0");
-function vv(e) {
+], gv = ["clock.settings", "plugin.clock.clock.settings"], _v = "plugin.clock.settings", vv = (e) => String(e).padStart(2, "0");
+function yv(e) {
 	return e && typeof e == "object" && !Array.isArray(e) ? e : {};
 }
-function yv(e) {
-	if (typeof e != "string") return null;
-	let t = fv[e] ?? e;
-	return dv.includes(t) ? t : null;
-}
 function bv(e) {
-	let t = vv(e);
+	if (typeof e != "string") return null;
+	let t = pv[e] ?? e;
+	return fv.includes(t) ? t : null;
+}
+function xv(e) {
+	let t = yv(e);
 	return {
-		hour12: typeof t.hour12 == "boolean" ? t.hour12 : uv.hour12,
-		showSeconds: typeof t.showSeconds == "boolean" ? t.showSeconds : uv.showSeconds,
-		dateFormat: yv(t.dateFormat) ?? uv.dateFormat
+		hour12: typeof t.hour12 == "boolean" ? t.hour12 : dv.hour12,
+		showSeconds: typeof t.showSeconds == "boolean" ? t.showSeconds : dv.showSeconds,
+		dateFormat: bv(t.dateFormat) ?? dv.dateFormat
 	};
 }
-function xv() {
+function Sv() {
+	let t = Cv();
+	if (!e.inHost) {
+		if (!t) return !1;
+		try {
+			localStorage.getItem(_v) === null && localStorage.setItem(_v, JSON.stringify(t));
+		} catch {}
+		return !0;
+	}
+	return wv(t), !!t;
+}
+function Cv() {
 	try {
-		if (localStorage.getItem(gv) !== null) return !1;
-		for (let e of hv) {
+		for (let e of gv) {
 			let t = localStorage.getItem(e);
 			if (t === null) continue;
 			let n;
@@ -21378,27 +21402,38 @@ function xv() {
 			} catch {
 				continue;
 			}
-			return localStorage.setItem(gv, JSON.stringify(bv(n))), !0;
+			return xv(n);
 		}
 	} catch {}
-	return !1;
+	return null;
 }
-function Sv(e, t) {
+async function wv(t) {
+	try {
+		if (await e.getConfig(uv) != null) return;
+		let n = await e.getConfig("clock.settings");
+		if (n && typeof n == "object" && !Array.isArray(n)) {
+			await e.setConfig(uv, xv(n));
+			return;
+		}
+		t && await e.setConfig(uv, t);
+	} catch {}
+}
+function Tv(e, t) {
 	let n = e.getHours(), r = "";
 	t.hour12 && (r = n >= 12 ? "PM" : "AM", n = n % 12 || 12);
-	let i = _v(e.getMinutes()), a = _v(e.getSeconds());
+	let i = vv(e.getMinutes()), a = vv(e.getSeconds());
 	return {
-		main: `${t.hour12 ? n : _v(n)}:${i}`,
+		main: `${t.hour12 ? n : vv(n)}:${i}`,
 		seconds: a,
 		meridiem: r,
-		time24: `${_v(e.getHours())}:${i}:${a}`
+		time24: `${vv(e.getHours())}:${i}:${a}`
 	};
 }
-function Cv(e, t) {
-	let n = e.getFullYear(), r = e.getMonth() + 1, i = e.getDate(), a = pv[e.getDay()], o = mv[e.getDay()];
+function Ev(e, t) {
+	let n = e.getFullYear(), r = e.getMonth() + 1, i = e.getDate(), a = mv[e.getDay()], o = hv[e.getDay()];
 	switch (t.dateFormat) {
 		case "iso": {
-			let e = `${n}-${_v(r)}-${_v(i)}`;
+			let e = `${n}-${vv(r)}-${vv(i)}`;
 			return {
 				date: e,
 				weekday: a,
@@ -21423,32 +21458,32 @@ function Cv(e, t) {
 		}
 	}
 }
-function wv() {
+function Dv() {
 	try {
 		return Intl.DateTimeFormat().resolvedOptions().timeZone || "本地时区";
 	} catch {
 		return "本地时区";
 	}
 }
-function Tv(e) {
+function Ov(e) {
 	let t = new Date(Date.UTC(e.getFullYear(), e.getMonth(), e.getDate())), n = t.getUTCDay() || 7;
 	t.setUTCDate(t.getUTCDate() + 4 - n);
 	let r = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
 	return Math.ceil(((t.getTime() - r.getTime()) / 864e5 + 1) / 7);
 }
-function Ev(e) {
+function kv(e) {
 	let t = Date.UTC(e.getFullYear(), 0, 1), n = Date.UTC(e.getFullYear(), e.getMonth(), e.getDate());
 	return Math.round((n - t) / 864e5) + 1;
 }
-function Dv(e) {
+function Av(e) {
 	return {
-		weekNumber: Tv(e),
-		dayOfYear: Ev(e),
-		timeZone: wv()
+		weekNumber: Ov(e),
+		dayOfYear: kv(e),
+		timeZone: Dv()
 	};
 }
-function Ov(e, t) {
-	let n = Sv(e, t), r = Cv(e, t), i = Dv(e);
+function jv(e, t) {
+	let n = Tv(e, t), r = Ev(e, t), i = Av(e);
 	return {
 		iso: e.toISOString(),
 		epochMs: e.getTime(),
@@ -21465,13 +21500,13 @@ function Ov(e, t) {
 		dayOfYear: i.dayOfYear
 	};
 }
-function kv(e, t) {
+function Mv(e, t) {
 	if (!t || typeof t != "object" || Array.isArray(t)) return { error: "参数必须是对象，例如 { \"hour12\": true }" };
 	let n = Object.keys(t);
 	if (n.length === 0) return { error: "至少提供 hour12、showSeconds、dateFormat 中的一个" };
 	let r = n.filter((e) => e !== "hour12" && e !== "showSeconds" && e !== "dateFormat");
 	if (r.length > 0) return { error: `未知设置字段：${r.join("、")}` };
-	let i = { ...bv(e) };
+	let i = { ...xv(e) };
 	if ("hour12" in t) {
 		if (typeof t.hour12 != "boolean") return { error: "hour12 需要是布尔值" };
 		i.hour12 = t.hour12;
@@ -21481,42 +21516,42 @@ function kv(e, t) {
 		i.showSeconds = t.showSeconds;
 	}
 	if ("dateFormat" in t) {
-		let e = yv(t.dateFormat);
+		let e = bv(t.dateFormat);
 		if (!e) return { error: "dateFormat 只支持 zh、iso、en" };
 		i.dateFormat = e;
 	}
 	return { settings: i };
 }
-var Av = "clock.places", jv = [
+var Nv = "clock.places", Pv = [
 	"plugin.clock.places",
 	"clock.worldClocks",
 	"clock.world"
-], Mv = "clock:places-changed", Nv = "clock.searchCache", Pv = 30, Fv = "https://nominatim.openstreetmap.org/search", Iv = "https://timeapi.io/api/TimeZone/coordinate", Lv = 6;
-function Rv(e, t) {
-	return ty(e, t).split(",")[0].split(";")[0].split("/")[0].trim();
+], Fv = "clock:places-changed", Iv = "clock.searchCache", Lv = 30, Rv = "https://nominatim.openstreetmap.org/search", zv = "https://timeapi.io/api/TimeZone/coordinate", Bv = 6;
+function Vv(e, t) {
+	return iy(e, t).split(",")[0].split(";")[0].split("/")[0].trim();
 }
-function zv(e) {
+function Hv(e) {
 	let t = String(e || "").split(",").map((e) => e.trim()).filter(Boolean);
 	return (t.length > 0 ? t[t.length - 1] : "").split("/")[0].split(";")[0].trim();
 }
-async function Bv(e, t, n) {
-	let r = `${Iv}?latitude=${encodeURIComponent(e)}&longitude=${encodeURIComponent(t)}`, i = await fetch(r, { signal: n });
+async function Uv(e, t, n) {
+	let r = `${zv}?latitude=${encodeURIComponent(e)}&longitude=${encodeURIComponent(t)}`, i = await fetch(r, { signal: n });
 	if (!i.ok) return "";
-	let a = ty((await i.json())?.timeZone);
-	return a && ny(a) ? a : "";
+	let a = iy((await i.json())?.timeZone);
+	return a && ay(a) ? a : "";
 }
-async function Vv(e, { signal: t, limit: n = Lv } = {}) {
+async function Wv(e, { signal: t, limit: n = Bv } = {}) {
 	let r = String(e ?? "").trim(), i = r.toLowerCase();
 	if (i.length < 2) return [];
-	let a = Wv();
+	let a = qv();
 	if (Array.isArray(a[i])) return a[i];
-	let o = `${Fv}?format=jsonv2&q=${encodeURIComponent(r)}&limit=${n}&featureType=settlement&accept-language=zh-CN`, s = await fetch(o, { signal: t });
+	let o = `${Rv}?format=jsonv2&q=${encodeURIComponent(r)}&limit=${n}&featureType=settlement&accept-language=zh-CN`, s = await fetch(o, { signal: t });
 	if (!s.ok) throw Error(`联网搜索失败（HTTP ${s.status}）`);
 	let c = await s.json(), l = [], u = /* @__PURE__ */ new Set();
 	for (let e of Array.isArray(c) ? c : []) {
-		let t = Rv(e?.name, e?.display_name), r = Number(e?.lat), i = Number(e?.lon);
+		let t = Vv(e?.name, e?.display_name), r = Number(e?.lat), i = Number(e?.lon);
 		if (!t || !Number.isFinite(r) || !Number.isFinite(i)) continue;
-		let a = zv(e?.display_name), o = `${t}|${a}`;
+		let a = Hv(e?.display_name), o = `${t}|${a}`;
 		if (u.has(o)) continue;
 		u.add(o);
 		let s = e?.osm_type && e?.osm_id ? `osm:${e.osm_type}:${e.osm_id}` : `osm:${t}:${r.toFixed(2)}:${i.toFixed(2)}`;
@@ -21529,7 +21564,7 @@ async function Vv(e, { signal: t, limit: n = Lv } = {}) {
 		}), l.length >= n) break;
 	}
 	let d = (await Promise.all(l.map(async (e) => {
-		let n = await Bv(e.latitude, e.longitude, t);
+		let n = await Uv(e.latitude, e.longitude, t);
 		return n ? {
 			id: e.id,
 			name: e.name,
@@ -21537,31 +21572,31 @@ async function Vv(e, { signal: t, limit: n = Lv } = {}) {
 			tz: n
 		} : null;
 	}))).filter(Boolean);
-	return d.length > 0 && Gv(i, d), d;
+	return d.length > 0 && Jv(i, d), d;
 }
-var Hv = 1100, Uv = (e) => new Promise((t) => setTimeout(t, e));
-function Wv() {
+var Gv = 1100, Kv = (e) => new Promise((t) => setTimeout(t, e));
+function qv() {
 	try {
-		let e = localStorage.getItem(Nv), t = e ? JSON.parse(e) : {};
-		return ey(t) ? t : {};
+		let e = localStorage.getItem(Iv), t = e ? JSON.parse(e) : {};
+		return ry(t) ? t : {};
 	} catch {
 		return {};
 	}
 }
-function Gv(e, t) {
+function Jv(e, t) {
 	try {
-		let n = Wv(), r = Object.keys(n);
-		!n[e] && r.length >= Pv && delete n[r[0]], n[e] = t, localStorage.setItem(Nv, JSON.stringify(n));
+		let n = qv(), r = Object.keys(n);
+		!n[e] && r.length >= Lv && delete n[r[0]], n[e] = t, localStorage.setItem(Iv, JSON.stringify(n));
 	} catch {}
 }
-async function Kv(e, t) {
-	let n = `${Fv}?format=jsonv2&q=${encodeURIComponent(e.name)}&limit=1&featureType=settlement&accept-language=zh-CN`, r = await fetch(n, { signal: t });
+async function Yv(e, t) {
+	let n = `${Rv}?format=jsonv2&q=${encodeURIComponent(e.name)}&limit=1&featureType=settlement&accept-language=zh-CN`, r = await fetch(n, { signal: t });
 	if (!r.ok) return "";
 	let i = await r.json(), a = Array.isArray(i) ? i[0] : null, o = Number(a?.lat), s = Number(a?.lon);
-	return !Number.isFinite(o) || !Number.isFinite(s) ? "" : Bv(o, s, t);
+	return !Number.isFinite(o) || !Number.isFinite(s) ? "" : Uv(o, s, t);
 }
-async function qv({ signal: e } = {}) {
-	let t = uy();
+async function Xv({ signal: e } = {}) {
+	let t = py();
 	if (t.length === 0) return {
 		total: 0,
 		resolved: 0,
@@ -21570,10 +21605,10 @@ async function qv({ signal: e } = {}) {
 	let n = [], r = 0, i = 0;
 	for (let a = 0; a < t.length; a += 1) {
 		let o = t[a];
-		a > 0 && await Uv(Hv);
+		a > 0 && await Kv(Gv);
 		let s = "";
 		try {
-			s = await Kv(o, e);
+			s = await Yv(o, e);
 		} catch (e) {
 			if (e?.name === "AbortError") throw e;
 			s = "";
@@ -21583,13 +21618,13 @@ async function qv({ signal: e } = {}) {
 			tz: s
 		})) : n.push(o);
 	}
-	return i > 0 && ly(n), {
+	return i > 0 && fy(n), {
 		total: t.length,
 		resolved: r,
 		updated: i
 	};
 }
-var Jv = [
+var Zv = [
 	"星期日",
 	"星期一",
 	"星期二",
@@ -21597,66 +21632,66 @@ var Jv = [
 	"星期四",
 	"星期五",
 	"星期六"
-], Yv = (e) => String(e).padStart(2, "0"), Xv = /* @__PURE__ */ new Map(), Zv = /* @__PURE__ */ new Map(), Qv = /* @__PURE__ */ new Map(), $v = /* @__PURE__ */ new Map();
-function ey(e) {
+], Qv = (e) => String(e).padStart(2, "0"), $v = /* @__PURE__ */ new Map(), ey = /* @__PURE__ */ new Map(), ty = /* @__PURE__ */ new Map(), ny = /* @__PURE__ */ new Map();
+function ry(e) {
 	return typeof e == "object" && !!e && !Array.isArray(e);
 }
-function ty(...e) {
+function iy(...e) {
 	for (let t of e) if (typeof t == "string" && t.trim()) return t.trim();
 	return "";
 }
-function ny(e) {
-	if ($v.has(e)) return $v.get(e);
+function ay(e) {
+	if (ny.has(e)) return ny.get(e);
 	let t = !1;
 	try {
 		new Intl.DateTimeFormat("en-US", { timeZone: e }).format(/* @__PURE__ */ new Date(0)), t = !0;
 	} catch {
 		t = !1;
 	}
-	return $v.set(e, t), t;
+	return ny.set(e, t), t;
 }
-function ry(e) {
+function oy(e) {
 	return (String(e).split("/").pop() || e).replace(/_/g, " ");
 }
-function iy(e) {
+function sy(e) {
 	let t = String(e ?? "").trim();
-	return ny(t) ? {
+	return ay(t) ? {
 		id: `tz:${t}`,
-		name: ry(t),
+		name: oy(t),
 		country: "",
 		tz: t
 	} : null;
 }
-function ay(e) {
+function cy(e) {
 	if (typeof e == "string") {
 		let t = e.trim();
-		return ny(t) ? {
+		return ay(t) ? {
 			id: `tz:${t}`,
-			name: ry(t),
+			name: oy(t),
 			country: "",
 			tz: t
 		} : null;
 	}
-	if (!ey(e)) return null;
-	let t = ty(e.tz, e.timezone, e.timeZone, e.zone);
-	return !t || !ny(t) ? null : {
-		id: ty(e.id) || `tz:${t}`,
-		name: ty(e.name, e.city) || ry(t),
-		country: ty(e.country, e.region),
+	if (!ry(e)) return null;
+	let t = iy(e.tz, e.timezone, e.timeZone, e.zone);
+	return !t || !ay(t) ? null : {
+		id: iy(e.id) || `tz:${t}`,
+		name: iy(e.name, e.city) || oy(t),
+		country: iy(e.country, e.region),
 		tz: t
 	};
 }
-function oy(e) {
+function ly(e) {
 	let t = [];
-	Array.isArray(e) ? t = e : ey(e) && (t = Array.isArray(e.places) ? e.places : Array.isArray(e.clocks) ? e.clocks : Array.isArray(e.cities) ? e.cities : [e]);
+	Array.isArray(e) ? t = e : ry(e) && (t = Array.isArray(e.places) ? e.places : Array.isArray(e.clocks) ? e.clocks : Array.isArray(e.cities) ? e.cities : [e]);
 	let n = /* @__PURE__ */ new Set(), r = [];
 	for (let e of t) {
-		let t = ay(e);
+		let t = cy(e);
 		if (t && !n.has(t.id) && (n.add(t.id), r.push(t), r.length >= 8)) break;
 	}
 	return r;
 }
-function sy(e) {
+function uy(e) {
 	let t;
 	try {
 		t = localStorage.getItem(e);
@@ -21665,38 +21700,38 @@ function sy(e) {
 	}
 	if (t === null) return null;
 	try {
-		return oy(JSON.parse(t));
+		return ly(JSON.parse(t));
 	} catch {
 		return [];
 	}
 }
-function cy() {
-	typeof window < "u" && window.dispatchEvent(new Event(Mv));
+function dy() {
+	typeof window < "u" && window.dispatchEvent(new Event(Fv));
 }
-function ly(e, { silent: t = !1 } = {}) {
+function fy(e, { silent: t = !1 } = {}) {
 	try {
-		localStorage.setItem(Av, JSON.stringify(e));
+		localStorage.setItem(Nv, JSON.stringify(e));
 	} catch {
 		return !1;
 	}
-	return t || cy(), !0;
+	return t || dy(), !0;
 }
-function uy() {
-	let e = sy(Av);
+function py() {
+	let e = uy(Nv);
 	if (e !== null) return e;
-	for (let e of jv) {
-		let t = sy(e);
-		if (t && t.length > 0) return ly(t, { silent: !0 }), t;
+	for (let e of Pv) {
+		let t = uy(e);
+		if (t && t.length > 0) return fy(t, { silent: !0 }), t;
 	}
 	return [];
 }
-function dy(e) {
-	let t = ay(e);
+function my(e) {
+	let t = cy(e);
 	if (!t) return {
 		ok: !1,
 		error: "无法识别的城市或 IANA 时区"
 	};
-	let n = uy(), r = n.find((e) => e.id === t.id);
+	let n = py(), r = n.find((e) => e.id === t.id);
 	if (r) return {
 		ok: !1,
 		code: "duplicate",
@@ -21710,7 +21745,7 @@ function dy(e) {
 		places: n
 	};
 	let i = [...n, t];
-	return ly(i) ? {
+	return fy(i) ? {
 		ok: !0,
 		place: t,
 		places: i
@@ -21719,32 +21754,32 @@ function dy(e) {
 		error: "无法保存世界时钟数据（本机存储不可写）"
 	};
 }
-function fy(e, t) {
+function hy(e, t) {
 	if (typeof t == "string") {
 		let n = t.trim().toLowerCase();
 		return n ? e.id.toLowerCase() === n || e.tz.toLowerCase() === n || e.name.toLowerCase() === n : !1;
 	}
-	if (!ey(t)) return !1;
-	let n = ty(t.id);
+	if (!ry(t)) return !1;
+	let n = iy(t.id);
 	if (n) return e.id.toLowerCase() === n.toLowerCase();
-	let r = ty(t.tz, t.timezone, t.timeZone, t.zone);
+	let r = iy(t.tz, t.timezone, t.timeZone, t.zone);
 	if (r) return e.tz.toLowerCase() === r.toLowerCase();
-	let i = ty(t.name, t.city);
+	let i = iy(t.name, t.city);
 	return i ? e.name.toLowerCase() === i.toLowerCase() : !1;
 }
-function py(e) {
-	let t = uy();
+function gy(e) {
+	let t = py();
 	if (t.length === 0) return {
 		ok: !1,
 		error: "世界时钟里还没有城市"
 	};
-	let n = t.findIndex((t) => fy(t, e));
+	let n = t.findIndex((t) => hy(t, e));
 	if (n < 0) return {
 		ok: !1,
 		error: "没有找到要删除的城市"
 	};
 	let r = t[n], i = t.filter((e, t) => t !== n);
-	return ly(i) ? {
+	return fy(i) ? {
 		ok: !0,
 		removed: r,
 		places: i
@@ -21753,8 +21788,8 @@ function py(e) {
 		error: "无法保存世界时钟数据（本机存储不可写）"
 	};
 }
-function my(e, t) {
-	let n = `${e}|${t ? "h12" : "h23"}`, r = Xv.get(n);
+function _y(e, t) {
+	let n = `${e}|${t ? "h12" : "h23"}`, r = $v.get(n);
 	return r || (r = new Intl.DateTimeFormat("en-US", {
 		timeZone: e,
 		hour12: t,
@@ -21762,19 +21797,19 @@ function my(e, t) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit"
-	}), Xv.set(n, r)), r;
+	}), $v.set(n, r)), r;
 }
-function hy(e) {
-	let t = Zv.get(e);
+function vy(e) {
+	let t = ey.get(e);
 	return t || (t = new Intl.DateTimeFormat("en-CA", {
 		timeZone: e,
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit"
-	}), Zv.set(e, t)), t;
+	}), ey.set(e, t)), t;
 }
-function gy(e) {
-	let t = Qv.get(e);
+function yy(e) {
+	let t = ty.get(e);
 	return t || (t = new Intl.DateTimeFormat("en-US", {
 		timeZone: e,
 		hourCycle: "h23",
@@ -21784,48 +21819,48 @@ function gy(e) {
 		hour: "2-digit",
 		minute: "2-digit",
 		second: "2-digit"
-	}), Qv.set(e, t)), t;
+	}), ty.set(e, t)), t;
 }
-function _y(e, t) {
+function by(e, t) {
 	let n = {};
 	for (let r of e.formatToParts(t)) r.type !== "literal" && (n[r.type] = r.value);
 	return n;
 }
-function vy(e, t, n) {
-	let r = _y(my(t, n.hour12), e);
+function xy(e, t, n) {
+	let r = by(_y(t, n.hour12), e);
 	return {
 		main: `${n.hour12 ? String(Number(r.hour)) : r.hour}:${r.minute}`,
 		seconds: r.second,
 		meridiem: n.hour12 ? (r.dayPeriod || "").toUpperCase() : ""
 	};
 }
-function yy(e, t) {
-	let n = _y(hy(t), e), r = Number(n.year), i = Number(n.month), a = Number(n.day);
+function Sy(e, t) {
+	let n = by(vy(t), e), r = Number(n.year), i = Number(n.month), a = Number(n.day);
 	return {
 		year: r,
 		month: i,
 		day: a,
-		weekday: Jv[new Date(Date.UTC(r, i - 1, a)).getUTCDay()],
-		dateLabel: `${r}-${Yv(i)}-${Yv(a)}`
+		weekday: Zv[new Date(Date.UTC(r, i - 1, a)).getUTCDay()],
+		dateLabel: `${r}-${Qv(i)}-${Qv(a)}`
 	};
 }
-function by(e, t) {
-	let n = _y(gy(t), e), r = Date.UTC(Number(n.year), Number(n.month) - 1, Number(n.day), Number(n.hour), Number(n.minute), Number(n.second)), i = Math.floor(e.getTime() / 1e3) * 1e3;
+function Cy(e, t) {
+	let n = by(yy(t), e), r = Date.UTC(Number(n.year), Number(n.month) - 1, Number(n.day), Number(n.hour), Number(n.minute), Number(n.second)), i = Math.floor(e.getTime() / 1e3) * 1e3;
 	return Math.round((r - i) / 6e4);
 }
-function xy(e) {
+function wy(e) {
 	let t = Math.floor(e / 60), n = e % 60;
 	return t > 0 && n > 0 ? `${t} 小时 ${n} 分钟` : t > 0 ? `${t} 小时` : `${n} 分钟`;
 }
-function Sy(e) {
-	return e === 0 ? "与本地相同" : `比本地${e > 0 ? "快" : "慢"} ${xy(Math.abs(e))}`;
+function Ty(e) {
+	return e === 0 ? "与本地相同" : `比本地${e > 0 ? "快" : "慢"} ${wy(Math.abs(e))}`;
 }
-function Cy(e, t) {
+function Ey(e, t) {
 	let n = Date.UTC(e.year, e.month - 1, e.day), r = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()), i = Math.round((n - r) / 864e5);
 	return i === 0 ? "今天" : i === 1 ? "明天" : i === -1 ? "昨天" : "";
 }
-function wy(e, t, n) {
-	let r = vy(t, e.tz, n), i = yy(t, e.tz), a = -t.getTimezoneOffset(), o = by(t, e.tz) - a;
+function Dy(e, t, n) {
+	let r = xy(t, e.tz, n), i = Sy(t, e.tz), a = -t.getTimezoneOffset(), o = Cy(t, e.tz) - a;
 	return {
 		id: e.id,
 		name: e.name,
@@ -21836,47 +21871,47 @@ function wy(e, t, n) {
 		meridiem: r.meridiem,
 		localDate: i.dateLabel,
 		weekday: i.weekday,
-		dayLabel: Cy(i, t),
+		dayLabel: Ey(i, t),
 		offsetMinutes: o,
-		offsetLabel: Sy(o)
+		offsetLabel: Ty(o)
 	};
 }
-function Ty(e, t, n) {
+function Oy(e, t, n) {
 	return {
 		limit: 8,
 		count: e.length,
-		systemTimeZone: wv(),
-		places: e.map((e) => wy(e, t, n))
+		systemTimeZone: Dv(),
+		places: e.map((e) => Dy(e, t, n))
 	};
 }
-function Ey() {
-	let [e, t] = (0, M.useState)(uy);
+function ky() {
+	let [e, t] = (0, M.useState)(py);
 	return (0, M.useEffect)(() => {
-		let e = () => t(uy()), n = (t) => {
-			(t.key === null || t.key === "clock.places" || jv.includes(t.key)) && e();
+		let e = () => t(py()), n = (t) => {
+			(t.key === null || t.key === "clock.places" || Pv.includes(t.key)) && e();
 		};
-		return window.addEventListener("storage", n), window.addEventListener(Mv, e), () => {
-			window.removeEventListener("storage", n), window.removeEventListener(Mv, e);
+		return window.addEventListener("storage", n), window.addEventListener(Fv, e), () => {
+			window.removeEventListener("storage", n), window.removeEventListener(Fv, e);
 		};
 	}, []), {
 		places: e,
 		add: (0, M.useCallback)((e) => {
-			let n = dy(e);
+			let n = my(e);
 			return n.ok && t(n.places), n;
 		}, []),
 		remove: (0, M.useCallback)((e) => {
-			let n = py(e);
+			let n = gy(e);
 			return n.ok && t(n.places), n;
 		}, [])
 	};
 }
 //#endregion
 //#region public/plugins/clock/src/tools.js
-var Dy = Object.freeze({
+var Ay = Object.freeze({
 	type: "object",
 	properties: {},
 	additionalProperties: !1
-}), Oy = {
+}), jy = {
 	type: "object",
 	properties: {
 		id: {
@@ -21893,16 +21928,16 @@ var Dy = Object.freeze({
 		}
 	},
 	additionalProperties: !1
-}, ky = Object.freeze([
+}, My = Object.freeze([
 	{
 		name: "clock.now",
 		description: "读取系统当前时间、日期、星期、时区与本周/年内天数（只读）。",
-		parameters: Dy
+		parameters: Ay
 	},
 	{
 		name: "clock.settings.get",
 		description: "读取时钟设置：hour12、showSeconds、dateFormat 及默认值（只读）。",
-		parameters: Dy
+		parameters: Ay
 	},
 	{
 		name: "clock.settings.set",
@@ -21934,41 +21969,41 @@ var Dy = Object.freeze({
 	{
 		name: "clock.world.list",
 		description: "列出已添加的世界时钟城市、当地时间、今天/明天/昨天与时差（只读）。",
-		parameters: Dy
+		parameters: Ay
 	},
 	{
 		name: "clock.world.add",
 		description: "添加一个世界时钟城市；必须提供 tz（IANA 时区），name/country 可选，最多 8 个。",
-		parameters: Oy
+		parameters: jy
 	},
 	{
 		name: "clock.world.remove",
 		description: "删除一个世界时钟城市；用 id、name 或 tz 指定，匹配第一条。",
-		parameters: Oy
+		parameters: jy
 	}
 ]);
-function Ay({ settings: e, setSettings: t, world: n }) {
-	let r = (t, n) => Ty(t, n, e);
+function Ny({ settings: e, setSettings: t, world: n }) {
+	let r = (t, n) => Oy(t, n, e);
 	return {
-		"clock.now": () => Ov(/* @__PURE__ */ new Date(), e),
+		"clock.now": () => jv(/* @__PURE__ */ new Date(), e),
 		"clock.settings.get": () => ({
 			settings: { ...e },
-			defaults: { ...uv },
-			schemaKey: lv,
+			defaults: { ...dv },
+			schemaKey: uv,
 			dateFormatOptions: [
 				"zh",
 				"iso",
 				"en"
 			],
-			timeZone: wv()
+			timeZone: Dv()
 		}),
 		"clock.settings.set": (n) => {
-			let r = kv(e, n);
+			let r = Mv(e, n);
 			if (r.error) throw Error(r.error);
 			return t(r.settings), {
 				ok: !0,
 				settings: r.settings,
-				defaults: { ...uv }
+				defaults: { ...dv }
 			};
 		},
 		"clock.world.list": () => {
@@ -21981,7 +22016,7 @@ function Ay({ settings: e, setSettings: t, world: n }) {
 			let a = /* @__PURE__ */ new Date();
 			return {
 				ok: !0,
-				added: wy(i.place, a, e),
+				added: Dy(i.place, a, e),
 				...r(i.places, a)
 			};
 		},
@@ -21991,7 +22026,7 @@ function Ay({ settings: e, setSettings: t, world: n }) {
 			let a = /* @__PURE__ */ new Date();
 			return {
 				ok: !0,
-				removed: wy(i.removed, a, e),
+				removed: Dy(i.removed, a, e),
 				...r(i.places, a)
 			};
 		}
@@ -21999,19 +22034,19 @@ function Ay({ settings: e, setSettings: t, world: n }) {
 }
 //#endregion
 //#region public/plugins/clock/src/sizes.js
-var jy = {
+var Py = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"3x2": [3, 2]
 };
-function My(e) {
+function Fy(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return jy[t] ? t : "2x1";
+	return Py[t] ? t : "2x1";
 }
 //#endregion
 //#region public/plugins/clock/src/ClockApp.jsx
-var Ny = 1e3, Py = Jn({
+var Iy = 1e3, Ly = Jn({
 	root: {
 		alignItems: "center",
 		justifyContent: "center",
@@ -22044,11 +22079,11 @@ var Ny = 1e3, Py = Jn({
 		minWidth: 0
 	},
 	numeric: {
-		...T_,
+		...E_,
 		whiteSpace: "nowrap"
 	},
 	time48: {
-		...w_(48),
+		...T_(48),
 		fontWeight: "600",
 		color: W.colorNeutralForeground1
 	},
@@ -22059,7 +22094,7 @@ var Ny = 1e3, Py = Jn({
 		color: W.colorNeutralForeground1
 	},
 	time112: {
-		...w_(112),
+		...T_(112),
 		fontWeight: "600",
 		color: W.colorNeutralForeground1
 	},
@@ -22073,8 +22108,8 @@ var Ny = 1e3, Py = Jn({
 		whiteSpace: "nowrap"
 	}
 });
-function Fy() {
-	let e = Py(), t = f_(My, "2x1"), [n, r] = p_(lv, uv, bv), i = Ey(), a = cv(Ny), o = t === "1x1", s = t === "3x2", c = new Date(a), l = Sv(c, n), u = Cv(c, n), d = n.showSeconds && !o, f = (0, M.useMemo)(() => `当前时间 ${n.hour12 ? `${l.main} ${l.meridiem}` : l.main}${d ? ` ${l.seconds} 秒` : ""}${o ? "" : `，${u.inline}`}，点击打开时钟详情`, [
+function Ry() {
+	let e = Ly(), t = f_(Fy, "2x1"), [n, r] = m_(uv, dv, xv), i = ky(), a = lv(Iy), o = t === "1x1", s = t === "3x2", c = new Date(a), l = Tv(c, n), u = Ev(c, n), d = n.showSeconds && !o, f = (0, M.useMemo)(() => `当前时间 ${n.hour12 ? `${l.main} ${l.meridiem}` : l.main}${d ? ` ${l.seconds} 秒` : ""}${o ? "" : `，${u.inline}`}，点击打开时钟详情`, [
 		o,
 		u.inline,
 		n.hour12,
@@ -22083,13 +22118,13 @@ function Fy() {
 		l.meridiem,
 		l.seconds
 	]);
-	return S_(ky, Ay({
+	return C_(My, Ny({
 		settings: n,
 		setSettings: r,
 		world: i
-	})), /* @__PURE__ */ (0, N.jsxs)(W_, {
+	})), /* @__PURE__ */ (0, N.jsxs)(G_, {
 		ariaLabel: f,
-		onActivate: () => h_("detail", "时钟详情"),
+		onActivate: () => g_("detail", "时钟详情"),
 		className: D(e.root, o && e.rootCompact, !o && !s && e.rootRow, s && e.rootLarge),
 		"data-clock-root": "true",
 		"data-clock-size": t,
@@ -22124,7 +22159,7 @@ function Fy() {
 }
 //#endregion
 //#region public/plugins/clock/src/ClockDetail.jsx
-var Iy = 1e3, Ly = Jn({
+var zy = 1e3, By = Jn({
 	stack: {
 		display: "flex",
 		flexDirection: "column",
@@ -22157,11 +22192,11 @@ var Iy = 1e3, Ly = Jn({
 		minWidth: 0
 	},
 	numeric: {
-		...T_,
+		...E_,
 		whiteSpace: "nowrap"
 	},
 	headerTime: {
-		...w_(48),
+		...T_(48),
 		fontWeight: "600",
 		color: W.colorNeutralForeground1
 	},
@@ -22188,7 +22223,7 @@ var Iy = 1e3, Ly = Jn({
 		minWidth: 0
 	},
 	worldTime: {
-		...T_,
+		...E_,
 		color: W.colorNeutralForeground1
 	},
 	dayLabel: {
@@ -22238,8 +22273,8 @@ var Iy = 1e3, Ly = Jn({
 		minWidth: 0
 	}
 });
-function Ry({ label: e, value: t, testId: n }) {
-	let r = Ly();
+function Vy({ label: e, value: t, testId: n }) {
+	let r = By();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.infoCell,
 		"data-date-info": n,
@@ -22255,19 +22290,19 @@ function Ry({ label: e, value: t, testId: n }) {
 		})]
 	});
 }
-function zy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm: i, onCancelConfirm: a, onRemove: o }) {
-	let s = Ly(), [c, l] = (0, M.useState)(!1);
+function Hy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm: i, onCancelConfirm: a, onRemove: o }) {
+	let s = By(), [c, l] = (0, M.useState)(!1);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		"data-world-row": e.id,
 		"data-world-confirming": r ? "true" : void 0,
-		children: [/* @__PURE__ */ (0, N.jsx)(j_, {
+		children: [/* @__PURE__ */ (0, N.jsx)(M_, {
 			visible: !c,
 			appear: n,
 			unmountOnExit: !0,
 			onMotionFinish: (t, n) => {
 				n?.direction === "exit" && o(e) === !1 && l(!1);
 			},
-			children: /* @__PURE__ */ (0, N.jsx)(K_, {
+			children: /* @__PURE__ */ (0, N.jsx)(q_, {
 				className: s.worldRow,
 				"data-world-city": e.id,
 				title: e.name,
@@ -22311,7 +22346,7 @@ function zy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm:
 							children: /* @__PURE__ */ (0, N.jsx)(dm, {
 								content: "城市操作",
 								relationship: "label",
-								children: /* @__PURE__ */ (0, N.jsx)(X_, {
+								children: /* @__PURE__ */ (0, N.jsx)(Z_, {
 									appearance: "subtle",
 									className: s.menuButton,
 									icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
@@ -22327,7 +22362,7 @@ function zy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm:
 					]
 				})
 			})
-		}), /* @__PURE__ */ (0, N.jsx)(M_, {
+		}), /* @__PURE__ */ (0, N.jsx)(N_, {
 			visible: r && !c,
 			unmountOnExit: !0,
 			children: /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -22343,10 +22378,10 @@ function zy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm:
 					]
 				}), /* @__PURE__ */ (0, N.jsxs)("div", {
 					className: s.confirmActions,
-					children: [/* @__PURE__ */ (0, N.jsx)(X_, {
+					children: [/* @__PURE__ */ (0, N.jsx)(Z_, {
 						onClick: a,
 						children: "取消"
-					}), /* @__PURE__ */ (0, N.jsx)(X_, {
+					}), /* @__PURE__ */ (0, N.jsx)(Z_, {
 						appearance: "secondary",
 						icon: /* @__PURE__ */ (0, N.jsx)(cu, {}),
 						className: s.danger,
@@ -22360,28 +22395,28 @@ function zy({ info: e, settings: t, animate: n, confirming: r, onRequestConfirm:
 		})]
 	});
 }
-function By() {
-	let e = Ly(), t = cv(Iy), [n] = p_(lv, uv, bv), r = Ey(), [i, a] = (0, M.useState)(!1), [o, s] = (0, M.useState)(null), [c, l] = (0, M.useState)(!1), [u, d] = (0, M.useState)(!1);
+function Uy() {
+	let e = By(), t = lv(zy), [n] = m_(uv, dv, xv), r = ky(), [i, a] = (0, M.useState)(!1), [o, s] = (0, M.useState)(null), [c, l] = (0, M.useState)(!1), [u, d] = (0, M.useState)(!1);
 	(0, M.useEffect)(() => {
 		l(!0);
 	}, []);
-	let f = new Date(t), p = Sv(f, n), m = Cv(f, n), h = Dv(f), g = (0, M.useMemo)(() => {
+	let f = new Date(t), p = Tv(f, n), m = Ev(f, n), h = Av(f), g = (0, M.useMemo)(() => {
 		let e = new Date(t);
-		return r.places.map((t) => wy(t, e, n));
+		return r.places.map((t) => Dy(t, e, n));
 	}, [
 		t,
 		n,
 		r.places
 	]), _ = () => a(!0);
-	return /* @__PURE__ */ (0, N.jsxs)(Q_, { children: [
-		/* @__PURE__ */ (0, N.jsxs)(ev, {
-			trailing: /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)(X_, {
+	return /* @__PURE__ */ (0, N.jsxs)($_, { children: [
+		/* @__PURE__ */ (0, N.jsxs)(tv, {
+			trailing: /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)(Z_, {
 				appearance: "primary",
 				icon: /* @__PURE__ */ (0, N.jsx)(au, {}),
 				onClick: _,
 				children: "添加城市"
-			}), /* @__PURE__ */ (0, N.jsx)(X_, {
-				onClick: g_,
+			}), /* @__PURE__ */ (0, N.jsx)(Z_, {
+				onClick: __,
 				children: "设置…"
 			})] }),
 			children: [/* @__PURE__ */ (0, N.jsxs)("div", {
@@ -22411,7 +22446,7 @@ function By() {
 				children: m.inline
 			})]
 		}),
-		/* @__PURE__ */ (0, N.jsx)(rv, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
+		/* @__PURE__ */ (0, N.jsx)(iv, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: e.stack,
 			children: [/* @__PURE__ */ (0, N.jsxs)("section", {
 				className: e.section,
@@ -22437,7 +22472,7 @@ function By() {
 									" 个"
 								]
 							}),
-							/* @__PURE__ */ (0, N.jsx)(X_, {
+							/* @__PURE__ */ (0, N.jsx)(Z_, {
 								"data-world-refresh": "true",
 								icon: /* @__PURE__ */ (0, N.jsx)(su, {}),
 								disabled: u || g.length === 0,
@@ -22445,7 +22480,7 @@ function By() {
 									if (!u) {
 										d(!0);
 										try {
-											await qv();
+											await Xv();
 										} catch {} finally {
 											d(!1);
 										}
@@ -22456,11 +22491,11 @@ function By() {
 							"              "
 						]
 					})]
-				}), g.length === 0 ? /* @__PURE__ */ (0, N.jsx)(J_, {
+				}), g.length === 0 ? /* @__PURE__ */ (0, N.jsx)(Y_, {
 					icon: /* @__PURE__ */ (0, N.jsx)(G, {}),
 					title: "还没有添加城市",
 					description: "添加城市后可以同时查看当地时间与时差",
-					action: /* @__PURE__ */ (0, N.jsx)(X_, {
+					action: /* @__PURE__ */ (0, N.jsx)(Z_, {
 						appearance: "primary",
 						icon: /* @__PURE__ */ (0, N.jsx)(au, {}),
 						onClick: _,
@@ -22469,7 +22504,7 @@ function By() {
 				}) : /* @__PURE__ */ (0, N.jsx)("div", {
 					className: e.worldList,
 					"data-world-list": "true",
-					children: g.map((e) => /* @__PURE__ */ (0, N.jsx)(zy, {
+					children: g.map((e) => /* @__PURE__ */ (0, N.jsx)(Hy, {
 						info: e,
 						settings: n,
 						animate: c,
@@ -22489,17 +22524,17 @@ function By() {
 				}), /* @__PURE__ */ (0, N.jsxs)("div", {
 					className: e.infoGrid,
 					children: [
-						/* @__PURE__ */ (0, N.jsx)(Ry, {
+						/* @__PURE__ */ (0, N.jsx)(Vy, {
 							label: "本周",
 							value: `第 ${h.weekNumber} 周`,
 							testId: "week"
 						}),
-						/* @__PURE__ */ (0, N.jsx)(Ry, {
+						/* @__PURE__ */ (0, N.jsx)(Vy, {
 							label: "今年",
 							value: `第 ${h.dayOfYear} 天`,
 							testId: "day-of-year"
 						}),
-						/* @__PURE__ */ (0, N.jsx)(Ry, {
+						/* @__PURE__ */ (0, N.jsx)(Vy, {
 							label: "系统时区",
 							value: h.timeZone,
 							testId: "time-zone"
@@ -22508,28 +22543,28 @@ function By() {
 				})]
 			})]
 		}) }),
-		i ? /* @__PURE__ */ (0, N.jsx)(sv, {
+		i ? /* @__PURE__ */ (0, N.jsx)(cv, {
 			title: "添加城市",
 			onClosed: () => a(!1),
-			trailing: /* @__PURE__ */ (0, N.jsx)(Vy, {}),
-			children: /* @__PURE__ */ (0, N.jsx)(Hy, {
+			trailing: /* @__PURE__ */ (0, N.jsx)(Wy, {}),
+			children: /* @__PURE__ */ (0, N.jsx)(Gy, {
 				existing: r.places,
 				onAdd: r.add
 			})
 		}) : null
 	] });
 }
-function Vy() {
-	let e = av();
-	return /* @__PURE__ */ (0, N.jsx)(X_, {
+function Wy() {
+	let e = ov();
+	return /* @__PURE__ */ (0, N.jsx)(Z_, {
 		onClick: () => e?.(),
 		children: "取消"
 	});
 }
-function Hy({ existing: e, onAdd: t }) {
-	let n = Ly(), r = av(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(""), [c, l] = (0, M.useState)([]), [u, d] = (0, M.useState)(!1);
+function Gy({ existing: e, onAdd: t }) {
+	let n = By(), r = ov(), [i, a] = (0, M.useState)(""), [o, s] = (0, M.useState)(""), [c, l] = (0, M.useState)([]), [u, d] = (0, M.useState)(!1);
 	(0, M.useEffect)(() => {
-		let e = i.trim(), t = iy(e);
+		let e = i.trim(), t = sy(e);
 		if (t) {
 			l([t]), d(!1);
 			return;
@@ -22541,7 +22576,7 @@ function Hy({ existing: e, onAdd: t }) {
 		let n = new AbortController(), r = setTimeout(async () => {
 			d(!0);
 			try {
-				l(await Vv(e, { signal: n.signal }));
+				l(await Wv(e, { signal: n.signal }));
 			} catch (e) {
 				e?.name !== "AbortError" && l([]);
 			} finally {
@@ -22594,7 +22629,7 @@ function Hy({ existing: e, onAdd: t }) {
 					u ? " · 搜索中…" : ""
 				]
 			}),
-			c.length === 0 ? u ? null : /* @__PURE__ */ (0, N.jsx)(J_, {
+			c.length === 0 ? u ? null : /* @__PURE__ */ (0, N.jsx)(Y_, {
 				icon: /* @__PURE__ */ (0, N.jsx)(ru, {}),
 				title: "没有找到城市",
 				description: "试试中文名、英文名或时区，例如“大阪”“Tokyo”“Asia/Tokyo”"
@@ -22603,11 +22638,11 @@ function Hy({ existing: e, onAdd: t }) {
 				"data-city-list": "true",
 				children: c.map((e) => {
 					let t = m(e), n = t || h;
-					return /* @__PURE__ */ (0, N.jsx)(K_, {
+					return /* @__PURE__ */ (0, N.jsx)(q_, {
 						"data-city-option": e.id,
 						title: e.name,
 						subtitle: [e.country, e.tz].filter(Boolean).join(" · "),
-						trailing: /* @__PURE__ */ (0, N.jsx)(X_, {
+						trailing: /* @__PURE__ */ (0, N.jsx)(Z_, {
 							"data-city-add": e.id,
 							"aria-label": t ? `${e.name} 已添加` : `添加 ${e.name}`,
 							appearance: "secondary",
@@ -22621,9 +22656,9 @@ function Hy({ existing: e, onAdd: t }) {
 		]
 	});
 }
-o_(), xv();
-function Uy() {
-	let { theme: e } = d_(), t = m_();
+o_(), Sv();
+function Ky() {
+	let { theme: e } = d_(), t = h_();
 	return /* @__PURE__ */ (0, N.jsx)(wl, {
 		theme: e,
 		style: {
@@ -22632,9 +22667,9 @@ function Uy() {
 			background: "transparent",
 			colorScheme: "normal"
 		},
-		children: t === "detail" ? /* @__PURE__ */ (0, N.jsx)(By, {}) : /* @__PURE__ */ (0, N.jsx)(Fy, {})
+		children: t === "detail" ? /* @__PURE__ */ (0, N.jsx)(Uy, {}) : /* @__PURE__ */ (0, N.jsx)(Ry, {})
 	});
 }
-var Wy = document.getElementById("root");
-Wy && (0, e_.createRoot)(Wy).render(/* @__PURE__ */ (0, N.jsx)(Uy, {}));
+var qy = document.getElementById("root");
+qy && (0, e_.createRoot)(qy).render(/* @__PURE__ */ (0, N.jsx)(Ky, {}));
 //#endregion

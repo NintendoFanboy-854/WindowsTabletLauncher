@@ -5,7 +5,7 @@
 
 ![桌面](docs/images/v030/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.3.5 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
+<p align="center"><sub>v0.3.6 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -93,7 +93,7 @@
 
 ### 直接安装
 
-从构建产物安装 `Windows Tablet Launcher 0.3.5`（NSIS 中文安装包，或 MSI zh-CN）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
+从构建产物安装 `Windows Tablet Launcher 0.3.6`（NSIS 中文安装包，或 MSI zh-CN）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
 
 首次启动后：
 
@@ -163,10 +163,11 @@ docs/                   # 需求/设计/组件契约/发布报告
 - [MOTION.md](docs/MOTION.md) / [AGENT-SURFACE-CONTRACT.md](docs/AGENT-SURFACE-CONTRACT.md) —— 动效与 Agent 浮空界面契约
 - [components/agent.md](docs/components/agent.md) / [components/weather.md](docs/components/weather.md) —— Agent 与天气组件规格
 - [PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) / [DECISIONS.md](docs/DECISIONS.md) —— 插件协议与关键决策
-- [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17 / v0.3.5 §18）
+- [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17 / v0.3.5 §18 / v0.3.6 §19）
 
-## 验证状态（v0.3.5）
+## 验证状态（v0.3.6）
 
+- v0.3.6 增量（用户反馈修复）：**桌面小组件配置实时同步**——新增宿主 → 插件 `host:config` 增量推送，天气自动定位/城市/显示项、时钟/倒数日/番茄钟/久坐/待办等所有插件在 Tauri 打包版里改配置即时生效，不再需要重启。根因：宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）跨 origin，旧的 storage 事件同步在打包版从未生效。验证：跨 origin harness before 复现 / after **PASS**（settings 34ms、places 58ms 同步，iframe `host:config` 6 条、console error 0）；独立审计 + diff 评审 P0/P1=0；六插件产物重建；`npm run typecheck` / `npm run build` exit 0；全量基线回归全绿（verify-plugin ×6 / overlays 6/6 / widgets 25/25 / plug-and-play 12/12 / sedentary 9/9，console 0）；**release 真窗口 CDP 38/38 PASS**（真实 WebView2：升级重种 0.3.5→0.3.6、时钟/天气设置页改动后跨 origin 卡片 2s 内更新、iframe 未 reload、console 0）。
 - v0.3.5 增量：Agent 里说「我站起来了 / 我坐下了」**立即生效**（插件 `phrases` 由宿主直接执行，不再依赖模型调工具；语音先等 ASR 转写再发请求），卡片/详情无需再点按钮；久坐 UI 文案做减法（删除「休息中，坐下后开始新一轮」等状态机说明与每次操作的「已记录…」通知）。验证：短语单测 10/10；真实 MiMo + headless Edge 端到端 **12/12 PASS**；`scripts/verify-agent-surface.mjs` **109/109 PASS**。`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
 - v0.3.4 增量：久坐改为手动**「坐着 ↔ 站立」循环**——坐着点「我站起来了」、站立点「我坐下了」；久坐只累计坐姿，站立单独统计；提醒只在坐着时出现。Agent 新增 `standUp` / `sitDown` / `stats`（移除 `takeBreak`），复盘页按「起身次数」为主数值、久坐/站立分钟为次要指标。验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 **10/10 PASS**；复盘页集成检查 PASS（`sedentary.stats` 被发现并渲染）；`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
 - v0.3.3 增量：久坐**移除免打扰（quietHours）**——设置页不再有该分组、到阈值就提醒；旧配置字段由迁移自动删除。
@@ -176,7 +177,7 @@ docs/                   # 需求/设计/组件契约/发布报告
 - 天气 3×2：横向连续空白 166px → 16px（1024 下 12px），内容带/今日指标/Secondary/断点门禁通过。
 - 真实 MiMo 音频冒烟：TTS 合成 → chat `input_audio`（HTTP 200，`audio_tokens` 与时长相符）→ ASR 回读与原文 100% 一致 → 后续纯文字请求无 `input_audio`。
 - release exe + WebView2 CDP：v0.3.1 真窗口（标题 2.8s / 全屏 / `--webview-exe-version=0.3.1`）；升级种子 `.seed-version` 0.3.0 → 0.3.1、天气产物哈希与仓库一致；6 卡、8 iframe、无 dock/机器人、console 0；右键菜单→设置、未播放时的常驻朗读开关在真实 WebView2 内 16/16 checks PASS。
-- 安装包（本机自用，含本地 Key，不外发）：v0.3.5 — NSIS 3,934,447 B / `65051899…`；MSI 5,140,480 B / `7DA6BD56…`；`app.exe` 12,168,704 B / `497BB9B9…`（旧版本产物在对应 `release/` 目录）。
+- 安装包（本机自用，含本地 Key，不外发）：v0.3.6 — NSIS 3,935,767 B / `3EB6230F…`；MSI 5,144,576 B / `7C6F51B2…`；`app.exe` 12,173,312 B / `1D1BFFC3…`（旧版本产物在对应 `release/` 目录）。
 
 ## 已知限制与安全
 

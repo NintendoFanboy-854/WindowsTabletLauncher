@@ -129,7 +129,10 @@ node scripts/verify-plugin.mjs weather
   `location`：最近一次定位结果 `{ place, source, at }`。
 - 首屏先读缓存，再按 `refreshMin` 轮询；页面隐藏暂停，回到前台补一拍。
 - 请求失败 / 429：用缓存并标注「离线 · N 分钟前更新」；缓存超过 2×刷新间隔时加「数据可能过期」。
-- 卡片与 L1/L2 是同一 origin 的不同 iframe，通过宿主 `plugin.weather.*` 的 storage 事件同步。
+- 卡片与 L1/L2 是同一插件的不同 iframe，通过宿主 `host:config` 推送（`plugin.onConfig` /
+  `useStoredConfig`）同步 `plugin.weather.*` 配置。**不能依赖 storage 事件**：Tauri 打包版宿主页
+  （`tauri.localhost`）与插件 iframe（`wtsl.localhost`）不同 origin，storage 事件到不了插件（D-29）；
+  dev 浏览器同源模式才会触发，仅作兜底。
 
 ## Agent 工具（UI 路径 ↔ 工具）
 

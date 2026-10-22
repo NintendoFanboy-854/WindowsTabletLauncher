@@ -22039,20 +22039,28 @@ function ly(t, n, r) {
 		}
 		d.current && n === f.current && (c(i.current ? i.current(r) : r ?? a.current), u(!0));
 	}, [t]);
-	return (0, M.useEffect)(() => {
+	(0, M.useEffect)(() => {
 		p();
 	}, [p]), (0, M.useEffect)(() => {
+		let n = e.onConfig?.((e, n) => {
+			e === t && (f.current += 1, c(i.current ? i.current(n) : n ?? a.current), u(!0));
+		});
+		return () => {
+			n?.();
+		};
+	}, [t]), (0, M.useEffect)(() => {
 		let n = `plugin.${e.pluginId}.${t}`, r = (e) => {
 			(e.key === null || e.key === n) && p();
 		};
 		return window.addEventListener("storage", r), () => window.removeEventListener("storage", r);
-	}, [t, p]), [
+	}, [t, p]);
+	let m = (0, M.useRef)(s);
+	return m.current = s, [
 		s,
 		(0, M.useCallback)((n) => {
-			f.current += 1, c((r) => {
-				let i = typeof n == "function" ? n(r) : n;
-				return e.setConfig(t, i).catch(() => {}), i;
-			});
+			f.current += 1;
+			let r = typeof n == "function" ? n(m.current) : n;
+			m.current = r, c(r), e.setConfig(t, r).catch(() => {});
 		}, [t]),
 		l
 	];

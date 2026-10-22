@@ -87,7 +87,8 @@ interface WorldClock {
 - 搜过的关键词缓存在 `clock.searchCache`（最多 30 条），缓存命中不发请求。
 - Nominatim 使用条款要求 ≤1 次/秒：输入 debounce 400ms，单次最多 6 条结果。
 - 夏令时/时区偏移由 `Intl` 计算；系统时区变化自动跟随。
-- 12/24h 与日期格式修改后，卡片与详情通过 storage 事件即时同步。
+- 12/24h 与日期格式修改后，卡片与详情通过宿主 `host:config` 推送即时同步（D-29；不依赖
+  storage 事件——Tauri 打包版宿主页与插件 iframe 不同 origin）。
 - 独立预览（无宿主）使用本地配置兜底，不依赖宿主 API。
 
 ## 不做什么

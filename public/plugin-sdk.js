@@ -14,7 +14,7 @@ const isInHost = window.parent !== window;
 const PLUGIN_ID = new URLSearchParams(location.search).get('plugin') || location.pathname.split('/')[2] || 'unknown';
 const pending = new Map();
 let seq = 0;
-const handlers = { init: [], theme: [], resize: [], focus: [], tool: [] };
+const handlers = { init: [], theme: [], resize: [], focus: [], tool: [], config: [] };
 
 function post(message) {
   if (isInHost) window.parent.postMessage(message, '*');
@@ -58,14 +58,17 @@ function fallback(method, params) {
 }
 
 /**
- * 最近一次 init / theme / resize。
+ * 最近一次 init / theme / resize / config。
  *
  * 宿主在 iframe onLoad 后立刻发 host:init，主题变化也可能早于 React 的
  * useEffect 注册监听；如果只把消息转发给“当前已注册的 handler”，后注册的
  * 插件会永远拿不到这次更新（实测会出现插件停在深色、宿主已切亮色）。
  * 所以 SDK 记忆最后一次值，并在注册监听时立即补发一次。
+ *
+ * config 按 key 记忆（宿主写 `plugin.<id>.<key>` 后用 `host:config` 推增量）；
+ * 跨 origin 下 localStorage 的 storage 事件到不了插件 iframe，配置同步只能靠它。
  */
-const last = { init: null, theme: null, resize: null };
+const last = { init: null, theme: null, resize: null, config: null };
 
 window.addEventListener('message', (event) => {
   if (event.source !== window.parent) return;
@@ -75,6 +78,7 @@ window.addEventListener('message', (event) => {
   switch (data.type) {
     case 'host:init':
       last.init = data.payload;
+      last.config = { ...(data.payload && data.payload.config) };
       handlers.init.forEach((fn) => fn(data.payload));
       break;
     case 'host:reply': {
@@ -96,6 +100,15 @@ window.addEventListener('message', (event) => {
     case 'host:focus':
       handlers.focus.forEach((fn) => fn());
       break;
+    case 'host:config': {
+      // 配置写入增量：更新本插件配置快照并派发。宿主写配置后必发，
+      // 不依赖同源 storage 事件（Tauri 里宿主页与插件 iframe 不同 origin）。
+      const payload = data.payload || {};
+      if (typeof payload.key !== 'string' || payload.key === '') break;
+      last.config = { ...(last.config || {}), [payload.key]: payload.value };
+      handlers.config.forEach((fn) => fn(payload.key, payload.value));
+      break;
+    }
     case 'host:tool-call':
       handlers.tool.forEach((fn) => fn(data));
       break;
@@ -122,6 +135,25 @@ export const plugin = {
   onInit: (fn) => onWithReplay(handlers.init, fn, last.init),
   onTheme: (fn) => onWithReplay(handlers.theme, fn, last.theme),
   onResize: (fn) => onWithReplay(handlers.resize, fn, last.resize),
+  /**
+   * 宿主配置变更（`host:config` 增量推送，回调 `(key, value)`）。
+   *
+   * 这是跨 origin 下唯一可靠的配置同步通道：Tauri 打包版宿主页是
+   * `http://tauri.localhost`、插件 iframe 是 `http://wtsl.localhost`，
+   * localStorage 的 `storage` 事件只在同源文档之间派发，插件收不到。宿主每次
+   * `setConfig` 都会给该插件的所有 iframe 推一次。注册时会重放已到达的快照。
+   *
+   * 维护不变式：这里对 last.config 的重放是**同步**的（注册即回调）。共享
+   * `useStoredConfig` 依赖同步重放来区分「注册重放」与「注册完成后的真实增量」，
+   * 若改成异步重放需同步修改 `_shared/host.js` 的 replaying 逻辑。
+   */
+  onConfig: (fn) => {
+    const off = on(handlers.config, fn);
+    if (last.config) {
+      for (const [key, value] of Object.entries(last.config)) fn(key, value);
+    }
+    return off;
+  },
   /** 宿主把键盘焦点交进来了 */
   onFocus: (fn) => on(handlers.focus, fn),
   /** Agent 调用本插件的工具 */

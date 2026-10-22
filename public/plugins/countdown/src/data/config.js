@@ -1,14 +1,13 @@
 /**
  * 倒数日配置读写 hook。
  *
- * 为什么不用 `_shared/host.js` 的 `useStoredConfig`：宿主把卡片 iframe 的
- * `configSnapshot` 转交给浮层 iframe 时，快照可能落后于 localStorage（浮层 iframe
- * 第一次收到 host:init 后，`useStoredConfig` 会认为“已经有值”而不再向宿主重读）。
- * 倒数日 L1 每次打开都要看到最新事件，因此这里在 mount 与每次 storage 事件后
- * 都向宿主 `getConfig` 重读一次；键名、normalize 与写入行为保持不变。
+ * 为什么不用 `_shared/host.js` 的 `useStoredConfig`：倒数日条目是高频内容数据，
+ * 这里保留更直接的「mount 必重读 + 序号作废旧响应」策略（早期版本担心浮层 iframe 的
+ * host:init 快照落后于 localStorage）。键名、normalize 与写入行为与 `useStoredConfig` 一致。
  *
- * 卡片与浮层是不同文档，宿主写 `plugin.countdown.<key>` 后两边都会收到 storage
- * 事件，所以设置页/Agent 工具的修改能即时同步。
+ * 同步通道：宿主 `plugin.onConfig` 推送 + mount 重读。注意不能依赖 storage 事件：
+ * Tauri 打包版宿主页（tauri.localhost）与插件 iframe（wtsl.localhost）不同 origin，
+ * storage 事件不会派发到插件文档；storage 监听只作 dev 同源模式兜底。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -63,6 +62,22 @@ export function usePluginConfig(key, fallback, normalize) {
     void read();
   }, [read]);
 
+  // 宿主推配置增量（Tauri 跨 origin 的正确通道）：作废在途读取后直接应用。
+  useEffect(() => {
+    const off = plugin.onConfig?.((changedKey, next) => {
+      if (changedKey !== key) return;
+      readSeqRef.current += 1;
+      setValueState(
+        normalizeRef.current ? normalizeRef.current(next) : next ?? fallbackRef.current,
+      );
+      setLoaded(true);
+    });
+    return () => {
+      off?.();
+    };
+  }, [key]);
+
+  // dev 同源模式 / 外部直接写 localStorage 的兜底（Tauri 跨 origin 下不会触发）
   useEffect(() => {
     const storageKey = `plugin.${plugin.pluginId}.${key}`;
     const onStorage = (event) => {
@@ -73,15 +88,18 @@ export function usePluginConfig(key, fallback, normalize) {
     return () => window.removeEventListener('storage', onStorage);
   }, [key, read]);
 
+  /** 最新值的同步镜像：setValue 的 updater 形式读它，避免把写配置塞进 React 状态 updater */
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
   const setValue = useCallback(
     (next) => {
       // 让在途读取作废，避免慢返回的旧值覆盖刚写入的新值
       readSeqRef.current += 1;
-      setValueState((previous) => {
-        const resolved = typeof next === 'function' ? next(previous) : next;
-        plugin.setConfig(key, resolved).catch(() => {});
-        return resolved;
-      });
+      const resolved = typeof next === 'function' ? next(valueRef.current) : next;
+      valueRef.current = resolved;
+      setValueState(resolved);
+      plugin.setConfig(key, resolved).catch(() => {});
     },
     [key],
   );

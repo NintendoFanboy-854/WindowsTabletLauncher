@@ -959,9 +959,13 @@ export async function seedDemoData() {
     lastBreakAt: new Date(now.getTime() - 96 * 60000).toISOString(),
     commandId: null,
   });
-  const settingsKey = `plugin.${plugin.pluginId}.${SETTINGS_KEY}`;
-  if (readJson(settingsKey, null) == null) {
-    writeJson(settingsKey, { ...DEFAULT_SETTINGS });
+  // 独立预览（?demo=1）才需要本地兜底设置：SDK getConfig 在无宿主时读本插件
+  // origin 的 localStorage。宿主内配置来自宿主，别把宿主键写进插件自己的存储区。
+  if (!plugin.inHost) {
+    const settingsKey = `plugin.${plugin.pluginId}.${SETTINGS_KEY}`;
+    if (readJson(settingsKey, null) == null) {
+      writeJson(settingsKey, { ...DEFAULT_SETTINGS });
+    }
   }
 }
 

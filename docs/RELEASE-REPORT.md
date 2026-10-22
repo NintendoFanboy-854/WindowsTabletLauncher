@@ -657,3 +657,61 @@ npx tauri build                    # release + 安装包
 
 - 番茄钟联动、插件间能力图/互调（沿用 D-27 的范围）。
 - 自动坐/站检测、键鼠空闲推断、免打扰时段。
+
+## 19. v0.3.6 插件配置同步修复：宿主主动 `host:config` 推送（2026-10-22）
+
+> 代码提交：本次修复提交（版本 0.3.6）；分支 `main`；tag `v0.3.6`。
+> 证据：`.tmp/config-sync-harness/`（跨 origin 回归 harness：before/after + 可复跑 `run.mjs`）、`.tmp/config-sync-audit/audit.md`（独立审计）、`.tmp/config-sync-review/review.md`（独立 diff 评审）、`shots/v036-dev/`、`shots/v036-final/`。
+
+### 19.1 背景
+
+用户反馈：「设置里打开天气自动定位后，详情页面自动有了信息，但桌面 widget 没有同步，必须重启。」重启后卡片恢复，且期间没有任何报错。
+
+### 19.2 根因（跨 origin 的 storage 事件）
+
+1. **宿主页与插件 iframe 是两个 origin**：Tauri 打包版宿主页是 `http://tauri.localhost`；插件 iframe 走自定义协议，Windows 上映射为 `http://wtsl.localhost`（`src-tauri/src/protocol.rs` 的 `frame_base()`；`tauri dev` 的宿主是 `localhost:5173`，对 `wtsl` 同样是跨 origin）。
+2. **配置写在宿主文档的 localStorage**：`HostBridge.setConfig` 写 `plugin.<id>.<key>`（`src/host/bridge/bridge.ts`）。
+3. **同步机制假设了同源**：插件 `useStoredConfig` 靠 `window 'storage'` 事件同步，而 storage 事件只派发给同一存储区里的其它同源文档——宿主写的配置永远到不了插件 iframe。此前所有浏览器自动化验收都是纯 vite 同源模式，所以测不出来。
+4. **因此现象完全对应**：设置里打开自动定位 → 设置本身生效；之后打开的详情 iframe 是新加载的，`host:init` 快照里 `autoLocate=true`，它自己定位并写 places；但一直挂着的桌面卡片 iframe 收不到任何推送，只能等重启时重新 `host:init`。
+5. **物理证据**：WebView2 LevelDB 中 `plugin.weather.*` 记录归属 `_http://tauri.localhost`，插件 iframe 自己写的 `sedentary.*` 归属 `_http://wtsl.localhost`——两个存储区物理隔离。跨 origin harness 复现：宿主 localStorage 已写入 `unit:"f"` / places 上海，已挂载卡片 2s 窗口内仍是「北京 23°」，iframe 收到 `host:config` 0 条。
+
+### 19.3 修复（D-29）
+
+1. **协议 v2 新增 `host:config`**（`{ key, value }` 增量）：`HostBridge.setConfig` 写盘后经 `src/host/bridge/configBus.ts` 广播；每个 `PluginWidgetFrame`（卡片 / 详情浮层 / 后台 iframe 三类实例）按 pluginId 订阅并各自转给自己的 iframe。
+2. **SDK `plugin.onConfig`**：处理 `host:config`、记忆最近配置快照并在注册时重放（与 init/theme 一致）；`host:init` 的 config 也记入快照。
+3. **`useStoredConfig` 新时序**：首帧 init 快照 → mount 时向宿主 `getConfig` 重读（权威最新）→ 订阅 `onConfig` 增量 → `storage` 仅作 dev 同源兜底。读取序号丢弃晚到的旧响应；注册重放不作废在途读取；同值回推丢弃（避免自身写盘回推触发二次刷新）。
+4. **浮层 iframe init 快照现取**（`PluginWidgetFrame.configSnapshot` 供应商），不再依赖父组件渲染时缓存的旧配置；后台 iframe 也补了 init 快照。
+5. **宿主设置页表单订阅 configBus**：插件 / Agent 写配置后，打开中的设置表单同步。
+6. **顺带修两处 misplaced write**：clock 旧设置迁移改为写宿主配置（`plugin.setConfig`，原来写进插件自己的 localStorage，打包版永远不生效；同时兼容宿主旧键 `plugin.clock.clock.settings` 与本插件 origin 的旧键）；sedentary `?demo=1` 的本地种子设置加宿主守卫。
+7. **顺带修 `verify-sedentary.mjs`**：v0.3.5 文案减法后脚本仍用旧长 aria-label，确定性 FAIL；更新 3 处选择器后 9/9 PASS。
+7. 六插件产物与 `dist` 重建；文档：`DECISIONS` D-29、`PLUGIN-CONTRACT`（配置更新时序/反模式）、`PLUGIN-REACT`（配置同步章节 + 维护不变式）、`components/weather.md`、`components/clock.md`、weather README。
+
+### 19.4 验证
+
+- **跨 origin harness（核心证据）**：真实宿主 `HostBridge` + `PluginWidgetFrame` + 真实天气产物，宿主页 `http://localhost:4300`、插件 iframe `http://127.0.0.1:4300`（与 tauri/wtsl 同为跨 origin，`crossOrigin=true`）。
+  - before（HEAD `5f098fe`）：宿主已写 `unit:f`/places 上海，卡片仍 `23°`/北京（2s 窗口），iframe `host:config` 0 条 → bug 复现。
+  - after（本修复，weather app.js SHA-256 `48C8B86E…`）：`host:config` 6 条；settings push **34ms** 生效（23°→73°F）、places push **58ms** 生效（北京→上海）；iframe console error 0。
+  - 期间 harness 抓到并修复两处时序回归（同值回推未置 `loaded` 导致天气 mock 空态；注册重放不应作废在途权威读取），最终冻结产物复跑 PASS，记录在 `.tmp/config-sync-harness/README.md`。
+- **独立审计 / 评审**：`sync-auditor` 复核根因同意（LevelDB/代码路径证据）；最终 diff 评审 **PASS，P0/P1 = 0**，门禁 `typecheck` / `build` / 六产物重建一致性 / `verify-plugin weather` 均 PASS。
+- **全量基线回归（dev 同源基线，`shots/v036-dev/` 与 `.tmp/v036-regression/`）**：全部 exit 0 / console error 0 ——
+  `npm run typecheck` / `npm run build`；`verify-plugin` × 6（clock 4/4、countdown 5/5、pomodoro 5/5、sedentary 5/5、todo 6/6、weather 6/6，均含宿主冒烟）；`verify-overlays` 6/6 detail；`verify-widgets` 25/25 全尺寸；`verify-plug-and-play` 12/12。
+  既有 `verify-sedentary.mjs` 因 v0.3.5 文案减法后选择器过期（仍用长 aria-label）确定性 FAIL；本次顺带更新 3 处选择器（v0.3.6 修复范围内），复跑 **9/9 PASS**（breaks 3→4、sitting↔standing、站立分钟累计、console 0）。
+- **release 真窗口 CDP（`shots/v036-final/`，patched 副本，38 PASS / 0 FAIL / 1 WARN=仅记录项）**：原产物 `app.exe` SHA-256 `1D1BFFC3…` 未改，仅替换副本内 62 字节 wry WebView2 默认参数开 CDP（offset=9,192,344；patched SHA-256 `EFA73285…`）。实测：宿主页 `http://tauri.localhost/`、6 卡 / 8 iframe（均 `http://wtsl.localhost/`）、console.error/exception/log.error = 0；升级重种走真实路径（先用 v0.3.5 exe 重种回旧产物，再自然升级）→ `.seed-version` 0.3.5 → **0.3.6**，六插件 `app.js` SHA-256 与仓库 `public/` 全部一致。**真实跨 origin 配置同步**：设置页时钟 12h→24h 后 host localStorage 写入、clock iframe **71ms** 收到 `host:config`（1 条）、卡片 **360ms** 内切换且 timeOrigin/探针证明**未 reload**（仍 8 iframe）；天气自动定位开关双向切换收到 `host:config`（settings 到达 75ms / 60ms），iframe 未 reload（卡片文案未变属仅记录 WARN：澳门定位结果本就不再变化，同步通道已由 host:config+时钟可见变化证明）。测试后 localStorage 精确恢复、只杀本次 PID 树、证据深层脱敏 0 泄漏。
+
+### 19.5 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,173,312 B | `1D1BFFC3AAF9CC8F68B7E2E7C4A60D77BF0044086CD34255611D43445835614E` |
+| NSIS `Windows Tablet Launcher_0.3.6_x64-setup.exe` | 3,935,767 B | `3EB6230FD16610550295A6FF7D0A83FD7B6C4BB7C7D35BBE4721CBCCE4CD2532` |
+| MSI `Windows Tablet Launcher_0.3.6_x64_zh-CN.msi` | 5,144,576 B | `7C6F51B2D8250334980F2B3F2782757F674864983D4DFB694DD90756FF2E6ECE` |
+
+- 插件产物（`node scripts/build-plugin.mjs --all`，均已提交）：weather `48C8B86E…`（931,780 B）、clock `DE99EF4A…`、countdown `7480589A…`、pomodoro `EA1CE279…`、sedentary `7BC44CAB…`、todo `984D6F95…`；`public/plugin-sdk.js` `86BD32C4…`、`public/plugins/_shared/host.js` `3232E775…`。
+- 升级时 `.seed-version` 0.3.5 → 0.3.6 自动重种内置插件；用户布局/会话/插件配置保留。
+- 安装包内含本地 `public/secrets.json`，仅本机自用，不外发。
+
+### 19.6 兼容与范围外
+
+- `host:config` 是可选增量：旧插件忽略未知消息即可、不会崩，但只升级宿主的旧构建插件会退化为修复前表现（需重新打包才享受推送）。
+- `storage` 监听保留为 dev 同源兜底；插件自己 origin 的 localStorage 同步（sedentary/todo/pomodoro 等运行时状态）不受影响。
+- 后续 follow-up（未进本次）：`PluginSettings` 表单写前与最新配置 merge 的加固；剩下一处历史注释同步；其他 P2 见评审报告。

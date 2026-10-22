@@ -6,6 +6,8 @@
  * （组件里用 useStoredConfig）。
  */
 
+import { plugin } from '/plugin-sdk.js';
+
 /** 宿主配置键：宿主最终存为 `plugin.clock.settings`（与 manifest settings.key 一致）。 */
 export const SETTINGS_KEY = 'settings';
 
@@ -56,15 +58,43 @@ export function normalizeSettings(raw) {
 }
 
 /**
- * 旧版本设置迁移：宿主里没有 `plugin.clock.settings` 时才从旧键导入。
- * 直接写宿主使用的 localStorage 键，保证首帧 useStoredConfig 就能读到；
- * 旧键原样保留，迁移失败也不会破坏原数据。
+ * 旧版本设置迁移：只在宿主里还没有 `plugin.clock.settings` 时导入旧数据。
  *
- * @returns {boolean} 是否执行了迁移
+ * 旧数据可能在三处（按权威性从低到高）：
+ * - 本插件 origin 的 localStorage：`clock.settings`（React 之前）、
+ *   `plugin.clock.clock.settings`（中间版本误带的 widget 前缀）；
+ * - 宿主配置里的旧键 `plugin.clock.clock.settings`（可用 `getConfig('clock.settings')` 读到）。
+ *
+ * 打包版宿主页（tauri.localhost）与插件 iframe（wtsl.localhost）不同 origin，
+ * 直接 `localStorage.setItem('plugin.clock.settings')` 只写进插件自己的存储区，
+ * 宿主读不到；所以宿主内迁移必须走 `plugin.setConfig` 写宿主配置（写后宿主会
+ * `host:config` 推回来）。独立预览（无宿主）仍以本地键为配置源。
+ *
+ * @returns {boolean} 是否发现并开始了迁移
  */
 export function migrateLegacySettings() {
+  const localLegacy = readLocalLegacySettings();
+  if (!plugin.inHost) {
+    // 独立预览 / 截图：SDK getConfig 兜底读的是本插件 origin 的 localStorage 键
+    if (!localLegacy) return false;
+    try {
+      if (localStorage.getItem(HOST_SETTINGS_STORAGE_KEY) === null) {
+        localStorage.setItem(HOST_SETTINGS_STORAGE_KEY, JSON.stringify(localLegacy));
+      }
+    } catch {
+      // 隐私模式 / 存储不可写：保持默认值，不阻塞插件启动
+    }
+    return true;
+  }
+
+  // 宿主内：以宿主配置为准，异步迁移（写后 host:config 会推给所有 iframe）
+  void migrateHostSettings(localLegacy);
+  return Boolean(localLegacy);
+}
+
+/** 读本插件 origin 里的旧设置键（归一化后）；没有返回 null */
+function readLocalLegacySettings() {
   try {
-    if (localStorage.getItem(HOST_SETTINGS_STORAGE_KEY) !== null) return false;
     for (const key of LEGACY_SETTINGS_KEYS) {
       const raw = localStorage.getItem(key);
       if (raw === null) continue;
@@ -74,16 +104,32 @@ export function migrateLegacySettings() {
       } catch {
         continue;
       }
-      localStorage.setItem(
-        HOST_SETTINGS_STORAGE_KEY,
-        JSON.stringify(normalizeSettings(parsed)),
-      );
-      return true;
+      return normalizeSettings(parsed);
     }
   } catch {
-    // 隐私模式 / 存储不可写时保持默认值，不阻塞插件启动
+    // 存储不可用时按“没有旧数据”处理
   }
-  return false;
+  return null;
+}
+
+/**
+ * 宿主内的迁移：宿主已有 `settings` 就什么都不做；否则优先迁中间版本写在宿主里的
+ * `plugin.clock.clock.settings`，再退到本插件 origin 的旧键。
+ */
+async function migrateHostSettings(localLegacy) {
+  try {
+    const current = await plugin.getConfig(SETTINGS_KEY);
+    if (current !== null && current !== undefined) return;
+
+    const midEra = await plugin.getConfig('clock.settings'); // 宿主键 plugin.clock.clock.settings
+    if (midEra && typeof midEra === 'object' && !Array.isArray(midEra)) {
+      await plugin.setConfig(SETTINGS_KEY, normalizeSettings(midEra));
+      return;
+    }
+    if (localLegacy) await plugin.setConfig(SETTINGS_KEY, localLegacy);
+  } catch {
+    // 迁移失败不影响启动；旧键原样保留
+  }
 }
 
 /** 本地时间 → { main, seconds, meridiem, time24 }（秒是否显示由调用方按设置裁剪）。 */

@@ -25,6 +25,7 @@ import type {
   ReminderResult,
   ShowReminderParams,
 } from './types';
+import { emitPluginConfigChange } from './configBus';
 
 /** 桌面层 / PluginWidgetFrame 需要暴露给桥接层的能力 */
 export interface PluginFrameHandle {
@@ -238,9 +239,17 @@ export class HostBridge {
     }
   }
 
+  /**
+   * 写插件配置。除了宿主自己的 localStorage，还要把新值广播出去：
+   * Tauri 里宿主页与插件 iframe 不同 origin，storage 事件到不了 iframe，
+   * 只能靠 `host:config`（见 configBus 注释）。插件自己调 setConfig、宿主设置页
+   * 直接调 `bridge.setConfig`、Agent 工具写配置，都走这一个入口。
+   */
   setConfig(pluginId: string, key: string, value: unknown): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(this.storageKey(pluginId, key), JSON.stringify(value));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageKey(pluginId, key), JSON.stringify(value));
+    }
+    emitPluginConfigChange(pluginId, key, value);
   }
 
   /** 给 `host:init` 用的配置快照 */

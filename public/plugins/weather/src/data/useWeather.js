@@ -3,11 +3,13 @@
  *
  * - 配置：settings（schema 字段）、places（内容键）、cache（按城市）、location（定位结果）；
  * - 数据：当前城市的缓存立即显示，随后按 refreshMin 后台刷新；失败保留缓存；
- * - 城市：添加 / 删除 / 设为当前，全部写宿主配置，另一个 iframe 通过 storage 事件同步；
+ * - 城市：添加 / 删除 / 设为当前，全部写宿主配置，另一个 iframe 通过宿主 `host:config`
+ *   推送同步（D-29：不能依赖 storage 事件——Tauri 打包版宿主页与插件 iframe 不同 origin）；
  * - 自动定位：D-16 链路只在 autoLocate 打开且有 Key 时跑，定位成功即加入/切换当前城市，
  *   mock 模式用 mock 城市演示。
  *
- * 卡片和详情各自挂一份 hook；它们通过 `plugin.weather.*` 的 localStorage 副本同步。
+ * 卡片和详情各自挂一份 hook；它们通过宿主 `host:config` 推送（`useStoredConfig` /
+ * `plugin.onConfig`）同步 `plugin.weather.*` 配置。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

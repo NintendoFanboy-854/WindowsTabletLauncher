@@ -91,6 +91,9 @@ function BackgroundFrameItem({
       theme={theme}
       hidden
       title={`${frame.pluginId} (background)`}
+      // 后台 iframe 常驻：init 也现取配置快照，别让它用空配置先跑一帧；
+      // 之后的配置变更由 host:config 推送（见 configBus）。
+      configSnapshot={bridge ? () => bridge.configSnapshot(frame.pluginId) : undefined}
       onMessage={onMessage}
       onApiCall={onApiCall}
     />

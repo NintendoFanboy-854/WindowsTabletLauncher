@@ -71,8 +71,10 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
 
-  // host:init 的配置快照来自桥接层（持久化命名空间 plugin.<id>.<key>）
+  // host:init 的配置快照来自桥接层（持久化命名空间 plugin.<id>.<key>）。
+  // configSnapshot 供后挂载的浮层 iframe 现取最新快照；config 保留给首帧渲染。
   const config = bridge.configSnapshot(pluginId);
+  const readConfig = useCallback(() => bridge.configSnapshot(pluginId), [bridge, pluginId]);
 
   // 桥接层需要 iframe 句柄：回复插件请求、把焦点交给插件、替 Agent 调插件工具。
   // uid 用桌面实例 uid，同一插件的多个组件实例在 HostBridge 里不会互相覆盖；
@@ -142,6 +144,7 @@ export const WidgetFrame = forwardRef<WidgetFrameHandle, WidgetFrameProps>(funct
       size={size}
       theme={theme}
       config={config}
+      configSnapshot={readConfig}
       title={title ?? `${pluginId} / ${widgetId}`}
       onApiCall={handleApiCall}
       onMessage={handleMessage}

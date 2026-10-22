@@ -16,7 +16,8 @@ import ClockDetail from './ClockDetail.jsx';
 import { migrateLegacySettings } from './settings.js';
 
 startHostCapture();
-// 旧版本设置键 → plugin.clock.settings；必须在 useStoredConfig 首帧前完成。
+// 旧设置迁移：独立预览时同步写本地键（首帧即可读）；宿主内异步写宿主配置，
+// 写后由宿主 host:config 推给所有 iframe（打包版不能用 localStorage 当宿主配置）。
 migrateLegacySettings();
 
 function Root() {

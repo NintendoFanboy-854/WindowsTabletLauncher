@@ -25,7 +25,7 @@ const snapshot = `(() => {
   const days = JSON.parse(localStorage.getItem('sedentary.days') || 'null');
   const day = days && Object.values(days).find((d) => d.date === new Date().toLocaleDateString('sv-SE'));
   const button = document.querySelector(
-    '[aria-label="我站起来了，记录一次起身"], [aria-label="我坐下了，开始新一轮久坐"]',
+    '[aria-label="我站起来了"], [aria-label="我坐下了"]',
   );
   return {
     rt,
@@ -74,7 +74,7 @@ try {
 
   const beforeBreaks = sitting.day?.breaks ?? 0;
   const beforeStanding = sitting.day?.standingMinutes ?? 0;
-  const standClick = await evalJS(clickButton('我站起来了，记录一次起身'));
+  const standClick = await evalJS(clickButton('我站起来了'));
   await sleep(1500);
   const standing = await evalJS(snapshot);
   result.checks.push({
@@ -91,7 +91,7 @@ try {
     detail: `${standing.buttonAria} / ${standing.text}`,
   });
 
-  const sitClick = await evalJS(clickButton('我坐下了，开始新一轮久坐'));
+  const sitClick = await evalJS(clickButton('我坐下了'));
   await sleep(1500);
   const sittingAgain = await evalJS(snapshot);
   result.checks.push({
