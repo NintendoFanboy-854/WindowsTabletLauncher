@@ -25,6 +25,19 @@ function asWidgetSize(value: unknown): WidgetSize | null {
   return [width as number, height as number];
 }
 
+/**
+ * manifest 里的 `cell` 是**网格坐标**（列, 行），允许 0（左上角）；
+ * 不能复用 `asWidgetSize`（它要求尺寸 ≥1），否则第一列/第一行的声明坐标会被静默丢掉，
+ * 默认布局退化成“首个空位”装箱（v0.4.0 发现：weather/clock/todo 的 (0,0)/(4,0)/(0,2) 全部失效）。
+ */
+function asGridCell(value: unknown): WidgetSize | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const [col, row] = value;
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+  if ((col as number) < 0 || (row as number) < 0) return null;
+  return [col as number, row as number];
+}
+
 function sameSize(a: WidgetSize, b: WidgetSize): boolean {
   return a[0] === b[0] && a[1] === b[1];
 }
@@ -56,7 +69,7 @@ function normalizeWidget(raw: unknown, index: number): NormalizedWidget | null {
     declaredDefault && sizes.some((size) => sameSize(size, declaredDefault))
       ? declaredDefault
       : sizes[0];
-  const cell = asWidgetSize(record.cell) ?? undefined;
+  const cell = asGridCell(record.cell) ?? undefined;
 
   return { id: widgetId, title, sizes, defaultSize, cell };
 }

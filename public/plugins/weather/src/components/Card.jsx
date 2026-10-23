@@ -2,20 +2,31 @@
  * 天气卡片（L0）：纯展示，点卡 = 打开 L1 详情。
  *
  * 五档尺寸（docs/components/weather.md）：
+ * - 所有档位内容区第一行是 `CardIdentity`（D-32）：1×1 只显示 24×24 accent chip；
+ *   2×1 起 chip + 「天气」，城市 / 预警 / 离线状态收进行尾 trailing；
  * - 1×1 图标 + 温度 48；
  * - 2×1 图标 + 温度 48 + 现象 16 + 今日高低温 14；
  * - 2×2 上当前天气、下逐时 6 列（时间 12 / 图标 20 / 温度 14）；
- * - 3×2 三带式（v0.3.0）：上带当前簇（城市 12 / 图标 56 / 温度 68 / 现象 14 / 高低温 14）
+ * - 3×2 三带式（v0.3.0）：上带当前簇（图标 56 / 温度 68 / 现象 14 / 高低温 14）
  *   + 今日指标（体感 / 降水概率 / 风），组间 16；下带全宽逐时 6 列（时间 12 / 图标 24 /
  *   温度 16 / 降水概率 12）；AQI 与 7 天只在 4×2；
  * - 4×2 上当前 + 空气质量（AQI 环 72），下未来 7 天等宽 7 列。
+ *
+ * 空态（无 Key / 无城市 / 数据不可用）统一用共享 `EmptyState` + identity 同色 accent：
+ * 短卡（1×1 / 2×1）空态直接铺满卡片；2×2 起在 identity 行下占满剩余高度。
  *
  * 卡片上没有城市菜单、刷新、设置、长按、右键：手势与主操作由共享 CardRoot 接管。
  */
 
 import { Spinner, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { Key20Regular, Location20Regular } from '@fluentui/react-icons';
-import { CardRoot, Metric } from '../../../_shared/ui.jsx';
+import {
+  Key32Regular,
+  Location48Regular,
+  WeatherCloudy48Regular,
+  WeatherSunny16Regular,
+} from '@fluentui/react-icons';
+import { requestHostSettings } from '../../../_shared/host.js';
+import { CardIdentity, CardRoot, EmptyState, Metric, TouchButton } from '../../../_shared/ui.jsx';
 import { Condition, HiLo, WarningBadge, WeatherIcon } from './atoms.jsx';
 import { AirRing, DailyColumns, HourlyBand, HourlyStrip, isNight } from './forecast.jsx';
 import { TodayMetrics } from './todayMetrics.jsx';
@@ -35,6 +46,22 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     minHeight: 0,
     minWidth: 0,
+  },
+
+  /** identity 行铺满内容宽度；trailing 由 CardIdentity 的 margin-inline-start:auto 贴右缘。 */
+  identityRow: {
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+
+  /** 短卡空态：卡片自身 padding 已留白，EmptyState 不再叠 24 内边距。 */
+  emptyShort: {
+    padding: 0,
+  },
+  /** 2×2 起空态：identity 行下方占满剩余高度、居中。 */
+  emptyFill: {
+    flex: 1,
+    minHeight: 0,
   },
 
   // 1×1：图标在上、温度在下，避免 −10° 这类宽值在 152px 卡里被裁切
@@ -225,12 +252,6 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
 
-  cityRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    minWidth: 0,
-  },
   cityName: {
     color: tokens.colorNeutralForeground3,
     overflow: 'hidden',
@@ -244,7 +265,7 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
 
-  // 状态（加载 / 空 / 无 Key / 错误）：居中、只用排版，不加卡片级按钮
+  // 加载态：居中排版，不加卡片级按钮
   state: {
     flex: 1,
     display: 'flex',
@@ -256,12 +277,6 @@ const useStyles = makeStyles({
     minHeight: 0,
     minWidth: 0,
   },
-  stateText: {
-    color: tokens.colorNeutralForeground3,
-    maxWidth: '30ch',
-  },
-  stateTitle: { color: tokens.colorNeutralForeground2 },
-  stateIcon: { color: tokens.colorNeutralForeground3 },
   stateInline: {
     display: 'flex',
     alignItems: 'center',
@@ -270,53 +285,60 @@ const useStyles = makeStyles({
   },
 });
 
+/** 无 Key：空态主操作直接跳到宿主「设置 → 插件 → 天气」。 */
 function KeyState({ compact }) {
   const styles = useStyles();
   return (
-    <div className={styles.state}>
-      <Key20Regular className={styles.stateIcon} />
-      {compact ? (
-        <Text size={200} className={styles.stateText}>
-          配置 Key
-        </Text>
-      ) : (
-        <>
-          <Text size={400} weight="semibold" className={styles.stateTitle}>
-            未配置和风天气 API Key
-          </Text>
-          <Text size={200} className={styles.stateText}>
-            在设置 → 插件 → 天气里填写 API Key 与 API Host
-          </Text>
-        </>
-      )}
-    </div>
+    <EmptyState
+      icon={<Key32Regular />}
+      iconAccent="teal"
+      title="未配置 Key"
+      description={compact ? null : '在设置 → 插件 → 天气里填写 API Key 与 API Host'}
+      action={
+        <TouchButton appearance="primary" onClick={() => requestHostSettings()}>
+          去设置
+        </TouchButton>
+      }
+      className={compact ? styles.emptyShort : styles.emptyFill}
+    />
   );
 }
 
-function CityEmptyState({ compact, locating }) {
+/** 无城市：空态主操作打开详情里的「管理城市」。 */
+function CityEmptyState({ compact, onOpenDetail }) {
   const styles = useStyles();
-  if (locating) {
-    return (
-      <div className={styles.state}>
-        <div className={styles.stateInline}>
-          <Spinner size="tiny" />
-          <Text size={200}>正在定位…</Text>
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className={styles.state}>
-      <Location20Regular className={styles.stateIcon} />
-      <Text size={compact ? 200 : 400} weight="semibold" className={styles.stateTitle}>
-        {compact ? '添加城市' : '还没有城市'}
-      </Text>
-      {compact ? null : (
-        <Text size={200} className={styles.stateText}>
-          打开详情搜索并添加城市
-        </Text>
-      )}
-    </div>
+    <EmptyState
+      icon={<Location48Regular />}
+      iconAccent="teal"
+      title="还没有城市"
+      description={compact ? null : '在详情里搜索并添加城市，卡片会显示天气'}
+      action={
+        <TouchButton appearance="primary" onClick={onOpenDetail}>
+          添加城市
+        </TouchButton>
+      }
+      className={compact ? styles.emptyShort : styles.emptyFill}
+    />
+  );
+}
+
+/** 数据不可用：空态主操作打开详情重试 / 查看缓存。 */
+function ErrorState({ compact, onOpenDetail }) {
+  const styles = useStyles();
+  return (
+    <EmptyState
+      icon={<WeatherCloudy48Regular />}
+      iconAccent="teal"
+      title="天气暂不可用"
+      description={compact ? null : '打开详情可重试；已缓存的数据会继续显示'}
+      action={
+        <TouchButton appearance="primary" onClick={onOpenDetail}>
+          打开详情
+        </TouchButton>
+      }
+      className={compact ? styles.emptyShort : styles.emptyFill}
+    />
   );
 }
 
@@ -332,27 +354,12 @@ function LoadingState({ compact }) {
   );
 }
 
-function ErrorState({ compact }) {
-  const styles = useStyles();
-  return (
-    <div className={styles.state}>
-      <Text size={compact ? 200 : 400} weight="semibold" className={styles.stateTitle}>
-        {compact ? '暂无数据' : '天气数据暂不可用'}
-      </Text>
-      {compact ? null : (
-        <Text size={200} className={styles.stateText}>
-          打开详情可重试；已缓存的数据会继续显示
-        </Text>
-      )}
-    </div>
-  );
-}
-
 export default function Card({ sizeKey, scheme, settings, place, data, status, locating, onOpenDetail }) {
   const styles = useStyles();
   const size = sizeKey || '3x2';
   const compact = size === '1x1';
   const large = size === '3x2' || size === '4x2';
+  const shortCard = compact || size === '2x1';
   const current = data?.current || null;
   const today = data?.daily?.[0] || null;
   const currentNight = current
@@ -362,14 +369,39 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
   const air = settings.showAir ? data?.air : null;
   const offline = Boolean(status.offline && data);
 
+  // 空态（无 Key / 无城市 / 数据不可用）时，短卡直接把整张卡交给 EmptyState；
+  // 2×2 起保留 identity 行，空态占满其下剩余高度。
+  let state = null;
+  if (!settings.apiKey && !settings.mock) state = 'key';
+  else if (!place) state = locating ? 'loading' : 'city';
+  else if (!current) state = status.loading || !status.error ? 'loading' : 'error';
+
+  const isEmpty = state === 'key' || state === 'city' || state === 'error';
+  const showIdentity = !(isEmpty && shortCard);
+
+  const cityTrailing = place ? (
+    <>
+      <Text size={200} className={styles.cityName} title={place.name}>
+        {place.name}
+      </Text>
+      <WarningBadge count={warnings.length} />
+      {offline ? (
+        <Text size={200} className={styles.offline}>
+          离线
+        </Text>
+      ) : null}
+    </>
+  ) : null;
+
   let content = null;
-  if (!settings.apiKey && !settings.mock) {
+  if (state === 'key') {
     content = <KeyState compact={compact} />;
-  } else if (!place) {
-    content = <CityEmptyState compact={compact} locating={locating} />;
-  } else if (!current) {
-    content =
-      status.loading || !status.error ? <LoadingState compact={compact} /> : <ErrorState compact={compact} />;
+  } else if (state === 'city') {
+    content = <CityEmptyState compact={compact} onOpenDetail={onOpenDetail} />;
+  } else if (state === 'error') {
+    content = <ErrorState compact={compact} onOpenDetail={onOpenDetail} />;
+  } else if (state === 'loading') {
+    content = <LoadingState compact={compact} />;
   } else {
     content = (
       <div className={mergeClasses(styles.body)}>
@@ -396,9 +428,6 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
         {size === '2x2' ? (
           <div className={styles.body22}>
             <div className={styles.top22}>
-              <Text size={200} className={styles.cityName}>
-                {place.name}
-              </Text>
               <div className={styles.top22Row}>
                 <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={48} title={current.text} />
                 <Metric value={fmtTemp(current.temp, settings.unit)} size={48} />
@@ -425,17 +454,6 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
           <div className={styles.body32} data-weather-layout="3x2">
             <div className={styles.top32} data-content-band="top">
               <div className={styles.current32} data-content-block="current">
-                <div className={styles.cityRow}>
-                  <Text size={200} className={styles.cityName}>
-                    {place.name}
-                  </Text>
-                  <WarningBadge count={warnings.length} />
-                  {offline ? (
-                    <Text size={200} className={styles.offline}>
-                      离线
-                    </Text>
-                  ) : null}
-                </div>
                 <div className={styles.current32Main}>
                   <WeatherIcon
                     code={current.icon}
@@ -477,17 +495,6 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
           <div className={styles.body42}>
             <div className={styles.top42}>
               <div className={styles.current42}>
-                <div className={styles.cityRow}>
-                  <Text size={200} className={styles.cityName}>
-                    {place.name}
-                  </Text>
-                  <WarningBadge count={warnings.length} />
-                  {offline ? (
-                    <Text size={200} className={styles.offline}>
-                      离线
-                    </Text>
-                  ) : null}
-                </div>
                 <div className={styles.current42Row}>
                   <WeatherIcon code={current.icon} night={currentNight} scheme={scheme} size={56} title={current.text} />
                   <Metric value={fmtTemp(current.temp, settings.unit)} size={68} />
@@ -535,6 +542,16 @@ export default function Card({ sizeKey, scheme, settings, place, data, status, l
         large && styles.padLarge,
       )}
     >
+      {showIdentity ? (
+        <CardIdentity
+          icon={<WeatherSunny16Regular />}
+          label="天气"
+          accent="teal"
+          compact={compact}
+          className={styles.identityRow}
+          trailing={compact ? null : cityTrailing}
+        />
+      ) : null}
       {content}
     </CardRoot>
   );

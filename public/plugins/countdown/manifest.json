@@ -7,8 +7,8 @@
       "id": "countdown",
       "title": "倒数日",
       "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
-      "defaultSize": [2, 1],
-      "cell": [5, 0]
+      "defaultSize": [2, 2],
+      "cell": [6, 2]
     }
   ],
   "settings": {

@@ -409,7 +409,8 @@ export function WidgetCard({
     transitionTimingFunction: cardCurve,
   };
 
-  // ---- 描边：hover 中性色常驻；长按品牌色 overlay 用 500ms 线性渐显 ----
+  // ---- 描边：静止态中性描边（FLUENT2 §6：卡片用 colorNeutralStroke2 表达边界）；
+  //      hover 升级到 stroke1，长按由品牌色 overlay 叠加 ----
   let hoverStrokeDuration: number = motionTokens.durationFaster;
   let hoverStrokeCurve: string = motionTokens.curveAccelerateMin;
   if (hoverActive) {
@@ -420,8 +421,8 @@ export function WidgetCard({
     hoverStrokeCurve = motionTokens.curveDecelerateMin;
   }
   const hoverStrokeStyle: CSSProperties = {
-    borderColor: tokens.colorNeutralStroke1,
-    opacity: hoverActive ? 1 : 0,
+    borderColor: hoverActive ? tokens.colorNeutralStroke1 : tokens.colorNeutralStroke2,
+    opacity: 1,
     transitionDuration: `${hoverStrokeDuration}ms`,
     transitionTimingFunction: hoverStrokeCurve,
   };

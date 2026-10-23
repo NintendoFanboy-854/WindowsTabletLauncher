@@ -208,6 +208,101 @@ export function CardHeader({ title, trailing, className, style }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* CardIdentity                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 组件 identity 色（DECISIONS D-32，2026-10-23 用户拍板）：
+ * 只允许用 Fluent shared palette 的 6 个 hue，且只出现在 identity 图标（≤10% 卡片面积），
+ * 不承担状态语义、不做数据色、不做装饰背景。
+ */
+export const CARD_ACCENTS = {
+  blue: { foreground: 'colorPaletteBlueForeground2', background: 'colorPaletteBlueBackground2' },
+  pink: { foreground: 'colorPalettePinkForeground2', background: 'colorPalettePinkBackground2' },
+  orange: { foreground: 'colorPaletteOrangeForeground2', background: 'colorPaletteOrangeBackground2' },
+  green: { foreground: 'colorPaletteGreenForeground2', background: 'colorPaletteGreenBackground2' },
+  purple: { foreground: 'colorPalettePurpleForeground2', background: 'colorPalettePurpleBackground2' },
+  teal: { foreground: 'colorPaletteTealForeground2', background: 'colorPaletteTealBackground2' },
+};
+
+const useCardIdentityStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  chip: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '24px',
+    height: '24px',
+    borderRadius: tokens.borderRadiusSmall,
+  },
+  label: {
+    minWidth: 0,
+    color: tokens.colorNeutralForeground3,
+  },
+  trailing: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    marginInlineStart: 'auto',
+    color: tokens.colorNeutralForeground3,
+  },
+});
+
+/**
+ * 卡片静态 identity 行（DENSITY §2 例外 D-34）：24px 高，24×24 accent chip + 12px 半粗标签。
+ *
+ * 它**不是** chrome：没有可交互控件、不常驻操作、不占点击热区，只是卡片身份的锚点。
+ * 1×1 卡用 `compact`（只留 chip）；2×1 起用 chip + 标签 + 可选 trailing。
+ *
+ * 用法：
+ *   <CardIdentity icon={<Clock16Regular />} label="时钟" accent="blue" />
+ *   <CardIdentity icon={<WeatherSunny16Regular />} label="天气" accent="teal" trailing={<Text size={200}>澳门</Text>} />
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.icon 16px Fluent System Icon
+ * @param {string} [props.label] 组件名（≤4 字）
+ * @param {'blue'|'pink'|'orange'|'green'|'purple'|'teal'} [props.accent='blue']
+ * @param {React.ReactNode} [props.trailing] 行尾辅助（城市、计数……）
+ * @param {boolean} [props.compact] 只显示 chip（1×1 卡）
+ */
+export function CardIdentity({ icon, label, accent = 'blue', trailing, compact = false, className, style }) {
+  const styles = useCardIdentityStyles();
+  const palette = CARD_ACCENTS[accent] ?? CARD_ACCENTS.blue;
+  return (
+    <div
+      className={mergeClasses(styles.root, className)}
+      style={style}
+      data-card-identity={accent}
+    >
+      <span
+        className={styles.chip}
+        style={{
+          color: `var(--${palette.foreground})`,
+          backgroundColor: `var(--${palette.background})`,
+        }}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      {!compact && label ? (
+        <Text size={200} weight="semibold" truncate wrap={false} className={styles.label}>
+          {label}
+        </Text>
+      ) : null}
+      {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Metric                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -472,6 +567,14 @@ const useEmptyStateStyles = makeStyles({
     display: 'inline-flex',
     color: tokens.colorNeutralForeground3,
   },
+  iconChip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '48px',
+    height: '48px',
+    borderRadius: tokens.borderRadiusLarge,
+  },
   title: {
     color: tokens.colorNeutralForeground1,
   },
@@ -497,16 +600,32 @@ const useEmptyStateStyles = makeStyles({
  *   />
  *
  * @param {object} props
- * @param {React.ReactNode} [props.icon]
+ * @param {React.ReactNode} [props.icon] 32–48px Fluent 图标（空态要成为视觉锚点）
+ * @param {'blue'|'pink'|'orange'|'green'|'purple'|'teal'} [props.iconAccent] 给图标加 identity 色底（D-32）
  * @param {React.ReactNode} [props.title]
  * @param {React.ReactNode} [props.description]
  * @param {React.ReactNode} [props.action]
  */
-export function EmptyState({ icon, title, description, action, className, style }) {
+export function EmptyState({ icon, iconAccent, title, description, action, className, style }) {
   const styles = useEmptyStateStyles();
+  const palette = iconAccent ? CARD_ACCENTS[iconAccent] ?? CARD_ACCENTS.blue : null;
   return (
     <div className={mergeClasses(styles.root, className)} style={style} data-empty-state="true">
-      {icon ? <div className={styles.icon}>{icon}</div> : null}
+      {icon ? (
+        <div
+          className={palette ? styles.iconChip : styles.icon}
+          style={
+            palette
+              ? {
+                  color: `var(--${palette.foreground})`,
+                  backgroundColor: `var(--${palette.background})`,
+                }
+              : undefined
+          }
+        >
+          {icon}
+        </div>
+      ) : null}
       {title ? (
         <Text size={400} weight="semibold" className={styles.title}>
           {title}

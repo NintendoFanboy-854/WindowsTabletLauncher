@@ -7,8 +7,8 @@
       "id": "pomodoro",
       "title": "番茄钟",
       "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
-      "defaultSize": [2, 1],
-      "cell": [2, 1]
+      "defaultSize": [3, 2],
+      "cell": [3, 2]
     }
   ],
   "settings": {

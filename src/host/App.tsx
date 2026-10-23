@@ -15,6 +15,7 @@ import type { HostBridge } from './bridge';
 import { AgentSurface } from './agent';
 import { applySeeds } from './bootstrap/seeds';
 import Desktop from './desktop/Desktop';
+import { WallpaperCredit, WallpaperLayer } from './desktop/WallpaperLayer';
 import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
 import { ReviewPage } from './pages/review/ReviewPage';
@@ -26,11 +27,12 @@ import {
   readThemeMode,
   resolveThemeMode,
   syncAutostartOnStartup,
+  useBingWallpaper,
   useGlobalShortcuts,
   useHostPage,
   writeThemeMode,
 } from './shell';
-import type { ColorScheme, HostPage, ThemeMode } from './shell';
+import type { BingWallpaper, ColorScheme, HostPage, ThemeMode } from './shell';
 
 /** 截图/调试用：`?agent=1` 直接打开 Agent 面板 */
 function readAgentParam(): boolean {
@@ -47,6 +49,8 @@ export default function App() {
   const [systemScheme, setSystemScheme] = useState<ColorScheme>(() => resolveThemeMode('system'));
   const [seeded, setSeeded] = useState(false);
   const bridge = useMemo(() => getHostBridge(), []);
+  /** 必应每日壁纸（v0.4.0）：后台取数，失败时桌面停在 Fluent 中性底色 */
+  const wallpaper = useBingWallpaper();
 
   // 跟随系统：订阅 Windows 亮暗模式变化
   useEffect(() => onSystemColorSchemeChange(setSystemScheme), []);
@@ -78,12 +82,15 @@ export default function App() {
   return (
     <FluentProvider
       theme={colorScheme === 'light' ? webLightTheme : webDarkTheme}
-      style={{ height: '100%' }}
+      // 壁纸层画在 provider 内部（body 上的旧渐变会被 provider 自带底色盖住）；
+      // provider 必须透明，否则壁纸永远看不见（v0.4.0 修复）。
+      style={{ height: '100%', backgroundColor: 'transparent' }}
     >
       {seeded && (
         <NotificationsProvider bridge={bridge}>
           <HostShell
             bridge={bridge}
+            wallpaper={wallpaper}
             themeMode={themeMode}
             colorScheme={colorScheme}
             onThemeModeChange={changeTheme}
@@ -96,13 +103,14 @@ export default function App() {
 
 interface HostShellProps {
   bridge: HostBridge;
+  wallpaper: BingWallpaper | null;
   themeMode: ThemeMode;
   /** 解析后的亮暗（system 模式下跟随系统），桌面层据此重新读 token 下发给插件 */
   colorScheme: ColorScheme;
   onThemeModeChange: (mode: ThemeMode) => void;
 }
 
-function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostShellProps) {
+function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChange }: HostShellProps) {
   const { notify } = useHostNotifications();
   const [page, navigate] = useHostPage();
 
@@ -199,6 +207,8 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
 
   return (
     <div className="host-root">
+      {/* 壁纸层：必应每日壁纸（4K，object-fit: cover），画在所有桌面内容下方 */}
+      <WallpaperLayer wallpaper={wallpaper} colorScheme={colorScheme} />
       {/*
         桌面层永远挂载：插件 iframe 与 background 运行时是 HostBridge 工具路由的
         接收方，切到设置/复盘/插件页时整棵卸载会让 todo.stats / pomodoro.stats
@@ -226,6 +236,8 @@ function HostShell({ bridge, themeMode, colorScheme, onThemeModeChange }: HostSh
       </div>
 
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
+      {/* 壁纸说明只在桌面页出现（设置/复盘/插件页是不透明全屏页，壁纸被盖住） */}
+      {page === 'desktop' && wallpaper ? <WallpaperCredit wallpaper={wallpaper} /> : null}
       {/* Agent 只有浮空形态：桌面页显示右下角入口按钮，其它页面由设置页「入口」打开 chat */}
       <AgentSurface
         open={agentOpen}

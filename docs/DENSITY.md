@@ -8,6 +8,9 @@
 1. **每个尺寸有信息预算**（见下表），超预算必须降级到二级区域或详情/菜单。
 2. **每张卡片只有一个 Primary**：一个最大值/主状态；一个 Primary Action（可选）。
 3. **Chrome on demand**：设置齿轮、标题栏、删除/改尺寸等操作，**默认不显示**，只在长按进入编辑模式或悬停时出现。
+4. **静态 identity 行**（v0.4.0，D-33）：每张卡内容区第一行允许一条 24px identity 行（24×24 identity chip + 12px 组件名 +
+   可选 trailing 辅助信息）。它**不是 chrome**——没有可交互控件、不常驻操作、不占点击热区；**不计入下面的信息预算**，
+   其余门禁（最小字号、主次比、空带、内容带、横向空洞）不变。
 
 ## 2. 尺寸信息预算
 
@@ -77,7 +80,7 @@
 **层级表达手段（只用 Fluent token）**
 
 - 字号：Primary 用 Fluent `Text size` / `Hero*`（大卡数字可用 D-07 的 `Display XL`），Secondary 用 `Base300/400`，Tertiary/微标签用 `Base200`；严格遵守 §2.1 的最小字号与主次比，不靠加粗堆层级。
-- 颜色：Primary `colorNeutralForeground1`，Secondary `colorNeutralForeground2`，Tertiary `colorNeutralForeground3`。
+- 颜色：Primary `colorNeutralForeground1`，Secondary `colorNeutralForeground2`，Tertiary `colorNeutralForeground3`；组件 identity 色只出现在 identity chip（D-32），不参与层级。
 - 分组：用 `spacingVertical*` 留白分组，**不靠边框/分割线**（Fluent 2 的 card 内部默认无分割线）。
 - 操作：次要操作收进 `Menu`，图标按钮必须有 `Tooltip`。
 

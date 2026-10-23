@@ -3007,7 +3007,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		}
 		return null;
 	}
-	var Vo = 0, H = null, U = null, Ho = null, W = !1, Uo = !1, Wo = !1, Go = 0, Ko = 0, qo = null, Jo = 0;
+	var Vo = 0, H = null, U = null, Ho = null, Uo = !1, Wo = !1, W = !1, Go = 0, Ko = 0, qo = null, Jo = 0;
 	function Yo() {
 		throw Error(i(321));
 	}
@@ -3017,25 +3017,25 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		return !0;
 	}
 	function Zo(e, t, n, r, i, a) {
-		return Vo = a, H = t, t.memoizedState = null, t.updateQueue = null, t.lanes = 0, E.H = e === null || e.memoizedState === null ? mc : hc, Wo = !1, a = n(r, i), Wo = !1, Uo && (a = $o(t, n, r, i)), Qo(e), a;
+		return Vo = a, H = t, t.memoizedState = null, t.updateQueue = null, t.lanes = 0, E.H = e === null || e.memoizedState === null ? mc : hc, W = !1, a = n(r, i), W = !1, Wo && (a = $o(t, n, r, i)), Qo(e), a;
 	}
 	function Qo(e) {
 		E.H = pc;
 		var t = U !== null && U.next !== null;
-		if (Vo = 0, Ho = U = H = null, W = !1, Ko = 0, qo = null, t) throw Error(i(300));
+		if (Vo = 0, Ho = U = H = null, Uo = !1, Ko = 0, qo = null, t) throw Error(i(300));
 		e === null || Mc || (e = e.dependencies, e !== null && Ea(e) && (Mc = !0));
 	}
 	function $o(e, t, n, r) {
 		H = e;
 		var a = 0;
 		do {
-			if (Uo && (qo = null), Ko = 0, Uo = !1, 25 <= a) throw Error(i(301));
+			if (Wo && (qo = null), Ko = 0, Wo = !1, 25 <= a) throw Error(i(301));
 			if (a += 1, Ho = U = null, e.updateQueue != null) {
 				var o = e.updateQueue;
 				o.lastEffect = null, o.events = null, o.stores = null, o.memoCache != null && (o.memoCache.index = 0);
 			}
 			E.H = gc, o = t(n, r);
-		} while (Uo);
+		} while (Wo);
 		return o;
 	}
 	function es() {
@@ -3050,14 +3050,14 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		t.updateQueue = e.updateQueue, t.flags &= -2053, e.lanes &= ~n;
 	}
 	function rs(e) {
-		if (W) {
+		if (Uo) {
 			for (e = e.memoizedState; e !== null;) {
 				var t = e.queue;
 				t !== null && (t.pending = null), e = e.next;
 			}
-			W = !1;
+			Uo = !1;
 		}
-		Vo = 0, Ho = U = H = null, Uo = !1, Ko = Go = 0, qo = null;
+		Vo = 0, Ho = U = H = null, Wo = !1, Ko = Go = 0, qo = null;
 	}
 	function is() {
 		var e = {
@@ -3172,7 +3172,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 						eagerState: u.eagerState,
 						next: null
 					}, l === null ? (c = l = f, s = o) : l = l.next = f, H.lanes |= p, od |= p;
-					f = u.action, Wo && n(o, f), o = u.hasEagerState ? u.eagerState : n(o, f);
+					f = u.action, W && n(o, f), o = u.hasEagerState ? u.eagerState : n(o, f);
 				} else p = {
 					lane: f,
 					revertLane: u.revertLane,
@@ -3249,7 +3249,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		var t = is();
 		if (typeof e == "function") {
 			var n = e;
-			if (e = n(), Wo) {
+			if (e = n(), W) {
 				st(!0);
 				try {
 					n();
@@ -3490,7 +3490,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		t = t === void 0 ? null : t;
 		var r = n.memoizedState;
 		if (t !== null && Xo(t, r[1])) return r[0];
-		if (r = e(), Wo) {
+		if (r = e(), W) {
 			st(!0);
 			try {
 				e();
@@ -3644,7 +3644,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 		return e === H || t !== null && t === H;
 	}
 	function dc(e, t) {
-		Uo = W = !0;
+		Wo = Uo = !0;
 		var n = e.pending;
 		n === null ? t.next = t : (t.next = n.next, n.next = t), e.pending = t;
 	}
@@ -3700,7 +3700,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 			var n = is();
 			t = t === void 0 ? null : t;
 			var r = e();
-			if (Wo) {
+			if (W) {
 				st(!0);
 				try {
 					e();
@@ -3714,7 +3714,7 @@ var t = Object.create, n = Object.defineProperty, r = Object.getOwnPropertyDescr
 			var r = is();
 			if (n !== void 0) {
 				var i = n(t);
-				if (Wo) {
+				if (W) {
 					st(!0);
 					try {
 						n(t);
@@ -13056,7 +13056,7 @@ var Eo = Xn({
 		}, n, l);
 	});
 	return o.displayName = e, o;
-}, Bo = /*#__PURE__*/ zo("ArrowDownRegular", "1em", ["M16.87 10.84a.5.5 0 1 0-.74-.68l-5.63 6.17V2.5a.5.5 0 0 0-1 0v13.83l-5.63-6.17a.5.5 0 0 0-.74.68l6.31 6.91a.75.75 0 0 0 1.11 0z"]), Vo = /*#__PURE__*/ zo("ArrowUpRegular", "1em", ["M3.13 9.16a.5.5 0 1 0 .74.68L9.5 3.67V17.5a.5.5 0 1 0 1 0V3.67l5.63 6.17a.5.5 0 0 0 .74-.68l-6.32-6.92a.75.75 0 0 0-1.1 0z"], { flipInRtl: !0 }), H = /*#__PURE__*/ zo("Timer20Regular", "20", ["M7.5 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm7.66 1.93a.5.5 0 1 0-.71.7l1.41 1.42a.5.5 0 1 0 .71-.7zM9.5 6a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5m0 12a7 7 0 1 0 0-14 7 7 0 0 0 0 14m0-1a6 6 0 1 1 0-12 6 6 0 0 1 0 12"]), U = {
+}, Bo = /*#__PURE__*/ zo("ArrowDownRegular", "1em", ["M16.87 10.84a.5.5 0 1 0-.74-.68l-5.63 6.17V2.5a.5.5 0 0 0-1 0v13.83l-5.63-6.17a.5.5 0 0 0-.74.68l6.31 6.91a.75.75 0 0 0 1.11 0z"]), Vo = /*#__PURE__*/ zo("ArrowUpRegular", "1em", ["M3.13 9.16a.5.5 0 1 0 .74.68L9.5 3.67V17.5a.5.5 0 1 0 1 0V3.67l5.63 6.17a.5.5 0 0 0 .74-.68l-6.32-6.92a.75.75 0 0 0-1.1 0z"], { flipInRtl: !0 }), H = /*#__PURE__*/ zo("PersonWalking16Regular", "16", ["M8.75 2a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5M6.5 3.25a2.25 2.25 0 1 1 3.83 1.6q.36.2.59.55l.64 1.04 1.29.8a1.6 1.6 0 1 1-1.7 2.72l-1.45-.9.58.8q.38.55.46 1.2l.25 2.16a1.6 1.6 0 0 1-3.18.36l-.23-1.99-.35-.5-1.14 2.9a1.6 1.6 0 1 1-2.98-1.17L4.21 10a1.6 1.6 0 0 1-1.47-2.2l.96-2.37c.2-.48.61-.83 1.11-.95l1.82-.44h.01q-.14-.37-.14-.79m.65 1.77a1 1 0 0 0-.29 0l-1.81.43a.6.6 0 0 0-.42.36l-.96 2.36a.6.6 0 1 0 1.1.46l.76-1.86a.48.48 0 0 1 .89.35l-2.38 6.06a.6.6 0 0 0 1.12.44l1.13-2.88a1 1 0 0 1 1.73-.22l.46.62a.4.4 0 0 1 .08.2l.24 2.13a.6.6 0 1 0 1.2-.14l-.25-2.14a1.6 1.6 0 0 0-.3-.76l-.73-.99a1 1 0 0 1-.13-.94l.34-.9a.4.4 0 0 1 .72-.08l.24.4a1 1 0 0 0 .2.19l1.6 1a.6.6 0 1 0 .63-1.02l-1.29-.8a1 1 0 0 1-.32-.32l-.64-1.04a.6.6 0 0 0-.36-.26z"]), U = /*#__PURE__*/ zo("PersonWalking24Regular", "24", ["M13 3.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M10 5a3 3 0 1 1 5.27 1.97q.3.16.51.43.15.16.25.33L17 9.26l.16.23.17.27 1.93.97a2.25 2.25 0 0 1-2 4.03l-2.48-1.23a2 2 0 0 1-.45-.3l-.1-.08q0 .2.13.39l.84 1.22q.5.75.58 1.63l.23 3.2a2.23 2.23 0 0 1-2.08 2.39 2.23 2.23 0 0 1-2.4-2.08l-.2-2.78-1.03-1.26-1.93 4.74C8 21.47 7.17 22 6.29 22l-.04-.01q-.43 0-.85-.17a2.24 2.24 0 0 1-1.23-2.93l1.8-4.42a2.25 2.25 0 0 1-1.82-3.03l.92-2.4.03-.06.52-1.36c.25-.66.8-1.16 1.48-1.36l2.25-.66.09-.03.09-.02.07-.01q.23-.04.44-.04A3 3 0 0 1 10 5m.22 2.03a1 1 0 0 0-.41 0l-2.3.67a.8.8 0 0 0-.5.45l-1.46 3.83a.75.75 0 0 0 1.39.57L8.16 9.8a.62.62 0 0 1 1.14.48l-.86 2.13-2.88 7.07a.75.75 0 0 0 1.38.56l2.2-5.39a1.14 1.14 0 0 1 1.9-.2l1.68 2.04q.05.06.05.14L13 19.8a.75.75 0 0 0 1.5-.1l-.23-3.19a2 2 0 0 0-.31-.87v-.01l-.01-.01-.84-1.23c-.42-.6-.5-1.38-.25-2.07l.25-.64.26-.54a.7.7 0 0 1 1.17-.15l.58.91q.1.18.3.27l2.5 1.25a.75.75 0 1 0 .67-1.34l-2.32-1.16-.39-.63-.12-.17-1.03-1.63a.8.8 0 0 0-.43-.32z"]), Ho = /*#__PURE__*/ zo("Timer20Regular", "20", ["M7.5 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1zm7.66 1.93a.5.5 0 1 0-.71.7l1.41 1.42a.5.5 0 1 0 .71-.7zM9.5 6a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0v-5a.5.5 0 0 0-.5-.5m0 12a7 7 0 1 0 0-14 7 7 0 0 0 0 14m0-1a6 6 0 1 1 0-12 6 6 0 0 1 0 12"]), Uo = {
 	durationUltraFast: 50,
 	durationFaster: 100,
 	durationFast: 150,
@@ -13065,7 +13065,7 @@ var Eo = Xn({
 	durationSlow: 300,
 	durationSlower: 400,
 	durationUltraSlow: 500
-}, Ho = {
+}, Wo = {
 	curveAccelerateMax: "cubic-bezier(0.9,0.1,1,0.2)",
 	curveAccelerateMid: "cubic-bezier(1,0,1,1)",
 	curveAccelerateMin: "cubic-bezier(0.8,0,0.78,1)",
@@ -13076,12 +13076,12 @@ var Eo = Xn({
 	curveEasyEase: "cubic-bezier(0.33,0,0.67,1)",
 	curveLinear: "cubic-bezier(0,0,1,1)"
 }, W = {
-	...U,
-	...Ho
+	...Uo,
+	...Wo
 };
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/utils/isAnimationRunning.js
-function Uo(e) {
+function Go(e) {
 	if (e.playState === "running") {
 		if (e.overallProgress !== void 0) {
 			let t = e.overallProgress ?? 0;
@@ -13094,8 +13094,8 @@ function Uo(e) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/hooks/useAnimateAtoms.js
-var Wo = { fill: "forwards" }, Go = { duration: 1 };
-function Ko(e) {
+var Ko = { fill: "forwards" }, qo = { duration: 1 };
+function Jo(e) {
 	return {
 		set playbackRate(t) {
 			e.forEach((e) => {
@@ -13113,7 +13113,7 @@ function Ko(e) {
 			});
 		},
 		isRunning() {
-			return e.some((e) => Uo(e));
+			return e.some((e) => Go(e));
 		},
 		dispose: () => {
 			e.length = 0;
@@ -13145,13 +13145,13 @@ function Ko(e) {
 		}
 	};
 }
-function qo() {
+function Yo() {
 	let e = typeof window < "u" && typeof window.Animation?.prototype.persist == "function";
 	return j.useCallback((t, n, r) => {
 		let i = Array.isArray(n) ? n : [n], { isReducedMotion: a } = r;
-		return Ko(i.map((n) => {
-			let { keyframes: r, reducedMotion: i = Go, ...o } = n, { keyframes: s = r, ...c } = i, l = a ? s : r, u = {
-				...Wo,
+		return Jo(i.map((n) => {
+			let { keyframes: r, reducedMotion: i = qo, ...o } = n, { keyframes: s = r, ...c } = i, l = a ? s : r, u = {
+				...Ko,
 				...o,
 				...a && c
 			};
@@ -13169,12 +13169,12 @@ function qo() {
 		}).filter((e) => !!e));
 	}, [e]);
 }
-function Jo() {
-	return qo();
+function Xo() {
+	return Yo();
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/hooks/useMotionImperativeRef.js
-function Yo(e) {
+function Zo(e) {
 	let t = j.useRef(void 0);
 	return j.useImperativeHandle(e, () => ({
 		setPlayState: (e) => {
@@ -13194,12 +13194,12 @@ function Yo(e) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/hooks/useIsReducedMotion.js
-var Xo = "screen and (prefers-reduced-motion: reduce)";
-function Zo() {
+var Qo = "screen and (prefers-reduced-motion: reduce)";
+function $o() {
 	let { targetDocument: e } = Gr(), t = e?.defaultView ?? null, n = j.useRef(!1), r = j.useCallback(() => n.current, []);
 	return ri(() => {
 		if (t === null || typeof t.matchMedia != "function") return;
-		let e = t.matchMedia(Xo);
+		let e = t.matchMedia(Qo);
 		e.matches && (n.current = !0);
 		let r = (e) => {
 			n.current = e.matches;
@@ -13211,32 +13211,32 @@ function Zo() {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/utils/useChildElement.js
-var Qo = [
+var es = [
 	"@fluentui/react-motion: Invalid child element.",
 	"\n",
 	"Motion factories require a single child element to be passed. ",
 	"That element element should support ref forwarding i.e. it should be either an intrinsic element (e.g. div) or a component that uses React.forwardRef()."
 ].join("");
-function $o(e, t = !0) {
+function ts(e, t = !0) {
 	let n = j.useRef(null);
 	j.useEffect(() => {}, [t]);
 	try {
 		let t = j.Children.only(e);
 		if (j.isValidElement(t)) return [j.cloneElement(t, { ref: ui(n, fi(t)) }), n];
 	} catch {}
-	throw Error(Qo);
+	throw Error(es);
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/contexts/MotionBehaviourContext.js
-var es = j.createContext(void 0);
-es.Provider;
-var ts = () => j.useContext(es) ?? "default", ns = Symbol("MOTION_DEFINITION");
-function rs(e) {
+var ns = j.createContext(void 0);
+ns.Provider;
+var rs = () => j.useContext(ns) ?? "default", is = Symbol("MOTION_DEFINITION");
+function as(e) {
 	return Object.assign((t) => {
-		let { children: n, imperativeRef: r, onMotionFinish: i, onMotionStart: a, onMotionCancel: o, replayKey: s, ...c } = t, l = c, [u, d] = $o(n), f = Yo(r), p = j.useRef(!0), m = ts() === "skip", h = j.useRef({
+		let { children: n, imperativeRef: r, onMotionFinish: i, onMotionStart: a, onMotionCancel: o, replayKey: s, ...c } = t, l = c, [u, d] = ts(n), f = Zo(r), p = j.useRef(!0), m = rs() === "skip", h = j.useRef({
 			skipMotions: m,
 			params: l
-		}), g = Jo(), _ = Zo(), v = ii(() => {
+		}), g = Xo(), _ = $o(), v = ii(() => {
 			a?.(null);
 		}), y = ii(() => {
 			i?.(null);
@@ -13278,15 +13278,15 @@ function rs(e) {
 		}, [s]), ri(() => (p.current = !1, () => {
 			p.current = !0;
 		}), []), u;
-	}, { [ns]: typeof e == "function" ? e : () => e });
+	}, { [is]: typeof e == "function" ? e : () => e });
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/contexts/PresenceGroupChildContext.js
-var is = j.createContext(void 0);
-is.Provider;
+var os = j.createContext(void 0);
+os.Provider;
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/hooks/useMountedState.js
-function as(e = !1, t = !1) {
+function ss(e = !1, t = !1) {
 	let n = j.useRef(!t || e), r = oi(), i = j.useCallback((e) => {
 		n.current !== e && (n.current = e, r());
 	}, [r]);
@@ -13296,17 +13296,17 @@ function as(e = !1, t = !1) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/factories/createPresenceComponent.js
-var os = Symbol("PRESENCE_MOTION_DEFINITION"), ss = Symbol.for("interruptablePresence");
-function cs(e) {
+var cs = Symbol("PRESENCE_MOTION_DEFINITION"), ls = Symbol.for("interruptablePresence");
+function us(e) {
 	return Object.assign((t) => {
 		let n = {
-			...j.useContext(is),
+			...j.useContext(os),
 			...t
-		}, r = ts() === "skip", { appear: i, children: a, imperativeRef: o, onExit: s, onMotionFinish: c, onMotionStart: l, onMotionCancel: u, visible: d, unmountOnExit: f, ...p } = n, m = p, [h, g] = as(d, f), [_, v] = $o(a, h), y = Yo(o), b = j.useRef({
+		}, r = rs() === "skip", { appear: i, children: a, imperativeRef: o, onExit: s, onMotionFinish: c, onMotionStart: l, onMotionCancel: u, visible: d, unmountOnExit: f, ...p } = n, m = p, [h, g] = ss(d, f), [_, v] = ts(a, h), y = Zo(o), b = j.useRef({
 			appear: i,
 			params: m,
 			skipMotions: r
-		}), ee = Jo(), x = ai(), te = Zo(), S = ii((e) => {
+		}), ee = Xo(), x = ai(), te = $o(), S = ii((e) => {
 			l?.(null, { direction: e });
 		}), C = ii((e) => {
 			c?.(null, { direction: e }), e === "exit" && f && (g(!1), s?.());
@@ -13329,7 +13329,7 @@ function cs(e) {
 			let i = typeof e == "function" ? e({
 				element: t,
 				...b.current.params
-			}) : e, a = i[ss];
+			}) : e, a = i[ls];
 			if (a && (n = y.current, n && n.isRunning())) return n.reverse(), r;
 			let o = d ? i.enter : i.exit, s = d ? "enter" : "exit", c = !b.current.appear && x, l = b.current.skipMotions;
 			return c || S(s), n = ee(t, o, { isReducedMotion: te() }), c ? (n.finish(), r) : (y.current = n, n.setMotionEndCallbacks(() => C(s), () => ne(s)), l && n.finish(), r);
@@ -13352,14 +13352,14 @@ function cs(e) {
 			f,
 			h
 		]), h ? _ : null;
-	}, { [os]: typeof e == "function" ? e : () => e }, {
-		In: rs(typeof e == "function" ? (...t) => e(...t).enter : e.enter),
-		Out: rs(typeof e == "function" ? (...t) => e(...t).exit : e.exit)
+	}, { [cs]: typeof e == "function" ? e : () => e }, {
+		In: as(typeof e == "function" ? (...t) => e(...t).enter : e.enter),
+		Out: as(typeof e == "function" ? (...t) => e(...t).exit : e.exit)
 	});
 }
 //#endregion
 //#region node_modules/@swc/helpers/esm/_define_property.js
-function ls(e, t, n) {
+function ds(e, t, n) {
 	return t in e ? Object.defineProperty(e, t, {
 		value: n,
 		enumerable: !0,
@@ -13369,7 +13369,7 @@ function ls(e, t, n) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/utils/groups/mergeChildMappings.js
-function us(e, t) {
+function fs(e, t) {
 	function n(n) {
 		return n in t ? t[n] : e[n];
 	}
@@ -13385,8 +13385,8 @@ function us(e, t) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/utils/groups/getNextChildMapping.js
-function ds(e, t) {
-	let n = us(e, t);
+function ps(e, t) {
+	let n = fs(e, t);
 	return Object.entries(n).forEach(([r, i]) => {
 		let a = r in e;
 		if (r in t) {
@@ -13407,7 +13407,7 @@ function ds(e, t) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/utils/groups/getChildMapping.js
-function fs(e) {
+function ms(e) {
 	let t = {};
 	return e && j.Children.toArray(e).forEach((e) => {
 		j.isValidElement(e) && (t[e.key ?? ""] = {
@@ -13420,7 +13420,7 @@ function fs(e) {
 }
 //#endregion
 //#region node_modules/@fluentui/react-motion/lib/components/PresenceGroupItemProvider.js
-var ps = (e) => {
+var hs = (e) => {
 	let { appear: t, childKey: n, onExit: r, visible: i, unmountOnExit: a } = e, o = j.useMemo(() => ({
 		appear: t,
 		visible: i,
@@ -13433,12 +13433,12 @@ var ps = (e) => {
 		i,
 		a
 	]);
-	return /*#__PURE__*/ j.createElement(is.Provider, { value: o }, e.children);
-}, ms = class extends j.Component {
+	return /*#__PURE__*/ j.createElement(os.Provider, { value: o }, e.children);
+}, gs = class extends j.Component {
 	static getDerivedStateFromProps(e, { childMapping: t, firstRender: n }) {
-		let r = fs(e.children);
+		let r = ms(e.children);
 		return {
-			childMapping: n ? r : ds(t, r),
+			childMapping: n ? r : ps(t, r),
 			firstRender: !1
 		};
 	}
@@ -13449,7 +13449,7 @@ var ps = (e) => {
 		this.mounted = !1;
 	}
 	render() {
-		return /*#__PURE__*/ j.createElement(j.Fragment, null, Object.entries(this.state.childMapping).map(([e, t]) => /*#__PURE__*/ j.createElement(ps, {
+		return /*#__PURE__*/ j.createElement(j.Fragment, null, Object.entries(this.state.childMapping).map(([e, t]) => /*#__PURE__*/ j.createElement(hs, {
 			...t,
 			childKey: e,
 			key: e,
@@ -13457,8 +13457,8 @@ var ps = (e) => {
 		}, t.element)));
 	}
 	constructor(e, t) {
-		super(e, t), ls(this, "mounted", !1), ls(this, "handleExit", (e) => {
-			e in fs(this.props.children) || this.mounted && this.setState((t) => {
+		super(e, t), ds(this, "mounted", !1), ds(this, "handleExit", (e) => {
+			e in ms(this.props.children) || this.mounted && this.setState((t) => {
 				let n = { ...t.childMapping };
 				return delete n[e], { childMapping: n };
 			});
@@ -13467,16 +13467,16 @@ var ps = (e) => {
 			firstRender: !0
 		};
 	}
-}, hs = (e, t) => {
+}, _s = (e, t) => {
 	let { shape: n = "circular", size: r = "medium", appearance: i = "filled", color: a = "brand", ...o } = e;
 	return {
-		...gs(o, t),
+		...vs(o, t),
 		shape: n,
 		size: r,
 		appearance: i,
 		color: a
 	};
-}, gs = (e, t) => {
+}, vs = (e, t) => {
 	let { iconPosition: n = "before" } = e;
 	return {
 		iconPosition: n,
@@ -13490,17 +13490,17 @@ var ps = (e) => {
 		}), { elementType: "div" }),
 		icon: ar(e.icon, { elementType: "span" })
 	};
-}, _s = {
+}, ys = {
 	root: "fui-Badge",
 	icon: "fui-Badge__icon"
 };
 V.spacingHorizontalXXS;
-var vs = /*#__PURE__*/ Zn("r1iycov", "r115jdol", [
+var bs = /*#__PURE__*/ Zn("r1iycov", "r115jdol", [
 	".r1iycov{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;position:relative;font-family:var(--fontFamilyBase);font-size:var(--fontSizeBase200);font-weight:var(--fontWeightSemibold);line-height:var(--lineHeightBase200);height:20px;min-width:20px;padding:0 calc(var(--spacingHorizontalXS) + var(--spacingHorizontalXXS));border-radius:var(--borderRadiusCircular);border-color:var(--colorTransparentStroke);}",
 	".r1iycov::after{content:\"\";position:absolute;top:0;left:0;bottom:0;right:0;border-style:solid;border-color:inherit;border-width:var(--strokeWidthThin);border-radius:inherit;}",
 	".r115jdol{display:inline-flex;box-sizing:border-box;align-items:center;justify-content:center;position:relative;font-family:var(--fontFamilyBase);font-size:var(--fontSizeBase200);font-weight:var(--fontWeightSemibold);line-height:var(--lineHeightBase200);height:20px;min-width:20px;padding:0 calc(var(--spacingHorizontalXS) + var(--spacingHorizontalXXS));border-radius:var(--borderRadiusCircular);border-color:var(--colorTransparentStroke);}",
 	".r115jdol::after{content:\"\";position:absolute;top:0;right:0;bottom:0;left:0;border-style:solid;border-color:inherit;border-width:var(--strokeWidthThin);border-radius:inherit;}"
-]), ys = /*#__PURE__*/ Xn({
+]), xs = /*#__PURE__*/ Xn({
 	fontSmallToTiny: {
 		Bahqtrf: "fk6fouc",
 		Be2twd7: "f13mqy1h",
@@ -13831,7 +13831,7 @@ var vs = /*#__PURE__*/ Zn("r1iycov", "r115jdol", [
 	".f1aw8cx4{border-right-color:var(--colorPaletteYellowBorder1);}",
 	".f51if14{border-left-color:var(--colorPaletteYellowBorder1);}",
 	".fvq8iai{border-bottom-color:var(--colorPaletteYellowBorder1);}"
-] }), bs = /*#__PURE__*/ Zn("rttl5z0", null, [".rttl5z0{display:flex;line-height:1;margin:0 calc(-1 * var(--spacingHorizontalXXS));font-size:12px;}"]), xs = /*#__PURE__*/ Xn({
+] }), Ss = /*#__PURE__*/ Zn("rttl5z0", null, [".rttl5z0{display:flex;line-height:1;margin:0 calc(-1 * var(--spacingHorizontalXXS));font-size:12px;}"]), Cs = /*#__PURE__*/ Xn({
 	beforeText: { t21cq0: ["f1t8l4o1", "f11juvx6"] },
 	afterText: { Frg6f3: ["f11juvx6", "f1t8l4o1"] },
 	beforeTextXL: { t21cq0: ["f1rs9grm", "f1kwmkpi"] },
@@ -13852,44 +13852,44 @@ var vs = /*#__PURE__*/ Zn("r1iycov", "r115jdol", [
 	".f1ugzwwg{font-size:12px;}",
 	".f4ybsrx{font-size:16px;}",
 	".fe5j1ua{font-size:20px;}"
-] }), Ss = (e) => {
-	let t = vs(), n = ys(), r = e.size === "small" || e.size === "extra-small" || e.size === "tiny";
-	e.root.className = T(_s.root, t, r && n.fontSmallToTiny, n[e.size], n[e.shape], e.shape === "rounded" && r && n.roundedSmallToTiny, e.appearance === "ghost" && n.borderGhost, n[e.appearance], n[`${e.appearance}-${e.color}`], e.root.className);
-	let i = bs(), a = xs();
+] }), ws = (e) => {
+	let t = bs(), n = xs(), r = e.size === "small" || e.size === "extra-small" || e.size === "tiny";
+	e.root.className = T(ys.root, t, r && n.fontSmallToTiny, n[e.size], n[e.shape], e.shape === "rounded" && r && n.roundedSmallToTiny, e.appearance === "ghost" && n.borderGhost, n[e.appearance], n[`${e.appearance}-${e.color}`], e.root.className);
+	let i = Ss(), a = Cs();
 	if (e.icon) {
 		let t;
-		j.Children.toArray(e.root.children).length > 0 && (t = e.size === "extra-large" ? e.iconPosition === "after" ? a.afterTextXL : a.beforeTextXL : e.iconPosition === "after" ? a.afterText : a.beforeText), e.icon.className = T(_s.icon, i, t, a[e.size], e.icon.className);
+		j.Children.toArray(e.root.children).length > 0 && (t = e.size === "extra-large" ? e.iconPosition === "after" ? a.afterTextXL : a.beforeTextXL : e.iconPosition === "after" ? a.afterText : a.beforeText), e.icon.className = T(ys.icon, i, t, a[e.size], e.icon.className);
 	}
 	return e;
-}, Cs = (e) => /*#__PURE__*/ xi(e.root, { children: [
+}, Ts = (e) => /*#__PURE__*/ xi(e.root, { children: [
 	e.iconPosition === "before" && e.icon && /*#__PURE__*/ bi(e.icon, {}),
 	e.root.children,
 	e.iconPosition === "after" && e.icon && /*#__PURE__*/ bi(e.icon, {})
-] }), ws = /*#__PURE__*/ j.forwardRef((e, t) => {
-	let n = hs(e, t);
-	return Ss(n), Qr("useBadgeStyles_unstable")(n), Cs(n);
+] }), Es = /*#__PURE__*/ j.forwardRef((e, t) => {
+	let n = _s(e, t);
+	return ws(n), Qr("useBadgeStyles_unstable")(n), Ts(n);
 });
-ws.displayName = "Badge";
+Es.displayName = "Badge";
 //#endregion
 //#region node_modules/@fluentui/react-button/lib/components/Button/renderButton.js
-var Ts = (e) => {
+var Ds = (e) => {
 	let { iconOnly: t, iconPosition: n } = e;
 	return /*#__PURE__*/ xi(e.root, { children: [
 		n !== "after" && e.icon && /*#__PURE__*/ bi(e.icon, {}),
 		!t && e.root.children,
 		n === "after" && e.icon && /*#__PURE__*/ bi(e.icon, {})
 	] });
-}, Es = j.createContext(void 0), Ds = {};
-Es.Provider;
-var Os = () => j.useContext(Es) ?? Ds, ks = (e, t) => {
-	let { size: n } = Os(), { appearance: r = "secondary", shape: i = "rounded", size: a = n ?? "medium", ...o } = e;
+}, Os = j.createContext(void 0), ks = {};
+Os.Provider;
+var As = () => j.useContext(Os) ?? ks, js = (e, t) => {
+	let { size: n } = As(), { appearance: r = "secondary", shape: i = "rounded", size: a = n ?? "medium", ...o } = e;
 	return {
 		appearance: r,
 		shape: i,
 		size: a,
-		...As(o, t)
+		...Ms(o, t)
 	};
-}, As = (e, t) => {
+}, Ms = (e, t) => {
 	let { icon: n, iconPosition: r = "before", ...i } = e, a = ar(n, { elementType: "span" });
 	return {
 		disabled: e.disabled ?? !1,
@@ -13909,12 +13909,12 @@ var Os = () => j.useContext(Es) ?? Ds, ks = (e, t) => {
 		}),
 		icon: a
 	};
-}, js = {
+}, Ns = {
 	root: "fui-Button",
 	icon: "fui-Button__icon"
 };
 `${V.strokeWidthThin}`;
-var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
+var Ps = /*#__PURE__*/ Zn("r1f29ykk", null, {
 	r: [
 		".r1f29ykk{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;text-decoration-line:none;vertical-align:middle;margin:0;overflow:hidden;background-color:var(--colorNeutralBackground1);color:var(--colorNeutralForeground1);border:var(--strokeWidthThin) solid var(--colorNeutralStroke1);font-family:var(--fontFamilyBase);outline-style:none;padding:5px var(--spacingHorizontalM);min-width:96px;border-radius:var(--borderRadiusMedium);font-size:var(--fontSizeBase300);font-weight:var(--fontWeightSemibold);line-height:var(--lineHeightBase300);transition-duration:var(--durationFaster);transition-property:background,border,color;transition-timing-function:var(--curveEasyEase);}",
 		".r1f29ykk:hover{background-color:var(--colorNeutralBackground1Hover);border-color:var(--colorNeutralStroke1Hover);color:var(--colorNeutralForeground1Hover);cursor:pointer;}",
@@ -13926,7 +13926,7 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 		"@media (forced-colors: active){.r1f29ykk:focus{border-color:ButtonText;}.r1f29ykk:hover{background-color:HighlightText;border-color:Highlight;color:Highlight;forced-color-adjust:none;}.r1f29ykk:hover:active,.r1f29ykk:active:focus-visible{background-color:HighlightText;border-color:Highlight;color:Highlight;forced-color-adjust:none;}}",
 		"@supports (-moz-appearance:button){.r1f29ykk[data-fui-focus-visible]{box-shadow:0 0 0 calc(var(--strokeWidthThin) + 0.25px) var(--colorStrokeFocus2) inset;}}"
 	]
-}), Ns = /*#__PURE__*/ Zn("rywnvv2", null, [".rywnvv2{align-items:center;display:inline-flex;justify-content:center;font-size:20px;height:20px;width:20px;--fui-Button__icon--spacing:var(--spacingHorizontalSNudge);}"]), Ps = /*#__PURE__*/ Xn({
+}), Fs = /*#__PURE__*/ Zn("rywnvv2", null, [".rywnvv2{align-items:center;display:inline-flex;justify-content:center;font-size:20px;height:20px;width:20px;--fui-Button__icon--spacing:var(--spacingHorizontalSNudge);}"]), Is = /*#__PURE__*/ Xn({
 	outline: {
 		De3pzq: "f1c21dwh",
 		Jwef8y: "fjxutwb",
@@ -14166,7 +14166,7 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 		["@media (forced-colors: active){.fxoo9op:hover{background-color:var(--colorTransparentBackground);}}", { m: "(forced-colors: active)" }],
 		["@media (forced-colors: active){.f1i0gk12:hover:active,.f1i0gk12:active:focus-visible{background-color:var(--colorTransparentBackground);}}", { m: "(forced-colors: active)" }]
 	]
-}), Fs = /*#__PURE__*/ Xn({
+}), Ls = /*#__PURE__*/ Xn({
 	base: {
 		De3pzq: "f1bg9a2p",
 		g2u3we: "f1jj8ep1",
@@ -14349,7 +14349,7 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 		["@media (forced-colors: active){.fpmuzpx:hover:active,.fpmuzpx:active:focus-visible{color:GrayText;}}", { m: "(forced-colors: active)" }],
 		["@media (forced-colors: active){.f168odog:hover:active .fui-Button__icon,.f168odog:active:focus-visible .fui-Button__icon{color:GrayText;}}", { m: "(forced-colors: active)" }]
 	]
-}), Is = /*#__PURE__*/ Xn({
+}), Rs = /*#__PURE__*/ Xn({
 	circular: {
 		Bw81rd7: 0,
 		kdpuga: 0,
@@ -14413,7 +14413,7 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 		[".f1b6alqh[data-fui-focus-visible]{border-radius:var(--borderRadiusLarge);}", { p: -1 }]
 	],
 	t: ["@supports (-moz-appearance:button){.f18mfu3r[data-fui-focus-visible]{box-shadow:var(--shadow2),0 0 0 calc(var(--strokeWidthThin) + 0.25px) var(--colorStrokeFocus2) inset,0 0 0 var(--strokeWidthThick) var(--colorNeutralForegroundOnBrand) inset;}.fixhny3[data-fui-focus-visible]{box-shadow:var(--shadow2),0 0 0 calc(var(--strokeWidthThin) + 0.25px) var(--colorStrokeFocus2) inset,0 0 0 var(--strokeWidthThick) var(--colorNeutralForegroundOnBrand) inset;}}", "@supports (-moz-appearance:button){.feygou5[data-fui-focus-visible]:hover{box-shadow:var(--shadow2),0 0 0 calc(var(--strokeWidthThin) + 0.25px) var(--colorStrokeFocus2) inset;}}"]
-}), Ls = /*#__PURE__*/ Xn({
+}), zs = /*#__PURE__*/ Xn({
 	small: {
 		Byoj8tv: 0,
 		uwmqm3: 0,
@@ -14451,7 +14451,7 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 	[".f1hbd1aw{padding:7px;}", { p: -1 }],
 	".f12clzc2{min-width:40px;}",
 	".fjy1crr{max-width:40px;}"
-] }), Rs = /*#__PURE__*/ Xn({
+] }), Bs = /*#__PURE__*/ Xn({
 	small: {
 		Be2twd7: "fe5j1ua",
 		Bqenvij: "fjamq6b",
@@ -14478,17 +14478,17 @@ var Ms = /*#__PURE__*/ Zn("r1f29ykk", null, {
 	".f1exjqw5{--fui-Button__icon--spacing:var(--spacingHorizontalSNudge);}",
 	".f1nizpg2{margin-right:var(--fui-Button__icon--spacing);}",
 	".f1a695kz{margin-left:var(--fui-Button__icon--spacing);}"
-] }), zs = (e) => {
-	let t = Ms(), n = Ns(), r = Ps(), i = Fs(), a = Is(), o = Ls(), s = Rs(), { appearance: c, disabled: l, disabledFocusable: u, icon: d, iconOnly: f, iconPosition: p, shape: m, size: h } = e;
-	return e.root.className = T(js.root, t, c && r[c], r[h], d && h === "small" && r.smallWithIcon, d && h === "large" && r.largeWithIcon, r[m], (l || u) && i.base, (l || u) && i.highContrast, c && (l || u) && i[c], c === "primary" && a.primary, a[h], a[m], f && o[h], e.root.className), e.icon && (e.icon.className = T(js.icon, n, !!e.root.children && s[p], s[h], e.icon.className)), e;
-}, Bs = /*#__PURE__*/ j.forwardRef((e, t) => {
-	let n = ks(e, t);
-	return zs(n), Qr("useButtonStyles_unstable")(n), Ts(n);
+] }), Vs = (e) => {
+	let t = Ps(), n = Fs(), r = Is(), i = Ls(), a = Rs(), o = zs(), s = Bs(), { appearance: c, disabled: l, disabledFocusable: u, icon: d, iconOnly: f, iconPosition: p, shape: m, size: h } = e;
+	return e.root.className = T(Ns.root, t, c && r[c], r[h], d && h === "small" && r.smallWithIcon, d && h === "large" && r.largeWithIcon, r[m], (l || u) && i.base, (l || u) && i.highContrast, c && (l || u) && i[c], c === "primary" && a.primary, a[h], a[m], f && o[h], e.root.className), e.icon && (e.icon.className = T(Ns.icon, n, !!e.root.children && s[p], s[h], e.icon.className)), e;
+}, Hs = /*#__PURE__*/ j.forwardRef((e, t) => {
+	let n = js(e, t);
+	return Vs(n), Qr("useButtonStyles_unstable")(n), Ds(n);
 });
-Bs.displayName = "Button";
+Hs.displayName = "Button";
 //#endregion
 //#region node_modules/@fluentui/react-text/lib/components/Text/useText.js
-var Vs = (e, t) => {
+var Us = (e, t) => {
 	let { wrap: n, truncate: r, block: i, italic: a, underline: o, strikethrough: s, size: c, font: l, weight: u, align: d } = e;
 	return {
 		align: d ?? "start",
@@ -14507,7 +14507,7 @@ var Vs = (e, t) => {
 			...e
 		}), { elementType: "span" })
 	};
-}, Hs = (e) => /*#__PURE__*/ bi(e.root, {}), Us = { root: "fui-Text" }, Ws = /*#__PURE__*/ Xn({
+}, Ws = (e) => /*#__PURE__*/ bi(e.root, {}), Gs = { root: "fui-Text" }, Ks = /*#__PURE__*/ Xn({
 	root: {
 		Bahqtrf: "fk6fouc",
 		Be2twd7: "fkhj508",
@@ -14621,30 +14621,30 @@ var Vs = (e, t) => {
 	".f17mccla{text-align:center;}",
 	".f12ymhq5{text-align:end;}",
 	".f1j59e10{text-align:justify;}"
-] }), Gs = (e) => {
-	let t = Ws();
-	return e.root.className = T(Us.root, t.root, e.wrap === !1 && t.nowrap, e.truncate && t.truncate, e.block && t.block, e.italic && t.italic, e.underline && t.underline, e.strikethrough && t.strikethrough, e.underline && e.strikethrough && t.strikethroughUnderline, e.size === 100 && t.base100, e.size === 200 && t.base200, e.size === 400 && t.base400, e.size === 500 && t.base500, e.size === 600 && t.base600, e.size === 700 && t.hero700, e.size === 800 && t.hero800, e.size === 900 && t.hero900, e.size === 1e3 && t.hero1000, e.font === "monospace" && t.monospace, e.font === "numeric" && t.numeric, e.weight === "medium" && t.weightMedium, e.weight === "semibold" && t.weightSemibold, e.weight === "bold" && t.weightBold, e.align === "center" && t.alignCenter, e.align === "end" && t.alignEnd, e.align === "justify" && t.alignJustify, e.root.className), e;
-}, Ks = /*#__PURE__*/ j.forwardRef((e, t) => {
-	let n = Vs(e, t);
-	return Gs(n), Qr("useTextStyles_unstable")(n), Hs(n);
+] }), qs = (e) => {
+	let t = Ks();
+	return e.root.className = T(Gs.root, t.root, e.wrap === !1 && t.nowrap, e.truncate && t.truncate, e.block && t.block, e.italic && t.italic, e.underline && t.underline, e.strikethrough && t.strikethrough, e.underline && e.strikethrough && t.strikethroughUnderline, e.size === 100 && t.base100, e.size === 200 && t.base200, e.size === 400 && t.base400, e.size === 500 && t.base500, e.size === 600 && t.base600, e.size === 700 && t.hero700, e.size === 800 && t.hero800, e.size === 900 && t.hero900, e.size === 1e3 && t.hero1000, e.font === "monospace" && t.monospace, e.font === "numeric" && t.numeric, e.weight === "medium" && t.weightMedium, e.weight === "semibold" && t.weightSemibold, e.weight === "bold" && t.weightBold, e.align === "center" && t.alignCenter, e.align === "end" && t.alignEnd, e.align === "justify" && t.alignJustify, e.root.className), e;
+}, Js = /*#__PURE__*/ j.forwardRef((e, t) => {
+	let n = Us(e, t);
+	return qs(n), Qr("useTextStyles_unstable")(n), Ws(n);
 });
-Ks.displayName = "Text";
+Js.displayName = "Text";
 //#endregion
 //#region public/plugins/_shared/theme.js
-var qs = _(), Js = {
+var Ys = _(), Xs = {
 	background: "colorNeutralBackground1",
 	foreground: "colorNeutralForeground1",
 	muted: "colorNeutralForeground2",
 	accent: "colorBrandBackground"
 };
-function Ys() {
+function Zs() {
 	return (typeof window < "u" && window.matchMedia?.("(prefers-color-scheme: light)"))?.matches ? "light" : "dark";
 }
-function Xs(e) {
-	let t = e && typeof e == "object" ? e : {}, n = t.colorScheme === "light" ? "light" : t.colorScheme === "dark" ? "dark" : Ys(), r = n === "light" ? oo : co, i = {};
+function Qs(e) {
+	let t = e && typeof e == "object" ? e : {}, n = t.colorScheme === "light" ? "light" : t.colorScheme === "dark" ? "dark" : Zs(), r = n === "light" ? oo : co, i = {};
 	for (let [e, n] of Object.entries(t)) {
 		if (typeof n != "string" || !n || e === "colorScheme") continue;
-		let t = Js[e];
+		let t = Xs[e];
 		t ? i[t] = n : Object.prototype.hasOwnProperty.call(r, e) && (i[e] = n);
 	}
 	return {
@@ -14655,7 +14655,7 @@ function Xs(e) {
 		scheme: n
 	};
 }
-function Zs(e) {
+function $s(e) {
 	if (!e || typeof e != "object") return null;
 	let t = String(e.background || "");
 	return {
@@ -14677,35 +14677,35 @@ function Zs(e) {
 }
 //#endregion
 //#region public/plugins/_shared/host.js
-var Qs = {
+var ec = {
 	init: null,
 	legacyTheme: null,
 	started: !1
 };
-function $s() {
-	Qs.started || (Qs.started = !0, e.onInit((e) => {
-		Qs.init ||= e;
+function tc() {
+	ec.started || (ec.started = !0, e.onInit((e) => {
+		ec.init ||= e;
 	}), window.addEventListener("message", (e) => {
 		let t = e.data;
-		t && t.type === "wtsl:init" && t.theme && (Qs.legacyTheme ||= t.theme);
+		t && t.type === "wtsl:init" && t.theme && (ec.legacyTheme ||= t.theme);
 	}));
 }
-function ec() {
-	return Qs.init;
+function nc() {
+	return ec.init;
 }
-function tc(e) {
-	return Qs.init?.theme ? Qs.init.theme : Qs.legacyTheme && Zs(Qs.legacyTheme) || { colorScheme: e };
+function rc(e) {
+	return ec.init?.theme ? ec.init.theme : ec.legacyTheme && $s(ec.legacyTheme) || { colorScheme: e };
 }
-function nc(e) {
-	let t = Qs.init?.config;
+function ic(e) {
+	let t = ec.init?.config;
 	if (t && typeof t == "object") return t[e];
 }
-var rc = "(prefers-color-scheme: light)";
-function ic() {
-	return typeof window > "u" || typeof window.matchMedia != "function" ? "dark" : window.matchMedia(rc).matches ? "light" : "dark";
+var ac = "(prefers-color-scheme: light)";
+function oc() {
+	return typeof window > "u" || typeof window.matchMedia != "function" ? "dark" : window.matchMedia(ac).matches ? "light" : "dark";
 }
-function ac(t = "dark") {
-	let [n, r] = (0, j.useState)(() => tc(t)), [i, a] = (0, j.useState)(ic);
+function sc(t = "dark") {
+	let [n, r] = (0, j.useState)(() => rc(t)), [i, a] = (0, j.useState)(oc);
 	(0, j.useEffect)(() => {
 		let t = e.onInit((e) => {
 			e && typeof e == "object" && e.theme && typeof e.theme == "object" && r(e.theme);
@@ -14717,22 +14717,22 @@ function ac(t = "dark") {
 		};
 	}, []), (0, j.useEffect)(() => {
 		if (e.inHost || typeof window.matchMedia != "function") return;
-		let t = window.matchMedia(rc), n = () => a(t.matches ? "light" : "dark");
+		let t = window.matchMedia(ac), n = () => a(t.matches ? "light" : "dark");
 		return typeof t.addEventListener == "function" ? (t.addEventListener("change", n), () => t.removeEventListener("change", n)) : (t.addListener(n), () => t.removeListener(n));
 	}, []);
 	let o = e.inHost ? n : {
 		...n,
 		colorScheme: i
-	}, s = (0, j.useMemo)(() => Xs(o), [o]);
+	}, s = (0, j.useMemo)(() => Qs(o), [o]);
 	return (0, j.useEffect)(() => {
 		typeof document < "u" && (document.documentElement.style.colorScheme = s.scheme, document.body && (document.body.style.colorScheme = s.scheme));
 	}, [s.scheme]), s;
 }
-function oc(t, n) {
+function cc(t, n) {
 	let r = (0, j.useRef)(t);
 	r.current = t;
 	let [i, a] = (0, j.useState)(() => {
-		let e = Qs.init?.size;
+		let e = ec.init?.size;
 		return Array.isArray(e) ? r.current(e) : n;
 	});
 	return (0, j.useEffect)(() => {
@@ -14744,7 +14744,7 @@ function oc(t, n) {
 		};
 	}, []), i;
 }
-function sc(e, t) {
+function lc(e, t) {
 	if (e === t) return !0;
 	try {
 		return JSON.stringify(e) === JSON.stringify(t);
@@ -14752,15 +14752,15 @@ function sc(e, t) {
 		return !1;
 	}
 }
-function cc(t, n, r) {
+function uc(t, n, r) {
 	let i = (0, j.useRef)(r);
 	i.current = r;
 	let a = (0, j.useRef)(n);
 	a.current = n;
 	let [o, s] = (0, j.useState)(() => {
-		let e = nc(t);
+		let e = ic(t);
 		return i.current ? i.current(e) : e ?? n;
-	}), [c, l] = (0, j.useState)(() => nc(t) !== void 0), u = (0, j.useRef)(o);
+	}), [c, l] = (0, j.useState)(() => ic(t) !== void 0), u = (0, j.useRef)(o);
 	u.current = o;
 	let d = (0, j.useRef)(0), f = (0, j.useRef)(!0);
 	(0, j.useEffect)(() => () => {
@@ -14780,7 +14780,7 @@ function cc(t, n, r) {
 		m();
 	}, [m]), (0, j.useEffect)(() => {
 		let n = !0, r = e.onConfig?.((e, r) => {
-			e === t && (n || (d.current += 1), l(!0), !sc(r, u.current) && p(r));
+			e === t && (n || (d.current += 1), l(!0), !lc(r, u.current) && p(r));
 		});
 		return n = !1, () => {
 			r?.();
@@ -14799,11 +14799,11 @@ function cc(t, n, r) {
 		c
 	];
 }
-function lc() {
+function dc() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function uc(e, t) {
+function fc(e, t) {
 	window.parent.postMessage({
 		type: "plugin:request-overlay",
 		payload: {
@@ -14812,10 +14812,10 @@ function uc(e, t) {
 		}
 	}, "*");
 }
-function dc() {
+function pc() {
 	window.parent.postMessage({ type: "plugin:request-host-settings" }, "*");
 }
-var fc = 500, pc = 8, mc = [
+var mc = 500, hc = 8, gc = [
 	"button",
 	"input",
 	"textarea",
@@ -14829,16 +14829,16 @@ var fc = 500, pc = 8, mc = [
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function hc(e, t) {
+function _c(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(mc);
+	let n = t.closest(gc);
 	return !!(n && n !== e && e.contains(n));
 }
-function gc() {
+function vc() {
 	let t = (0, j.useRef)(null);
 	return (0, j.useEffect)(() => {
 		let n = t.current;
-		if (!n || !e.inHost || lc()) return;
+		if (!n || !e.inHost || dc()) return;
 		let r = null, i = 0, a = 0, o = 0, s = !1, c = !1, l = 0, u = !1, d = (e) => e === "mouse" || e === "pen", f = (e, t) => {
 			window.parent.postMessage({
 				type: "plugin:card-pointer",
@@ -14859,15 +14859,15 @@ function gc() {
 		}, _ = () => {
 			u && (l && window.clearTimeout(l), l = window.setTimeout(h, 1e3));
 		}, v = (e) => {
-			e.button === 0 && (hc(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
+			e.button === 0 && (_c(n, e.target) || r === null && (r = e.pointerId, i = e.clientX, a = e.clientY, s = !1, f("down", e.pointerType), o = window.setTimeout(() => {
 				o = 0, s = !0, g(), window.parent.postMessage({ type: "plugin:request-edit-mode" }, "*");
-			}, fc)));
+			}, mc)));
 		}, y = (e) => {
 			if (d(e.pointerType)) {
-				let t = !hc(n, e.target);
+				let t = !_c(n, e.target);
 				t !== c && (c = t, f(t ? "hover-enter" : "hover-leave", e.pointerType));
 			}
-			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= pc || (p(), !s && (r = null, f("cancel", e.pointerType))));
+			r !== null && e.pointerId === r && (Math.hypot(e.clientX - i, e.clientY - a) <= hc || (p(), !s && (r = null, f("cancel", e.pointerType))));
 		}, b = (e) => {
 			r !== null && e.pointerId === r && (r = null, p(), f("up", e.pointerType), s && _());
 		}, ee = (e) => {
@@ -14880,10 +14880,10 @@ function gc() {
 		};
 	}, []), { ref: t };
 }
-typeof window < "u" && lc() && window.addEventListener("keydown", (e) => {
+typeof window < "u" && dc() && window.addEventListener("keydown", (e) => {
 	e.key === "Escape" && (e.preventDefault(), window.parent.postMessage({ type: "plugin:request-overlay-close" }, "*"));
 });
-function _c(t, n) {
+function yc(t, n) {
 	let r = (0, j.useRef)(n);
 	r.current = n;
 	let i = (0, j.useRef)(t);
@@ -14904,20 +14904,20 @@ function _c(t, n) {
 }
 //#endregion
 //#region public/plugins/_shared/motion.js
-var vc = "(prefers-reduced-motion: reduce)", yc = "8px", bc = "4px", xc = "48px";
-function Sc() {
-	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(vc);
+var bc = "(prefers-reduced-motion: reduce)", xc = "8px", Sc = "4px", Cc = "48px";
+function wc() {
+	return typeof window > "u" || typeof window.matchMedia != "function" ? null : window.matchMedia(bc);
 }
-function Cc() {
-	let [e, t] = (0, j.useState)(() => !!Sc()?.matches);
+function Tc() {
+	let [e, t] = (0, j.useState)(() => !!wc()?.matches);
 	return (0, j.useEffect)(() => {
-		let e = Sc();
+		let e = wc();
 		if (!e) return;
 		let n = () => t(e.matches);
 		return n(), typeof e.addEventListener == "function" ? (e.addEventListener("change", n), () => e.removeEventListener("change", n)) : (e.addListener(n), () => e.removeListener(n));
 	}, []), e;
 }
-function wc(e, t) {
+function Ec(e, t) {
 	switch (e) {
 		case "down": return `0px -${t}`;
 		case "left": return `${t} 0px`;
@@ -14925,12 +14925,12 @@ function wc(e, t) {
 		default: return `0px ${t}`;
 	}
 }
-function Tc(e, t = W.durationFaster, n = W.curveAccelerateMin) {
+function Dc(e, t = W.durationFaster, n = W.curveAccelerateMin) {
 	return ({ direction: r = "up" }) => ({
 		enter: {
 			keyframes: [{
 				opacity: 0,
-				translate: wc(r, e)
+				translate: Ec(r, e)
 			}, {
 				opacity: 1,
 				translate: "0px 0px"
@@ -14963,9 +14963,9 @@ function Tc(e, t = W.durationFaster, n = W.curveAccelerateMin) {
 		}
 	});
 }
-cs(Tc(yc));
-var Ec = cs(Tc(bc, W.durationFast, W.curveAccelerateMid));
-cs(({ element: e }) => {
+us(Dc(xc));
+var Oc = us(Dc(Sc, W.durationFast, W.curveAccelerateMid));
+us(({ element: e }) => {
 	let t = `${e.scrollHeight}px`;
 	return {
 		enter: {
@@ -15017,7 +15017,7 @@ cs(({ element: e }) => {
 		}
 	};
 });
-function Dc({ value: e, direction: t = "up", children: n, className: r, style: i }) {
+function kc({ value: e, direction: t = "up", children: n, className: r, style: i }) {
 	let a = e == null ? "default" : String(e);
 	return (0, j.createElement)("div", {
 		className: r,
@@ -15027,7 +15027,7 @@ function Dc({ value: e, direction: t = "up", children: n, className: r, style: i
 			...i
 		},
 		"data-cross-fade": a
-	}, (0, j.createElement)(ms, null, (0, j.createElement)(Ec, {
+	}, (0, j.createElement)(gs, null, (0, j.createElement)(Oc, {
 		key: a,
 		direction: t
 	}, (0, j.createElement)("div", { style: {
@@ -15035,8 +15035,8 @@ function Dc({ value: e, direction: t = "up", children: n, className: r, style: i
 		minWidth: 0
 	} }, n))));
 }
-cs(({ direction: e = "forward" }) => {
-	let t = e === "back", n = t ? `-${xc} 0px` : `${xc} 0px`, r = t ? `${xc} 0px` : `-${xc} 0px`;
+us(({ direction: e = "forward" }) => {
+	let t = e === "back", n = t ? `-${Cc} 0px` : `${Cc} 0px`, r = t ? `${Cc} 0px` : `-${Cc} 0px`;
 	return {
 		enter: {
 			keyframes: [{
@@ -15074,7 +15074,7 @@ cs(({ direction: e = "forward" }) => {
 		}
 	};
 });
-var Oc = {
+var Ac = {
 	press: ["durationUltraFast", "curveAccelerateMin"],
 	hoverEnter: ["durationFaster", "curveDecelerateMin"],
 	hoverLeave: ["durationFaster", "curveAccelerateMin"],
@@ -15084,23 +15084,23 @@ var Oc = {
 	slow: ["durationSlow", "curveDecelerateMid"],
 	longPress: ["durationUltraSlow", "curveLinear"]
 };
-function kc(e = "normal") {
-	let [t, n] = Oc[e] ?? Oc.normal;
+function jc(e = "normal") {
+	let [t, n] = Ac[e] ?? Ac.normal;
 	return {
 		transitionDuration: `${W[t]}ms`,
 		transitionTimingFunction: W[n]
 	};
 }
-function Ac(e = "normal") {
-	let t = Cc();
+function Mc(e = "normal") {
+	let t = Tc();
 	return (0, j.useMemo)(() => t ? {
 		transitionDuration: `${W.durationFaster}ms`,
 		transitionTimingFunction: W.curveDecelerateMin
-	} : kc(e), [e, t]);
+	} : jc(e), [e, t]);
 }
 //#endregion
 //#region public/plugins/_shared/typography.js
-var jc = {
+var Nc = {
 	48: {
 		fontSize: "48px",
 		lineHeight: "56px"
@@ -15118,12 +15118,12 @@ var jc = {
 		lineHeight: "124px"
 	}
 };
-function Mc(e) {
-	let t = jc[e];
+function Pc(e) {
+	let t = Nc[e];
 	if (!t) throw Error(`Display XL 只定义了 48/80/96/112，收到 ${String(e)}`);
 	return t;
 }
-var Nc = { fontVariantNumeric: "tabular-nums" }, Pc = 40, Fc = 44, Ic = 56, Lc = 48, Rc = 40, zc = 56, Bc = [
+var Fc = { fontVariantNumeric: "tabular-nums" }, Ic = 40, Lc = 44, Rc = 56, zc = 48, Bc = 40, Vc = 56, Hc = [
 	"button",
 	"input",
 	"textarea",
@@ -15137,12 +15137,12 @@ var Nc = { fontVariantNumeric: "tabular-nums" }, Pc = 40, Fc = 44, Ic = 56, Lc =
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function Vc(e, t) {
+function Uc(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(Bc);
+	let n = t.closest(Hc);
 	return !!(n && n !== e && e.contains(n));
 }
-var Hc = Yn({ root: {
+var Wc = Yn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -15155,11 +15155,11 @@ var Hc = Yn({ root: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function Uc({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = Hc(), s = gc(), c = (0, j.useCallback)((t) => {
-		Vc(t.currentTarget, t.target) || e?.(t);
+function Gc({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = Wc(), s = vc(), c = (0, j.useCallback)((t) => {
+		Uc(t.currentTarget, t.target) || e?.(t);
 	}, [e]), l = (0, j.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (Vc(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (Uc(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, M.jsx)("div", {
 		...a,
@@ -15175,7 +15175,7 @@ function Uc({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, 
 		children: i
 	});
 }
-var Wc = Yn({
+Yn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
@@ -15196,25 +15196,93 @@ var Wc = Yn({
 		gap: V.spacingHorizontalXS
 	}
 });
-function Gc({ title: e, trailing: t, className: n, style: r }) {
-	let i = Wc();
+var Kc = {
+	blue: {
+		foreground: "colorPaletteBlueForeground2",
+		background: "colorPaletteBlueBackground2"
+	},
+	pink: {
+		foreground: "colorPalettePinkForeground2",
+		background: "colorPalettePinkBackground2"
+	},
+	orange: {
+		foreground: "colorPaletteOrangeForeground2",
+		background: "colorPaletteOrangeBackground2"
+	},
+	green: {
+		foreground: "colorPaletteGreenForeground2",
+		background: "colorPaletteGreenBackground2"
+	},
+	purple: {
+		foreground: "colorPalettePurpleForeground2",
+		background: "colorPalettePurpleBackground2"
+	},
+	teal: {
+		foreground: "colorPaletteTealForeground2",
+		background: "colorPaletteTealBackground2"
+	}
+}, qc = Yn({
+	root: {
+		display: "flex",
+		flexShrink: 0,
+		alignItems: "center",
+		gap: V.spacingHorizontalXS,
+		minWidth: 0
+	},
+	chip: {
+		display: "inline-flex",
+		flexShrink: 0,
+		alignItems: "center",
+		justifyContent: "center",
+		width: "24px",
+		height: "24px",
+		borderRadius: V.borderRadiusSmall
+	},
+	label: {
+		minWidth: 0,
+		color: V.colorNeutralForeground3
+	},
+	trailing: {
+		display: "inline-flex",
+		flexShrink: 0,
+		alignItems: "center",
+		gap: V.spacingHorizontalXS,
+		marginInlineStart: "auto",
+		color: V.colorNeutralForeground3
+	}
+});
+function Jc({ icon: e, label: t, accent: n = "blue", trailing: r, compact: i = !1, className: a, style: o }) {
+	let s = qc(), c = Kc[n] ?? Kc.blue;
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
-		className: T(i.header, n),
-		style: r,
-		children: [typeof e == "string" || typeof e == "number" ? /* @__PURE__ */ (0, M.jsx)(Ks, {
-			size: 200,
-			weight: "semibold",
-			truncate: !0,
-			wrap: !1,
-			className: i.title,
-			children: e
-		}) : e, t ? /* @__PURE__ */ (0, M.jsx)("div", {
-			className: i.trailing,
-			children: t
-		}) : null]
+		className: T(s.root, a),
+		style: o,
+		"data-card-identity": n,
+		children: [
+			/* @__PURE__ */ (0, M.jsx)("span", {
+				className: s.chip,
+				style: {
+					color: `var(--${c.foreground})`,
+					backgroundColor: `var(--${c.background})`
+				},
+				"aria-hidden": "true",
+				children: e
+			}),
+			!i && t ? /* @__PURE__ */ (0, M.jsx)(Js, {
+				size: 200,
+				weight: "semibold",
+				truncate: !0,
+				wrap: !1,
+				className: s.label,
+				children: t
+			}) : null,
+			r ? /* @__PURE__ */ (0, M.jsx)("div", {
+				className: s.trailing,
+				children: r
+			}) : null
+		]
 	});
 }
-var Kc = Yn({
+var Yc = Yn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -15229,19 +15297,19 @@ var Kc = Yn({
 		minWidth: 0
 	},
 	value: {
-		...Nc,
+		...Fc,
 		fontWeight: "600",
 		color: V.colorNeutralForeground1,
 		whiteSpace: "nowrap"
 	},
-	size48: Mc(48),
+	size48: Pc(48),
 	size68: {
 		fontSize: V.fontSizeHero1000,
 		lineHeight: V.lineHeightHero1000
 	},
-	size80: Mc(80),
-	size96: Mc(96),
-	size112: Mc(112),
+	size80: Pc(80),
+	size96: Pc(96),
+	size112: Pc(112),
 	unit: { color: V.colorNeutralForeground2 },
 	meta: {
 		display: "flex",
@@ -15251,15 +15319,15 @@ var Kc = Yn({
 	},
 	label: { color: V.colorNeutralForeground2 },
 	caption: { color: V.colorNeutralForeground3 }
-}), qc = {
+}), Xc = {
 	48: "size48",
 	68: "size68",
 	80: "size80",
 	96: "size96",
 	112: "size112"
 };
-function Jc({ value: e, unit: t, label: n, caption: r, size: i = 48, className: a, style: o }) {
-	let s = Kc(), c = s[qc[i] ?? "size48"];
+function Zc({ value: e, unit: t, label: n, caption: r, size: i = 48, className: a, style: o }) {
+	let s = Yc(), c = s[Xc[i] ?? "size48"];
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
 		className: T(s.root, a),
 		style: o,
@@ -15268,18 +15336,18 @@ function Jc({ value: e, unit: t, label: n, caption: r, size: i = 48, className: 
 			children: [/* @__PURE__ */ (0, M.jsx)("span", {
 				className: T(s.value, c),
 				children: e
-			}), t ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			}), t ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 300,
 				className: s.unit,
 				children: t
 			}) : null]
 		}), n || r ? /* @__PURE__ */ (0, M.jsxs)("div", {
 			className: s.meta,
-			children: [n ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			children: [n ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 300,
 				className: s.label,
 				children: n
-			}) : null, r ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			}) : null, r ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 200,
 				className: s.caption,
 				children: r
@@ -15287,13 +15355,13 @@ function Jc({ value: e, unit: t, label: n, caption: r, size: i = 48, className: 
 		}) : null]
 	});
 }
-var Yc = Yn({
+var Qc = Yn({
 	row: {
 		display: "flex",
 		alignItems: "center",
 		gap: V.spacingHorizontalS,
 		width: "100%",
-		minHeight: `${Fc}px`,
+		minHeight: `${Lc}px`,
 		boxSizing: "border-box",
 		paddingInline: 0,
 		border: "none",
@@ -15337,8 +15405,8 @@ var Yc = Yn({
 		gap: V.spacingHorizontalXS
 	}
 });
-function Xc({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = Yc(), d = (e) => {
+function $c({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = Qc(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
@@ -15360,13 +15428,13 @@ function Xc({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 			}) : null,
 			/* @__PURE__ */ (0, M.jsxs)("div", {
 				className: u.main,
-				children: [t ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+				children: [t ? /* @__PURE__ */ (0, M.jsx)(Js, {
 					size: o,
 					truncate: !0,
 					wrap: !1,
 					className: u.title,
 					children: t
-				}) : null, n ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+				}) : null, n ? /* @__PURE__ */ (0, M.jsx)(Js, {
 					size: 200,
 					truncate: !0,
 					wrap: !1,
@@ -15381,7 +15449,7 @@ function Xc({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var Zc = Yn({
+var el = Yn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -15395,6 +15463,14 @@ var Zc = Yn({
 		display: "inline-flex",
 		color: V.colorNeutralForeground3
 	},
+	iconChip: {
+		display: "inline-flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: "48px",
+		height: "48px",
+		borderRadius: V.borderRadiusLarge
+	},
 	title: { color: V.colorNeutralForeground1 },
 	description: {
 		maxWidth: "42ch",
@@ -15402,41 +15478,45 @@ var Zc = Yn({
 	},
 	action: { marginTop: V.spacingVerticalS }
 });
-function Qc({ icon: e, title: t, description: n, action: r, className: i, style: a }) {
-	let o = Zc();
+function tl({ icon: e, iconAccent: t, title: n, description: r, action: i, className: a, style: o }) {
+	let s = el(), c = t ? Kc[t] ?? Kc.blue : null;
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
-		className: T(o.root, i),
-		style: a,
+		className: T(s.root, a),
+		style: o,
 		"data-empty-state": "true",
 		children: [
 			e ? /* @__PURE__ */ (0, M.jsx)("div", {
-				className: o.icon,
+				className: c ? s.iconChip : s.icon,
+				style: c ? {
+					color: `var(--${c.foreground})`,
+					backgroundColor: `var(--${c.background})`
+				} : void 0,
 				children: e
 			}) : null,
-			t ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			n ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 400,
 				weight: "semibold",
-				className: o.title,
-				children: t
-			}) : null,
-			n ? /* @__PURE__ */ (0, M.jsx)(Ks, {
-				size: 300,
-				className: o.description,
+				className: s.title,
 				children: n
 			}) : null,
-			r ? /* @__PURE__ */ (0, M.jsx)("div", {
-				className: o.action,
+			r ? /* @__PURE__ */ (0, M.jsx)(Js, {
+				size: 300,
+				className: s.description,
 				children: r
+			}) : null,
+			i ? /* @__PURE__ */ (0, M.jsx)("div", {
+				className: s.action,
+				children: i
 			}) : null
 		]
 	});
 }
-var $c = Yn({ button: {
-	minWidth: `${Pc}px`,
-	minHeight: `${Pc}px`
-} }), el = (0, j.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = $c();
-	return /* @__PURE__ */ (0, M.jsx)(Bs, {
+var nl = Yn({ button: {
+	minWidth: `${Ic}px`,
+	minHeight: `${Ic}px`
+} }), rl = (0, j.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = nl();
+	return /* @__PURE__ */ (0, M.jsx)(Hs, {
 		...i,
 		ref: a,
 		type: "button",
@@ -15446,7 +15526,7 @@ var $c = Yn({ button: {
 		style: n,
 		children: r
 	});
-}), tl = el, nl = Yn({ root: {
+}), il = rl, al = Yn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -15460,8 +15540,8 @@ var $c = Yn({ button: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function rl({ children: e, className: t, style: n }) {
-	let r = nl();
+function ol({ children: e, className: t, style: n }) {
+	let r = al();
 	return /* @__PURE__ */ (0, M.jsx)("div", {
 		className: T(r.root, t),
 		style: n,
@@ -15469,14 +15549,14 @@ function rl({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var il = Yn({
+var sl = Yn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: V.spacingHorizontalM,
-		minHeight: `${Ic}px`,
+		minHeight: `${Rc}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -15494,8 +15574,8 @@ var il = Yn({
 		gap: V.spacingHorizontalS
 	}
 });
-function al({ children: e, trailing: t, className: n, style: r }) {
-	let i = il();
+function cl({ children: e, trailing: t, className: n, style: r }) {
+	let i = sl();
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
 		className: T(i.header, n),
 		style: r,
@@ -15509,17 +15589,17 @@ function al({ children: e, trailing: t, className: n, style: r }) {
 		}) : null]
 	});
 }
-var ol = Yn({ toolbar: {
+var ll = Yn({ toolbar: {
 	display: "flex",
 	flexShrink: 0,
 	alignItems: "center",
 	gap: V.spacingHorizontalS,
-	minHeight: `${Lc}px`,
+	minHeight: `${zc}px`,
 	paddingInline: V.spacingHorizontalXXL,
 	boxSizing: "border-box"
 } });
-function sl({ children: e, className: t, style: n }) {
-	let r = ol();
+function ul({ children: e, className: t, style: n }) {
+	let r = ll();
 	return /* @__PURE__ */ (0, M.jsx)("div", {
 		className: T(r.toolbar, t),
 		style: n,
@@ -15530,20 +15610,20 @@ function sl({ children: e, className: t, style: n }) {
 Yn({
 	tabs: {
 		flexShrink: 0,
-		height: `${Rc}px`,
-		minHeight: `${Rc}px`,
+		height: `${Bc}px`,
+		minHeight: `${Bc}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${Rc}px`,
-		minHeight: `${Rc}px`,
+		height: `${Bc}px`,
+		minHeight: `${Bc}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: V.spacingHorizontalXS }
 });
-var cl = Yn({
+var dl = Yn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -15574,7 +15654,7 @@ var cl = Yn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function ll(e) {
+function fl(e) {
 	let [t, n] = (0, j.useState)(!1);
 	return (0, j.useEffect)(() => {
 		let t = e.current;
@@ -15598,8 +15678,8 @@ function ll(e) {
 		};
 	}, [e]), t;
 }
-function ul({ children: e, className: t, style: n }) {
-	let r = cl(), i = (0, j.useRef)(null), a = ll(i);
+function pl({ children: e, className: t, style: n }) {
+	let r = dl(), i = (0, j.useRef)(null), a = fl(i);
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -15636,7 +15716,7 @@ function ul({ children: e, className: t, style: n }) {
 		flexShrink: 0,
 		alignItems: "center",
 		gap: V.spacingHorizontalS,
-		minHeight: `${zc}px`,
+		minHeight: `${Vc}px`,
 		paddingInline: V.spacingHorizontalXXL,
 		boxSizing: "border-box"
 	},
@@ -15691,7 +15771,7 @@ function ul({ children: e, className: t, style: n }) {
 		boxSizing: "border-box"
 	}
 });
-function dl(e = 1e3) {
+function ml(e = 1e3) {
 	let [t, n] = (0, j.useState)(() => Date.now()), [r, i] = (0, j.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, j.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -15706,43 +15786,43 @@ function dl(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/sedentary/src/data/engine.js
-var fl = "settings", pl = "sedentary.days", ml = "sedentary.runtime", hl = "sedentary.command", gl = 1e4, G = 500, _l = 5, vl = 400, yl = 7, bl = "wtsl.sedentary.engine", xl = "sedentary:command", Sl = Object.freeze({
+var hl = "settings", gl = "sedentary.days", G = "sedentary.runtime", _l = "sedentary.command", vl = 1e4, yl = 500, bl = 5, xl = 400, Sl = 7, Cl = "wtsl.sedentary.engine", wl = "sedentary:command", Tl = Object.freeze({
 	enabled: !0,
 	thresholdMin: 45,
 	remindEveryMin: 10,
 	strongReminder: !0
-}), Cl = {
+}), El = {
 	thresholdMin: [5, 120],
 	remindEveryMin: [1, 60]
-}, wl = {
+}, Dl = {
 	success: "久坐中",
 	warning: "接近提醒",
 	danger: "该起身了",
 	resting: "休息中",
 	off: "已关闭"
-}, Tl = {
+}, Ol = {
 	sitting: "坐着",
 	standing: "站立"
-}, El = /^\d{4}-\d{2}-\d{2}$/, Dl = (e) => String(e).padStart(2, "0");
-function Ol(e) {
-	return `${e.getFullYear()}-${Dl(e.getMonth() + 1)}-${Dl(e.getDate())}`;
-}
-function kl(e) {
-	return `${Ol(e)}T${Dl(e.getHours())}:${Dl(e.getMinutes())}`;
-}
-function Al(e) {
-	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${Dl(e.getHours())}:${Dl(e.getMinutes())}`;
-}
+}, kl = /^\d{4}-\d{2}-\d{2}$/, Al = (e) => String(e).padStart(2, "0");
 function jl(e) {
+	return `${e.getFullYear()}-${Al(e.getMonth() + 1)}-${Al(e.getDate())}`;
+}
+function Ml(e) {
+	return `${jl(e)}T${Al(e.getHours())}:${Al(e.getMinutes())}`;
+}
+function Nl(e) {
+	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${Al(e.getHours())}:${Al(e.getMinutes())}`;
+}
+function Pl(e) {
 	if (typeof e != "string") return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function Ml(e) {
+function Fl(e) {
 	let t = new Date(e);
 	return t.setHours(0, 0, 0, 0), t;
 }
-function Nl(e, t) {
+function Il(e, t) {
 	try {
 		let n = localStorage.getItem(e);
 		return n == null ? t : JSON.parse(n);
@@ -15750,101 +15830,101 @@ function Nl(e, t) {
 		return t;
 	}
 }
-function Pl(e, t) {
+function Ll(e, t) {
 	try {
 		localStorage.setItem(e, JSON.stringify(t));
 	} catch {}
 }
-function Fl(e, [t, n], r) {
+function Rl(e, [t, n], r) {
 	let i = Math.round(Number(e));
 	return Number.isFinite(i) ? Math.min(n, Math.max(t, i)) : r;
 }
-function Il(e) {
+function zl(e) {
 	let t = Number(e);
 	return Number.isFinite(t) && t > 0 ? t : 0;
 }
-function Ll(e) {
+function Bl(e) {
 	return Math.round(e * 10) / 10;
 }
-function Rl(e) {
+function Vl(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		enabled: typeof t.enabled == "boolean" ? t.enabled : Sl.enabled,
-		thresholdMin: Fl(t.thresholdMin ?? Sl.thresholdMin, Cl.thresholdMin, Sl.thresholdMin),
-		remindEveryMin: Fl(t.remindEveryMin ?? Sl.remindEveryMin, Cl.remindEveryMin, Sl.remindEveryMin),
-		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : Sl.strongReminder
+		enabled: typeof t.enabled == "boolean" ? t.enabled : Tl.enabled,
+		thresholdMin: Rl(t.thresholdMin ?? Tl.thresholdMin, El.thresholdMin, Tl.thresholdMin),
+		remindEveryMin: Rl(t.remindEveryMin ?? Tl.remindEveryMin, El.remindEveryMin, Tl.remindEveryMin),
+		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : Tl.strongReminder
 	};
-}
-async function zl() {
-	let t = null;
-	try {
-		t = await e.getConfig(fl);
-	} catch {
-		t = null;
-	}
-	return Rl(t);
-}
-function Bl(e) {
-	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {};
-	typeof t.enabled == "boolean" && (n.enabled = t.enabled), typeof t.strongReminder == "boolean" && (n.strongReminder = t.strongReminder);
-	for (let e of Object.keys(Cl)) typeof t[e] == "number" && Number.isFinite(t[e]) && (n[e] = t[e]);
-	return n;
-}
-function Vl(e) {
-	if (!e || typeof e != "object" || Array.isArray(e)) return {};
-	let t = { ...e };
-	return delete t.quietHours, t;
 }
 async function Hl() {
 	let t = null;
 	try {
-		t = await e.getConfig(fl);
+		t = await e.getConfig(hl);
+	} catch {
+		t = null;
+	}
+	return Vl(t);
+}
+function Ul(e) {
+	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {};
+	typeof t.enabled == "boolean" && (n.enabled = t.enabled), typeof t.strongReminder == "boolean" && (n.strongReminder = t.strongReminder);
+	for (let e of Object.keys(El)) typeof t[e] == "number" && Number.isFinite(t[e]) && (n[e] = t[e]);
+	return n;
+}
+function Wl(e) {
+	if (!e || typeof e != "object" || Array.isArray(e)) return {};
+	let t = { ...e };
+	return delete t.quietHours, t;
+}
+async function Gl() {
+	let t = null;
+	try {
+		t = await e.getConfig(hl);
 	} catch {
 		return null;
 	}
 	if (!t || typeof t != "object" || Array.isArray(t)) return null;
 	let n = {
-		...Vl(t),
-		...Rl(t)
+		...Wl(t),
+		...Vl(t)
 	};
 	if (JSON.stringify(n) === JSON.stringify(t)) return n;
 	try {
-		await e.setConfig(fl, n);
+		await e.setConfig(hl, n);
 	} catch {
 		return n;
 	}
 	return n;
 }
-async function Ul(t) {
+async function Kl(t) {
 	let n = null;
 	try {
-		n = await e.getConfig(fl);
+		n = await e.getConfig(hl);
 	} catch {
 		n = null;
 	}
-	let r = Rl({
-		...Rl(n),
-		...Bl(t)
-	}), i = {
+	let r = Vl({
 		...Vl(n),
+		...Ul(t)
+	}), i = {
+		...Wl(n),
 		...r
 	};
 	try {
-		await e.setConfig(fl, i);
+		await e.setConfig(hl, i);
 	} catch {}
 	return r;
 }
-function Wl(e, t) {
+function ql(e, t) {
 	let n = t && typeof t == "object" ? t : {};
 	return {
 		date: e,
-		sittingMinutes: Il(n.sittingMinutes),
-		standingMinutes: Il(n.standingMinutes),
-		longestStreakMin: Il(n.longestStreakMin),
-		breaks: Math.round(Il(n.breaks))
+		sittingMinutes: zl(n.sittingMinutes),
+		standingMinutes: zl(n.standingMinutes),
+		longestStreakMin: zl(n.longestStreakMin),
+		breaks: Math.round(zl(n.breaks))
 	};
 }
-function Gl(e) {
+function Jl(e) {
 	return {
 		date: e,
 		sittingMinutes: 0,
@@ -15853,25 +15933,25 @@ function Gl(e) {
 		breaks: 0
 	};
 }
-function Kl(e, t) {
-	return e[t] || (e[t] = Gl(t)), e[t];
+function Yl(e, t) {
+	return e[t] || (e[t] = Jl(t)), e[t];
 }
-function ql() {
-	let e = Nl(pl, null), t = Array.isArray(e) ? e.reduce((e, t) => {
+function Xl() {
+	let e = Il(gl, null), t = Array.isArray(e) ? e.reduce((e, t) => {
 		let n = t && typeof t.date == "string" ? t.date : null;
 		return n && (e[n] = t), e;
 	}, {}) : e && typeof e == "object" ? e : {}, n = {};
-	for (let [e, r] of Object.entries(t)) El.test(e) && (n[e] = Wl(e, r));
+	for (let [e, r] of Object.entries(t)) kl.test(e) && (n[e] = ql(e, r));
 	return n;
 }
-function Jl(e) {
-	Pl(pl, e);
+function Zl(e) {
+	Ll(gl, e);
 }
-function Yl() {
-	let e = Nl(ml, null), t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = typeof t.sittingSince == "string" ? t.sittingSince : null, r = t.posture === "sitting" || t.posture === "standing" ? t.posture : n ? "sitting" : null, i = typeof t.postureSince == "string" ? t.postureSince : r === "sitting" ? n : null;
+function Ql() {
+	let e = Il(G, null), t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = typeof t.sittingSince == "string" ? t.sittingSince : null, r = t.posture === "sitting" || t.posture === "standing" ? t.posture : n ? "sitting" : null, i = typeof t.postureSince == "string" ? t.postureSince : r === "sitting" ? n : null;
 	return {
 		posture: r,
-		postureSince: jl(i) ? i : null,
+		postureSince: Pl(i) ? i : null,
 		lastRemindAt: typeof t.lastRemindAt == "string" ? t.lastRemindAt : null,
 		lastRemindMinute: typeof t.lastRemindMinute == "string" ? t.lastRemindMinute : null,
 		snoozedUntil: typeof t.snoozedUntil == "string" ? t.snoozedUntil : null,
@@ -15880,151 +15960,151 @@ function Yl() {
 		commandId: typeof t.commandId == "string" ? t.commandId : null
 	};
 }
-function Xl(e) {
-	Pl(ml, e);
+function $l(e) {
+	Ll(G, e);
 }
-function Zl(e) {
+function eu(e) {
 	let t = Object.keys(e).sort();
-	if (t.length <= vl) return e;
+	if (t.length <= xl) return e;
 	let n = new Set(t.slice(-400)), r = {};
 	for (let i of t) n.has(i) && (r[i] = e[i]);
 	return r;
 }
-function Ql(e, t, n, r) {
+function tu(e, t, n, r) {
 	if (!(t instanceof Date) || !(n instanceof Date) || n.getTime() <= t.getTime()) return;
 	let i = t;
 	for (; i.getTime() < n.getTime();) {
-		let t = Ol(i), a = new Date(i.getFullYear(), i.getMonth(), i.getDate() + 1), o = a.getTime() < n.getTime() ? a : n, s = (o.getTime() - i.getTime()) / 6e4;
+		let t = jl(i), a = new Date(i.getFullYear(), i.getMonth(), i.getDate() + 1), o = a.getTime() < n.getTime() ? a : n, s = (o.getTime() - i.getTime()) / 6e4;
 		if (s > 0) {
-			let n = Kl(e, t);
+			let n = Yl(e, t);
 			r === "sitting" ? n.sittingMinutes += s : r === "standing" && (n.standingMinutes += s);
 		}
 		i = o;
 	}
 }
-function $l(e, t, n, r) {
+function nu(e, t, n, r) {
 	if (t !== "sitting" || !(n instanceof Date)) return;
 	let i = Math.max(0, (r.getTime() - n.getTime()) / 6e4);
 	if (i <= 0) return;
-	let a = Kl(e, Ol(r));
+	let a = Yl(e, jl(r));
 	i > a.longestStreakMin && (a.longestStreakMin = Math.round(i));
 }
-function eu(e, t = Date.now()) {
-	let n = jl(e.postureSince);
+function ru(e, t = Date.now()) {
+	let n = Pl(e.postureSince);
 	return !n || !e.posture ? 0 : Math.max(0, (t - n.getTime()) / 6e4);
 }
-function tu(e, t = Date.now()) {
-	return e.posture === "sitting" ? eu(e, t) : 0;
+function K(e, t = Date.now()) {
+	return e.posture === "sitting" ? ru(e, t) : 0;
 }
-function nu(e = /* @__PURE__ */ new Date()) {
-	let t = Ol(e);
-	return ql()[t] ?? Gl(t);
-}
-function ru(e, t, n = /* @__PURE__ */ new Date()) {
-	if (!e.enabled) return "off";
-	if (t.posture === "standing") return "resting";
-	let r = tu(t, n.getTime());
-	return r >= e.thresholdMin ? "danger" : r >= e.thresholdMin * .6 ? "warning" : "success";
-}
-function K(e) {
-	return wl[e] ?? wl.success;
-}
-function iu(e, t, n = /* @__PURE__ */ new Date()) {
-	let r = ru(e, t, n);
-	if (r === "off") return "久坐提醒已关闭";
-	if (r === "resting") return "";
-	let i = jl(t.snoozedUntil);
-	if (i && i > n) return `提醒已推迟到 ${Al(i)}`;
-	if (!t.posture) return "";
-	let a = e.thresholdMin - tu(t, n.getTime());
-	return a <= 0 ? "该起身了" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
+function iu(e = /* @__PURE__ */ new Date()) {
+	let t = jl(e);
+	return Xl()[t] ?? Jl(t);
 }
 function au(e, t, n = /* @__PURE__ */ new Date()) {
-	if (!e.enabled || t.posture !== "sitting") return !1;
-	let r = jl(t.snoozedUntil);
-	return r && r > n ? !1 : tu(t, n.getTime()) >= e.thresholdMin;
+	if (!e.enabled) return "off";
+	if (t.posture === "standing") return "resting";
+	let r = K(t, n.getTime());
+	return r >= e.thresholdMin ? "danger" : r >= e.thresholdMin * .6 ? "warning" : "success";
 }
-function ou(e, t) {
+function ou(e) {
+	return Dl[e] ?? Dl.success;
+}
+function su(e, t, n = /* @__PURE__ */ new Date()) {
+	let r = au(e, t, n);
+	if (r === "off") return "久坐提醒已关闭";
+	if (r === "resting") return "";
+	let i = Pl(t.snoozedUntil);
+	if (i && i > n) return `提醒已推迟到 ${Nl(i)}`;
+	if (!t.posture) return "";
+	let a = e.thresholdMin - K(t, n.getTime());
+	return a <= 0 ? "该起身了" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
+}
+function cu(e, t, n = /* @__PURE__ */ new Date()) {
+	if (!e.enabled || t.posture !== "sitting") return !1;
+	let r = Pl(t.snoozedUntil);
+	return r && r > n ? !1 : K(t, n.getTime()) >= e.thresholdMin;
+}
+function lu(e, t) {
 	if (t === 0) return "今天";
 	if (t === 1) return "昨天";
 	let n = "日一二三四五六"[e.getDay()];
 	return `${e.getMonth() + 1}月${e.getDate()}日 周${n}`;
 }
-function su(e = ql(), t = /* @__PURE__ */ new Date()) {
+function uu(e = Xl(), t = /* @__PURE__ */ new Date()) {
 	let n = [];
-	for (let r = 0; r < yl; r += 1) {
-		let i = new Date(t.getFullYear(), t.getMonth(), t.getDate() - r), a = Ol(i), o = e[a] ?? Gl(a);
+	for (let r = 0; r < Sl; r += 1) {
+		let i = new Date(t.getFullYear(), t.getMonth(), t.getDate() - r), a = jl(i), o = e[a] ?? Jl(a);
 		n.push({
 			...o,
-			label: ou(i, r)
+			label: lu(i, r)
 		});
 	}
 	return n;
 }
-function cu(e, t, n = /* @__PURE__ */ new Date()) {
-	return eu(e, n.getTime()) > 0 || t.sittingMinutes > 0 || t.standingMinutes > 0 || t.breaks > 0 || !!jl(e.lastBreakAt);
+function du(e, t, n = /* @__PURE__ */ new Date()) {
+	return ru(e, n.getTime()) > 0 || t.sittingMinutes > 0 || t.standingMinutes > 0 || t.breaks > 0 || !!Pl(e.lastBreakAt);
 }
-function lu(e, t = /* @__PURE__ */ new Date()) {
-	let n = Yl(), r = ql(), i = r[Ol(t)] ?? Gl(Ol(t)), a = ru(e, n, t), o = e.enabled ? n.posture : null, s = o ? eu(n, t.getTime()) : 0, c = jl(n.lastBreakAt);
+function fu(e, t = /* @__PURE__ */ new Date()) {
+	let n = Ql(), r = Xl(), i = r[jl(t)] ?? Jl(jl(t)), a = au(e, n, t), o = e.enabled ? n.posture : null, s = o ? ru(n, t.getTime()) : 0, c = Pl(n.lastBreakAt);
 	return {
 		runtime: n,
 		today: i,
 		posture: o,
-		postureLabel: o ? Tl[o] : "",
+		postureLabel: o ? Ol[o] : "",
 		status: a,
-		statusLabel: K(a),
+		statusLabel: ou(a),
 		currentMin: Math.floor(s),
 		stateMinutes: s,
-		hint: iu(e, n, t),
-		lastBreakText: c ? Al(c) : "—",
-		snoozable: au(e, n, t),
-		hasData: cu(n, i, t),
-		recentDays: su(r, t)
+		hint: su(e, n, t),
+		lastBreakText: c ? Nl(c) : "—",
+		snoozable: cu(e, n, t),
+		hasData: du(n, i, t),
+		recentDays: uu(r, t)
 	};
 }
-function uu(e, t = /* @__PURE__ */ new Date()) {
-	let n = Yl(), r = nu(t), i = e.enabled ? n.posture : null, a = i ? eu(n, t.getTime()) : 0, o = tu(n, t.getTime());
+function pu(e, t = /* @__PURE__ */ new Date()) {
+	let n = Ql(), r = iu(t), i = e.enabled ? n.posture : null, a = i ? ru(n, t.getTime()) : 0, o = K(n, t.getTime());
 	return {
 		enabled: e.enabled,
 		posture: i,
-		postureLabel: i ? Tl[i] : "未开始",
-		status: ru(e, n, t),
-		statusLabel: K(ru(e, n, t)),
+		postureLabel: i ? Ol[i] : "未开始",
+		status: au(e, n, t),
+		statusLabel: ou(au(e, n, t)),
 		currentStateMin: Math.round(a),
 		currentStreakMin: Math.round(o),
-		sittingMinutesToday: Ll(r.sittingMinutes),
-		standingMinutesToday: Ll(r.standingMinutes),
+		sittingMinutesToday: Bl(r.sittingMinutes),
+		standingMinutesToday: Bl(r.standingMinutes),
 		breaksToday: r.breaks,
 		thresholdMin: e.thresholdMin,
 		nextReminderMin: e.enabled && i === "sitting" ? Math.max(0, e.thresholdMin - Math.round(o)) : null,
-		snoozable: au(e, n, t),
+		snoozable: cu(e, n, t),
 		snoozedUntil: n.snoozedUntil,
 		lastBreakAt: n.lastBreakAt,
-		hint: iu(e, n, t)
+		hint: su(e, n, t)
 	};
 }
-function du(e = /* @__PURE__ */ new Date()) {
-	let t = ql(), n = Yl(), r = t[Ol(e)] ?? Gl(Ol(e));
+function mu(e = /* @__PURE__ */ new Date()) {
+	let t = Xl(), n = Ql(), r = t[jl(e)] ?? Jl(jl(e));
 	return {
 		...r,
-		sittingMinutes: Ll(r.sittingMinutes),
-		standingMinutes: Ll(r.standingMinutes),
+		sittingMinutes: Bl(r.sittingMinutes),
+		standingMinutes: Bl(r.standingMinutes),
 		lastBreakAt: n.lastBreakAt,
-		recentDays: su(t, e)
+		recentDays: uu(t, e)
 	};
 }
-function fu(e = ql(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
-	let a = jl(i) ?? n, o = jl(r);
+function hu(e = Xl(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
+	let a = Pl(i) ?? n, o = Pl(r);
 	if (!o) {
 		if (t === "week") {
-			let e = Ml(n), t = (e.getDay() + 6) % 7;
+			let e = Fl(n), t = (e.getDay() + 6) % 7;
 			e.setDate(e.getDate() - t), o = e;
-		} else o = t === "month" ? new Date(n.getFullYear(), n.getMonth(), 1) : Ml(n);
+		} else o = t === "month" ? new Date(n.getFullYear(), n.getMonth(), 1) : Fl(n);
 	}
-	let s = Ol(o), c = Ol(a), l = 0, u = 0, d = 0, f = 0, p = {};
+	let s = jl(o), c = jl(a), l = 0, u = 0, d = 0, f = 0, p = {};
 	for (let [t, n] of Object.entries(e)) {
 		if (t < s || t > c) continue;
-		let e = Wl(t, n);
+		let e = ql(t, n);
 		l += e.sittingMinutes, u += e.standingMinutes, d += e.breaks, e.longestStreakMin > f && (f = e.longestStreakMin), e.breaks > 0 && (p[t] = e.breaks);
 	}
 	return {
@@ -16033,45 +16113,45 @@ function fu(e = ql(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
 		to: a.toISOString(),
 		completed: d,
 		breaks: d,
-		sittingMinutes: Ll(l),
-		standingMinutes: Ll(u),
+		sittingMinutes: Bl(l),
+		standingMinutes: Bl(u),
 		longestStreakMin: Math.round(f),
 		byDay: p
 	};
 }
-function pu(e, t = {}) {
+function gu(e, t = {}) {
 	let n = {
 		id: `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 		type: e,
 		at: (/* @__PURE__ */ new Date()).toISOString(),
 		...t
 	};
-	return Pl(hl, n), window.dispatchEvent(new CustomEvent(xl, { detail: n })), n;
+	return Ll(_l, n), window.dispatchEvent(new CustomEvent(wl, { detail: n })), n;
 }
-function mu() {
-	return pu("stand");
-}
-function hu() {
-	return pu("sit");
-}
-function gu(e = 5) {
-	return pu("snooze", { minutes: e });
-}
-function _u(e) {
-	let t = (t) => e(t.detail);
-	return window.addEventListener(xl, t), () => window.removeEventListener(xl, t);
+function _u() {
+	return gu("stand");
 }
 function vu() {
+	return gu("sit");
+}
+function yu(e = 5) {
+	return gu("snooze", { minutes: e });
+}
+function bu(e) {
+	let t = (t) => e(t.detail);
+	return window.addEventListener(wl, t), () => window.removeEventListener(wl, t);
+}
+function xu() {
 	if (typeof navigator > "u") return null;
 	let e = navigator.locks;
 	return e && typeof e.request == "function" ? e : null;
 }
-async function yu(e) {
-	let t = vu();
+async function Su(e) {
+	let t = xu();
 	if (!t) return e();
 	let n = !1;
 	try {
-		return await t.request(bl, { ifAvailable: !0 }, async (t) => {
+		return await t.request(Cl, { ifAvailable: !0 }, async (t) => {
 			if (t) return n = !0, e();
 		});
 	} catch (t) {
@@ -16079,23 +16159,23 @@ async function yu(e) {
 		return e();
 	}
 }
-async function bu(e) {
-	let t = vu();
+async function Cu(e) {
+	let t = xu();
 	if (!t) return e();
 	let n = !1;
 	try {
-		return await t.request(bl, async () => (n = !0, e()));
+		return await t.request(Cl, async () => (n = !0, e()));
 	} catch (t) {
 		if (n) throw t;
 		return e();
 	}
 }
-var xu = class {
+var wu = class {
 	constructor() {
 		this.running = !1, this.ticking = !1, this.timer = 0, this.firstTimer = 0, this.disposers = [];
 	}
 	start() {
-		this.running || (this.running = !0, this.disposers.push(this.#e()), this.firstTimer = window.setTimeout(() => void this.tick(), G), this.timer = window.setInterval(() => void this.tick(), gl));
+		this.running || (this.running = !0, this.disposers.push(this.#e()), this.firstTimer = window.setTimeout(() => void this.tick(), yl), this.timer = window.setInterval(() => void this.tick(), vl));
 	}
 	stop() {
 		this.running = !1, window.clearTimeout(this.firstTimer), window.clearInterval(this.timer);
@@ -16104,11 +16184,11 @@ var xu = class {
 	#e() {
 		let e = (e) => {
 			if (e.key !== "sedentary.command") return;
-			let t = Nl(hl, null);
+			let t = Il(_l, null);
 			t && this.handleCommand(t);
 		};
 		window.addEventListener("storage", e);
-		let t = _u((e) => void this.handleCommand(e));
+		let t = bu((e) => void this.handleCommand(e));
 		return () => {
 			window.removeEventListener("storage", e), t();
 		};
@@ -16117,7 +16197,7 @@ var xu = class {
 		if (!e) return;
 		let t = e.type === "break" ? "stand" : e.type;
 		if (t === "stand" || t === "sit" || t === "snooze") try {
-			await bu(() => this.#t({
+			await Cu(() => this.#t({
 				...e,
 				type: t
 			}));
@@ -16126,21 +16206,21 @@ var xu = class {
 		}
 	}
 	#t(e) {
-		let t = Yl();
-		t.commandId !== e.id && (t.commandId = e.id, Xl(t), e.type === "snooze" ? this.#n(e.minutes) : e.type === "sit" ? this.#s("manual") : this.#o("manual"));
+		let t = Ql();
+		t.commandId !== e.id && (t.commandId = e.id, $l(t), e.type === "snooze" ? this.#n(e.minutes) : e.type === "sit" ? this.#s("manual") : this.#o("manual"));
 	}
 	async standUp(e = "manual") {
-		return bu(() => this.#o(e));
+		return Cu(() => this.#o(e));
 	}
 	async sitDown(e = "manual") {
-		return bu(() => this.#s(e));
+		return Cu(() => this.#s(e));
 	}
 	async snooze(e = 5) {
-		return bu(() => this.#n(e));
+		return Cu(() => this.#n(e));
 	}
 	#n(e) {
-		let t = Fl(e, [1, 60], 5), n = Yl();
-		return n.posture === "sitting" ? (n.snoozedUntil = new Date(Date.now() + t * 6e4).toISOString(), n.lastRemindAt = null, n.lastRemindMinute = null, Xl(n), {
+		let t = Rl(e, [1, 60], 5), n = Ql();
+		return n.posture === "sitting" ? (n.snoozedUntil = new Date(Date.now() + t * 6e4).toISOString(), n.lastRemindAt = null, n.lastRemindMinute = null, $l(n), {
 			minutes: t,
 			snoozedUntil: n.snoozedUntil
 		}) : null;
@@ -16149,7 +16229,7 @@ var xu = class {
 		if (this.running && !this.ticking) {
 			this.ticking = !0;
 			try {
-				let e = await yu(() => this.#r());
+				let e = await Su(() => this.#r());
 				e?.remind && await this.#a(e.minutes, e.settings);
 			} catch (e) {
 				console.warn("[sedentary] tick 失败", e);
@@ -16159,32 +16239,32 @@ var xu = class {
 		}
 	}
 	#r() {
-		let e = /* @__PURE__ */ new Date(), t = Yl(), n = ql();
-		return zl().then((r) => {
-			if (!r.enabled) return t.posture = null, t.postureSince = null, t.lastRemindAt = null, t.lastRemindMinute = null, t.snoozedUntil = null, t.lastTickAt = e.toISOString(), Xl(t), Jl(Zl(n)), null;
-			let i = jl(t.lastTickAt), a = i ? Math.max(0, (e - i) / 6e4) : 0;
-			if (i && a > _l) {
-				let r = jl(t.postureSince);
-				return r && (t.postureSince = new Date(r.getTime() + (e.getTime() - i.getTime())).toISOString()), t.lastTickAt = e.toISOString(), Xl(t), Jl(Zl(n)), null;
+		let e = /* @__PURE__ */ new Date(), t = Ql(), n = Xl();
+		return Hl().then((r) => {
+			if (!r.enabled) return t.posture = null, t.postureSince = null, t.lastRemindAt = null, t.lastRemindMinute = null, t.snoozedUntil = null, t.lastTickAt = e.toISOString(), $l(t), Zl(eu(n)), null;
+			let i = Pl(t.lastTickAt), a = i ? Math.max(0, (e - i) / 6e4) : 0;
+			if (i && a > bl) {
+				let r = Pl(t.postureSince);
+				return r && (t.postureSince = new Date(r.getTime() + (e.getTime() - i.getTime())).toISOString()), t.lastTickAt = e.toISOString(), $l(t), Zl(eu(n)), null;
 			}
 			t.posture || (t.posture = "sitting", t.postureSince = e.toISOString());
-			let o = jl(t.postureSince);
-			Ql(n, i ?? o ?? e, e, t.posture), $l(n, t.posture, o, e), t.lastTickAt = e.toISOString();
+			let o = Pl(t.postureSince);
+			tu(n, i ?? o ?? e, e, t.posture), nu(n, t.posture, o, e), t.lastTickAt = e.toISOString();
 			let s = null;
 			if (t.posture === "sitting") {
-				let n = tu(t, e.getTime());
+				let n = K(t, e.getTime());
 				s = this.#i(e, n, r, t);
 			}
-			return Xl(t), Jl(Zl(n)), s;
+			return $l(t), Zl(eu(n)), s;
 		});
 	}
 	#i(e, t, n, r) {
 		if (t < n.thresholdMin) return null;
-		let i = jl(r.snoozedUntil);
+		let i = Pl(r.snoozedUntil);
 		if (i && i > e) return null;
-		let a = kl(e);
+		let a = Ml(e);
 		if (r.lastRemindMinute === a) return null;
-		let o = jl(r.lastRemindAt), s = Math.max(1, n.remindEveryMin) * 6e4;
+		let o = Pl(r.lastRemindAt), s = Math.max(1, n.remindEveryMin) * 6e4;
 		return !o || e.getTime() - o.getTime() >= s ? (r.lastRemindAt = e.toISOString(), r.lastRemindMinute = a, r.snoozedUntil = null, {
 			remind: !0,
 			minutes: Math.round(t),
@@ -16218,48 +16298,48 @@ var xu = class {
 		i === "stand" ? await this.standUp("reminder") : i === "snooze" && await this.snooze(5);
 	}
 	#o(e) {
-		let t = /* @__PURE__ */ new Date(), n = Ol(t), r = ql(), i = Yl(), a = Kl(r, n);
-		if (i.posture !== "sitting") return Jl(Zl(r)), {
+		let t = /* @__PURE__ */ new Date(), n = jl(t), r = Xl(), i = Ql(), a = Yl(r, n);
+		if (i.posture !== "sitting") return Zl(eu(r)), {
 			changed: !1,
 			day: a,
 			source: e
 		};
-		let o = jl(i.postureSince), s = jl(i.lastTickAt);
-		return Ql(r, s && o && s > o ? s : o ?? s ?? t, t, "sitting"), $l(r, "sitting", o, t), a.breaks += 1, i.posture = "standing", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastBreakAt = t.toISOString(), i.lastTickAt = t.toISOString(), Xl(i), Jl(Zl(r)), {
+		let o = Pl(i.postureSince), s = Pl(i.lastTickAt);
+		return tu(r, s && o && s > o ? s : o ?? s ?? t, t, "sitting"), nu(r, "sitting", o, t), a.breaks += 1, i.posture = "standing", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastBreakAt = t.toISOString(), i.lastTickAt = t.toISOString(), $l(i), Zl(eu(r)), {
 			changed: !0,
 			day: a,
 			source: e
 		};
 	}
 	#s(e) {
-		let t = /* @__PURE__ */ new Date(), n = Ol(t), r = ql(), i = Yl(), a = Kl(r, n);
-		if (i.posture !== "standing") return Jl(Zl(r)), {
+		let t = /* @__PURE__ */ new Date(), n = jl(t), r = Xl(), i = Ql(), a = Yl(r, n);
+		if (i.posture !== "standing") return Zl(eu(r)), {
 			changed: !1,
 			day: a,
 			source: e
 		};
-		let o = jl(i.postureSince), s = jl(i.lastTickAt);
-		return Ql(r, s && o && s > o ? s : o ?? s ?? t, t, "standing"), i.posture = "sitting", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastTickAt = t.toISOString(), Xl(i), Jl(Zl(r)), {
+		let o = Pl(i.postureSince), s = Pl(i.lastTickAt);
+		return tu(r, s && o && s > o ? s : o ?? s ?? t, t, "standing"), i.posture = "sitting", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastTickAt = t.toISOString(), $l(i), Zl(eu(r)), {
 			changed: !0,
 			day: a,
 			source: e
 		};
 	}
 };
-async function Su() {
-	let t = /* @__PURE__ */ new Date(), n = Nl(pl, null);
+async function Tu() {
+	let t = /* @__PURE__ */ new Date(), n = Il(gl, null);
 	if (!n || Object.keys(n).length === 0) {
 		let e = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
-		Jl({
-			[Ol(t)]: {
-				date: Ol(t),
+		Zl({
+			[jl(t)]: {
+				date: jl(t),
 				sittingMinutes: 187,
 				standingMinutes: 24,
 				longestStreakMin: 52,
 				breaks: 3
 			},
-			[Ol(e)]: {
-				date: Ol(e),
+			[jl(e)]: {
+				date: jl(e),
 				sittingMinutes: 312,
 				standingMinutes: 41,
 				longestStreakMin: 96,
@@ -16267,7 +16347,7 @@ async function Su() {
 			}
 		});
 	}
-	if (Xl({
+	if ($l({
 		posture: "sitting",
 		postureSince: (/* @__PURE__ */ new Date(t.getTime() - 72e4)).toISOString(),
 		lastRemindAt: null,
@@ -16277,59 +16357,59 @@ async function Su() {
 		lastBreakAt: (/* @__PURE__ */ new Date(t.getTime() - 576e4)).toISOString(),
 		commandId: null
 	}), !e.inHost) {
-		let t = `plugin.${e.pluginId}.${fl}`;
-		Nl(t, null) ?? Pl(t, { ...Sl });
+		let t = `plugin.${e.pluginId}.${hl}`;
+		Il(t, null) ?? Ll(t, { ...Tl });
 	}
 }
-var Cu = null;
-function wu() {
-	return Cu ??= new xu(), Cu;
+var Eu = null;
+function Du() {
+	return Eu ??= new wu(), Eu;
 }
 //#endregion
 //#region public/plugins/sedentary/src/useSedentaryState.js
-function Tu(e) {
-	let t = dl(1e3), [, n] = (0, j.useReducer)((e) => e + 1, 0);
+function Ou(e) {
+	let t = ml(1e3), [, n] = (0, j.useReducer)((e) => e + 1, 0);
 	return (0, j.useEffect)(() => {
 		let e = (e) => {
 			(e.key === null || e.key === "sedentary.days" || e.key === "sedentary.runtime") && n();
 		};
 		return window.addEventListener("storage", e), () => window.removeEventListener("storage", e);
-	}, []), (0, j.useMemo)(() => lu(e, new Date(t)), [e, t]);
+	}, []), (0, j.useMemo)(() => fu(e, new Date(t)), [e, t]);
 }
 //#endregion
 //#region public/plugins/sedentary/src/sizes.js
-var Eu = {
+var ku = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function Du(e) {
+function Au(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return Eu[t] ? t : "2x1";
+	return ku[t] ? t : "2x1";
 }
-function Ou() {
+function ju() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return Eu[n] ? n : null;
+	return ku[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryApp.jsx
-var ku = {
+var Mu = {
 	success: "success",
 	warning: "warning",
 	danger: "danger",
 	resting: "informative",
 	off: "subtle"
-}, Au = {
+}, Nu = {
 	success: V.colorStatusSuccessForeground1,
 	warning: V.colorStatusWarningForeground1,
 	danger: V.colorStatusDangerForeground1,
 	resting: V.colorBrandForeground1,
 	off: V.colorNeutralForeground4
-}, ju = Yn({
+}, Pu = Yn({
 	root: {
 		minWidth: 0,
 		minHeight: 0,
@@ -16342,50 +16422,37 @@ var ku = {
 		gap: V.spacingVerticalS,
 		padding: V.spacingVerticalS
 	},
+	identityStart: { alignSelf: "flex-start" },
 	rootRow: {
-		flexDirection: "row",
+		gap: V.spacingVerticalS,
+		paddingBlock: V.spacingVerticalS,
+		paddingInline: V.spacingHorizontalM
+	},
+	rowBody: {
+		display: "flex",
+		flex: "1 1 auto",
 		alignItems: "center",
-		gap: V.spacingHorizontalS,
-		padding: `${V.spacingVerticalS} ${V.spacingHorizontalM}`
+		justifyContent: "space-between",
+		gap: V.spacingHorizontalM,
+		minHeight: 0
 	},
 	rootMedium: {
 		gap: V.spacingVerticalS,
 		padding: V.spacingVerticalM
 	},
 	rootWide: {
+		gap: V.spacingVerticalS,
+		paddingBlock: V.spacingVerticalM,
+		paddingInline: V.spacingHorizontalL
+	},
+	wideBody: {
 		display: "grid",
 		gridTemplateColumns: "minmax(0, 1.15fr) minmax(0, 1fr) auto",
 		alignItems: "center",
 		columnGap: V.spacingHorizontalXL,
 		rowGap: V.spacingVerticalS,
-		padding: `${V.spacingVerticalM} ${V.spacingHorizontalL}`
-	},
-	rowMain: {
-		display: "flex",
-		flex: 1,
-		flexDirection: "column",
-		gap: V.spacingVerticalXS,
-		minWidth: 0
-	},
-	rowHead: {
-		display: "flex",
-		alignItems: "center",
-		flexWrap: "nowrap",
-		whiteSpace: "nowrap",
-		gap: V.spacingHorizontalS,
-		minWidth: 0
-	},
-	hintRow: {
-		display: "flex",
-		alignItems: "center",
-		gap: V.spacingHorizontalXS,
-		minWidth: 0
-	},
-	statusDot: {
-		flexShrink: 0,
-		width: V.spacingHorizontalM,
-		height: V.spacingHorizontalM,
-		borderRadius: V.borderRadiusCircular
+		flex: "1 1 auto",
+		minHeight: 0
 	},
 	wideMain: {
 		display: "flex",
@@ -16403,6 +16470,18 @@ var ku = {
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "flex-end"
+	},
+	trailingHint: {
+		display: "inline-flex",
+		alignItems: "center",
+		gap: V.spacingHorizontalXS,
+		minWidth: 0
+	},
+	statusDot: {
+		flexShrink: 0,
+		width: V.spacingHorizontalM,
+		height: V.spacingHorizontalM,
+		borderRadius: V.borderRadiusCircular
 	},
 	statsRow: {
 		display: "flex",
@@ -16439,24 +16518,34 @@ var ku = {
 		marginTop: "auto",
 		alignItems: "center",
 		gap: V.spacingHorizontalS
+	},
+	emptyCard: {
+		alignItems: "center",
+		justifyContent: "center",
+		padding: V.spacingVerticalL
+	},
+	emptyCardCompact: {
+		alignItems: "center",
+		justifyContent: "center",
+		padding: V.spacingVerticalS
 	}
 });
-function Mu({ fallbackSizeKey: t }) {
-	let n = ju(), r = oc(Du, t || "2x1"), [i] = cc(fl, Sl, Rl), a = Tu(i), o = Ac("normal"), s = r === "1x1", c = r === "2x1", l = r === "3x2";
+function Fu({ fallbackSizeKey: t }) {
+	let n = Pu(), r = cc(Au, t || "2x1"), [i] = uc(hl, Tl, Vl), a = Ou(i), o = Mc("normal"), s = r === "1x1", c = r === "2x1", l = r === "3x2";
 	(0, j.useEffect)(() => {
 		if (e.inHost) return;
-		let t = wu();
+		let t = Du();
 		return t.start(), () => t.stop();
 	}, []);
-	let u = (0, j.useCallback)(() => uc("detail", "久坐详情"), []), d = a.posture === "standing", f = (0, j.useCallback)((e) => {
-		e.stopPropagation(), i.enabled && (d ? hu() : mu());
-	}, [i.enabled, d]), p = a.postureLabel || "久坐提醒", m = i.enabled ? `${a.statusLabel}，${p} ${a.currentMin} 分钟；点击打开详情` : "久坐提醒已关闭；点击打开详情", h = /* @__PURE__ */ (0, M.jsx)(ws, {
+	let u = (0, j.useCallback)(() => fc("detail", "久坐详情"), []), d = a.posture === "standing", f = (0, j.useCallback)((e) => {
+		e.stopPropagation(), i.enabled && (d ? vu() : _u());
+	}, [i.enabled, d]), p = a.postureLabel || "久坐提醒", m = i.enabled ? `${a.statusLabel}，${p} ${a.currentMin} 分钟；点击打开详情` : "久坐提醒已关闭；点击打开详情", h = /* @__PURE__ */ (0, M.jsx)(Es, {
 		appearance: "tint",
-		color: ku[a.status] ?? "informative",
+		color: Mu[a.status] ?? "informative",
 		size: "large",
 		"aria-label": `状态：${a.statusLabel}`,
 		children: a.statusLabel
-	}), g = a.status === "resting" ? null : h, _ = [
+	}), g = [
 		{
 			key: "sitting",
 			label: "今日久坐",
@@ -16475,118 +16564,167 @@ function Mu({ fallbackSizeKey: t }) {
 			value: a.today.breaks,
 			unit: "次"
 		}
-	], v = (e) => /* @__PURE__ */ (0, M.jsxs)("div", {
+	], _ = (e) => /* @__PURE__ */ (0, M.jsxs)("div", {
 		className: n.stat,
-		children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+		children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 			size: 200,
 			className: n.statLabel,
 			children: e.label
 		}), /* @__PURE__ */ (0, M.jsxs)("div", {
 			className: n.statValueRow,
-			children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+			children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 500,
 				weight: "semibold",
 				className: n.statValue,
 				children: e.value
-			}), /* @__PURE__ */ (0, M.jsx)(Ks, {
+			}), /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 200,
 				className: n.statLabel,
 				children: e.unit
 			})]
 		})]
-	}, e.key), y = /* @__PURE__ */ (0, M.jsx)(el, {
+	}, e.key), v = /* @__PURE__ */ (0, M.jsx)(rl, {
 		appearance: "primary",
 		icon: d ? /* @__PURE__ */ (0, M.jsx)(Bo, {}) : /* @__PURE__ */ (0, M.jsx)(Vo, {}),
 		onClick: f,
 		disabled: !i.enabled,
 		"aria-label": d ? "我坐下了" : "我站起来了",
 		children: d ? "我坐下了" : "我站起来了"
-	}), b = d ? "休息中" : a.hint;
-	return s ? /* @__PURE__ */ (0, M.jsxs)(Uc, {
+	}), y = d ? "休息中" : a.hint;
+	if (!i.enabled) {
+		let e = /* @__PURE__ */ (0, M.jsx)(rl, {
+			appearance: "primary",
+			onClick: (e) => {
+				e.stopPropagation(), pc();
+			},
+			children: "打开设置"
+		});
+		return s || c ? /* @__PURE__ */ (0, M.jsx)(Gc, {
+			ariaLabel: m,
+			onActivate: u,
+			className: T(n.root, n.emptyCardCompact),
+			children: /* @__PURE__ */ (0, M.jsx)(tl, {
+				icon: /* @__PURE__ */ (0, M.jsx)(U, {}),
+				iconAccent: "green",
+				title: "提醒已关闭",
+				action: e,
+				style: {
+					padding: 0,
+					gap: V.spacingVerticalXS
+				}
+			})
+		}) : /* @__PURE__ */ (0, M.jsx)(Gc, {
+			ariaLabel: m,
+			onActivate: u,
+			className: T(n.root, n.emptyCard),
+			children: /* @__PURE__ */ (0, M.jsx)(tl, {
+				icon: /* @__PURE__ */ (0, M.jsx)(U, {}),
+				iconAccent: "green",
+				title: "提醒已关闭",
+				description: "开启后按久坐时长提醒起身",
+				action: e
+			})
+		});
+	}
+	return s ? /* @__PURE__ */ (0, M.jsxs)(Gc, {
 		ariaLabel: m,
 		onActivate: u,
 		className: T(n.root, n.rootCompact),
-		children: [h, /* @__PURE__ */ (0, M.jsx)(Jc, {
-			value: a.currentMin,
-			unit: "分钟",
-			size: 48
-		})]
-	}) : c ? /* @__PURE__ */ (0, M.jsxs)(Uc, {
+		children: [
+			/* @__PURE__ */ (0, M.jsx)(Jc, {
+				className: n.identityStart,
+				icon: /* @__PURE__ */ (0, M.jsx)(H, {}),
+				accent: "green",
+				compact: !0
+			}),
+			h,
+			/* @__PURE__ */ (0, M.jsx)(Zc, {
+				value: a.currentMin,
+				unit: "分钟",
+				size: 48
+			})
+		]
+	}) : c ? /* @__PURE__ */ (0, M.jsxs)(Gc, {
 		ariaLabel: m,
 		onActivate: u,
 		className: T(n.root, n.rootRow),
-		children: [/* @__PURE__ */ (0, M.jsxs)("div", {
-			className: n.rowMain,
-			children: [/* @__PURE__ */ (0, M.jsx)("div", {
-				className: n.rowHead,
-				children: /* @__PURE__ */ (0, M.jsx)(Jc, {
-					value: a.currentMin,
-					unit: "分钟",
-					size: 68
-				})
-			}), /* @__PURE__ */ (0, M.jsxs)("div", {
-				className: n.hintRow,
+		children: [/* @__PURE__ */ (0, M.jsx)(Jc, {
+			icon: /* @__PURE__ */ (0, M.jsx)(H, {}),
+			label: "久坐",
+			accent: "green",
+			trailing: /* @__PURE__ */ (0, M.jsxs)("span", {
+				className: n.trailingHint,
 				children: [/* @__PURE__ */ (0, M.jsx)("span", {
 					className: n.statusDot,
-					style: { backgroundColor: Au[a.status] },
+					style: { backgroundColor: Nu[a.status] },
 					"aria-hidden": "true"
-				}), b ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+				}), y ? /* @__PURE__ */ (0, M.jsx)(Js, {
 					size: 300,
 					className: n.hint,
 					style: o,
-					children: b
+					children: y
 				}) : null]
-			})]
-		}), y]
-	}) : l ? /* @__PURE__ */ (0, M.jsxs)(Uc, {
+			})
+		}), /* @__PURE__ */ (0, M.jsxs)("div", {
+			className: n.rowBody,
+			children: [/* @__PURE__ */ (0, M.jsx)(Zc, {
+				value: a.currentMin,
+				unit: "分钟",
+				size: 68
+			}), v]
+		})]
+	}) : l ? /* @__PURE__ */ (0, M.jsxs)(Gc, {
 		ariaLabel: m,
 		onActivate: u,
 		className: T(n.root, n.rootWide),
-		children: [
-			/* @__PURE__ */ (0, M.jsxs)("div", {
-				className: n.wideMain,
-				children: [
-					/* @__PURE__ */ (0, M.jsx)(Gc, {
-						title: d ? "站立休息" : "连续久坐",
-						trailing: g
-					}),
-					/* @__PURE__ */ (0, M.jsx)(Jc, {
+		children: [/* @__PURE__ */ (0, M.jsx)(Jc, {
+			icon: /* @__PURE__ */ (0, M.jsx)(H, {}),
+			label: "久坐",
+			accent: "green",
+			trailing: h
+		}), /* @__PURE__ */ (0, M.jsxs)("div", {
+			className: n.wideBody,
+			children: [
+				/* @__PURE__ */ (0, M.jsxs)("div", {
+					className: n.wideMain,
+					children: [/* @__PURE__ */ (0, M.jsx)(Zc, {
 						value: a.currentMin,
 						unit: "分钟",
 						size: 96
-					}),
-					a.hint ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+					}), a.hint ? /* @__PURE__ */ (0, M.jsx)(Js, {
 						size: 300,
 						className: n.hint,
 						style: o,
 						children: a.hint
-					}) : null
-				]
-			}),
-			/* @__PURE__ */ (0, M.jsx)("div", {
-				className: n.wideStats,
-				children: _.map(v)
-			}),
-			/* @__PURE__ */ (0, M.jsx)("div", {
-				className: n.wideActions,
-				children: y
-			})
-		]
-	}) : /* @__PURE__ */ (0, M.jsxs)(Uc, {
+					}) : null]
+				}),
+				/* @__PURE__ */ (0, M.jsx)("div", {
+					className: n.wideStats,
+					children: g.map(_)
+				}),
+				/* @__PURE__ */ (0, M.jsx)("div", {
+					className: n.wideActions,
+					children: v
+				})
+			]
+		})]
+	}) : /* @__PURE__ */ (0, M.jsxs)(Gc, {
 		ariaLabel: m,
 		onActivate: u,
 		className: T(n.root, n.rootMedium),
 		children: [
-			/* @__PURE__ */ (0, M.jsx)(Gc, {
-				title: d ? "站立休息" : "连续久坐",
-				trailing: g
-			}),
 			/* @__PURE__ */ (0, M.jsx)(Jc, {
+				icon: /* @__PURE__ */ (0, M.jsx)(H, {}),
+				label: "久坐",
+				accent: "green",
+				trailing: h
+			}),
+			/* @__PURE__ */ (0, M.jsx)(Zc, {
 				value: a.currentMin,
 				unit: "分钟",
 				size: 80
 			}),
-			a.hint ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			a.hint ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 300,
 				className: n.hint,
 				style: o,
@@ -16594,18 +16732,18 @@ function Mu({ fallbackSizeKey: t }) {
 			}) : null,
 			/* @__PURE__ */ (0, M.jsx)("div", {
 				className: n.statsRow,
-				children: _.slice(0, 2).map(v)
+				children: g.slice(0, 2).map(_)
 			}),
 			/* @__PURE__ */ (0, M.jsx)("div", {
 				className: n.actions,
-				children: y
+				children: v
 			})
 		]
 	});
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryDetail.jsx
-var Nu = Yn({
+var Iu = Yn({
 	headerText: {
 		display: "flex",
 		flexDirection: "column",
@@ -16656,22 +16794,22 @@ var Nu = Yn({
 	dayLabel: { color: V.colorNeutralForeground2 },
 	emptyWrap: { minWidth: 0 }
 });
-function Pu({ label: e, value: t, unit: n }) {
-	let r = Nu();
+function Lu({ label: e, value: t, unit: n }) {
+	let r = Iu();
 	return /* @__PURE__ */ (0, M.jsxs)("div", {
 		className: r.stat,
-		children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+		children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 			size: 200,
 			className: r.muted,
 			children: e
 		}), /* @__PURE__ */ (0, M.jsxs)("div", {
 			className: r.statValueRow,
-			children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+			children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 600,
 				weight: "semibold",
 				className: r.statValue,
 				children: t
-			}), n ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+			}), n ? /* @__PURE__ */ (0, M.jsx)(Js, {
 				size: 200,
 				className: r.muted,
 				children: n
@@ -16679,12 +16817,12 @@ function Pu({ label: e, value: t, unit: n }) {
 		})]
 	});
 }
-function Fu() {
-	let e = Nu(), [t] = cc(fl, Sl, Rl), n = Tu(t), r = n.posture === "standing", i = n.posture === "sitting", a = (0, j.useCallback)((e) => {
-		e?.stopPropagation?.(), t.enabled && (r ? hu() : mu());
+function Ru() {
+	let e = Iu(), [t] = uc(hl, Tl, Vl), n = Ou(t), r = n.posture === "standing", i = n.posture === "sitting", a = (0, j.useCallback)((e) => {
+		e?.stopPropagation?.(), t.enabled && (r ? vu() : _u());
 	}, [t.enabled, r]), o = (0, j.useCallback)((e) => {
-		e?.stopPropagation?.(), gu();
-	}, []), s = t.enabled ? i ? `连续久坐 ${n.currentMin} 分钟` : r ? `站立休息 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", c = t.enabled && i ? n.hint : "", l = /* @__PURE__ */ (0, M.jsx)(tl, {
+		e?.stopPropagation?.(), yu();
+	}, []), s = t.enabled ? i ? `连续久坐 ${n.currentMin} 分钟` : r ? `站立休息 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", c = t.enabled && i ? n.hint : "", l = /* @__PURE__ */ (0, M.jsx)(il, {
 		appearance: "primary",
 		icon: r ? /* @__PURE__ */ (0, M.jsx)(Bo, {}) : /* @__PURE__ */ (0, M.jsx)(Vo, {}),
 		onClick: a,
@@ -16692,60 +16830,60 @@ function Fu() {
 		"aria-label": r ? "我坐下了" : "我站起来了",
 		children: r ? "我坐下了" : "我站起来了"
 	});
-	return /* @__PURE__ */ (0, M.jsxs)(rl, { children: [
-		/* @__PURE__ */ (0, M.jsx)(al, {
-			trailing: /* @__PURE__ */ (0, M.jsx)(tl, {
-				onClick: () => dc(),
+	return /* @__PURE__ */ (0, M.jsxs)(ol, { children: [
+		/* @__PURE__ */ (0, M.jsx)(cl, {
+			trailing: /* @__PURE__ */ (0, M.jsx)(il, {
+				onClick: () => pc(),
 				"aria-label": "打开久坐设置",
 				children: "设置…"
 			}),
 			children: /* @__PURE__ */ (0, M.jsxs)("div", {
 				className: e.headerText,
-				children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+				children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 					size: 400,
 					weight: "semibold",
 					children: s
-				}), c ? /* @__PURE__ */ (0, M.jsx)(Ks, {
+				}), c ? /* @__PURE__ */ (0, M.jsx)(Js, {
 					size: 200,
 					className: e.muted,
 					children: c
 				}) : null]
 			})
 		}),
-		n.hasData ? /* @__PURE__ */ (0, M.jsxs)(sl, { children: [l, n.snoozable ? /* @__PURE__ */ (0, M.jsx)(tl, {
+		n.hasData ? /* @__PURE__ */ (0, M.jsxs)(ul, { children: [l, n.snoozable ? /* @__PURE__ */ (0, M.jsx)(il, {
 			onClick: o,
 			children: "稍后 5 分钟"
 		}) : null] }) : null,
-		/* @__PURE__ */ (0, M.jsx)(ul, { children: /* @__PURE__ */ (0, M.jsx)(Dc, {
+		/* @__PURE__ */ (0, M.jsx)(pl, { children: /* @__PURE__ */ (0, M.jsx)(kc, {
 			value: n.hasData ? "data" : "empty",
 			children: n.hasData ? /* @__PURE__ */ (0, M.jsxs)("div", {
 				className: e.content,
 				children: [/* @__PURE__ */ (0, M.jsxs)("section", {
 					className: e.section,
 					"aria-label": "今日统计",
-					children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+					children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 						size: 400,
 						weight: "semibold",
 						children: "今日统计"
 					}), /* @__PURE__ */ (0, M.jsxs)("div", {
 						className: e.statGrid,
 						children: [
-							/* @__PURE__ */ (0, M.jsx)(Pu, {
+							/* @__PURE__ */ (0, M.jsx)(Lu, {
 								label: "今日久坐",
 								value: Math.round(n.today.sittingMinutes),
 								unit: "分钟"
 							}),
-							/* @__PURE__ */ (0, M.jsx)(Pu, {
+							/* @__PURE__ */ (0, M.jsx)(Lu, {
 								label: "今日站立",
 								value: Math.round(n.today.standingMinutes),
 								unit: "分钟"
 							}),
-							/* @__PURE__ */ (0, M.jsx)(Pu, {
+							/* @__PURE__ */ (0, M.jsx)(Lu, {
 								label: "起身次数",
 								value: n.today.breaks,
 								unit: "次"
 							}),
-							/* @__PURE__ */ (0, M.jsx)(Pu, {
+							/* @__PURE__ */ (0, M.jsx)(Lu, {
 								label: "最长连续坐",
 								value: Math.round(n.today.longestStreakMin),
 								unit: "分钟"
@@ -16755,19 +16893,19 @@ function Fu() {
 				}), /* @__PURE__ */ (0, M.jsxs)("section", {
 					className: e.section,
 					"aria-label": "最近 7 天",
-					children: [/* @__PURE__ */ (0, M.jsx)(Ks, {
+					children: [/* @__PURE__ */ (0, M.jsx)(Js, {
 						size: 400,
 						weight: "semibold",
 						children: "最近 7 天"
 					}), /* @__PURE__ */ (0, M.jsx)("div", {
 						className: e.days,
-						children: n.recentDays.map((t) => /* @__PURE__ */ (0, M.jsx)(Xc, {
+						children: n.recentDays.map((t) => /* @__PURE__ */ (0, M.jsx)($c, {
 							title: /* @__PURE__ */ (0, M.jsx)("span", {
 								className: e.dayLabel,
 								children: t.label
 							}),
 							subtitle: `站立 ${Math.round(t.standingMinutes)} 分钟 · 起身 ${t.breaks} 次`,
-							trailing: /* @__PURE__ */ (0, M.jsxs)(Ks, {
+							trailing: /* @__PURE__ */ (0, M.jsxs)(Js, {
 								size: 400,
 								weight: "semibold",
 								className: e.statValue,
@@ -16779,8 +16917,8 @@ function Fu() {
 				})]
 			}) : /* @__PURE__ */ (0, M.jsx)("div", {
 				className: e.emptyWrap,
-				children: /* @__PURE__ */ (0, M.jsx)(Qc, {
-					icon: /* @__PURE__ */ (0, M.jsx)(H, {}),
+				children: /* @__PURE__ */ (0, M.jsx)(tl, {
+					icon: /* @__PURE__ */ (0, M.jsx)(Ho, {}),
 					title: "还没有今天的记录",
 					action: l
 				})
@@ -16790,8 +16928,8 @@ function Fu() {
 }
 //#endregion
 //#region public/plugins/sedentary/src/main.jsx
-$s();
-var Iu = new URLSearchParams(location.search), Lu = lc(), Ru = Iu.get("background") === "1", zu = Ou(), Bu = [
+tc();
+var zu = new URLSearchParams(location.search), Bu = dc(), Vu = zu.get("background") === "1", Hu = ju(), Uu = [
 	{
 		name: "sedentary.status",
 		description: "读取久坐状态：当前姿态、当前状态持续分钟、今日久坐/站立分钟、起身次数、距离下次提醒时间",
@@ -16916,23 +17054,23 @@ var Iu = new URLSearchParams(location.search), Lu = lc(), Ru = Iu.get("backgroun
 		}
 	}
 ];
-function Vu(t = 2500) {
-	return !e.inHost || ec() ? Promise.resolve() : new Promise((e) => {
+function Wu(t = 2500) {
+	return !e.inHost || nc() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
-			(ec() || Date.now() - n > t) && (window.clearInterval(r), e());
+			(nc() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function Hu() {
+function Gu() {
 	return (0, j.useEffect)(() => {
-		let e = wu();
-		return e.start(), Hl(), () => e.stop();
-	}, []), _c(Bu, {
-		"sedentary.status": async () => uu(await zl()),
-		"sedentary.today": () => du(),
+		let e = Du();
+		return e.start(), Gl(), () => e.stop();
+	}, []), yc(Uu, {
+		"sedentary.status": async () => pu(await Hl()),
+		"sedentary.today": () => mu(),
 		"sedentary.standUp": async () => {
-			if (!(await zl()).enabled) throw Error("久坐提醒已关闭");
-			let e = await wu().standUp("agent");
+			if (!(await Hl()).enabled) throw Error("久坐提醒已关闭");
+			let e = await Du().standUp("agent");
 			if (!e.changed) throw Error("当前已经是站立状态");
 			return {
 				posture: "standing",
@@ -16940,8 +17078,8 @@ function Hu() {
 			};
 		},
 		"sedentary.sitDown": async () => {
-			if (!(await zl()).enabled) throw Error("久坐提醒已关闭");
-			let e = await wu().sitDown("agent");
+			if (!(await Hl()).enabled) throw Error("久坐提醒已关闭");
+			let e = await Du().sitDown("agent");
 			if (!e.changed) throw Error("当前已经是坐着状态");
 			return {
 				posture: "sitting",
@@ -16950,24 +17088,24 @@ function Hu() {
 			};
 		},
 		"sedentary.snooze": async () => {
-			let e = await zl();
+			let e = await Hl();
 			if (!e.enabled) throw Error("久坐提醒已关闭");
-			if (!lu(e).snoozable) throw Error("当前没有可推迟的提醒");
-			let t = await wu().snooze();
+			if (!fu(e).snoozable) throw Error("当前没有可推迟的提醒");
+			let t = await Du().snooze();
 			if (!t) throw Error("当前不在久坐计时中");
 			return {
 				snoozedUntil: t.snoozedUntil,
-				status: uu(e)
+				status: pu(e)
 			};
 		},
-		"sedentary.stats": async (e = {}) => fu(ql(), e.range, /* @__PURE__ */ new Date(), e.from, e.to),
-		"sedentary.settings.get": async () => ({ settings: await zl() }),
-		"sedentary.settings.set": async (e) => ({ settings: await Ul(e) })
+		"sedentary.stats": async (e = {}) => hu(Xl(), e.range, /* @__PURE__ */ new Date(), e.from, e.to),
+		"sedentary.settings.get": async () => ({ settings: await Hl() }),
+		"sedentary.settings.set": async (e) => ({ settings: await Kl(e) })
 	}), null;
 }
-function Uu() {
-	let { theme: t } = ac(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, M.jsx)(Mu, { fallbackSizeKey: zu });
-	return Ru ? r = /* @__PURE__ */ (0, M.jsx)(Hu, {}) : Lu === "detail" && (r = /* @__PURE__ */ (0, M.jsx)(Fu, {})), /* @__PURE__ */ (0, M.jsx)(wo, {
+function Ku() {
+	let { theme: t } = sc(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, M.jsx)(Fu, { fallbackSizeKey: Hu });
+	return Vu ? r = /* @__PURE__ */ (0, M.jsx)(Gu, {}) : Bu === "detail" && (r = /* @__PURE__ */ (0, M.jsx)(Ru, {})), /* @__PURE__ */ (0, M.jsx)(wo, {
 		theme: t,
 		style: {
 			width: "100%",
@@ -16978,9 +17116,9 @@ function Uu() {
 		children: r
 	});
 }
-async function Wu() {
+async function qu() {
 	let e = document.getElementById("root");
-	e && (await Vu(), Iu.get("demo") === "1" && await Su(), (0, qs.createRoot)(e).render(/* @__PURE__ */ (0, M.jsx)(Uu, {})));
+	e && (await Wu(), zu.get("demo") === "1" && await Tu(), (0, Ys.createRoot)(e).render(/* @__PURE__ */ (0, M.jsx)(Ku, {})));
 }
-Wu();
+qu();
 //#endregion

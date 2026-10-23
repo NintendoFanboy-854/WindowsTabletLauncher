@@ -2,8 +2,10 @@
  * 时钟卡片（L0）：纯展示，主体点击 / Enter / Space 打开宿主详情浮层。
  *
  * 信息预算（docs/components/clock.md）：
+ * - 所有档位内容区第一行是 `CardIdentity`（D-32）：1×1 只显示 24×24 accent chip；
+ *   2×1 / 3×2 显示 chip + 「时钟」，2×1 把日期收进行尾 trailing；
  * - 1×1：只显示 HH:MM，Display XL 48（D-07）；
- * - 2×1：时间 68 + 秒 16 + 日期 16；
+ * - 2×1：时间 68 + 秒 16；日期 14 在 identity 行尾；
  * - 3×2：时间 112 + 秒 16 + 日期/星期 20。
  *
  * 长按 / 右键 / hover 由 CardRoot 内部的 useHostCardGesture 交给宿主；插件不写任何
@@ -12,10 +14,11 @@
 
 import { useMemo } from 'react';
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { Clock16Regular } from '@fluentui/react-icons';
 
 import { requestOverlay, useAgentTools, useHostSize, useStoredConfig } from '../../_shared/host.js';
 import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
-import { CardRoot, useNow } from '../../_shared/ui.jsx';
+import { CardIdentity, CardRoot, useNow } from '../../_shared/ui.jsx';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
@@ -52,11 +55,17 @@ const useStyles = makeStyles({
     paddingInline: tokens.spacingHorizontalM,
     gap: tokens.spacingVerticalXS,
   },
-  /** 3×2：12 纵 / 16 横，组间距 8 */
+  /** 3×2：12 纵 / 16 横；header / 时间 / 日期三段分布，时间落在卡面中心 */
   rootLarge: {
     paddingBlock: tokens.spacingVerticalM,
     paddingInline: tokens.spacingHorizontalL,
     gap: tokens.spacingVerticalS,
+    justifyContent: 'space-between',
+  },
+  /** identity 行铺满内容宽度：chip 固定左上，trailing 贴右缘（clock / 2×1 的日期）。 */
+  identityRow: {
+    alignSelf: 'stretch',
+    minWidth: 0,
   },
   timeRow: {
     display: 'flex',
@@ -141,6 +150,20 @@ export default function ClockApp() {
       data-clock-root="true"
       data-clock-size={sizeKey}
     >
+      <CardIdentity
+        icon={<Clock16Regular />}
+        label="时钟"
+        accent="blue"
+        compact={compact}
+        className={styles.identityRow}
+        trailing={
+          compact || large ? null : (
+            <Text size={300} data-clock-date="true">
+              {date.date}
+            </Text>
+          )
+        }
+      />
       <div className={styles.timeRow}>
         <span
           data-clock-time="true"
@@ -170,13 +193,13 @@ export default function ClockApp() {
           </Text>
         ) : null}
       </div>
-      {!compact ? (
+      {large ? (
         <Text
           data-clock-date="true"
-          size={large ? 500 : 400}
+          size={500}
           className={styles.date}
         >
-          {large ? `${date.date} ${date.weekday}` : date.date}
+          {`${date.date} ${date.weekday}`}
         </Text>
       ) : null}
     </CardRoot>

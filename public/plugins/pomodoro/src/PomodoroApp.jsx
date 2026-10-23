@@ -2,10 +2,10 @@
  * 番茄钟卡片（L0）。
  *
  * 信息预算（docs/components/pomodoro.md）：
- * - 1×1：剩余时间 48 + 阶段 14 + 2px 进度；不放按钮，点卡体进详情
- * - 2×1：时间 68 + 阶段 +「开始/暂停」40 +「重置」40
- * - 2×2：时间 80 + 阶段 + 当前任务 + 今日统计一行 + 两个 40 按钮
- * - 3×2：时间 96 + 进度 + 阶段 + 任务 + 两条今日统计 + 轮次 + 两个 40 按钮
+ * - 1×1：identity chip（compact）+ 剩余时间 48 + 阶段 14 + 2px 进度；不放按钮，点卡体进详情
+ * - 2×1：identity 行（chip +「番茄钟」+ trailing 阶段）+ 时间 68 + 两个 40 按钮
+ * - 2×2：identity 行 + 时间 80 + 阶段 + 当前任务 + 今日统计一行 + 两个 40 按钮
+ * - 3×2：identity 行（trailing 轮次）+ 进度 + 时间 96 + 任务 + 两条今日统计 + 两个 40 按钮
  *
  * 卡片主体点击 = 打开 L1；快捷按钮 stopPropagation，不打开详情。
  * 长按/右键/hover 全部交给 CardRoot（useHostCardGesture），这里不处理。
@@ -24,11 +24,12 @@ import {
   ArrowReset20Regular,
   Pause20Filled,
   Play20Filled,
+  Timer16Regular,
 } from '@fluentui/react-icons';
 import { requestOverlay, useAgentTools, useHostSize, useStoredConfig } from '../../_shared/host.js';
 import { useMotionTransition } from '../../_shared/motion.js';
 import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
-import { CardRoot, TouchButton } from '../../_shared/ui.jsx';
+import { CardIdentity, CardRoot, TouchButton } from '../../_shared/ui.jsx';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
@@ -50,13 +51,21 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXS,
     padding: tokens.spacingVerticalS,
   },
+  identityTop: {
+    alignSelf: 'flex-start',
+  },
   root21: {
-    flexDirection: 'row',
+    gap: tokens.spacingVerticalS,
+    paddingBlock: tokens.spacingVerticalS,
+    paddingInline: tokens.spacingHorizontalM,
+  },
+  row21Body: {
+    display: 'flex',
+    flex: '1 1 auto',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalM,
-    paddingBlock: tokens.spacingVerticalS,
-    paddingInline: tokens.spacingHorizontalM,
+    minHeight: 0,
   },
   root22: {
     alignItems: 'center',
@@ -69,13 +78,6 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalS,
     paddingBlock: tokens.spacingVerticalM,
     paddingInline: tokens.spacingHorizontalL,
-  },
-  mainColumn: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
   },
   wide: {
     display: 'grid',
@@ -251,6 +253,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
       {snapshot.phaseLabel}
     </Text>
   );
+  const roundText = `第 ${snapshot.roundInCycle} / ${snapshot.roundsBeforeLongBreak} 轮`;
   const taskTitle = snapshot.taskTitle || '未关联任务';
   const toggleText = toggleTextOf(snapshot);
   const cardLabel = `${snapshot.phaseLabel} ${snapshot.remainingText}，${
@@ -259,7 +262,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
 
   const actions = <CardActions styles={styles} snapshot={snapshot} onToggle={toggle} onReset={reset} />;
 
-  /* ---- 1×1：时间 48 + 阶段 + 2px 进度；无按钮 ---- */
+  /* ---- 1×1：identity chip + 时间 48 + 阶段 + 2px 进度；无按钮 ---- */
   if (compact) {
     return (
       <CardRoot
@@ -270,6 +273,12 @@ export default function PomodoroApp({ fallbackSizeKey }) {
         data-pomodoro-phase={snapshot.phase}
         data-pomodoro-running={snapshot.running ? 'true' : 'false'}
       >
+        <CardIdentity
+          className={styles.identityTop}
+          icon={<Timer16Regular />}
+          accent="orange"
+          compact
+        />
         <span className={mergeClasses(styles.time, styles.time48)} data-pomodoro-time>
           {snapshot.remainingText}
         </span>
@@ -284,7 +293,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     );
   }
 
-  /* ---- 2×1：时间 68 + 阶段 + 两个 40 按钮 ---- */
+  /* ---- 2×1：identity 行（trailing 阶段）+ 时间 68 + 两个 40 按钮 ---- */
   if (row) {
     return (
       <CardRoot
@@ -295,18 +304,23 @@ export default function PomodoroApp({ fallbackSizeKey }) {
         data-pomodoro-phase={snapshot.phase}
         data-pomodoro-running={snapshot.running ? 'true' : 'false'}
       >
-        <div className={styles.mainColumn}>
+        <CardIdentity
+          icon={<Timer16Regular />}
+          label="番茄钟"
+          accent="orange"
+          trailing={phaseText}
+        />
+        <div className={styles.row21Body}>
           <span className={mergeClasses(styles.time, styles.time68)} data-pomodoro-time>
             {snapshot.remainingText}
           </span>
-          {phaseText}
+          {actions}
         </div>
-        {actions}
       </CardRoot>
     );
   }
 
-  /* ---- 3×2：进度 + 时间 96 + 阶段 / 任务 + 两条统计 + 轮次 + 按钮 ---- */
+  /* ---- 3×2：identity 行（trailing 轮次）+ 进度 + 时间 96 + 任务 + 两条统计 + 按钮 ---- */
   if (wide) {
     return (
       <CardRoot
@@ -317,6 +331,16 @@ export default function PomodoroApp({ fallbackSizeKey }) {
         data-pomodoro-phase={snapshot.phase}
         data-pomodoro-running={snapshot.running ? 'true' : 'false'}
       >
+        <CardIdentity
+          icon={<Timer16Regular />}
+          label="番茄钟"
+          accent="orange"
+          trailing={
+            <Text size={200} className={styles.round}>
+              {roundText}
+            </Text>
+          }
+        />
         <ProgressBar
           className={styles.progressTop}
           value={snapshot.progress}
@@ -341,9 +365,6 @@ export default function PomodoroApp({ fallbackSizeKey }) {
               <Text size={300} className={styles.statLine}>
                 专注 {snapshot.today.focusMinutes} 分钟
               </Text>
-              <Text size={200} className={styles.round}>
-                第 {snapshot.roundInCycle} / {snapshot.roundsBeforeLongBreak} 轮
-              </Text>
             </div>
             {actions}
           </div>
@@ -352,7 +373,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     );
   }
 
-  /* ---- 2×2：时间 80 + 阶段 + 任务 + 今日统计一行 + 按钮 ---- */
+  /* ---- 2×2：identity 行 + 时间 80 + 阶段 + 任务 + 今日统计一行 + 按钮 ---- */
   return (
     <CardRoot
       ariaLabel={cardLabel}
@@ -362,6 +383,7 @@ export default function PomodoroApp({ fallbackSizeKey }) {
       data-pomodoro-phase={snapshot.phase}
       data-pomodoro-running={snapshot.running ? 'true' : 'false'}
     >
+      <CardIdentity icon={<Timer16Regular />} label="番茄钟" accent="orange" />
       <span className={mergeClasses(styles.time, styles.time80)} data-pomodoro-time>
         {snapshot.remainingText}
       </span>

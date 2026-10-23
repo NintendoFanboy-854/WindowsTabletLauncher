@@ -8,8 +8,8 @@
       "id": "clock",
       "title": "时钟",
       "sizes": [[1, 1], [2, 1], [3, 2]],
-      "defaultSize": [2, 1],
-      "cell": [0, 0]
+      "defaultSize": [3, 2],
+      "cell": [4, 0]
     }
   ],
   "settings": {

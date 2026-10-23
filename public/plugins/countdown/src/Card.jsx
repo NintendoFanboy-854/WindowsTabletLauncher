@@ -13,9 +13,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { CalendarLtr16Regular, CalendarLtr48Regular } from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
 import { requestOverlay, useAgentTools, useHostSize } from '../../_shared/host.js';
-import { CardRoot, ListRow, Metric, useNow } from '../../_shared/ui.jsx';
+import {
+  CardIdentity,
+  CardRoot,
+  EmptyState,
+  ListRow,
+  Metric,
+  TouchButton,
+  useNow,
+} from '../../_shared/ui.jsx';
 import { TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import { usePluginConfig } from './data/config.js';
@@ -175,13 +184,23 @@ const useStyles = makeStyles({
   titleText: {
     color: tokens.colorNeutralForeground1,
   },
-  subText: {
-    minWidth: 0,
-    color: tokens.colorNeutralForeground3,
-  },
   metricRight: {
     flex: '0 0 auto',
     alignItems: 'flex-end',
+  },
+  /** identity 行铺满内容宽度；1×1 只露 chip，2×1 起 chip + 标签 + 行尾 auxiliary。 */
+  identityRow: {
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+  /** 短卡（1×1 / 2×1）空态：卡片自身 padding 已留白，EmptyState 不再叠 24 内边距。 */
+  emptyShort: {
+    padding: 0,
+  },
+  /** 2×2 / 3×2 空态：identity 行下方占满剩余高度、居中。 */
+  emptyFill: {
+    flex: 1,
+    minHeight: 0,
   },
   list: {
     display: 'flex',
@@ -191,15 +210,7 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     flex: '0 1 auto',
   },
-  /** 列表卡必须有主层（DENSITY §2.1）：事件总数用 Hero700 28px 承担列表头。 */
-  listHead: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalS,
-    flexShrink: 0,
-    minWidth: 0,
-  },
+  /** 列表卡主层（DENSITY §2.1）：事件总数 28/48px 放在 identity 行尾。 */
   countLine: {
     display: 'inline-flex',
     alignItems: 'baseline',
@@ -240,10 +251,6 @@ const useStyles = makeStyles({
     flexShrink: 0,
     textAlign: 'right',
     color: tokens.colorNeutralForeground3,
-  },
-  emptyText: {
-    color: tokens.colorNeutralForeground3,
-    textAlign: 'center',
   },
 });
 
@@ -408,15 +415,33 @@ export default function CountdownCard({ fallbackSizeKey }) {
   }
 
   if (!allEntries.length) {
+    const shortCard = compact || row;
     return (
       <CardRoot
         ariaLabel="倒数日：还没有倒数日，点击打开详情添加"
         onActivate={openDetail}
         className={rootClass}
       >
-        <Text size={300} className={styles.emptyText}>
-          还没有倒数日
-        </Text>
+        {shortCard ? null : (
+          <CardIdentity
+            icon={<CalendarLtr16Regular />}
+            label="倒数日"
+            accent="pink"
+            className={styles.identityRow}
+          />
+        )}
+        <EmptyState
+          icon={<CalendarLtr48Regular />}
+          iconAccent="pink"
+          title="还没有倒数日"
+          description={shortCard ? null : '添加一个重要的日子，卡片会显示剩余天数'}
+          action={
+            <TouchButton appearance="primary" onClick={openDetail}>
+              添加倒数日
+            </TouchButton>
+          }
+          className={shortCard ? styles.emptyShort : styles.emptyFill}
+        />
       </CardRoot>
     );
   }
@@ -429,6 +454,13 @@ export default function CountdownCard({ fallbackSizeKey }) {
   if (compact) {
     return (
       <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
+        <CardIdentity
+          icon={<CalendarLtr16Regular />}
+          label="倒数日"
+          accent="pink"
+          compact
+          className={styles.identityRow}
+        />
         <div className={styles.singleContent}>
           <Metric
             value={primaryTextOf(near)}
@@ -446,13 +478,21 @@ export default function CountdownCard({ fallbackSizeKey }) {
   if (row) {
     return (
       <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
+        <CardIdentity
+          icon={<CalendarLtr16Regular />}
+          label="倒数日"
+          accent="pink"
+          className={styles.identityRow}
+          trailing={
+            <Text size={200} truncate>
+              {near.subtitle}
+            </Text>
+          }
+        />
         <div className={styles.row21}>
           <div className={styles.titleBlock}>
             <Text size={400} weight="semibold" truncate className={styles.titleText}>
               {near.item.title}
-            </Text>
-            <Text size={200} truncate className={styles.subText}>
-              {near.subtitle}
             </Text>
           </div>
           <Metric
@@ -466,24 +506,27 @@ export default function CountdownCard({ fallbackSizeKey }) {
     );
   }
 
-  // 2×2 / 3×2：按 iframe 高度计算能完整放下的行数，避免静默裁切。
+  // 2×2 / 3×2：identity 行（含事件总数主层）之下，按 iframe 高度计算能完整放下的行数，避免静默裁切。
   const verticalPadding = 12;
-  // 列表头主层：2×2 用 28px（36 高），3×2 用 48px（56 高）；剩余高度再按 44 行高 + 4 行距排。
-  const headerHeight = wide ? 56 : 36;
-  const available = Math.max(44, viewportHeight - verticalPadding * 2);
-  // DENSITY §2：2×2 最多 4 项 Secondary；3×2 多 1–2 行，并保留列表头。
+  /** 卡片根 gap（styles.pad22 / pad32 的 spacingVerticalS = 8） */
+  const rowGap = 8;
+  // 列表主层放在 identity 行尾：2×2 用 28px（36 高），3×2 用 48px（56 高）；剩余高度按 44 行高 + 4 行距排。
+  const identityHeight = wide ? 56 : 36;
+  const available = Math.max(44, viewportHeight - verticalPadding * 2 - identityHeight - rowGap);
+  // DENSITY §2：2×2 最多 4 项 Secondary；3×2 多 1–2 行，并保留列表主层。
   const maxRows = wide ? 5 : 4;
-  const rowCount = Math.max(
-    1,
-    Math.min(maxRows, Math.floor((available - headerHeight) / 48)),
-  );
+  const rowCount = Math.max(1, Math.min(maxRows, Math.floor(available / 48)));
   const visibleRows = allEntries.slice(0, rowCount);
   const hiddenCount = allEntries.length - visibleRows.length;
 
   return (
     <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
-      <div className={styles.list}>
-        <div className={styles.listHead}>
+      <CardIdentity
+        icon={<CalendarLtr16Regular />}
+        label="倒数日"
+        accent="pink"
+        className={styles.identityRow}
+        trailing={
           <div className={styles.countLine}>
             <span className={mergeClasses(styles.countValue, wide && styles.countValueWide)}>
               {allEntries.length}
@@ -491,13 +534,15 @@ export default function CountdownCard({ fallbackSizeKey }) {
             <Text size={wide ? 400 : 300} className={styles.countLabel}>
               个事件
             </Text>
+            {hiddenCount > 0 ? (
+              <Text size={200} className={styles.listFooter}>
+                还有 {hiddenCount} 项
+              </Text>
+            ) : null}
           </div>
-          {hiddenCount > 0 ? (
-            <Text size={200} className={styles.listFooter}>
-              还有 {hiddenCount} 项
-            </Text>
-          ) : null}
-        </div>
+        }
+      />
+      <div className={styles.list}>
         {visibleRows.map((entry) => (
           <ListRow
             key={entry.item.id}

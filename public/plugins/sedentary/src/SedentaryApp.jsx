@@ -4,10 +4,11 @@
  * 状态机：坐着（sitting）↔ 站立（standing），手动切换（D-27）。
  *
  * 尺寸档位：
- * - 1×1：状态 Badge + 当前状态分钟（48）；无按钮，点卡体开详情；
- * - 2×1：分钟 68 + 状态点 + 提示文案 + 状态按钮 40；
- * - 2×2：分钟 80 + 两项统计（今日久坐/今日站立）+ 状态按钮；
- * - 3×2：分钟 96 + 三项统计（今日久坐/今日站立/起身次数）+ 状态按钮。
+ * - 1×1：identity chip（compact）+ 状态 Badge + 当前状态分钟（48）；无按钮，点卡体开详情；
+ * - 2×1：identity 行（chip +「久坐」+ trailing 状态点/提示）+ 分钟 68 + 状态按钮 40；
+ * - 2×2：identity 行（trailing 状态 Badge）+ 分钟 80 + 两项统计（今日久坐/今日站立）+ 状态按钮；
+ * - 3×2：identity 行 + 分钟 96 + 三项统计（今日久坐/今日站立/起身次数）+ 状态按钮；
+ * - 提醒关闭：EmptyState（green identity 色）+ 单个主操作「打开设置」。
  *
  * CardRoot 负责卡片手势、键盘 Enter/Space 与内部控件过滤；快捷按钮再显式
  * stopPropagation，确保只记录状态、不打开详情。长按 / hover / 右键全部交给宿主，
@@ -22,13 +23,24 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { ArrowDownRegular, ArrowUpRegular } from '@fluentui/react-icons';
+import {
+  ArrowDownRegular,
+  ArrowUpRegular,
+  PersonWalking16Regular,
+  PersonWalking24Regular,
+} from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
-import { requestOverlay, useHostSize, useStoredConfig } from '../../_shared/host.js';
+import {
+  requestHostSettings,
+  requestOverlay,
+  useHostSize,
+  useStoredConfig,
+} from '../../_shared/host.js';
 import { useMotionTransition } from '../../_shared/motion.js';
 import {
-  CardHeader,
+  CardIdentity,
   CardRoot,
+  EmptyState,
   Metric,
   TouchButton,
 } from '../../_shared/ui.jsx';
@@ -74,50 +86,39 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalS,
     padding: tokens.spacingVerticalS,
   },
+  identityStart: {
+    alignSelf: 'flex-start',
+  },
   rootRow: {
-    flexDirection: 'row',
+    gap: tokens.spacingVerticalS,
+    paddingBlock: tokens.spacingVerticalS,
+    paddingInline: tokens.spacingHorizontalM,
+  },
+  rowBody: {
+    display: 'flex',
+    flex: '1 1 auto',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM,
+    minHeight: 0,
   },
   rootMedium: {
     gap: tokens.spacingVerticalS,
     padding: tokens.spacingVerticalM,
   },
   rootWide: {
+    gap: tokens.spacingVerticalS,
+    paddingBlock: tokens.spacingVerticalM,
+    paddingInline: tokens.spacingHorizontalL,
+  },
+  wideBody: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr) auto',
     alignItems: 'center',
     columnGap: tokens.spacingHorizontalXL,
     rowGap: tokens.spacingVerticalS,
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
-  },
-  rowMain: {
-    display: 'flex',
-    flex: 1,
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  rowHead: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'nowrap',
-    whiteSpace: 'nowrap',
-    gap: tokens.spacingHorizontalS,
-    minWidth: 0,
-  },
-  hintRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    minWidth: 0,
-  },
-  statusDot: {
-    flexShrink: 0,
-    width: tokens.spacingHorizontalM,
-    height: tokens.spacingHorizontalM,
-    borderRadius: tokens.borderRadiusCircular,
+    flex: '1 1 auto',
+    minHeight: 0,
   },
   wideMain: {
     display: 'flex',
@@ -135,6 +136,18 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
+  },
+  trailingHint: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  statusDot: {
+    flexShrink: 0,
+    width: tokens.spacingHorizontalM,
+    height: tokens.spacingHorizontalM,
+    borderRadius: tokens.borderRadiusCircular,
   },
   statsRow: {
     display: 'flex',
@@ -173,6 +186,16 @@ const useStyles = makeStyles({
     marginTop: 'auto',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: tokens.spacingVerticalL,
+  },
+  emptyCardCompact: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: tokens.spacingVerticalS,
   },
 });
 
@@ -222,8 +245,6 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       {snapshot.statusLabel}
     </Badge>
   );
-  // 头部卡片有标题，站立时标题已经说了“站立休息”，不再叠一个同义 Badge
-  const headerBadge = snapshot.status === 'resting' ? null : statusBadge;
 
   const stats = [
     { key: 'sitting', label: '今日久坐', value: Math.round(snapshot.today.sittingMinutes), unit: '分钟' },
@@ -267,6 +288,53 @@ export default function SedentaryApp({ fallbackSizeKey }) {
   /** 2×1 没有 Badge，用一句最短状态文案补位；坐着时显示提醒距离 */
   const rowHint = standing ? '休息中' : snapshot.hint;
 
+  /* 提醒关闭：空态（identity 色由 EmptyState 的 accent 图标承担，避免两个绿 chip） */
+  if (!settings.enabled) {
+    const emptyAction = (
+      <TouchButton
+        appearance="primary"
+        onClick={(event) => {
+          event.stopPropagation();
+          requestHostSettings();
+        }}
+      >
+        打开设置
+      </TouchButton>
+    );
+    if (compact || row) {
+      return (
+        <CardRoot
+          ariaLabel={ariaLabel}
+          onActivate={openDetail}
+          className={mergeClasses(styles.root, styles.emptyCardCompact)}
+        >
+          <EmptyState
+            icon={<PersonWalking24Regular />}
+            iconAccent="green"
+            title="提醒已关闭"
+            action={emptyAction}
+            style={{ padding: 0, gap: tokens.spacingVerticalXS }}
+          />
+        </CardRoot>
+      );
+    }
+    return (
+      <CardRoot
+        ariaLabel={ariaLabel}
+        onActivate={openDetail}
+        className={mergeClasses(styles.root, styles.emptyCard)}
+      >
+        <EmptyState
+          icon={<PersonWalking24Regular />}
+          iconAccent="green"
+          title="提醒已关闭"
+          description="开启后按久坐时长提醒起身"
+          action={emptyAction}
+        />
+      </CardRoot>
+    );
+  }
+
   if (compact) {
     return (
       <CardRoot
@@ -274,6 +342,12 @@ export default function SedentaryApp({ fallbackSizeKey }) {
         onActivate={openDetail}
         className={mergeClasses(styles.root, styles.rootCompact)}
       >
+        <CardIdentity
+          className={styles.identityStart}
+          icon={<PersonWalking16Regular />}
+          accent="green"
+          compact
+        />
         {statusBadge}
         <Metric value={snapshot.currentMin} unit="分钟" size={48} />
       </CardRoot>
@@ -287,24 +361,29 @@ export default function SedentaryApp({ fallbackSizeKey }) {
         onActivate={openDetail}
         className={mergeClasses(styles.root, styles.rootRow)}
       >
-        <div className={styles.rowMain}>
-          <div className={styles.rowHead}>
-            <Metric value={snapshot.currentMin} unit="分钟" size={68} />
-          </div>
-          <div className={styles.hintRow}>
-            <span
-              className={styles.statusDot}
-              style={{ backgroundColor: STATUS_DOT_COLOR[snapshot.status] }}
-              aria-hidden="true"
-            />
-            {rowHint ? (
-              <Text size={300} className={styles.hint} style={motionStyle}>
-                {rowHint}
-              </Text>
-            ) : null}
-          </div>
+        <CardIdentity
+          icon={<PersonWalking16Regular />}
+          label="久坐"
+          accent="green"
+          trailing={
+            <span className={styles.trailingHint}>
+              <span
+                className={styles.statusDot}
+                style={{ backgroundColor: STATUS_DOT_COLOR[snapshot.status] }}
+                aria-hidden="true"
+              />
+              {rowHint ? (
+                <Text size={300} className={styles.hint} style={motionStyle}>
+                  {rowHint}
+                </Text>
+              ) : null}
+            </span>
+          }
+        />
+        <div className={styles.rowBody}>
+          <Metric value={snapshot.currentMin} unit="分钟" size={68} />
+          {standButton}
         </div>
-        {standButton}
       </CardRoot>
     );
   }
@@ -316,17 +395,24 @@ export default function SedentaryApp({ fallbackSizeKey }) {
         onActivate={openDetail}
         className={mergeClasses(styles.root, styles.rootWide)}
       >
-        <div className={styles.wideMain}>
-          <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={headerBadge} />
-          <Metric value={snapshot.currentMin} unit="分钟" size={96} />
-          {snapshot.hint ? (
-            <Text size={300} className={styles.hint} style={motionStyle}>
-              {snapshot.hint}
-            </Text>
-          ) : null}
+        <CardIdentity
+          icon={<PersonWalking16Regular />}
+          label="久坐"
+          accent="green"
+          trailing={statusBadge}
+        />
+        <div className={styles.wideBody}>
+          <div className={styles.wideMain}>
+            <Metric value={snapshot.currentMin} unit="分钟" size={96} />
+            {snapshot.hint ? (
+              <Text size={300} className={styles.hint} style={motionStyle}>
+                {snapshot.hint}
+              </Text>
+            ) : null}
+          </div>
+          <div className={styles.wideStats}>{stats.map(renderStat)}</div>
+          <div className={styles.wideActions}>{standButton}</div>
         </div>
-        <div className={styles.wideStats}>{stats.map(renderStat)}</div>
-        <div className={styles.wideActions}>{standButton}</div>
       </CardRoot>
     );
   }
@@ -337,7 +423,12 @@ export default function SedentaryApp({ fallbackSizeKey }) {
       onActivate={openDetail}
       className={mergeClasses(styles.root, styles.rootMedium)}
     >
-      <CardHeader title={standing ? '站立休息' : '连续久坐'} trailing={headerBadge} />
+      <CardIdentity
+        icon={<PersonWalking16Regular />}
+        label="久坐"
+        accent="green"
+        trailing={statusBadge}
+      />
       <Metric value={snapshot.currentMin} unit="分钟" size={80} />
       {snapshot.hint ? (
         <Text size={300} className={styles.hint} style={motionStyle}>

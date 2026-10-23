@@ -38,6 +38,9 @@
 - 小组件是 iframe，**iframe 的视口就是卡片本身**：内部直接用 `vw / vh / % / clamp()`，不要写死像素。
 - 字阶、间距用 Fluent token 做基准；文本字号只用 `Text size` / `fontSizeBase*` / `fontSizeHero*`。数字型主信息可按 DECISIONS D-07 使用项目 `Display XL`（48/80/96/112），不得用于标题/正文/标签，不做 `lineHeight: 1`。间距按 DENSITY §2.1 的尺寸档映射，不再用任意 `clamp()`。
 - 触控目标不小于 **40×40 CSS px**（Fluent 的触控尺寸）。
+- **卡片 identity 行**（v0.4.0，D-33）：内容区第一行可放一条静态 identity 行——24×24 identity chip（Fluent shared palette）+
+  12px 半粗 `colorNeutralForeground3` 组件名（≤4 字），可选 trailing 放原顶部辅助信息；`1×1` 只留 chip。
+  它不是 chrome：没有可交互控件、不常驻操作、不占点击热区，不计入 DENSITY 的信息预算。
 - 每个组件文档里必须写清楚：各档位显示什么、**太小的时候砍掉什么**。
 - 加载态用 Fluent `Skeleton` / `Spinner`，错误态用 `MessageBar`，空状态用 Fluent 的空状态排版。
 
@@ -132,9 +135,14 @@
 
 - **组件**：一律用 Fluent UI React v9（`@fluentui/react-components`）的 Button、Card、Dialog、Drawer、TabList、Menu、Toast、Skeleton、MessageBar、Spinner、Input、Switch、Slider…；不自己画控件。
 - **主题**：`FluentProvider` 深色 / 亮色两套，**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定（见 DECISIONS D-06）；插件由宿主 `host:init/theme` 注入同一套主题。颜色全部取 `tokens.*`，不手写 hex。
+- **颜色例外**（v0.4.0，D-32）：每个插件允许一个 identity 色，只用于卡片顶部 24×24 identity chip 与 16px 图标（≤10% 卡面积），
+  固定映射到 Fluent shared palette 六种，不承担状态/语义、不用于背景/边框，不新增 hex 或项目 token（见 FLUENT2 §2）。
 - **字体**：Fluent 字体 token（`fontFamilyBase` → Segoe UI Variable），字阶用 `fontSizeBase*` 档位。
 - **圆角 / 间距 / 阴影**：`borderRadius*`、`spacing*`、`shadow*` token。
-- **材质**：Fluent 的 web 端没有 Acrylic/Mica 的官方实现，也不做系统级窗口材质（已决定）。卡片用 `colorNeutralBackground*` 的半透明色 + 统一的 `backdrop-filter` 模糊（模糊值定义成项目 token `--wtsl-material-blur`，只此一处例外）。未来若升 Windows 11 再考虑 Mica。
+- **材质与壁纸**（v0.4.0，D-31）：桌面壁纸层画在 `FluentProvider` 内部最底层（provider 根背景透明，否则壁纸被盖住——v0.3.x 实测失效）。
+  壁纸用必应每日壁纸 UHD 4K，比例不匹配时 `object-fit: cover`（填充），不拉伸；左下角只有一条 12px 壁纸说明。
+  卡片材质 = `colorNeutralBackground1` 72% + 既有 `--wtsl-material-blur` 模糊 + `colorNeutralStroke2` 1px 描边（Fluent web 无 Acrylic token，
+  模糊值仍是唯一的项目 token 例外）。未来若升 Windows 11 再考虑 Mica。
 - **图标**：界面图标用 Fluent System Icons；**天气现象图标是唯一例外**（用和风 SVG，因为 Fluent 天气图标覆盖不全），只作为内容图形，颜色/间距仍按 Fluent 排。
 - **焦点态 / 高对比度**：用 Fluent 默认焦点样式，不覆写。
 - 本地参考：`references/fluentui-docs/`。

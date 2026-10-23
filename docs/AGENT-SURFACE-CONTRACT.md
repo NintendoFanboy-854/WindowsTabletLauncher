@@ -312,3 +312,24 @@ interface AgentSettings {
   不再自动 upgrade、无输入框的半高窗、单行 composer、焦点断言）。
 - 证据目录：`shots/v037-dev/`（截图 + JSON + REPORT.md）。
 
+## 15. v0.4.0 修订（半高窗 idle 视觉锚点）
+
+> 背景：v0.3.7 的半高语音窗在 idle 态中部只有 24px `ChatSparkle`，420 × clamp(320px,44vh,440px) 窗口大面积空白；
+> 用户反馈"素"。`MOTION.md §6` 明确禁止循环呼吸/粒子/视差/自造时长，因此用**静态构图**而不是动效填。
+
+### 15.1 idle 静态 voice mark
+
+- voice 段空态（无 peek 消息）中部：96px 圆形容器（`borderRadiusCircular`、`colorNeutralBackground2` 底、
+  `strokeWidthThin` `colorNeutralStroke2` 边）+ 40px `ChatSparkleRegular`（`colorBrandForeground1`）；
+  外层 132/168px 两层 `colorNeutralStroke3` 细环，绝对居中、不占布局、不裁切。
+- dock 内加 `Text size={300}` 提示「说点什么，或按住空格」（14px、`colorNeutralForeground3`、无句号）；
+  「点击说话」按钮保留 `aria-label="开始语音"`，并用 `aria-describedby` 关联该提示；移除原 Tooltip（提示常驻更可发现）。
+- 空态关闭 peek 顶部渐隐 mask（`mask-image: none`），有消息时恢复原渐隐。
+- **不新增任何动画时长/曲线、不做循环呼吸/脉冲**；idle→recording 仍只切换现有 `VoiceCapture` 声纹。
+
+### 15.2 契约不变
+
+- voice 段无 textarea；顶栏 ⌃/朗读/✕；peek 最近 3 条；底部「点击说话」；录音时声纹替换；焦点/Esc/关闭语义同 §14.2。
+- 验收：`scripts/verify-agent-surface.mjs` 127/127 PASS；`scripts/verify-agent-voice-first.mjs` 断言层全 PASS
+  （198/200，2 条 FAIL 为并发环境 Edge teardown 竞态）；`npm run typecheck` exit 0。决策记录见 DECISIONS D-35。
+

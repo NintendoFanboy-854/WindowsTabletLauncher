@@ -3,9 +3,9 @@
 给 Windows 平板用的全屏小组件桌面，外加一个内置的语音优先 Agent。  
 没有应用图标、没有搜索框、没有开始菜单——开机就是整屏小组件，所有交互通过小组件和 Agent 直接完成。
 
-![桌面](docs/images/v030/desktop-1440-dark.png)
+![桌面](docs/images/v040/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.3.7 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
+<p align="center"><sub>v0.4.0 · 1440×960 · 深色主题 · 必应每日壁纸（4K，填充）+ 磨砂卡片 · 六张卡片的 identity 行与默认满屏构图</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -14,14 +14,23 @@
 
 ## 特性
 
+- **必应每日壁纸**：启动时从必应壁纸接口取 UHD 4K 图（`api.bimg.cc`，文档站 `api-bimg-cc.apifox.cn`；另尝试必应原生接口），比例不符时按“填充”（`object-fit: cover`）不拉伸；桌面左下角保留一条安静的图片说明。取不到时退回 Fluent 中性底色，不影响使用。
 - **小组件桌面**：自适应网格、多页滑动、长按进入编辑模式（拖拽换位/改尺寸/删除/添加组件）、编辑删除持久化；布局、主题偏好都保存在本机。
-- **六个内置小组件**：时钟、倒数日、番茄钟、久坐提醒、待办、天气。天气 3×2 为「当前天气 + 今日指标 + 逐时 6 列」三带式布局，4×2 显示 AQI + 未来 7 天。
+- **六个内置小组件**：时钟、倒数日、番茄钟、久坐提醒、待办、天气。每张卡有静态 identity 行（identity 色 + 组件名），空态有图标与主操作；默认布局按 8×5 满屏构图。
+- **天气 3×2 为「当前天气 + 今日指标 + 逐时 6 列」三带式布局**，4×2 显示 AQI + 未来 7 天。
 - **语音优先 Agent**：右下角浮空入口 → **半高纯语音窗** → 全高对话浮栏。点按或按住空格**立即开始说话**，回答自动朗读；语音回合结束后**停在半高窗继续下一轮**（不自动弹成全高），连续语音对话；文字对话是兜底，显式展开全高浮栏后才出现输入框。空格默认永远是按住说话（只有光标在输入框里才是打字）。语音音频只上传当轮一次，转写文字入库，后续上下文不再携带音频。
 - **插件系统**：每个插件是一个 `manifest.json` + 自包含页面，宿主通过 postMessage 暴露 8 个 API（配置、主题、尺寸、焦点、Agent 工具等）；可安装/启用/禁用，带可复制的插件模板。
 - **宿主页面**：设置、复盘（使用统计/热力图）、插件管理；多个入口收进设置页，不占桌面。
 - **无摄像头 / 无人脸 / 无唤醒词 / 无全屏语音页 / 无 dock**（v0.3.0 已全部移除）。
 
 ## 截图
+
+### 桌面（v0.4.0：必应每日壁纸 + 磨砂卡片 + 满屏默认构图）
+
+| 深色 · 1440×960 | 亮色 · 1440×960 |
+|---|---|
+| <img src="docs/images/v040/desktop-1440-dark.png" width="440" /> | <img src="docs/images/v040/desktop-1440-light.png" width="440" /> |
+| <sub>4K 壁纸按“填充”铺满；卡片浮在壁纸上；左下角是壁纸说明</sub> | <sub>同一套 Fluent token，亮色下卡片为白色磨砂面</sub> |
 
 ### Agent：右下角浮空三段界面（语音优先）
 
@@ -52,15 +61,15 @@
 
 | 深色 | 亮色 |
 |---|---|
-| <img src="docs/images/v030/weather-3x2-dark.png" width="400" /> | <img src="docs/images/v030/weather-3x2-light.png" width="400" /> |
-| <sub>当前天气 + 今日指标（体感/降水概率/风）+ 逐时 6 列（含降水概率）</sub> | <sub>1024 下今日指标降为 2 项，不裁切</sub> |
+| <img src="docs/images/v040/weather-3x2-dark.png" width="400" /> | <img src="docs/images/v040/weather-3x2-light.png" width="400" /> |
+| <sub>identity 行（天气 + 城市）+ 当前天气 + 今日指标（体感/降水概率/风）+ 逐时 6 列</sub> | <sub>1024 下今日指标降为 2 项，不裁切</sub> |
 
 <details>
 <summary>2×2 / 4×2 对照</summary>
 
 | 2×2 | 4×2 |
 |---|---|
-| <img src="docs/images/v030/weather-2x2-dark.png" width="400" /> | <img src="docs/images/v030/weather-4x2-dark.png" width="400" /> |
+| <img src="docs/images/v040/weather-2x2-dark.png" width="400" /> | <img src="docs/images/v040/weather-4x2-dark.png" width="400" /> |
 
 </details>
 
@@ -98,7 +107,7 @@
 
 ### 直接安装
 
-从构建产物安装 `Windows Tablet Launcher`（NSIS 中文安装包或 MSI zh-CN；本机 `release/v0.3.7/` 为当前已构建产物）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
+从构建产物安装 `Windows Tablet Launcher`（NSIS 中文安装包或 MSI zh-CN；本机 `release/v0.4.0/` 为当前已构建产物）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
 
 首次启动后：
 
@@ -170,7 +179,10 @@ docs/                   # 需求/设计/组件契约/发布报告
 - [PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) / [DECISIONS.md](docs/DECISIONS.md) —— 插件协议与关键决策
 - [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17 / v0.3.5 §18 / v0.3.6 §19 / v0.3.7 §20）
 
-## 验证状态（v0.3.7）
+## 验证状态（v0.4.0）
+
+- v0.4.0（视觉返工，用户反馈"很素"）：**壁纸/材质层修复**——`FluentProvider` 根背景改透明、壁纸画在 provider 内部（v0.3.x 壁纸被 `colorNeutralBackground1` 实色盖住，`backdrop-filter` 一直在模糊纯色）；壁纸改用**必应每日壁纸 4K**（依次尝试 `api.bimg.cc` / `api-bimg-cc.apifox.cn` / 必应原生 JSON，UHD 3840×2160，`object-fit: cover` 填充不拉伸，`wtsl.wallpaper.v1` 缓存 12h，失败退回 Fluent 中性底色）；桌面左下角加壁纸说明（标题 + 地点短句）。卡片材质改 `colorNeutralBackground1` 72% + 模糊 + `colorNeutralStroke2` 描边；六插件加静态 identity 行与 identity 色（Fluent shared palette，≤10% 面积，D-32/D-33）与空态主操作；默认布局改为 8×5 满屏构图（35/40 格，D-34，另修了 `cell` 坐标被 `asWidgetSize` 误判的解析 bug）；Agent 半高窗 idle 加静态 voice mark（D-35）。
+  验证：`npm run typecheck` / `npm run build` exit 0；六插件 `build-plugin.mjs --all` exit 0；`npx tauri build` exit 0；`verify-widgets.mjs` 六插件 dark+light **60/60 尺寸用例 PASS**（A 34、B 26）；`verify-agent-surface.mjs` **127/127 PASS**；`verify-agent-voice-first.mjs` 断言层全 PASS（198/200，2 条 FAIL 为并发环境 Edge teardown 竞态）；截图 `docs/images/v040/`。**不新增设计 token**：identity 色全部取 Fluent `colorPalette*`，brand 保持 Fluent 默认。
 
 - v0.3.7 增量（用户反馈修复）：Agent 改为**语音优先**——半高窗成为纯语音形态（无文字输入框），语音回合结束**不再自动展开全高**（连续语音对话），全高对话只在显式展开后出现；空格默认永远是按住说话（修复“回答后按空格打进输入框”的根因：不再自动聚焦输入框）；全高对话的输入区改为单行 `[语音] [输入] [发送]`。视觉严格回到 Fluent 2 token（自造尺寸/圆角清零：语音主按钮用 `size=large`，间距/圆角/阴影/动效全取 token），交互按 HIG 思想收敛（入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 渐隐渐进披露、半高 detent、reduced-motion）。验证：新增 `scripts/verify-agent-voice-first.mjs` **198/198 PASS**（含“语音回合后观测不到 chat”“回答后空格再录音”“半高窗 textarea=0”“chat composer 单行三控件同轴”“窗口失焦取消任意路径录音”P2 回归）；`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/smoke-v031-ui.mjs` **26/26 PASS**；1440 dark / 1024 light / reduced-motion 三段 console error 0；`npm run typecheck` / `npm run build` exit 0；`npx tauri build` exit 0（cargo release 4m53s，NSIS + MSI 完成），产物在 `release/v0.3.7/`；证据 `shots/v037-dev/REPORT.md`。
 - v0.3.6 增量（用户反馈修复）：**桌面小组件配置实时同步**——新增宿主 → 插件 `host:config` 增量推送，天气自动定位/城市/显示项、时钟/倒数日/番茄钟/久坐/待办等所有插件在 Tauri 打包版里改配置即时生效，不再需要重启。根因：宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）跨 origin，旧的 storage 事件同步在打包版从未生效。验证：跨 origin harness before 复现 / after **PASS**（settings 34ms、places 58ms 同步，iframe `host:config` 6 条、console error 0）；独立审计 + diff 评审 P0/P1=0；六插件产物重建；`npm run typecheck` / `npm run build` exit 0；全量基线回归全绿（verify-plugin ×6 / overlays 6/6 / widgets 25/25 / plug-and-play 12/12 / sedentary 9/9，console 0）；**release 真窗口 CDP 38/38 PASS**（真实 WebView2：升级重种 0.3.5→0.3.6、时钟/天气设置页改动后跨 origin 卡片 2s 内更新、iframe 未 reload、console 0）。
@@ -189,6 +201,7 @@ docs/                   # 需求/设计/组件契约/发布报告
 
 - **密钥不进仓库**：`public/secrets.json` 与 `*.env` 等已在 `.gitignore` 中，从未被跟踪。可在设置页录入 Key，或使用本地 `public/secrets.json`（仅供本机构建/开发）。
 - ⚠️ **构建会把本地 `secrets.json` 打进 `dist/` 与安装包**。如果要公开分发安装包，请先移除该文件或改为运行时录入，否则等于公开你的 MiMo / 和风天气 Key。
+- 必应每日壁纸需要联网取 4K 图（缓存 12h）；离线/接口失败时桌面停在 Fluent 中性底色，不影响功能。
 - 个人项目，未附开源许可证（默认保留所有权利）。
 - 语音 ASR/TTS 依赖云端 MiMo，受网络与配额影响；不本地跑大模型。
 - 不做唤醒词、常驻麦克风监听、人脸/摄像头；语音入口只有入口按钮、按住空格、「点击说话」与全高输入区语音按钮。

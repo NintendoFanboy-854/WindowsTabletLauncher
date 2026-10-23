@@ -12,7 +12,13 @@ import { makeStyles, tokens, motionTokens } from '@fluentui/react-components';
 /** 卡片圆角：项目 token（12px），不再用 calc 自造数值 */
 export const CARD_RADIUS = 'var(--wtsl-card-radius)';
 
-const MATERIAL_BACKGROUND = `color-mix(in srgb, ${tokens.colorNeutralBackground2} 72%, transparent)`;
+/**
+ * 卡片材质底色（v0.4.0）：壁纸层可见之后，卡片要用「比壁纸亮」的 Fluent 表面 token
+ * （`colorNeutralBackground1`）做半透明混合 + 既有 `--wtsl-material-blur`，
+ * 才有 Windows 11 Acrylic/Mica 那种"浮在壁纸上的磨砂面"的观感。
+ * 原来用 background2 会比底色更暗，暗色下卡片像凹陷的洞（V-32 根因）。
+ */
+const MATERIAL_BACKGROUND = `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`;
 
 /** 卡片材质底色：Fluent 没有 Acrylic token，统一用 colorNeutralBackground2 半透明 + 模糊 */
 export const CARD_MATERIAL = {

@@ -66,6 +66,8 @@ const SPACE_HOLD_CANCEL_MS = 300;
 const ENTRY_FADE_OUT_DELAY = motionTokens.durationFaster;
 /** 减少动态效果下唯一保留的过渡：120ms opacity */
 const REDUCED_FADE_MS = 120;
+/** 半高空态提示的 DOM id：「点击说话」按钮通过 aria-describedby 关联这行说明 */
+const VOICE_HINT_ID = 'wtsl-agent-voice-hint';
 
 export interface AgentSurfaceProps {
   /** 注入传输层（测试或截图用）；不传按 URL 参数创建 */
@@ -237,6 +239,11 @@ const useStyles = makeStyles({
   peekAreaBusy: {
     cursor: 'default',
   },
+  // 空态没有旧消息需要顶部渐隐：关掉 mask，静态锚点的外环不被切掉上缘
+  peekAreaEmpty: {
+    maskImage: 'none',
+    WebkitMaskImage: 'none',
+  },
   peekRow: {
     display: 'flex',
     minWidth: 0,
@@ -262,12 +269,54 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorBrandBackground2,
     color: tokens.colorNeutralForeground1,
   },
-  peekEmpty: {
+  // 半高空态：静态视觉锚点（96px 中性圆 + 品牌图标 + 两层细环），
+  // 纯静态构图，不做循环呼吸/脉冲/自造时长（MOTION §6）。
+  voiceEmpty: {
     flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceMarkGroup: {
+    position: 'relative',
     display: 'grid',
     placeItems: 'center',
+    width: '96px',
+    height: '96px',
+    flexShrink: 0,
+  },
+  voiceMarkRing: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    borderRadius: tokens.borderRadiusCircular,
+    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke3}`,
+    pointerEvents: 'none',
+  },
+  voiceMarkRingInner: {
+    width: '132px',
+    height: '132px',
+  },
+  voiceMarkRingOuter: {
+    width: '168px',
+    height: '168px',
+  },
+  voiceMark: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '96px',
+    height: '96px',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorNeutralBackground2,
+    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
     color: tokens.colorBrandForeground1,
-    opacity: 0.75,
+  },
+  voiceHint: {
+    color: tokens.colorNeutralForeground3,
+    textAlign: 'center',
   },
   voiceDock: {
     flex: '0 0 auto',
@@ -892,7 +941,9 @@ export function AgentSurface({
             </div>
 
             <div
-              className={`${styles.peekArea} ${voiceBusy ? styles.peekAreaBusy : ''}`}
+              className={`${styles.peekArea} ${
+                peekMessages.length === 0 ? styles.peekAreaEmpty : ''
+              } ${voiceBusy ? styles.peekAreaBusy : ''}`}
               role="button"
               tabIndex={0}
               aria-label="展开对话"
@@ -910,8 +961,19 @@ export function AgentSurface({
               }}
             >
               {peekMessages.length === 0 ? (
-                <div className={styles.peekEmpty} aria-hidden="true">
-                  <ChatSparkleRegular fontSize={24} />
+                <div className={styles.voiceEmpty}>
+                  {/* 静态 voice mark：中性圆 + 品牌图标，外套两层细环；不占布局，不做循环动画 */}
+                  <div
+                    className={styles.voiceMarkGroup}
+                    data-wtsl-agent-voice-mark="true"
+                    aria-hidden="true"
+                  >
+                    <span className={`${styles.voiceMarkRing} ${styles.voiceMarkRingOuter}`} />
+                    <span className={`${styles.voiceMarkRing} ${styles.voiceMarkRingInner}`} />
+                    <span className={styles.voiceMark}>
+                      <ChatSparkleRegular fontSize={40} />
+                    </span>
+                  </div>
                 </div>
               ) : (
                 peekMessages.map((message) => (
@@ -936,20 +998,29 @@ export function AgentSurface({
             <div className={styles.voiceDock}>
               <AgentAlerts session={session} onOpenSettings={() => setSettingsOpen(true)} />
               {voiceStage === 'idle' ? (
-                <Tooltip content="按住空格也可以说话" relationship="description">
-                  <Button
-                    className={styles.talkButton}
-                    appearance="primary"
-                    size="large"
-                    icon={<SoundWaveCircleRegular />}
-                    data-wtsl-agent-talk="true"
-                    aria-label="开始语音"
-                    disabled={session.status !== 'idle'}
-                    onClick={handleTalkClick}
-                  >
-                    点击说话
-                  </Button>
-                </Tooltip>
+                <Text
+                  size={300}
+                  id={VOICE_HINT_ID}
+                  className={styles.voiceHint}
+                  data-wtsl-agent-voice-hint="true"
+                >
+                  说点什么，或按住空格
+                </Text>
+              ) : null}
+              {voiceStage === 'idle' ? (
+                <Button
+                  className={styles.talkButton}
+                  appearance="primary"
+                  size="large"
+                  icon={<SoundWaveCircleRegular />}
+                  data-wtsl-agent-talk="true"
+                  aria-label="开始语音"
+                  aria-describedby={VOICE_HINT_ID}
+                  disabled={session.status !== 'idle'}
+                  onClick={handleTalkClick}
+                >
+                  点击说话
+                </Button>
               ) : (
                 <div className={styles.voiceCard}>
                   <div style={{ flex: 1, minWidth: 0 }}>

@@ -25,6 +25,9 @@
 - 只允许用 Fluent token：`colorNeutralBackground*`（表面）、`colorNeutralForeground1/2/3`（文字层级）、`colorNeutralStroke*`（轮廓）、`colorBrandBackground*`（主操作）、`colorStatus*`（semantic）。
 - **不手写 hex**；需要新语义色先找 token。
 - 层级表达顺序：字号 → foreground 层级 → 间距。颜色最后用。
+- **identity 色例外**（v0.4.0，DECISIONS D-32）：每个插件允许一个 identity 色，只出现在卡片顶部 24×24 identity chip 与其 16px 图标
+  （≤10% 卡面积），固定映射到 Fluent shared palette 六种（blue/pink/orange/green/purple/teal 的 `colorPalette*Foreground2` +
+  `colorPalette*Background2`）；不承担状态/语义、不用于背景/边框、不新增 hex。
 - 深色/浅色主题都由 `FluentProvider` 切换，组件不硬编码主题；**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定为深色/亮色（DECISIONS D-06）。插件由宿主注入同一主题，独立打开时跟随系统。
 
 ## 3. 字体与字阶（官方 type ramp，Web）
@@ -97,6 +100,9 @@
 
 - **不做系统级 Mica/Acrylic**（Web 端无官方实现；Win10 19044 无 Mica）。
 - 桌面卡片与面板用 **solid + 半透明 Fluent 颜色 + 单一 `backdrop-filter` 模糊 token**（`--wtsl-material-blur`），这是官方在 web 上"近似材质"的合理做法。
+- **v0.4.0 壁纸/材质修复**（DECISIONS D-31）：桌面壁纸层画在 `FluentProvider` 内部最底层（provider 根背景必须透明，否则 v0.3.x 的壁纸被
+  `colorNeutralBackground1` 实色盖住）；壁纸用必应每日壁纸 UHD 4K，比例不符时 `object-fit: cover` 填充不拉伸；卡片底色改用
+  `colorNeutralBackground1` 72% + 模糊 + `colorNeutralStroke2` 1px 描边，暗色下才浮在壁纸之上。左下角壁纸说明只用 12px / `colorNeutralForeground2/3`。
 - 弹层/菜单/遮罩一律用 Fluent 组件自带的材质与 scrim，不自己画。
 
 ## 8. 动效（官方原则 + 时长/曲线）
@@ -172,6 +178,9 @@
 | 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |
 | 9 | 插件自绘控件（clock/countdown/pomodoro/sedentary/todo） | 一律用 Fluent UI React 组件 | **已定案：全部迁移到 Fluent UI React + FluentProvider（DECISIONS D-02b），按严格规范执行** |
 | 10 | 数字型主信息使用 48–112px（超出 Fluent Display 68px 上限） | 官方字阶最大 Display 68/92 | **已定案：项目级 Display XL 例外（DECISIONS D-07），只用于数字主信息，48/80/96/112，走 `_shared/typography.js`；文本/标签不得使用** |
+| 11 | 六张卡各有一个 identity 色 | 颜色严格功能化（中性 + 品牌 + 语义） | **已定案：项目例外（DECISIONS D-32）**，只用于 24×24 identity chip 与 16px 图标（≤10% 面积），取 Fluent shared palette，不承担语义 |
+| 12 | 卡片顶部静态 identity 行（24px） | chrome on demand / 正常模式无标题栏 | **已定案：项目例外（DECISIONS D-33）**，静态无交互、不占点击热区、不计入信息预算 |
+| 13 | 桌面使用必应每日壁纸 | Fluent 2 不规定桌面壁纸（Windows 桌面本身靠壁纸/Mica） | **已定案（DECISIONS D-31）**：壁纸是桌面场景的内容层；比例不符用 cover 填充；说明文字仍用 Fluent 字阶/颜色 token |
 
 ## 15. 检查清单（每个组件/页面上线前）
 

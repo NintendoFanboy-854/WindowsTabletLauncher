@@ -32,3 +32,12 @@ export {
   type ColorScheme,
   type ThemeMode,
 } from './themeMode';
+export {
+  fetchBingWallpaper,
+  readCachedWallpaper,
+  useBingWallpaper,
+  wallpaperCredit,
+  type BingWallpaper,
+  type WallpaperCredit,
+  type WallpaperSource,
+} from './wallpaper';

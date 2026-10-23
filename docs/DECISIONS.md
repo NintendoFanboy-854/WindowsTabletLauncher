@@ -407,3 +407,51 @@
   - 「靠“输入框为空时允许空格录音”的启发式」：状态不可预测，且解决不了自动聚焦根因。
 - 兼容：`SurfaceStage` 由 `composer` 改为 `voice`（仅 UI 内部类型，不持久化）；`AgentSurface` props 不变（`open` 仍打开 `chat`）；session / 存储 / 音频链路不变；不迁移数据。
 - 验证：新增 `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风，voice 回合后观测不到 chat、回答后空格再录音、半高窗 textarea=0、chat 单行 composer 三控件同轴、焦点/Esc/录音取消、reduced-motion、console 0）；`scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 按新语义更新后全 PASS；`tsc --noEmit` / `npm run build` 通过；证据 `shots/v037-dev/`。
+
+## D-31 壁纸层：必应每日壁纸（原生接口）+ 修复 provider 盖住壁纸（2026-10-23，v0.4.0）
+
+- 背景：v0.3.x 的桌面壁纸 `--wtsl-desktop-backdrop` 挂在 `body` 上，被 `FluentProvider` 根 div 自带的不透明 `background-color: var(--colorNeutralBackground1)` 完全盖住（截图像素实测：暗色画布 `#292929`、亮色 `#ffffff`）。因此卡片上的 `--wtsl-material-blur` 实际在模糊一块纯色，`MATERIAL_BACKGROUND`（`colorNeutralBackground2` 72%）在暗色下比画布更暗，读作"凹陷的洞"；亮色卡片 `#fbfbfb` 对 `#ffffff` 仅 1.03:1。用户反馈界面"很素"，这是材质层失效的根因。
+- 决策：
+  1. `FluentProvider` 根背景显式透明，壁纸层放到 provider 内部最底层（`src/host/desktop/WallpaperLayer.tsx`），固定在桌面内容下方、不拦指针；设置/复盘/插件页仍是不透明全屏页，壁纸不会透出。
+  2. 壁纸来源：**必应每日壁纸**。按用户要求「都试一下」，依次尝试 `https://api.bimg.cc/all?...&uhd=true`（必应壁纸 API 的实际接口；文档站即 `api-bimg-cc.apifox.cn`）→ `https://api-bimg-cc.apifox.cn/all?...` → `https://www.bing.com/HPImageArchive.aspx?format=js`（原生 JSON，可能无 CORS，失败即跳过）。取 UHD（3840×2160）4K；缓存 `wtsl.wallpaper.v1` 12 小时；全部失败退回上次缓存，再失败停在 `colorNeutralBackground3`。
+  3. 比例不匹配用 `object-fit: cover`（填充），**不拉伸**（用户明确要求）。
+  4. 壁纸说明：桌面左下角一条安静的 12px 说明（标题 + 地点短句；完整版权放 `aria-label` / `title`），只在桌面页出现，不新增入口、不抢小组件。
+  5. 卡片材质回到 `colorNeutralBackground1` 72% + 既有 `--wtsl-material-blur` + `colorNeutralStroke2` 1px 描边（`FLUENT2.md §6/§7`），暗色卡片才重新"浮"在壁纸上。
+- 不新增设计 token：颜色/字号/间距/圆角/阴影全部取 Fluent token；只沿用既有两个项目 token（卡片圆角、材质模糊）与既有 `--wtsl-material-blur` 引用点。
+- 否掉：把必应图片打进 `public/` 随仓库分发（版权与体积）；随机图片 API（不可复现）；`background-size: 100% 100%` 拉伸铺满。
+
+## D-32 组件 identity 色（2026-10-23，v0.4.0，用户拍板"开吧"）
+
+- 背景：D-15「颜色严格功能化」+ DENSITY「层级只用中性色」让六张卡完全同质（全界面唯一彩色是 Microsoft 蓝按钮），用户认为"素"。
+- 决策：允许每个插件一个 **identity 色**，仅用于卡片顶部 24×24 identity chip 的背景和其中 16px 图标，占卡面积 ≤10%；色相固定映射到 Fluent shared palette 六种，不新增 hex：
+  - clock = blue（`colorPaletteBlueForeground2` / `colorPaletteBlueBackground2`）
+  - countdown = pink、pomodoro = orange、sedentary = green、todo = purple、weather = teal（同理取对应 palette token）
+- 限制：identity 色不承担状态/语义/数据含义（状态仍用 `colorStatus*` / 语义色）；不用于背景、边框、大面积填充；不新增项目 token。实现集中在 `public/plugins/_shared/ui.jsx` 的 `CARD_ACCENTS` / `CardIdentity` / `EmptyState.iconAccent`。
+- 否掉：给每卡配自定义主色（会变成 6 套小主题，和 Fluent token 体系冲突）；用 identity 色做卡片背景渐变（不是 Fluent 2）。
+
+## D-33 卡片静态 identity 行（2026-10-23，v0.4.0）
+
+- 背景：DENSITY「正常模式无 chrome」+ 去标题栏之后，卡片没有身份锚点，桌面读作"灰色矩形阵列"。
+- 决策：每张卡内容区第一行允许一条 **静态** identity 行：24px 高，identity chip（24×24）+ 12px 半粗 `colorNeutralForeground3` 组件名（≤4 字）+ 可选 trailing（原有计数 / 城市 / 状态）。1×1 卡只留 chip（`compact`）。
+- 边界：它不是 chrome——没有可交互控件、不常驻操作、不占点击热区；不改变「点击=主操作、长按=编辑」的交互契约。DENSITY §2 的 Primary/Secondary 信息预算不把 identity 行计入；其余门禁（最小 12px、主次字号比、空带、内容带、横向空洞）不变。
+
+## D-34 默认布局：填满首屏（2026-10-23，v0.4.0）
+
+- 背景：8 列 × 5 行网格，六个内置插件的旧默认布局只占 2–3 行（实测截图 18/40 格），右下大片空白，进一步放大"素"。
+- 决策：内置插件 `manifest.json` 的默认尺寸/位置改为一块 35/40 格构图（1440×960）：
+  weather 4×2 @ (0,0)、clock 3×2 @ (4,0)、todo 3×3 @ (0,2)、pomodoro 3×2 @ (3,2)、countdown 2×2 @ (6,2)、sedentary 2×1 @ (6,4)。
+- 兼容：老用户已保存的 `wtsl.layout` 不受影响；「重置布局」回落到新构图。其他分辨率按既有 clamp / 首个空位回退规则，不追求一致。
+- 实现修正（v0.4.0 落位时发现）：`src/host/plugins/manifest.ts` 原先用 `asWidgetSize` 校验 `cell`（尺寸语义，要求两维 ≥1），导致声明在**第一列/第一行**的坐标（0）被判非法、默认布局静默退化成“首个空位”装箱。已改为 `asGridCell`（坐标语义，允许 0）；默认构图的落位以本条为准。
+
+## D-35 半高语音窗 idle 视觉锚点（2026-10-23，v0.4.0）
+
+- 背景：v0.3.7 的半高语音窗在 idle 态中部只有 24px `ChatSparkle`，420 × clamp(320px,44vh,440px) 的窗口大面积空白，用户认为"素"；而 `MOTION.md §6` 明确禁止"循环呼吸/粒子/视差/自造时长"，不能用动效填。
+- 决策：voice 段空态改为**静态**构图：
+  1. 96px 圆形容器（`borderRadiusCircular`、`colorNeutralBackground2` 底、`strokeWidthThin colorNeutralStroke2` 边），内部 40px `ChatSparkleRegular`（`colorBrandForeground1`）；
+  2. 外层 132/168px 两层 `colorNeutralStroke3` 细环，绝对居中、不占布局；
+  3. dock 内加 14px `colorNeutralForeground3` 提示「说点什么，或按住空格」（`Text size={300}`，无句号），talk 按钮 `aria-describedby` 指向它；移除原「按住空格也可以说话」Tooltip（空格录音仍保留，提示常驻更可发现）；
+  4. 空态关闭 peek 顶部渐隐 mask（避免 168 环上缘被 mask 切掉）；有消息时恢复原渐隐。
+- 明确不做：循环呼吸/脉冲/粒子/视差动画；**本轮新增动画时长 = 0**（进入仍走既有 motionTokens 过渡）。
+- 契约不变：voice 段无 textarea、顶栏 ⌃/朗读/✕、peek 最近 3 条、底部「点击说话」、录音时声纹替换。
+- 验证：`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/verify-agent-voice-first.mjs` 断言层全 PASS（198/200，2 条 FAIL 为并发环境 Edge teardown 竞态，非 UI 断言）；`npm run typecheck` exit 0。详见 `docs/AGENT-SURFACE-CONTRACT.md §14.6`。
+

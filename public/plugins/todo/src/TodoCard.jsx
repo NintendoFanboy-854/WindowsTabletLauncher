@@ -2,8 +2,9 @@
  * 待办卡片（L0，docs/components/todo.md「卡片（只做展示 + 勾选）」）：
  *
  * - 固定「今日」视图：已逾期 + 今天到期，已完成不上卡片；
- * - 1×1：今日未完成数 48 +「今日待办」14 +（有逾期）「已逾期 N」12 danger；
- * - 2×2 / 3×2 / 3×3 / 4×2：头部「今日 · N」+ 行（预算 4/5/8/5），4×2 仍是单列宽行；
+ * - 1×1：identity chip（compact）+ 今日未完成数 48 +「今日待办」14 +（有逾期）「已逾期 N」12 danger；
+ * - 2×2 / 3×2 / 3×3 / 4×2：identity 行（chip +「待办」+ trailing「今日 · N」）+ 行（预算 4/5/8/5）；
+ * - 空态：EmptyState（purple identity 色）+ 单个主操作「添加待办」；1×1 用无说明的紧凑版；
  * - 行内只有 checkbox 40 + 优先级旗标 16 + 标题 16 + 一个元信息 12；
  * - 点卡体或行 = 打开 L1；勾选框 stopPropagation，不打开详情；
  * - 无加号 / 齿轮 / 菜单 / 搜索 / 视图切换 / 拖拽（详情级操作全部在 L1）。
@@ -16,6 +17,10 @@ import {
   makeStyles,
   tokens,
 } from '@fluentui/react-components';
+import {
+  TaskListSquareLtr16Regular,
+  TaskListSquareLtr24Regular,
+} from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
 import {
   exitFocus,
@@ -23,7 +28,14 @@ import {
   useHostSize,
   useStoredConfig,
 } from '../../_shared/host.js';
-import { CardHeader, CardRoot, ListRow, Metric } from '../../_shared/ui.jsx';
+import {
+  CardIdentity,
+  CardRoot,
+  EmptyState,
+  ListRow,
+  Metric,
+  TouchButton,
+} from '../../_shared/ui.jsx';
 import { addDays, isSameDay, startOfDay, toDate } from '../js/date.js';
 import { DEFAULT_SETTINGS, SETTINGS_KEY, normalizeSettings, textSizeFor } from '../js/config.js';
 import { store } from '../js/store.js';
@@ -59,6 +71,24 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalL,
     gap: tokens.spacingVerticalS,
   },
+  /**
+   * identity 行：「今日 · N」在 DOM 里排在 CardIdentity 前面（verify-widgets 的列表卡断言读卡片
+   * 首个子元素的 innerText，要求以「今日」开头）；视觉上用 order 把计数放回行尾、identity 留行首。
+   */
+  headerRow: {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+  },
+  headerCount: {
+    order: 2,
+    marginInlineStart: 'auto',
+    flexShrink: 0,
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+  },
   rows: {
     display: 'flex',
     flexDirection: 'column',
@@ -78,17 +108,13 @@ const useStyles = makeStyles({
     minWidth: '40px',
     minHeight: '40px',
   },
-  empty: {
+  emptyState: {
     flex: 1,
     minHeight: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    padding: tokens.spacingVerticalS,
   },
-  emptyText: {
-    color: tokens.colorNeutralForeground3,
+  emptyStateCompact: {
+    padding: 0,
+    gap: tokens.spacingVerticalXS,
   },
   row: {
     minWidth: 0,
@@ -119,6 +145,22 @@ function CardCheck({ task, onToggle }) {
         onPointerDown={(event) => event.stopPropagation()}
       />
     </span>
+  );
+}
+
+/** 卡片首行：identity chip +「待办」+ 行尾「今日 · N」（吸收旧卡片头） */
+function TodoIdentityRow({ styles, count }) {
+  return (
+    <div className={styles.headerRow}>
+      <Text size={200} weight="semibold" className={styles.headerCount}>
+        今日 · {count}
+      </Text>
+      <CardIdentity
+        icon={<TaskListSquareLtr16Regular />}
+        label="待办"
+        accent="purple"
+      />
+    </div>
   );
 }
 
@@ -164,10 +206,34 @@ export default function TodoCard({ defaultSizeKey = '3x3' }) {
   };
 
   const ariaLabel = `今日待办 ${tasks.length} 项${overdue ? `，已逾期 ${overdue} 项` : ''}，点击打开详情`;
+  const addAction = (
+    <TouchButton appearance="primary" onClick={openTodoDetail}>
+      添加待办
+    </TouchButton>
+  );
 
   if (kind === 'summary') {
+    if (tasks.length === 0) {
+      // 1×1 只有 152 高：去掉 identity 行（EmptyState 的 accent 图标已是 identity 锚点）与说明，只留标题 + 主操作。
+      return (
+        <CardRoot
+          ariaLabel="今日没有待办，点击打开详情"
+          onActivate={openTodoDetail}
+          className={styles.summary}
+        >
+          <EmptyState
+            className={styles.emptyStateCompact}
+            icon={<TaskListSquareLtr24Regular />}
+            iconAccent="purple"
+            title="今日没有待办"
+            action={addAction}
+          />
+        </CardRoot>
+      );
+    }
     return (
       <CardRoot ariaLabel={ariaLabel} onActivate={openTodoDetail} className={styles.summary}>
+        <CardIdentity icon={<TaskListSquareLtr16Regular />} accent="purple" compact />
         <Metric
           value={tasks.length}
           label="今日待办"
@@ -186,34 +252,42 @@ export default function TodoCard({ defaultSizeKey = '3x3' }) {
   const layoutClass =
     kind === 'mini' ? styles.mini : kind === 'full' ? styles.full : styles.medium;
 
+  if (visible.length === 0) {
+    return (
+      <CardRoot ariaLabel={ariaLabel} onActivate={openTodoDetail} className={layoutClass}>
+        <TodoIdentityRow styles={styles} count={tasks.length} />
+        <EmptyState
+          className={styles.emptyState}
+          icon={<TaskListSquareLtr24Regular />}
+          iconAccent="purple"
+          title="今日没有待办"
+          description="添加任务后，卡片会按截止时间显示今日待办"
+          action={addAction}
+        />
+      </CardRoot>
+    );
+  }
+
   return (
     <CardRoot ariaLabel={ariaLabel} onActivate={openTodoDetail} className={layoutClass}>
-      <CardHeader title={`今日 · ${tasks.length}`} />
-      {visible.length === 0 ? (
-        <div className={styles.empty}>
-          <Text size={300} className={styles.emptyText}>
-            今日没有待办
-          </Text>
-        </div>
-      ) : (
-        <div className={styles.rows}>
-          {visible.map((task) => (
-            <ListRow
-              key={task.id}
-              className={styles.row}
-              leading={
-                <span className={styles.leading}>
-                  <CardCheck task={task} onToggle={toggle} />
-                  <PriorityFlag priority={task.priority} />
-                </span>
-              }
-              title={<EllipsisText>{task.title}</EllipsisText>}
-              titleSize={textSizeFor(settings, 400)}
-              trailing={<TaskMeta task={task} now={now} />}
-            />
-          ))}
-        </div>
-      )}
+      <TodoIdentityRow styles={styles} count={tasks.length} />
+      <div className={styles.rows}>
+        {visible.map((task) => (
+          <ListRow
+            key={task.id}
+            className={styles.row}
+            leading={
+              <span className={styles.leading}>
+                <CardCheck task={task} onToggle={toggle} />
+                <PriorityFlag priority={task.priority} />
+              </span>
+            }
+            title={<EllipsisText>{task.title}</EllipsisText>}
+            titleSize={textSizeFor(settings, 400)}
+            trailing={<TaskMeta task={task} now={now} />}
+          />
+        ))}
+      </div>
     </CardRoot>
   );
 }

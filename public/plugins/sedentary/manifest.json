@@ -9,7 +9,7 @@
       "title": "久坐提醒",
       "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
       "defaultSize": [2, 1],
-      "cell": [0, 2]
+      "cell": [6, 4]
     }
   ],
   "settings": {
