@@ -169,3 +169,20 @@
 - [x] 文档：D-29、`PLUGIN-CONTRACT.md`（配置更新时序）、`PLUGIN-REACT.md`（配置同步章节）、`components/weather.md` / `clock.md`、weather README、README、RELEASE-REPORT §19
 - [x] 安装包不外发（内含本地 `public/secrets.json`）
 - [ ] `git status` 干净；commit / tag `v0.3.6`
+
+## 14. v0.3.7 语音优先 Agent 界面（2026-10-23）
+
+> 背景：用户反馈「按着空格发语音 / 触屏点 chat 图标，期待的是连续语音对话，文字对话是兜底；现在语音一发完就自动半高 → 全高；半高窗不该有文字输入框；回答完再按空格竟打出空格；右下角对话框没必要分两行」。四条同源：把语音当成“填满文字对话的输入方式”。修复见 D-30、AGENT-SURFACE-CONTRACT §14、RELEASE-REPORT §20。§1–§13 继续有效。
+
+- [x] 版本号 0.3.7 五处一致（`package.json` / `package-lock.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` 的 `name = "app"` 条目；`app.exe` 资源版本实测 0.3.7）
+- [x] 状态机：`composer` → `voice`（半高纯语音窗）；**删除发送/语音结束自动升级到 chat**，进入全高只能显式展开（⌃ / peek / Enter / 受控 open）；语音回合结束留在 voice（连续语音对话）
+- [x] 半高窗移除文字输入框/发送按钮：peek + 全宽 primary「点击说话」（`size=large` 40px）/ 录音声纹条；无横向溢出
+- [x] 空格与焦点：不再自动聚焦输入框（修复“回答后空格打出空格”）；只有光标主动在 textarea 内才是打字；textarea 内第一次 Esc 只失焦；窗口失焦取消任意路径录音（P2）；Esc/点外部监听常驻化，消除换段丢事件
+- [x] 全高输入区改单行 `[语音][输入][发送]`（空卡高 44px、三控件垂直中心差 1px）；录音/转写整行换声纹条；草稿跨 chat→voice→chat 保留
+- [x] Fluent 2 token 审计：颜色/字号/间距/圆角/阴影/动效全取 `tokens`/`motionTokens`，语音主按钮用 `size=large`（不自造 56px 高度）、不覆写按钮圆角；HIG 取舍：入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 顶部渐隐、半高 detent、reduced-motion 120ms
+- [x] 新增 `scripts/verify-agent-voice-first.mjs` **198/198 PASS**（194s）；`scripts/verify-agent-surface.mjs` **127/127 PASS**（217s）；`scripts/smoke-v031-ui.mjs` **26/26 PASS**（82s）；1440 dark / 1024 light / reduced-motion console error 0 — `shots/v037-dev/REPORT.md`
+- [x] `npm run typecheck` / `npm run build` exit 0
+- [x] `npx tauri build` exit 0（cargo release 4m53s；NSIS/MSI 完成）；产物：`app.exe` 12,173,312 B / `33791E72…`；NSIS 3,936,298 B / `E6E6098D…`；MSI 5,144,576 B / `7C925253…`；已复制到 `release/v0.3.7/` + `SHA256SUMS.txt`（哈希自校验 OK）
+- [x] 文档：D-30、`AGENT-SURFACE-CONTRACT.md` §14、`components/agent.md`、`DESIGN.md`、`MOTION.md`、README（含 v037 截图）、RELEASE-REPORT §20
+- [x] 安装包不外发（内含本地 `public/secrets.json`）
+- [x] `git status` 干净；commit / push / tag `v0.3.7`

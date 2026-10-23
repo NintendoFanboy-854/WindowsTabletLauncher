@@ -715,3 +715,52 @@ npx tauri build                    # release + 安装包
 - `host:config` 是可选增量：旧插件忽略未知消息即可、不会崩，但只升级宿主的旧构建插件会退化为修复前表现（需重新打包才享受推送）。
 - `storage` 监听保留为 dev 同源兜底；插件自己 origin 的 localStorage 同步（sedentary/todo/pomodoro 等运行时状态）不受影响。
 - 后续 follow-up（未进本次）：`PluginSettings` 表单写前与最新配置 merge 的加固；剩下一处历史注释同步；其他 P2 见评审报告。
+
+## 20. v0.3.7 语音优先 Agent 界面：半高窗不再自动升级 + 全高输入区单行（2026-10-23）
+
+> 背景：用户反馈「按着空格发语音 / 触屏点 chat 图标，期待的是连续语音对话，文字对话其实是兜底；现在语音一发完就自动半高 → 全高；半高窗里不该有文字输入框；回答完再按空格竟然打出空格；右下角对话框没必要分两行」。修复决策见 D-30，交互口径见 `AGENT-SURFACE-CONTRACT.md` §14。§1–§19 继续有效。
+
+### 20.1 问题与根因
+
+| 用户看到的问题 | 根因 |
+|---|---|
+| 语音一发完：半高 → 自动全高 | 旧状态机把「发送 / 语音结束」写成唯一的自动升级路径（v0.3.0 契约 §2），语音结果决定形态 |
+| 半高窗里有文字输入框 | 半高 `composer` 与全高 `chat` 共用同一个带 textarea 的输入组件 |
+| 回答后再按空格打出空格 | 自动展开 chat 后自动把焦点塞进 textarea；空格在输入框里当然是打字 |
+| 右下角对话框输入区分两行 | 输入一行 + 按钮一行，窄窗里挤成两层 |
+
+四条同源：把「语音」当成填满文字对话的输入方式，而不是一个独立、可停留的对话形态。
+
+### 20.2 修复
+
+1. **三段语义重定义**：`collapsed` → `voice`（半高纯语音窗，原 `composer` 更名）→ `chat`（全高文字/历史浮栏）。**删除“发送 / 语音结束自动升级”**；语音回合结束（转写 → 回答 → 朗读）留在 `voice`，可立即再按住空格/点「点击说话」继续下一轮 = 连续语音对话。进入 `chat` 只能显式操作（⌃ / 点 peek / Enter / 受控 `open`）。
+2. **半高窗纯语音**：移除文字输入框、发送按钮与 peek 下方输入区；底部只留全宽 primary「点击说话」（Fluent `Button size=large`，40px）或声纹录音条（录/转写中）。文字输入只存在于 `chat` 的单行输入区。
+3. **空格默认永远是按住说话**：展开 / 收起 / 语音回合结束**不再自动聚焦输入框**；只有用户主动点入 `chat` 的 textarea（或 Tab 进入）才打字；textarea 内第一次 Esc 只退出输入框、第二次才退级；窗口失焦取消**任意路径**（空格 / 入口 / 点击说话）起的录音；Esc / 点外部监听改为常驻注册 + `stageRef` 判层，消除换段一帧的事件丢失。
+4. **全高输入区单行**：`[语音] [Textarea] [发送/停止]` 同一行（space 录/转写时整行换声纹条）；空内容发送按钮保持可见禁用；Enter 发送 / Shift+Enter 换行；草稿跨 `chat → voice → chat` 保留（Composer 常驻挂载）。
+5. **设计规范**：只使用 Fluent 2 设计 token（颜色 `colorNeutral*/colorBrand*/colorStatus*`、字号 type ramp、间距 `spacing*`、圆角 `borderRadius*`、阴影 `shadow*`、动效 `motionTokens`；不写 hex / 不自造毫秒与尺寸，语音主按钮回到 `size=large`，不覆写按钮圆角）；HIG 思想取舍：入口长出/原路收回、关闭后焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 顶部渐隐做渐进披露、半高 detent 可停留可展开、reduced-motion 只留 120ms 透明度。
+
+### 20.3 验证
+
+- **新增** `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风 + `?mock=1`）：**198/198 PASS，0 FAIL，194s**。关键断言：入口 / 空格 / 点击说话 → `stage=voice` + 立即 recording 且 `data-stage` 观测器全程无 `chat`；语音回合后 3.6s 采样仍 `voice`；回答后空格再次 `recording`（不存在可被写入的 textarea）；半高窗 textarea=0、全文无可见输入框；chat composer 三控件垂直中心差 **1px**、空卡高 **44px**；焦点从不落进 textarea；Esc 链 chat→voice→collapsed 首次命中；录音 / 转写中展开禁用、X 取消后麦克风 0 live；textarea 内空格是打字不是录音；窗口失焦两条录音路径均取消（P2 回归）；reduced-motion 尺寸过渡 0ms + 连续动画 none + 保留 120ms opacity；console error 0。
+- `scripts/verify-agent-surface.mjs`（按新语义适配，覆盖 1440 dark / 1024 light / reduced-motion）：**127/127 PASS，0 FAIL，217s**（旧版 112 checks，未削弱）。
+- `scripts/smoke-v031-ui.mjs`（voice 阶段适配）：**26/26 PASS，0 FAIL，82s**。
+- 证据：`shots/v037-dev/REPORT.md`、`run-06-final.log`、`smoke-final.log`、`verify-agent-surface-final.log`、`verify-voice-first-results.json` + 16 张截图（01–14、20、21）。
+- `npm run typecheck` / `npm run build` exit 0；`npx tauri build` exit 0（cargo release **4m53s**，NSIS + MSI 完成）。
+
+### 20.4 构建产物
+
+| 产物 | 大小 | SHA-256 |
+|---|---|---|
+| `app.exe` | 12,173,312 B | `33791E725DE8A56733BDFC15D6C39973A04E433773802AEC123CBD8342EBDB6F` |
+| NSIS `Windows Tablet Launcher_0.3.7_x64-setup.exe` | 3,936,298 B | `E6E6098DC8EADB4996C3A2FA8463ED575926B76CE5B9C26B396899F3530908E2` |
+| MSI `Windows Tablet Launcher_0.3.7_x64_zh-CN.msi` | 5,144,576 B | `7C925253F5551BB2C27F581A4EC2B5D6E564C3C45DF72AD13FC532D7C655D333` |
+
+- 已复制到本机 `release/v0.3.7/`，附 `README.txt` 与 `SHA256SUMS.txt`（哈希自校验 OK）；`app.exe` 资源版本 FileVersion/ProductVersion 实测 **0.3.7**。
+- 升级时 `.seed-version`（`env!("CARGO_PKG_VERSION")`）0.3.6 → 0.3.7 自动重种内置插件，用户布局 / 会话 / 插件配置保留。
+- 安装包内含本地 `public/secrets.json`，仅本机自用，不外发。
+
+### 20.5 兼容与范围外
+
+- `SurfaceStage` 的 `composer → voice` 仅是 UI 内部类型（不持久化、不进 session）；`AgentSurface` props 不变（`open` 仍打开全高 chat）；session / 存储 / 音频链路 / 插件协议均未改，不迁移数据。
+- 本轮未重建插件产物（插件未改动；升级时 seed 版本变化会自动重种现有产物）。
+- 未做 release 真窗口 CDP 复测：本轮是 UI 状态机 + token 改动，dev E2E（headless Edge 真窗口尺寸、假麦克风、mock 全链路）已覆盖；如需可后补 release 冒烟。
