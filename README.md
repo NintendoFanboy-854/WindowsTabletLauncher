@@ -195,7 +195,7 @@ docs/                   # 需求/设计/组件契约/发布报告
 - 天气 3×2：横向连续空白 166px → 16px（1024 下 12px），内容带/今日指标/Secondary/断点门禁通过。
 - 真实 MiMo 音频冒烟：TTS 合成 → chat `input_audio`（HTTP 200，`audio_tokens` 与时长相符）→ ASR 回读与原文 100% 一致 → 后续纯文字请求无 `input_audio`。
 - release exe + WebView2 CDP：v0.3.1 真窗口（标题 2.8s / 全屏 / `--webview-exe-version=0.3.1`）；升级种子 `.seed-version` 0.3.0 → 0.3.1、天气产物哈希与仓库一致；6 卡、8 iframe、无 dock/机器人、console 0；右键菜单→设置、未播放时的常驻朗读开关在真实 WebView2 内 16/16 checks PASS。
-- 安装包（本机自用，含本地 Key，不外发）：v0.3.7 — NSIS 3,936,298 B / `E6E6098D…`；MSI 5,144,576 B / `7C925253…`；`app.exe` 12,173,312 B / `33791E72…`（对应 `release/v0.3.7/`，SHA-256 全表见该目录 `SHA256SUMS.txt`；旧版本产物在各自 `release/` 目录）。
+- 安装包（本机自用，含本地 Key，不外发）：v0.4.0 — NSIS 3,952,328 B / `85D483BC…`；MSI 5,156,864 B / `609830CA…`；`app.exe` 12,183,552 B / `E30FC6C4…`（对应 `release/v0.4.0/`，SHA-256 全表见该目录 `SHA256SUMS.txt`；旧版本产物在各自 `release/` 目录）。本机已用该 NSIS 静默升级安装并启动验证（窗口标题 `Windows Tablet Launcher`；运行时插件目录 6 个插件，无测试探针）。
 
 ## 已知限制与安全
 
