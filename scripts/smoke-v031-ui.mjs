@@ -1,5 +1,9 @@
 /**
- * v0.3.1 UI 冒烟：桌面右键菜单 / Agent 半高窗控制条+peek / 全高窗常驻朗读开关 / 菜单项边界。
+ * v0.3.1 UI 冒烟：桌面右键菜单 / Agent 半高语音窗控制条+peek / 全高窗常驻朗读开关 / 菜单项边界。
+ *
+ * v0.3.7 适配：半高窗由旧「composer（输入窗）」改为纯语音窗 `data-stage="voice"`
+ * （无 textarea、点「点击说话」开录、peek 展开对话）；全高 chat 的输入区改成单行 composer。
+ * 本文件跟随新契约调整阶段名与断言，覆盖范围不缩水。
  *
  * 用法（仓库根目录，dev server 已在跑；端口可用 WTSL_BASE_URL 覆盖）：
  *   node scripts/smoke-v031-ui.mjs
@@ -14,7 +18,9 @@ import { launch, sleep } from './lib/cdp.mjs';
 
 const REPO_ROOT = process.cwd();
 const OUT = join(REPO_ROOT, 'shots', 'v031-dev');
-const BASE_URL = process.env.WTSL_BASE_URL || 'http://127.0.0.1:5173';
+// 注意：Vite dev server 可能只监听 IPv6 loopback（::1），127.0.0.1 会 ERR_CONNECTION_REFUSED；
+// 统一用 localhost（与 scripts/lib/cdp.mjs 的 DEFAULT_BASE_URL 一致）。
+const BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 mkdirSync(OUT, { recursive: true });
 
 const results = [];
@@ -190,7 +196,7 @@ async function openMoreMenu() {
     20000,
     '未进入 chat，无法打开 ⋯ 菜单',
   );
-  await sleep(600); // 等 composer → chat 的几何过渡与 header 重排结束
+  await sleep(600); // 等 voice → chat 的几何过渡与 header 重排结束
   const info = await evalJS(`(() => {
     const surface = document.querySelector('[data-wtsl-agent-surface]');
     const button = [...(surface?.querySelectorAll('[aria-label]') || [])].find((el) => (el.getAttribute('aria-label') || '') === '更多');
@@ -490,7 +496,7 @@ try {
 
   // ================= D 半高窗控制条 + peek =================
   await step('D', '半高窗：顶部控制条（展开对话/朗读开关/收起）+ peek 区域 + 无横向溢出', async () => {
-    // 从 chat 收起再点入口进入录音 → composer
+    // 从 chat 收起再点入口进入录音 → voice（v0.3.7：半高窗是纯语音形态）
     await clickAria('关闭 Agent', 15000);
     await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'collapsed'`, 15000, '未收起为 collapsed');
     await sleep(350); // 等 back-collapsed 200–240ms 过渡结束，入口按钮稳定可命中
@@ -513,18 +519,18 @@ try {
     })()`);
     evidence.entryDiag = entryDiag;
     await clickAria('开始语音提问', 15000);
-    let composerOk = await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'composer'`, 12000, '入口未进入 composer').then(() => true).catch(() => false);
+    let voiceOk = await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'voice'`, 12000, '入口未进入 voice').then(() => true).catch(() => false);
     let entryClickMethod = 'mouse';
-    if (!composerOk) {
+    if (!voiceOk) {
       // 回退：页面内 .click()（排除坐标/遮挡因素）
       await evalJS(`(() => { const el = document.querySelector('[data-wtsl-agent-entry]'); if (el) el.click(); return Boolean(el); })()`);
       entryClickMethod = 'programmatic-fallback';
-      composerOk = await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'composer'`, 12000, '入口未进入 composer').then(() => true).catch(() => false);
+      voiceOk = await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'voice'`, 12000, '入口未进入 voice').then(() => true).catch(() => false);
     }
     const afterEntry = await surfaceState();
-    const entryClickDiag = { entryDiag, afterEntry, entryClickMethod, composerOk };
+    const entryClickDiag = { entryDiag, afterEntry, entryClickMethod, voiceOk };
     evidence.entryClick = entryClickDiag;
-    expect(composerOk, `入口未进入 composer；diag=${JSON.stringify(entryClickDiag)}`);
+    expect(voiceOk, `入口未进入 voice；diag=${JSON.stringify(entryClickDiag)}`);
     // 入口即录是异步的（getUserMedia 可能数百 ms~数秒）：等 recording 后再断言控制条禁用态
     await waitFor(
       `document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage') === 'recording'`,
@@ -545,14 +551,23 @@ try {
         close: Boolean(close),
       };
     })()`);
-    check('D', 'composer 顶部控制条三个控件存在', topBar.expand && topBar.toggle && topBar.close, JSON.stringify({ topBar, recording }));
+    check('D', 'voice 顶部控制条三个控件存在', topBar.expand && topBar.toggle && topBar.close, JSON.stringify({ topBar, recording }));
     check('D', '录音态顶部「展开对话」按设计为禁用（voiceStage!=idle）', topBar.expandDisabled === true, JSON.stringify({ topBar, voiceStage: recording.voiceStage }));
-    // 取消录音回 idle → peek 区域应出现（录音态 Esc = 取消并停留 composer）
+    // v0.3.7：半高窗是纯语音形态 —— 录音态与 idle 都不允许出现 textarea
+    const voiceInputs = await evalJS(`(() => {
+      const pane = document.querySelector('[data-wtsl-agent-pane="voice"]');
+      return {
+        paneTextareas: pane ? pane.querySelectorAll('textarea').length : -1,
+        talkExists: Boolean(pane && pane.querySelector('[data-wtsl-agent-talk]')),
+      };
+    })()`);
+    check('D', 'voice 窗内没有 textarea（纯语音）', voiceInputs.paneTextareas === 0, JSON.stringify(voiceInputs));
+    // 取消录音回 idle → peek 区域应出现（录音态 Esc = 取消并停留 voice）
     await pressKey('Escape', 'Escape', 27);
     await waitFor(
-      `document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'composer' && document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage') === 'idle'`,
+      `document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'voice' && document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage') === 'idle'`,
       30000,
-      'Esc 取消录音后未回到 composer idle',
+      'Esc 取消录音后未回到 voice idle',
     );
     await sleep(300);
     const idle = await surfaceState();
@@ -564,9 +579,10 @@ try {
       const cs = getComputedStyle(el);
       return { width: Math.round(r.width), height: Math.round(r.height), display: cs.display, visibility: cs.visibility, text: String(el.innerText || '').slice(0, 120) };
     })()`);
-    expect(peek, 'composer idle 时找不到 peek 区域 [role=button][aria-label=展开对话]');
+    expect(peek, 'voice idle 时找不到 peek 区域 [role=button][aria-label=展开对话]');
     expect(peek.width > 10 && peek.height > 10, `peek 区域尺寸异常：${JSON.stringify(peek)}`);
-    check('D', 'composer 顶部朗读开关存在且默认「关闭自动朗读」', idle.stage === 'composer' && topBar.toggleLabel === '关闭自动朗读', JSON.stringify({ stage: idle.stage, toggleLabel: topBar.toggleLabel }));
+    check('D', 'voice 顶部朗读开关存在且默认「关闭自动朗读」', idle.stage === 'voice' && topBar.toggleLabel === '关闭自动朗读', JSON.stringify({ stage: idle.stage, toggleLabel: topBar.toggleLabel }));
+    check('D', 'voice idle 时有「点击说话」按钮 [data-wtsl-agent-talk]', await evalJS(`Boolean(document.querySelector('[data-wtsl-agent-pane="voice"] [data-wtsl-agent-talk]'))`));
     // 无横向溢出：文档无溢出 + surface overflowX=hidden（内容被裁剪、不出滚动条）；
     // surface scrollWidth-clientWidth 允许 1px 边框亚像素舍入（探针 shots/v031-dev/overflow-probe.log 证：无子元素越界）。
     const overflow = await evalJS(`(() => {
@@ -597,14 +613,13 @@ try {
       return out;
     })()`);
     const small = Object.entries(sizes).filter(([, value]) => !value || value.w < 40 || value.h < 40).map(([label]) => label);
-    check('D', 'composer 顶部控件 ≥40×40', small.length === 0, JSON.stringify(sizes));
-    await screenshot('04-composer.png');
+    check('D', 'voice 顶部控件 ≥40×40', small.length === 0, JSON.stringify(sizes));
+    await screenshot('04-voice.png');
     return JSON.stringify({ recording: { stage: recording.stage, voiceStage: recording.voiceStage }, topBar, peek, sizes });
   });
 
   // ================= E 展开 → chat；未播放也有朗读开关 =================
-  await step('E', '点「展开对话」→ chat；header 未播放时也有常驻朗读开关', async () => {
-    await clickAria('展开对话', 15000);
+  await step('E', '点「展开对话」→ chat；header 未播放时也有常驻朗读开关', async () => {    await clickAria('展开对话', 15000);
     await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-stage') === 'chat'`, 20000, '点「展开对话」未进入 chat');
     const state = await surfaceState();
     expect(state.stage === 'chat', `stage=${state.stage}`);
@@ -724,7 +739,7 @@ try {
     })()`);
     expect(recording, `录音未开始；diag=${JSON.stringify(gDiag)}`);
     const recState = await surfaceState();
-    expect(recState.stage === 'composer', `录音时 stage=${recState.stage}`);
+    expect(recState.stage === 'voice', `录音时 stage=${recState.stage}`);
     const recordingUi = await evalJS(`Boolean(document.querySelector('[aria-label="结束录音并发送"], [aria-label="取消录音"]'))`);
     check('G', '录音态录音 UI 可见（结束/取消按钮）', recordingUi === true, String(recordingUi));
     // 录音中点顶部 X（收起 Agent）

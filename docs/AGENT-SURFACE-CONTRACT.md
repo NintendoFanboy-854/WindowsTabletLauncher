@@ -1,6 +1,10 @@
 # Agent 浮空界面与语音契约（v0.3.0 实施用）
 
-> 这是本版实现的唯一口径。设计取自用户明确要求 + `docs/reference/APPLE-HIG.md`（§5 层级与模态、§5.1 关闭语义、§9 动效、§13.2 sheet detent 思想）+ `docs/FLUENT2.md`。
+> 这是 v0.3.0 的实现口径。**v0.3.7 的语音优先修订见 §14**：半高窗改为「纯语音」形态、
+> 语音回合结束后不再自动升级到全高、空格默认永远是按住说话；与本文 §1/§2/§3/§8 冲突处
+> 以 §14 为准（§8 的 `SurfaceStage` 已同步更新）。
+>
+> 设计取自用户明确要求 + `docs/reference/APPLE-HIG.md`（§5 层级与模态、§5.1 关闭语义、§9 动效、§13.2 sheet detent 思想）+ `docs/FLUENT2.md`。
 > 实现完成后本文并入 `docs/components/agent.md` 与 `docs/DESIGN.md`。
 
 ## 0. 范围
@@ -104,7 +108,7 @@
 
 ```ts
 export type TurnStatus = 'idle' | 'streaming' | 'tools';
-export type SurfaceStage = 'collapsed' | 'composer' | 'chat'; // 仅 UI 持有
+export type SurfaceStage = 'collapsed' | 'voice' | 'chat'; // 仅 UI 持有；v0.3.7 起 composer → voice
 
 export interface AgentVoiceState {
   stage: 'idle' | 'recording' | 'transcribing';
@@ -239,4 +243,72 @@ interface AgentSettings {
 - **鼠标路径**：桌面空白处右键 = Windows 桌面惯例；不再要求用户先知道 Ctrl+, 或长按空白。触控长按语义不变。
 - 验收：`scripts/smoke-v031-ui.mjs`（headless Edge + 假麦克风）A–H 全 PASS（24/24，console error 0）；
   `tsc --noEmit` 通过；截图 `shots/v031-dev/`。
+
+## 14. v0.3.7 修订（语音优先：半高窗不再自动升级）
+
+> 背景（用户反馈）：按住空格或触屏点入口后，语音回合结束会「半高 → 全高」自动展开；但用户期待的是
+> **连续语音对话**，文字对话只是兜底。半高窗里还留着文字输入框（应纯语音）；自动展开又把焦点塞进
+> 输入框，导致回答完后**再按空格打出的是空格**；全高输入区还分两行（输入一行、按钮一行），一行放得下。
+> 三个问题同源：把「语音」当成填满文字对话的一种输入方式，而不是独立、可停留的对话形态。
+
+### 14.1 三段形态（`composer` 更名 `voice`）
+
+| 阶段 | 尺寸 | 内容 | 进入 / 退出 |
+|---|---|---|---|
+| `collapsed` 按钮 | 56×56 | `ChatSparkle20Regular` | 点按 / 按住空格 → `voice` 并**立即录音** |
+| `voice` 半高纯语音窗 | min(420px, 92vw) × clamp(320px, 44vh, 440px) | 顶部：⌃ 展开对话（录音/转写中禁用）/ 朗读开关 /（播报中）停止朗读 / ✕ 收起；中部：最近 3 条消息 peek（底部对齐、顶部渐隐；点击或 Enter 展开，空格=说话）；底部：**「点击说话」大按钮**（全宽、primary、`size=large`）或录音条（声纹 + 取消 X + 停止 ■）。**没有文字输入框。** | 显式 ⌃ / 点 peek / Enter → `chat`；Esc / ✕ / 点外部 → `collapsed`（录音中先取消）；语音回合结束**留在本层** |
+| `chat` 全高对话浮栏 | 同宽 × calc(100vh − 40px) | 头部：ChatSparkle + 朗读开关 /（播报中）停止朗读 / ⌄ 收起到语音窗 / ⋯ 菜单 / ✕ 关闭；消息列表；底部**单行输入区**：`[语音] [输入框] [发送]`（录音/转写时整行换成声纹条） | ⌄ / Esc → `voice`；✕ → `collapsed`；点外部不关闭；发送文字/语音回合**留在本层** |
+
+- **不再有自动形态升级**。`open` 受控入口（设置页「打开 Agent」/ `?agent=1`）仍打开 `chat`。
+- 半高语音窗是「语音对话的家」：回答会被朗读（`tts.autoRead` 开时）并显示在 peek 里，用户可立即再按住
+  空格/点「点击说话」继续下一轮；想读历史或打字时再显式展开。
+
+### 14.2 空格 / 焦点（edge corner 口径）
+
+| 场景 | 结果 |
+|---|---|
+| 默认焦点（body / surface 容器 / 消息区 / 入口按钮 / 「点击说话」/ peek）按住空格 | 立即录音；松开 ≥300ms 发送，<300ms 或失焦取消 |
+| 光标在输入框 / textarea / contenteditable 内 | 空格是打字，**不**录音（文字兜底模式，用户主动点入才成立） |
+| 焦点在其它按钮 / 链接 / 菜单 / 对话框 | 不劫持空格（保留原生激活语义） |
+| 带 Ctrl/Alt/Meta/Shift 的空格、输入法组合中、auto-repeat | 不触发 |
+| 任何展开 / 收起 / 语音回合结束 / 播放结束 | **绝不自动聚焦输入框**；焦点放在 surface 容器（开/换层）或入口按钮（收起） |
+| 输入框获得焦点后按 Esc | 第一次 Esc 只退出输入框（焦点回容器），窗口不退级；再按 Esc 才 `chat → voice → collapsed` |
+
+- 这条修复的直接 bug：旧实现 `语音结束 → 自动展开 chat → 自动聚焦 textarea`，用户再按空格就把空格
+  打进输入框。现在「语音结束」不换层、不聚焦输入框，空格默认永远是按住说话。
+- 录音 / 转写中：⌃ 与 ⌄ 禁用、音频回合不叠新录音；✕ / 点外部收起时先 `cancelRecording()`；
+  转写结果仍保存，不会再把窗口弹回来。窗口失焦 = 取消录音（不能留没人能停的麦克风）。
+- 播报中：开始录音先 `stopSpeaking()`；收起 / 关闭窗口立即停播；两个形态的顶部都有常驻朗读开关，
+  「停止朗读」只在播报中出现。
+
+### 14.3 全高输入区：单行
+
+- 一行三控件：`[SoundWaveCircle20Regular 语音] [Textarea 自动增高 ≤3 行] [SendRegular 发送]`，
+  空内容时发送按钮保持可见禁用态（outline + disabled，不隐藏；生成中换成「停止生成」）。
+- Enter 发送 / Shift+Enter 换行；`?mock=1` 下文字链路可用。草稿在 `chat → voice → chat` 之间保留
+  （Composer 常驻不卸载，切层只切可见性）。
+
+### 14.4 设计规范（FLUENT2 强约束 + HIG 取舍启发）
+
+- **只用 Fluent 2 设计 token**：颜色（`colorNeutral*/colorBrand*/colorStatus*`）、字号（type ramp token）、
+  间距（`spacingHorizontal*/spacingVertical*`）、圆角（`borderRadius*`；容器 12px 项目 token）、
+  阴影（`shadow*`）、动效（`motionTokens`）。不写 hex、不自造毫秒/曲线/间距；触控目标 ≥40×40；
+  图标只用 Fluent System Icons 的 Regular 尺寸 16/20/24。主操作（点击说话）用 primary 样式，
+  次操作（展开 / 朗读 / 收起）用 subtle 图标按钮，命令式文案不加句号。
+- **HIG 启发（不照搬 iOS 组件）**：
+  - *从哪来、回哪去*（HIG §5）：窗口永远从右下角入口长出、原路收回；关闭后焦点回入口按钮；
+    进入方向定义出场方向（§9）。
+  - *关闭语义一致*（§5.1）：✕ = 关闭这一层；⌄ / Esc = 退回上一级；多条退出路径语义不冲突。
+  - *渐进披露*（§7）：半高只给最近 3 条 peek + 顶部渐隐暗示还有更多；完整历史/文字输入在显式展开后。
+  - *sheet detent 思想*（§13.2）：半高先出现、可展开全高；半高本身是可持续停留的形态，不是过渡态。
+  - *减少动效*（§9）：reduced-motion 下只保留 120ms 透明度，无尺寸/阴影/位移。
+
+### 14.5 验收
+
+- 新脚本 `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风）：入口→voice+录音；空格语音回合
+  后**观测不到 chat**；回答后空格再次录音；voice 窗 textarea=0；chat 输入区单行（三控件同轴、高度紧凑）；
+  展开/收起/Esc/点外部/焦点/录音中禁用/取消录音；reduced-motion；console error 0。
+- 既有 `scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 已按新语义更新（stage 名、
+  不再自动 upgrade、无输入框的半高窗、单行 composer、焦点断言）。
+- 证据目录：`shots/v037-dev/`（截图 + JSON + REPORT.md）。
 

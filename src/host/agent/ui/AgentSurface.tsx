@@ -1,12 +1,15 @@
 /**
- * Agent 浮空界面：右下角 56×56 入口按钮 → 半高输入窗 → 全高浮栏。
+ * Agent 浮空界面：右下角 56×56 入口按钮 → 半高语音窗 → 全高对话浮栏。
  *
- * 同一个容器只改宽高（right/bottom 与 12px 圆角不变），三段形态共享 DOM，
- * 输入组件不重挂、草稿不丢。契约覆盖：
- * - §1 三段形态与尺寸；        - §2 手势 / 键盘 / 焦点 / 关闭语义；
- * - §3 motionTokens 动效；     - §4 token 颜色与图标语义；
- * - §5 入口即录（点按/空格立即 startRecording，录音结束才 morph 到 chat）。
+ * v0.3.7 语音优先（取代 v0.3.0「发送后自动升级到 chat」的行为）：
+ * - 语音是主入口：点按/空格立即录音；一轮结束后**留在半高语音窗**继续下一轮，
+ *   不再自动 morph 到全高。文字对话是兜底，必须显式「展开对话」才进入全高浮栏。
+ * - 半高窗是纯语音形态：没有文字输入框；录音 / 转写 / 回答都在这一层完成。
+ * - 空格默认永远是「按住说话」：展开/收起/语音结束都**不**把焦点塞进输入框，
+ *   只有用户主动点进全高浮栏的输入框（或 Tab 进去）时空格才是打字。
+ * - 全高浮栏的输入区是单行：[语音] [输入] [发送]。
  *
+ * 同一容器只改宽高（right/bottom 与 12px 圆角不变），三段共享 DOM；
  * UI 只消费 useAgentSession 暴露的状态与动作，不直接碰 recorder / ttsPlayer。
  */
 
@@ -36,6 +39,7 @@ import {
   DismissRegular,
   MoreHorizontalRegular,
   SettingsRegular,
+  SoundWaveCircleRegular,
   Speaker2Regular,
   SpeakerMuteRegular,
   StopRegular,
@@ -46,18 +50,21 @@ import {
   type AgentSession,
 } from '../hooks/useAgentSession';
 import type { AgentTransport } from '../types';
+import { AgentAlerts } from './AgentAlerts';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { SettingsDialog } from './SettingsDialog';
 import { useReducedMotion } from './useReducedMotion';
+import { useVoiceControls } from './useVoiceControls';
+import { VoiceCapture } from './VoiceCapture';
 import type { SurfaceStage } from './types';
 import './agent.css';
 
-/** 空格按住不足 300ms 视为误触，取消录音（契约 §2） */
+/** 空格按住不足 300ms 视为误触，取消录音 */
 const SPACE_HOLD_CANCEL_MS = 300;
-/** 展开后内容淡入的等待：图标先 80ms 淡出（契约 §3） */
+/** 展开后内容淡入的等待：图标先 80ms 淡出 */
 const ENTRY_FADE_OUT_DELAY = motionTokens.durationFaster;
-/** 减少动态效果下唯一保留的过渡：120ms opacity（契约 §3） */
+/** 减少动态效果下唯一保留的过渡：120ms opacity */
 const REDUCED_FADE_MS = 120;
 
 export interface AgentSurfaceProps {
@@ -65,7 +72,7 @@ export interface AgentSurfaceProps {
   transport?: AgentTransport;
   /** 测试或截图用的初始会话 */
   seed?: AgentSeed;
-  /** 受控打开 chat（设置页「打开 Agent」/ `?agent=1` 用） */
+  /** 受控打开全高对话（设置页「打开 Agent」/ `?agent=1` 用） */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** 无桌面入口时（如设置页内的实例）：不渲染右下角按钮 */
@@ -74,72 +81,86 @@ export interface AgentSurfaceProps {
   defaultSettingsOpen?: boolean;
 }
 
-type MorphKind = 'open-composer' | 'open-chat' | 'back-composer' | 'back-collapsed' | 'close-chat';
+type MorphKind = 'open-voice' | 'open-chat' | 'back-voice' | 'back-collapsed' | 'close-chat';
 
 interface MorphSpec {
   geometry: { duration: number; curve: string };
   content: { duration: number; delay: number; curve: string };
   entry: { duration: number; delay: number; curve: string };
-  chatExit: number;
+  /** 离开该层时的 fade 时长（chat / voice 交叉淡出） */
+  paneExit: number;
 }
 
 /**
  * 三段 morph 的时长/曲线（全部来自 motionTokens）：
- * button → composer 用 decelerate，composer → chat 用 decelerate；
- * 收回方向（chat → composer / → button）用 accelerate（契约 §3）。
+ * 打开方向用 decelerate，收回方向用 accelerate；只变宽高，位置与圆角不变。
  */
 const MORPH: Record<MorphKind, MorphSpec> = {
-  'open-composer': {
+  'open-voice': {
     geometry: { duration: motionTokens.durationSlow, curve: motionTokens.curveDecelerateMid },
     content: { duration: motionTokens.durationFast, delay: ENTRY_FADE_OUT_DELAY, curve: motionTokens.curveDecelerateMid },
     entry: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveDecelerateMid },
-    chatExit: 0,
+    paneExit: 0,
   },
   'open-chat': {
     geometry: { duration: motionTokens.durationSlow, curve: motionTokens.curveDecelerateMid },
     content: { duration: motionTokens.durationFast, delay: 0, curve: motionTokens.curveDecelerateMid },
     entry: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveDecelerateMid },
-    chatExit: 0,
+    paneExit: 0,
   },
-  'back-composer': {
+  'back-voice': {
     geometry: { duration: motionTokens.durationGentle, curve: motionTokens.curveAccelerateMid },
-    content: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveAccelerateMid },
+    content: { duration: motionTokens.durationFast, delay: 0, curve: motionTokens.curveAccelerateMid },
     entry: { duration: 0, delay: 0, curve: motionTokens.curveLinear },
-    chatExit: motionTokens.durationFaster,
+    paneExit: motionTokens.durationFaster,
   },
   'back-collapsed': {
     geometry: { duration: motionTokens.durationNormal, curve: motionTokens.curveAccelerateMid },
     content: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveAccelerateMid },
     entry: { duration: motionTokens.durationFast, delay: motionTokens.durationFaster, curve: motionTokens.curveDecelerateMid },
-    chatExit: motionTokens.durationFaster,
+    paneExit: motionTokens.durationFaster,
   },
   'close-chat': {
     geometry: { duration: motionTokens.durationGentle, curve: motionTokens.curveAccelerateMid },
     content: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveAccelerateMid },
     entry: { duration: motionTokens.durationFast, delay: motionTokens.durationFaster, curve: motionTokens.curveDecelerateMid },
-    chatExit: motionTokens.durationFaster,
+    paneExit: motionTokens.durationFaster,
   },
 };
 
-/** 空格 / Esc 的键盘守卫：只放行“不在输入控件、不在外部弹层、不在其它按钮上”的场景。
- * 入口按钮本身要放行（焦点回到按钮后仍能按住空格说话，契约 §2）。 */
+function isEditableTarget(target: HTMLElement): boolean {
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
+/**
+ * 空格守卫：默认放行 → 按住说话；只在这些地方不响应：
+ * - 输入控件（input / textarea / contenteditable）——用户在打字；
+ * - 外部弹层（菜单 / 对话框 / 设置对话框，Fluent Portal 在 surface 之外）；
+ * - 其它按钮 / 链接——空格是它们的激活键；
+ * 入口按钮、半高窗「点击说话」按钮与 peek 区例外：它们本身就是语音入口。
+ */
 function canUseVoiceKeys(event: KeyboardEvent, surface: HTMLElement | null): boolean {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return true;
-  if (target.isContentEditable) return false;
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return false;
+  if (isEditableTarget(target)) return false;
 
   const insideSurface = Boolean(surface?.contains(target));
   if (!insideSurface && target.closest('[role="dialog"], [role="menu"], [role="listbox"]')) {
     return false;
   }
-  const interactive = target.closest('button, [role="button"], a[href]');
-  if (interactive && !interactive.hasAttribute('data-wtsl-agent-entry')) return false;
-  return true;
+  if (
+    target.closest(
+      '[data-wtsl-agent-entry], [data-wtsl-agent-talk], [data-wtsl-agent-peek]',
+    )
+  ) {
+    return true;
+  }
+  return !target.closest('button, [role="button"], a[href]');
 }
 
 const useStyles = makeStyles({
   contentLayer: {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
@@ -147,37 +168,48 @@ const useStyles = makeStyles({
     minHeight: 0,
     opacity: 0,
   },
-  chatPane: {
+  pane: {
+    position: 'absolute',
+    inset: 0,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
     overflow: 'hidden',
   },
-  composerPane: {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: 0,
-    paddingInline: tokens.spacingHorizontalM,
-    paddingBlockEnd: tokens.spacingVerticalM,
-    paddingBlockStart: tokens.spacingVerticalS,
-    gap: tokens.spacingVerticalS,
-  },
-  composerPaneChat: {
-    flex: '0 0 auto',
-  },
-  composerPaneCompact: {
-    flex: '1 1 auto',
-    paddingBlock: tokens.spacingVerticalM,
-  },
-  // 半高窗顶部控制条：展开对话 / 静音 / 关闭（鼠标与触控都直接可见）
-  composerTop: {
+  header: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    minHeight: '40px',
+    paddingInline: tokens.spacingHorizontalM,
+    paddingBlock: tokens.spacingVerticalS,
     flex: '0 0 auto',
   },
-  composerTopSpacer: {
+  headerMark: {
+    color: tokens.colorBrandForeground1,
+    flexShrink: 0,
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  menuAnchor: {
+    display: 'inline-flex',
+  },
+  composerHost: {
+    flex: '0 0 auto',
+    paddingInline: tokens.spacingHorizontalM,
+    paddingBlockEnd: tokens.spacingVerticalM,
+    paddingBlockStart: tokens.spacingVerticalS,
+  },
+  // ---- 半高纯语音窗 ----
+  voiceTop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingInline: tokens.spacingHorizontalM,
+    paddingBlock: tokens.spacingVerticalS,
+    flex: '0 0 auto',
+  },
+  voiceSpacer: {
     flex: 1,
   },
   // 半高窗里的近期消息 peek：底部对齐、顶部渐隐；整块点击展开对话
@@ -189,9 +221,10 @@ const useStyles = makeStyles({
     justifyContent: 'flex-end',
     gap: tokens.spacingVerticalS,
     overflow: 'hidden',
+    paddingInline: tokens.spacingHorizontalM,
     paddingBlock: tokens.spacingVerticalS,
     cursor: 'pointer',
-    borderRadius: tokens.borderRadiusLarge,
+    borderRadius: tokens.borderRadiusXLarge,
     maskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)',
     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)',
     ':focus-visible': {
@@ -200,6 +233,9 @@ const useStyles = makeStyles({
       outlineWidth: '2px',
       outlineOffset: '-2px',
     },
+  },
+  peekAreaBusy: {
+    cursor: 'default',
   },
   peekRow: {
     display: 'flex',
@@ -233,36 +269,31 @@ const useStyles = makeStyles({
     color: tokens.colorBrandForeground1,
     opacity: 0.75,
   },
-  composerSlot: {
+  voiceDock: {
+    flex: '0 0 auto',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 0,
-    flex: '0 0 auto',
+    gap: tokens.spacingVerticalS,
+    paddingInline: tokens.spacingHorizontalM,
+    paddingBlockStart: tokens.spacingVerticalS,
+    paddingBlockEnd: tokens.spacingVerticalM,
   },
-  composerSlotCenter: {
-    // 录音 / 转写：声纹带放到输入窗中部（契约 §5）
-    flex: '1 1 auto',
-    justifyContent: 'center',
-    paddingBlockEnd: tokens.spacingVerticalXXL,
-  },
-  header: {
+  voiceCard: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
     paddingInline: tokens.spacingHorizontalM,
-    paddingBlock: tokens.spacingVerticalS,
-    flex: '0 0 auto',
+    paddingBlock: tokens.spacingVerticalXS,
+    borderRadius: tokens.borderRadiusXLarge,
+    backgroundColor: tokens.colorNeutralBackground2,
   },
-  headerMark: {
-    color: tokens.colorBrandForeground1,
-    flexShrink: 0,
+  talkButton: {
+    // 半高窗的主操作：宽度占满、高度用 Fluent Button 的大尺寸（40px，满足触控目标）
+    width: '100%',
   },
-  headerSpacer: {
-    flex: 1,
-  },
+  // ---- 入口按钮 ----
   entryLayer: {
     position: 'absolute',
-    // 盖住 1px 描边：入口按钮与容器同为 56×56（契约 §1）
+    // 盖住 1px 描边：入口按钮与容器同为 56×56
     inset: '-1px',
     zIndex: 2,
     display: 'grid',
@@ -304,11 +335,7 @@ const useStyles = makeStyles({
     display: 'grid',
     placeItems: 'center',
     color: tokens.colorPaletteRedForeground1,
-    // 语义色只用于错误图标 + tooltip（契约 §4）
     pointerEvents: 'auto',
-  },
-  menuAnchor: {
-    display: 'inline-flex',
   },
 });
 
@@ -330,10 +357,9 @@ export function AgentSurface({
   const reducedMotion = useReducedMotion();
   const session = useAgentSession({ transport, seed });
   const [stage, setStage] = useState<SurfaceStage>(() => (open ? 'chat' : 'collapsed'));
-  const [motion, setMotion] = useState<MorphKind>('open-composer');
+  const [motion, setMotion] = useState<MorphKind>('open-voice');
   const [settingsOpen, setSettingsOpen] = useState(defaultSettingsOpen);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [focusSignal, setFocusSignal] = useState(0);
   const [chatViewKey, setChatViewKey] = useState(0);
   const surfaceRef = useRef<HTMLElement | null>(null);
   const entryRef = useRef<HTMLButtonElement | null>(null);
@@ -344,15 +370,17 @@ export function AgentSurface({
   const menuOpenRef = useRef(menuOpen);
   const onOpenChangeRef = useRef(onOpenChange);
   const previousStageRef = useRef<SurfaceStage>(stage);
-  /** 转写途中被收起：识别完成后不再把窗口弹回 chat（关闭就是关闭） */
-  const suppressVoiceRevealRef = useRef(false);
+  const voiceControls = useVoiceControls(session);
 
   sessionRef.current = session;
   settingsOpenRef.current = settingsOpen;
   menuOpenRef.current = menuOpen;
   onOpenChangeRef.current = onOpenChange;
 
-  const requestInputFocus = useCallback(() => setFocusSignal((value) => value + 1), []);
+  /** 展开/收起阶段切换后，把键盘焦点放在容器上（绝不自动进输入框） */
+  const requestSurfaceFocus = useCallback(() => {
+    surfaceRef.current?.focus({ preventScroll: true });
+  }, []);
 
   /** 只改宽高与圆角阴影：形态切换的唯一入口 */
   const go = useCallback((next: SurfaceStage, kind: MorphKind) => {
@@ -362,9 +390,9 @@ export function AgentSurface({
     setStage(next);
   }, []);
 
-  const openComposer = useCallback(() => {
+  const openVoice = useCallback(() => {
     if (stageRef.current !== 'collapsed') return;
-    go('composer', 'open-composer');
+    go('voice', 'open-voice');
   }, [go]);
 
   const openChat = useCallback(() => {
@@ -374,62 +402,52 @@ export function AgentSurface({
     onOpenChangeRef.current?.(true);
   }, [go]);
 
-  const chatToComposer = useCallback(() => {
+  /** chat → 半高语音窗（文字模式退回语音模式） */
+  const chatToVoice = useCallback(() => {
     if (stageRef.current !== 'chat') return;
     sessionRef.current.stopSpeaking();
-    go('composer', 'back-composer');
-    requestInputFocus();
-  }, [go, requestInputFocus]);
+    go('voice', 'back-voice');
+  }, [go]);
 
   const collapse = useCallback(() => {
     const current = stageRef.current;
     if (current === 'collapsed') return;
     sessionRef.current.stopSpeaking();
     // 录音中收起 = 放弃这次录音：不能留一个没人能停的麦克风在后台
-    const voiceStage = sessionRef.current.voice.stage;
-    if (voiceStage === 'recording') {
+    if (sessionRef.current.voice.stage === 'recording') {
       sessionRef.current.cancelRecording();
-    } else if (voiceStage === 'transcribing') {
-      suppressVoiceRevealRef.current = true;
     }
     go('collapsed', current === 'chat' ? 'close-chat' : 'back-collapsed');
     onOpenChangeRef.current?.(false);
   }, [go]);
 
-  /** 语音结束的回调：只有用户没有主动收起时才升级到 chat */
-  const handleVoiceDone = useCallback(() => {
-    if (suppressVoiceRevealRef.current) {
-      suppressVoiceRevealRef.current = false;
-      return;
-    }
-    openChat();
-  }, [openChat]);
-
   const startVoice = useCallback(() => {
     const current = sessionRef.current;
     if (current.voice.stage !== 'idle' || current.status !== 'idle') return;
-    suppressVoiceRevealRef.current = false;
-    openComposer();
+    openVoice();
     void current.startRecording();
-  }, [openComposer]);
+  }, [openVoice]);
 
-  /** 入口按钮：点按 = 立即录音（不是先开窗再点录音，契约 §2/§5） */
+  /** 入口按钮：点按 = 立即录音（不是先开窗再点录音） */
   const handleEntryClick = () => {
     const current = sessionRef.current;
-    if (current.voice.stage !== 'idle') {
-      // 录音/转写中（理论上入口不可见）：回到输入窗即可
-      openComposer();
-      return;
-    }
-    if (current.status !== 'idle') {
-      // 后台还在生成回答：先回到 chat 看结果，不叠新录音
-      openChat();
+    if (current.voice.stage !== 'idle' || current.status !== 'idle') {
+      // 后台还在生成回答 / 录音理论上入口不可见：先回到语音窗看结果，不叠新录音
+      openVoice();
       return;
     }
     startVoice();
   };
 
-  // 受控 open：外部要求打开 chat 时进入 chat；收起时同步父层状态
+  /** 半高窗「点击说话」：触摸/鼠标点按 = 开始录音；键盘按住空格走空格路径 */
+  const handleTalkClick = () => {
+    const current = sessionRef.current;
+    if (current.voice.stage !== 'idle' || current.status !== 'idle') return;
+    sessionRef.current.stopSpeaking();
+    void current.startRecording();
+  };
+
+  // 受控 open：外部要求打开时进入全高对话；收起时同步父层状态
   useEffect(() => {
     if (open === undefined) return;
     if (open) {
@@ -444,23 +462,16 @@ export function AgentSurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // 展开到 composer / chat 后焦点到输入框（录音入口不抢焦点，避免录音时弹出输入法）
-  const focusStageRef = useRef<SurfaceStage>(stage);
-  useEffect(() => {
-    const previous = focusStageRef.current;
-    focusStageRef.current = stage;
-    if (stage === 'chat' || (stage === 'composer' && previous === 'chat')) {
-      requestInputFocus();
-    }
-  }, [stage, requestInputFocus]);
-
-  // 关闭后焦点回到入口按钮（契约 §2）。
-  // 点外部收起时，pointerdown 的默认 focus 会在我们的 effect 之后落到 body/桌面卡片，
-  // 所以在下一帧再抢一次焦点（Esc / X 路径同样受益，不影响草稿）。
+  // 阶段切换的焦点：收起后回到入口按钮；展开/换层后焦点在容器上（空格继续可用）。
+  // 旧实现把焦点塞进输入框，导致「回答后按空格打出空格」，这里根除。
   useEffect(() => {
     const previous = previousStageRef.current;
     previousStageRef.current = stage;
-    if (stage !== 'collapsed' || previous === 'collapsed' || hideEntry) return undefined;
+    if (stage !== 'collapsed') {
+      const timer = window.setTimeout(requestSurfaceFocus, 0);
+      return () => window.clearTimeout(timer);
+    }
+    if (previous === 'collapsed' || hideEntry) return undefined;
     const focusEntry = () => entryRef.current?.focus({ preventScroll: true });
     let raf2 = 0;
     const raf1 = window.requestAnimationFrame(() => {
@@ -472,10 +483,20 @@ export function AgentSurface({
       window.cancelAnimationFrame(raf2);
       window.clearTimeout(timer);
     };
-  }, [stage, hideEntry]);
+  }, [stage, hideEntry, requestSurfaceFocus]);
 
-  // 收起为按钮后绝不留“看不见的播报”：如果收起的瞬间/之后 TTS 才开始，立即停掉
-  // （语音提问的自动朗读只在窗口打开时发生；关闭/收起 = 停止播报，契约 §5）
+  // 录音/转写结束：焦点回到容器（用户可能刚点过停止，按钮已随录音态卸载）。
+  // 不抢正在输入框里的焦点（chat 里用户主动点进了输入框就直接保留）。
+  useEffect(() => {
+    if (stageRef.current === 'collapsed') return;
+    if (voiceControls.busy) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && isEditableTarget(active)) return;
+    requestSurfaceFocus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.voice.stage]);
+
+  // 收起为按钮后绝不留“看不见的播报”
   useEffect(() => {
     if (stage === 'collapsed' && session.speakingMessageId) {
       session.stopSpeaking();
@@ -483,9 +504,10 @@ export function AgentSurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, session.speakingMessageId]);
 
-  // 空格 = 按住说话：keydown 立即开始录音，keyup 结束发送；<300ms 或失焦取消
+  // 空格 = 按住说话：keydown 立即开始录音，keyup 结束发送；<300ms 或失焦取消。
+  // 语音结束后只停录音、**不**切换形态：连续语音对话留在半高窗里。
   useEffect(() => {
-    if (hideEntry) return undefined;
+    if (hideEntry && stageRef.current === 'collapsed') return undefined;
 
     const finishSpace = (token: SpaceSession) => {
       const current = sessionRef.current;
@@ -496,7 +518,7 @@ export function AgentSurface({
         return;
       }
       if (current.voice.stage !== 'recording') return;
-      void current.stopRecording().then(() => openChat());
+      void current.stopRecording();
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -504,6 +526,7 @@ export function AgentSurface({
       if (event.key !== ' ' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
         return;
       }
+      if (hideEntry && stageRef.current === 'collapsed') return;
       if (!canUseVoiceKeys(event, surfaceRef.current) || settingsOpenRef.current) return;
       const current = sessionRef.current;
       if (current.voice.stage !== 'idle' || current.status !== 'idle') return;
@@ -511,7 +534,7 @@ export function AgentSurface({
       event.preventDefault();
       const token: SpaceSession = { startedAt: performance.now(), cancelled: false, send: false };
       spaceRef.current = token;
-      openComposer();
+      openVoice();
       void current.startRecording().then(() => {
         // 不读 sessionRef.voice.stage（getUserMedia 慢时 .then 早于 React 渲染）：
         // 取消直接交给 hook（支持 starting 阶段），发送交给 finishSpace 处理。
@@ -533,10 +556,13 @@ export function AgentSurface({
     };
 
     const onBlur = () => {
+      // 窗口失焦 = 放弃当前录音（不能留一个没人能停的麦克风在后台）。
+      // 不只空格路径：入口点击 / 「点击说话」起的录音同样要停。
       const token = spaceRef.current;
-      if (!token) return;
-      spaceRef.current = null;
-      token.cancelled = true;
+      if (token) {
+        spaceRef.current = null;
+        token.cancelled = true;
+      }
       sessionRef.current.cancelRecording();
     };
 
@@ -548,33 +574,47 @@ export function AgentSurface({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [hideEntry, openComposer, openChat]);
+  }, [hideEntry, openVoice]);
 
-  // Esc：录音中取消；composer 收起；chat 退到 composer（契约 §2）
+  // Esc：录音中取消；输入框聚焦时先退出输入（回到“空格=说话”）；否则退一级。
+  // 监听常驻、用 stageRef 判断当前层：阶段切换的同一帧里连按 Esc 也不会丢事件
+  // （按 stage 重挂监听会留下一个很窄的未注册窗口）。
   useEffect(() => {
-    if (stage === 'collapsed') return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
+      if (stageRef.current === 'collapsed') return;
       if (settingsOpenRef.current || menuOpenRef.current) return;
-      event.preventDefault();
       const current = sessionRef.current;
       if (current.voice.stage === 'recording') {
+        event.preventDefault();
         current.cancelRecording();
-        requestInputFocus();
+        requestSurfaceFocus();
         return;
       }
       if (current.voice.stage === 'transcribing') return;
-      if (stageRef.current === 'chat') chatToComposer();
-      else if (stageRef.current === 'composer') collapse();
+
+      // 第一次 Esc：只从输入框退出（用户主动点进去打字的场景），窗口不退级
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && isEditableTarget(active)) {
+        event.preventDefault();
+        active.blur();
+        requestSurfaceFocus();
+        return;
+      }
+
+      event.preventDefault();
+      if (stageRef.current === 'chat') chatToVoice();
+      else if (stageRef.current === 'voice') collapse();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [stage, chatToComposer, collapse, requestInputFocus]);
+  }, [chatToVoice, collapse, requestSurfaceFocus]);
 
-  // composer：点外部收起为按钮，草稿保留；chat：点外部不关（契约 §2）
+  // 半高语音窗：点外部收起为按钮（chat 点外部不关，稳定阅读）。
+  // 监听常驻、用 stageRef 判断当前层，避免换段的那一帧丢 pointerdown。
   useEffect(() => {
-    if (stage !== 'composer') return undefined;
     const onPointerDown = (event: PointerEvent) => {
+      if (stageRef.current !== 'voice') return;
       if (settingsOpenRef.current) return;
       if (sessionRef.current.voice.stage !== 'idle') return;
       const target = event.target;
@@ -584,10 +624,10 @@ export function AgentSurface({
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [stage, collapse]);
+  }, [collapse]);
 
   const messages = session.conversation?.messages ?? [];
-  // 半高窗只展示最近 3 条有内容的对话（用户/助手），最新一条贴着输入区
+  // 半高语音窗只展示最近 3 条有内容的对话（用户/助手），最新一条贴着底部语音条
   const peekMessages = useMemo(
     () =>
       messages
@@ -608,8 +648,13 @@ export function AgentSurface({
 
   const spec = MORPH[motion];
   const inChat = stage === 'chat';
-  const inComposer = stage === 'composer';
+  const inVoice = stage === 'voice';
   const voiceStage = session.voice.stage;
+  const speaking = Boolean(session.speakingMessageId);
+  const voiceBusy = voiceStage !== 'idle';
+  const hidden = hideEntry && stage === 'collapsed';
+  const micError =
+    session.voice.error?.kind === 'mic' ? session.voice.error.message : null;
 
   const containerStyle: CSSProperties = reducedMotion
     ? { transitionDuration: '0ms' }
@@ -650,28 +695,33 @@ export function AgentSurface({
         transitionTimingFunction: spec.entry.curve,
       };
 
-  const chatPaneStyle: CSSProperties = {
-    position: inChat ? 'relative' : 'absolute',
-    inset: inChat ? undefined : 0,
-    flex: inChat ? '1 1 auto' : undefined,
-    opacity: inChat ? 1 : 0,
-    pointerEvents: inChat ? 'auto' : 'none',
+  const paneStyle = (active: boolean): CSSProperties => ({
+    opacity: active ? 1 : 0,
+    pointerEvents: active ? 'auto' : 'none',
     transitionProperty: 'opacity',
     transitionDuration: reducedMotion
       ? `${REDUCED_FADE_MS}ms`
-      : `${inChat ? spec.content.duration : spec.chatExit}ms`,
+      : `${active ? spec.content.duration : spec.paneExit}ms`,
+    transitionDelay: reducedMotion ? '0ms' : `${active ? spec.content.delay : 0}ms`,
     transitionTimingFunction: reducedMotion
       ? 'linear'
-      : inChat
+      : active
         ? motionTokens.curveDecelerateMid
         : motionTokens.curveAccelerateMid,
-  };
+  });
 
-  const hidden = hideEntry && stage === 'collapsed';
-  const speaking = Boolean(session.speakingMessageId);
-  // 麦克风不可用：入口旁 danger 图标 + Tooltip（docs/components/agent.md 错误与空态）
-  const micError =
-    session.voice.error?.kind === 'mic' ? session.voice.error.message : null;
+  const autoReadToggle = (
+    <Tooltip content={autoRead ? '关闭自动朗读' : '开启自动朗读'} relationship="label">
+      <ToggleButton
+        size="large"
+        appearance="subtle"
+        checked={autoRead}
+        icon={autoRead ? <Speaker2Regular /> : <SpeakerMuteRegular />}
+        aria-label={autoRead ? '关闭自动朗读' : '开启自动朗读'}
+        onClick={toggleAutoRead}
+      />
+    </Tooltip>
+  );
 
   return (
     <>
@@ -687,8 +737,9 @@ export function AgentSurface({
         role={stage === 'collapsed' ? undefined : 'dialog'}
         aria-modal={stage === 'collapsed' ? undefined : false}
         aria-label={
-          stage === 'chat' ? 'Agent 对话' : stage === 'composer' ? 'Agent 输入' : undefined
+          stage === 'chat' ? 'Agent 对话' : stage === 'voice' ? 'Agent 语音' : undefined
         }
+        tabIndex={-1}
       >
         <div
           className={styles.contentLayer}
@@ -696,33 +747,18 @@ export function AgentSurface({
           aria-hidden={stage === 'collapsed'}
           inert={stage === 'collapsed'}
         >
+          {/* 全高对话浮栏（文字兜底 + 历史） */}
           <div
-            className={styles.chatPane}
-            style={chatPaneStyle}
+            className={styles.pane}
+            style={paneStyle(inChat)}
             aria-hidden={!inChat}
             inert={!inChat}
+            data-wtsl-agent-pane="chat"
           >
             <header className={styles.header}>
-              <ChatSparkleRegular
-                fontSize={20}
-                className={styles.headerMark}
-                aria-hidden="true"
-              />
+              <ChatSparkleRegular fontSize={20} className={styles.headerMark} aria-hidden="true" />
               <div className={styles.headerSpacer} />
-              {/* 常驻朗读开关：显示当前是否会自动朗读（不再只在播放时才冒出一个控件） */}
-              <Tooltip
-                content={autoRead ? '关闭自动朗读' : '开启自动朗读'}
-                relationship="label"
-              >
-                <ToggleButton
-                  size="large"
-                  appearance="subtle"
-                  checked={autoRead}
-                  icon={autoRead ? <Speaker2Regular /> : <SpeakerMuteRegular />}
-                  aria-label={autoRead ? '关闭自动朗读' : '开启自动朗读'}
-                  onClick={toggleAutoRead}
-                />
-              </Tooltip>
+              {autoReadToggle}
               {speaking ? (
                 <Tooltip content="停止朗读" relationship="label">
                   <Button
@@ -734,13 +770,14 @@ export function AgentSurface({
                   />
                 </Tooltip>
               ) : null}
-              <Tooltip content="收起到输入框" relationship="label">
+              <Tooltip content="收起到语音窗" relationship="label">
                 <Button
                   size="large"
                   appearance="subtle"
                   icon={<ChevronDownRegular />}
-                  aria-label="收起到输入框"
-                  onClick={chatToComposer}
+                  aria-label="收起到语音窗"
+                  disabled={voiceBusy}
+                  onClick={chatToVoice}
                 />
               </Tooltip>
               <Tooltip content="更多" relationship="label">
@@ -806,107 +843,147 @@ export function AgentSurface({
               </Tooltip>
             </header>
             <MessageList key={chatViewKey} session={session} />
+            <div className={styles.composerHost}>
+              <Composer session={session} onOpenSettings={() => setSettingsOpen(true)} />
+            </div>
           </div>
 
+          {/* 半高窗：纯语音（没有文字输入框） */}
           <div
-            className={`${styles.composerPane} ${
-              inComposer ? styles.composerPaneCompact : styles.composerPaneChat
-            }`}
+            className={styles.pane}
+            style={paneStyle(inVoice)}
+            aria-hidden={!inVoice}
+            inert={!inVoice}
+            data-wtsl-agent-pane="voice"
           >
-            {inComposer ? (
-              <div className={styles.composerTop}>
-                {/* 半高窗不再是死路：这里直接展开到全高对话 */}
-                <Tooltip content="展开对话" relationship="label">
+            <div className={styles.voiceTop}>
+              <Tooltip content="展开对话" relationship="label">
+                <Button
+                  size="large"
+                  appearance="subtle"
+                  icon={<ChevronUpRegular />}
+                  aria-label="展开对话"
+                  disabled={voiceBusy}
+                  onClick={openChat}
+                />
+              </Tooltip>
+              <div className={styles.voiceSpacer} />
+              {autoReadToggle}
+              {speaking ? (
+                <Tooltip content="停止朗读" relationship="label">
                   <Button
                     size="large"
                     appearance="subtle"
-                    icon={<ChevronUpRegular />}
-                    disabled={voiceStage !== 'idle'}
-                    aria-label="展开对话"
-                    onClick={openChat}
+                    icon={<StopRegular />}
+                    aria-label="停止朗读"
+                    onClick={session.stopSpeaking}
                   />
                 </Tooltip>
-                <div className={styles.composerTopSpacer} />
-                <Tooltip
-                  content={autoRead ? '关闭自动朗读' : '开启自动朗读'}
-                  relationship="label"
-                >
-                  <ToggleButton
-                    size="large"
-                    appearance="subtle"
-                    checked={autoRead}
-                    icon={autoRead ? <Speaker2Regular /> : <SpeakerMuteRegular />}
-                    aria-label={autoRead ? '关闭自动朗读' : '开启自动朗读'}
-                    onClick={toggleAutoRead}
-                  />
-                </Tooltip>
-                <Tooltip content="收起" relationship="label">
-                  <Button
-                    size="large"
-                    appearance="subtle"
-                    icon={<DismissRegular />}
-                    aria-label="收起 Agent"
-                    onClick={collapse}
-                  />
-                </Tooltip>
-              </div>
-            ) : null}
-            {inComposer && voiceStage === 'idle' ? (
-              <div
-                className={styles.peekArea}
-                role="button"
-                tabIndex={0}
-                aria-label="展开对话"
-                onClick={openChat}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' && event.key !== ' ') return;
-                  event.preventDefault();
-                  openChat();
-                }}
-              >
-                {peekMessages.length === 0 ? (
-                  <div className={styles.peekEmpty} aria-hidden="true">
-                    <ChatSparkleRegular fontSize={28} />
-                  </div>
-                ) : (
-                  peekMessages.map((message) => (
+              ) : null}
+              <Tooltip content="收起" relationship="label">
+                <Button
+                  size="large"
+                  appearance="subtle"
+                  icon={<DismissRegular />}
+                  aria-label="收起 Agent"
+                  onClick={collapse}
+                />
+              </Tooltip>
+            </div>
+
+            <div
+              className={`${styles.peekArea} ${voiceBusy ? styles.peekAreaBusy : ''}`}
+              role="button"
+              tabIndex={0}
+              aria-label="展开对话"
+              aria-disabled={voiceBusy ? 'true' : undefined}
+              data-wtsl-agent-peek="true"
+              onClick={() => {
+                if (voiceBusy) return;
+                openChat();
+              }}
+              onKeyDown={(event) => {
+                // 只认 Enter：空格在默认焦点下永远是“按住说话”，不是展开
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                if (!voiceBusy) openChat();
+              }}
+            >
+              {peekMessages.length === 0 ? (
+                <div className={styles.peekEmpty} aria-hidden="true">
+                  <ChatSparkleRegular fontSize={24} />
+                </div>
+              ) : (
+                peekMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`${styles.peekRow} ${
+                      message.role === 'user' ? styles.peekRowUser : ''
+                    }`}
+                  >
                     <div
-                      key={message.id}
-                      className={`${styles.peekRow} ${
-                        message.role === 'user' ? styles.peekRowUser : ''
+                      className={`${styles.peekBubble} ${
+                        message.role === 'user' ? styles.peekBubbleUser : ''
                       }`}
                     >
-                      <div
-                        className={`${styles.peekBubble} ${
-                          message.role === 'user' ? styles.peekBubbleUser : ''
-                        }`}
-                      >
-                        <Text size={200}>{message.content}</Text>
-                      </div>
+                      <Text size={300}>{message.content}</Text>
                     </div>
-                  ))
-                )}
-              </div>
-            ) : null}
-            <div
-              className={`${styles.composerSlot} ${
-                inComposer && voiceStage !== 'idle' ? styles.composerSlotCenter : ''
-              }`}
-            >
-              <Composer
-                session={session}
-                stage={stage}
-                focusSignal={focusSignal}
-                onSent={openChat}
-                onVoiceDone={handleVoiceDone}
-                onOpenSettings={() => setSettingsOpen(true)}
-              />
+                  </div>
+                ))
+              )}
             </div>
+
+            <div className={styles.voiceDock}>
+              <AgentAlerts session={session} onOpenSettings={() => setSettingsOpen(true)} />
+              {voiceStage === 'idle' ? (
+                <Tooltip content="按住空格也可以说话" relationship="description">
+                  <Button
+                    className={styles.talkButton}
+                    appearance="primary"
+                    size="large"
+                    icon={<SoundWaveCircleRegular />}
+                    data-wtsl-agent-talk="true"
+                    aria-label="开始语音"
+                    disabled={session.status !== 'idle'}
+                    onClick={handleTalkClick}
+                  >
+                    点击说话
+                  </Button>
+                </Tooltip>
+              ) : (
+                <div className={styles.voiceCard}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <VoiceCapture
+                      stage={voiceStage === 'recording' ? 'recording' : 'transcribing'}
+                      level={session.voice.level}
+                      busy={voiceControls.busy}
+                      onStop={voiceControls.stop}
+                      onCancel={voiceControls.cancel}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <span className="wtsl-agent-sr-only" aria-live="polite">
+              {voiceStage === 'recording'
+                ? '正在录音'
+                : voiceStage === 'transcribing'
+                  ? '正在识别语音'
+                  : session.status !== 'idle'
+                    ? '正在回答'
+                    : ''}
+            </span>
           </div>
         </div>
 
         {!hideEntry ? (
-          <div className={styles.entryLayer} style={entryStyle}>
+          <div
+            className={styles.entryLayer}
+            style={entryStyle}
+            aria-hidden={stage !== 'collapsed'}
+            inert={stage !== 'collapsed'}
+          >
             <Tooltip content="开始语音提问" relationship="label">
               <button
                 ref={entryRef}

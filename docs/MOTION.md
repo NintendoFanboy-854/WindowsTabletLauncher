@@ -98,19 +98,20 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 - 设置页内插件分区切换：内容 150ms 淡入 + 4px 上移，不横向滑动。
 - Agent 浮空窗口：三段式 container transform（§5.1）；Toast / 强提醒 / 其它 Drawer：用 Fluent 默认过渡，不覆写。
 
-### 5.1 Agent 浮空三段 morph（v0.3.0，D-20）
+### 5.1 Agent 浮空三段 morph（v0.3.0 D-20；v0.3.7 D-30 语义修订）
 
 同一容器固定在 right/bottom，只过渡 width/height/borderRadius/box-shadow，禁止位移与模糊往返：
 
 | 过渡 | 时长 / 曲线 | 内容 |
 |---|---|---|
-| 按钮 → 半高 composer | 280ms `durationSlow` / `curveDecelerateMid` | 图标 80ms 淡出；内容 120ms 淡入（delay 80ms） |
-| composer → 全高 chat | 320ms `durationSlow` / `curveDecelerateMid` | 输入组件共享元素不重排；消息列表 150ms 淡入 + 4px 上移；气泡 20ms 错峰 |
-| chat → composer | 220ms `curveAccelerateMid` | 消息 100ms 淡出后收几何 |
-| composer → 按钮 | 200ms `curveAccelerateMid` | 内容 100ms 淡出，图标 120ms 淡入 |
-| chat → 按钮（X） | 240ms `curveAccelerateMid` | 内容 100ms 淡出后收几何 |
+| 按钮 → 半高语音窗（`open-voice`） | 300ms `durationSlow` / `curveDecelerateMid` | 图标 100ms 淡出；内容 150ms 淡入（delay 100ms） |
+| 半高语音窗 → 全高对话（`open-chat`，显式展开） | 300ms / `curveDecelerateMid` | 内容 150ms 交叉淡入；消息列表 150ms 淡入 + 4px 上移；气泡 20ms 错峰 |
+| 全高对话 → 半高语音窗（`back-voice`，⌄ / Esc） | 250ms / `curveAccelerateMid` | 对话淡出，语音窗内容淡入（共享元素只切可见性，不重排） |
+| 半高语音窗 → 按钮（`back-collapsed`） | 200ms / `curveAccelerateMid` | 内容 100ms 淡出，图标 150ms 淡入 |
+| 全高对话 → 按钮（`close-chat`，X） | 250ms / `curveAccelerateMid` | 内容 100ms 淡出后收几何 |
 | 按压 | 100ms `durationFaster` | scale 0.98 + surface pressed；悬停只变 surface/shadow |
 
+- **语音回合结束不换段**（v0.3.7）：录音结束 → 转写 → 回答 → 朗读，全部在当前段内完成，没有 chat/composer 的自动 morph；只播放状态变化（声纹 / 流式气泡 / 朗读图标），不触发几何过渡。
 - 动画不阻塞操作（输入首帧可用）；阶段可打断并从当前尺寸重定向。
 - Reduced Motion：只保留 120ms 透明度，无尺寸/阴影/位移动画；声纹/脉冲静止。
 - 入场方向定义出场方向：永远从右下角长出、原路收回；关闭后焦点回入口按钮。

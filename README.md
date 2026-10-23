@@ -5,7 +5,7 @@
 
 ![桌面](docs/images/v030/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.3.6 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
+<p align="center"><sub>v0.3.7 · 1440×960 · 深色主题 · 六个内置小组件（右侧天气为 3×2 三带式）· 右下角为 Agent 入口</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -16,35 +16,37 @@
 
 - **小组件桌面**：自适应网格、多页滑动、长按进入编辑模式（拖拽换位/改尺寸/删除/添加组件）、编辑删除持久化；布局、主题偏好都保存在本机。
 - **六个内置小组件**：时钟、倒数日、番茄钟、久坐提醒、待办、天气。天气 3×2 为「当前天气 + 今日指标 + 逐时 6 列」三带式布局，4×2 显示 AQI + 未来 7 天。
-- **语音优先 Agent**：右下角浮空入口 → 半高输入窗 → 全高浮栏；点按或按住空格**立即开始说话**，回答自动语音朗读。总开关可随时静音（回答只显示文字），半高窗可直接展开到全高对话。语音音频只上传当轮一次，转写文字入库，后续上下文不再携带音频。
+- **语音优先 Agent**：右下角浮空入口 → **半高纯语音窗** → 全高对话浮栏。点按或按住空格**立即开始说话**，回答自动朗读；语音回合结束后**停在半高窗继续下一轮**（不自动弹成全高），连续语音对话；文字对话是兜底，显式展开全高浮栏后才出现输入框。空格默认永远是按住说话（只有光标在输入框里才是打字）。语音音频只上传当轮一次，转写文字入库，后续上下文不再携带音频。
 - **插件系统**：每个插件是一个 `manifest.json` + 自包含页面，宿主通过 postMessage 暴露 8 个 API（配置、主题、尺寸、焦点、Agent 工具等）；可安装/启用/禁用，带可复制的插件模板。
 - **宿主页面**：设置、复盘（使用统计/热力图）、插件管理；多个入口收进设置页，不占桌面。
 - **无摄像头 / 无人脸 / 无唤醒词 / 无全屏语音页 / 无 dock**（v0.3.0 已全部移除）。
 
 ## 截图
 
-### Agent：右下角浮空三段界面
+### Agent：右下角浮空三段界面（语音优先）
 
-| 入口按钮 | 录音中 |
+| 入口按钮 | 半高语音窗 · 录音中 |
 |---|---|
-| <img src="docs/images/v030/agent-collapsed-1440-dark.png" width="400" /> | <img src="docs/images/v030/agent-recording-1440-dark.png" width="400" /> |
-| <sub>点按 / 按住空格立即录音</sub> | <sub>声纹带 + 停止 / 取消</sub> |
+| <img src="docs/images/v030/agent-collapsed-1440-dark.png" width="400" /> | <img src="docs/images/v037/agent-voice-recording-1440-dark.png" width="400" /> |
+| <sub>点按 / 按住空格立即录音</sub> | <sub>纯语音形态：声纹 + 停止 / 取消，没有文字输入框</sub> |
 
-| 转写中 | 语音消息（声纹 + 文字） |
+| 半高语音窗 · 回答后停留 | 全高对话 · 单行输入 |
 |---|---|
-| <img src="docs/images/v030/agent-transcribing-1440-dark.png" width="400" /> | <img src="docs/images/v030/agent-voice-bubble-1440-dark.png" width="400" /> |
-| <sub>识别通常 &lt;1s；超过 400ms 才显示 spinner</sub> | <sub>不写“语音/转写”标签，靠声纹装饰表达</sub> |
-
-| 播报中 | 全高浮栏（对话） |
-|---|---|
-| <img src="docs/images/v030/agent-speaking-1440-dark.png" width="400" /> | <img src="docs/images/v030/agent-chat-1440-dark.png" width="400" /> |
-| <sub>语音提问自动朗读，单条可停止</sub> | <sub>半高窗发送后 morph 到全高浮栏</sub> |
+| <img src="docs/images/v037/agent-voice-reply-1440-dark.png" width="400" /> | <img src="docs/images/v037/agent-chat-single-row-1440-dark.png" width="400" /> |
+| <sub>语音回合结束不自动展开，peek 显示问答，可继续说下一轮</sub> | <sub>`[语音] [输入] [发送]` 一行；文字对话是兜底</sub> |
 
 ### 亮色 / 1024×768
 
-| 入口 | 录音中 | 对话 |
+| 半高语音窗 · 录音中 | 半高语音窗 · 回答后 | 全高对话 |
 |---|---|---|
-| <img src="docs/images/v030/agent-collapsed-1024-light.png" width="240" /> | <img src="docs/images/v030/agent-recording-1024-light.png" width="240" /> | <img src="docs/images/v030/agent-chat-1024-light.png" width="240" /> |
+| <img src="docs/images/v037/agent-voice-recording-1024-light.png" width="240" /> | <img src="docs/images/v037/agent-voice-reply-1024-light.png" width="240" /> | <img src="docs/images/v037/agent-chat-single-row-1024-light.png" width="240" /> |
+
+### 语音消息呈现
+
+| 语音消息（声纹 + 文字） |
+|---|
+| <img src="docs/images/v030/agent-voice-bubble-1440-dark.png" width="400" /> |
+| <sub>不写「语音 / 转写结果」标签，靠声纹装饰表达</sub> |
 
 ### 天气 3×2 三带式
 
@@ -74,26 +76,29 @@
 <details>
 <summary>减少动态效果（reduced-motion）状态</summary>
 
-| 录音 | 对话 |
-|---|---|
-| <img src="docs/images/v030/agent-recording-reduced-motion.png" width="400" /> | <img src="docs/images/v030/agent-chat-reduced-motion.png" width="400" /> |
+| 半高语音窗 · 回答后（减少动效） |
+|---|
+| <img src="docs/images/v037/agent-voice-reduced-motion.png" width="400" /> |
+| <sub>只保留 120ms 透明度，不做尺寸/阴影/位移动画；声纹与脉冲静止</sub> |
 
 </details>
 
 ## 语音优先 Agent
 
-- **入口**：右下角 56×56 浮空按钮。点按或按住空格**立即开始录音**；松开 / 再点一下结束并发送；录音中 Esc 取消。没有“先打开窗口再点录音”的中间步骤。
-- **三段形态**：按钮（56×56）→ 半高输入窗（420 × clamp(320px, 44vh, 440px)）→ 全高浮栏（420 × calc(100vh − 40px)）。右/下锚定，只变宽高，圆角恒 12px；Esc 退一级，⌄ 收起，X 关闭。半高窗顶部有展开/朗读/收起控制条，中部显示最近 3 条消息（点开即全高对话），不再需要“先发一条”才能升级；录音中收起会取消录音。
+- **入口**：右下角 56×56 浮空按钮。点按 / 按住空格 / 点半高窗「点击说话」**立即开始录音**；松开或点停止结束并发送；录音中 Esc 取消。没有“先打开窗口再点录音”的中间步骤。
+- **三段形态（语音优先，v0.3.7）**：按钮（56×56）→ 半高语音窗（420 × clamp(320px, 44vh, 440px)）→ 全高对话浮栏（420 × calc(100vh − 40px)）。右/下锚定，只变宽高，圆角恒 12px。
+  - **半高窗是纯语音形态**：没有文字输入框；顶部 ⌃ 展开 / 朗读开关 / ✕ 收起，中部最近 3 条消息 peek，底部「点击说话」大按钮（录音中换成声纹条）。语音回合结束**留在半高窗**，回答会被朗读并显示在 peek 里，可立刻再说下一轮 = 连续语音对话。
+  - **全高对话是文字兜底**：显式点 ⌃ / peek / Enter 才展开；头部 ⌄ 收起到语音窗、✕ 关闭；底部是单行输入区 `[语音] [输入框] [发送]`。⌄ 或 Esc 退回语音窗，✕ 直接回按钮；关闭后焦点回入口按钮。
+- **默认行为（edge corner）**：空格默认永远是“按住说话”，只有光标主动落进全高输入框时才是打字；展开 / 收起 / 语音结束都不会把焦点塞进输入框（v0.3.7 修复“回答后按空格打出空格”）。输入框内按 Esc 先退出输入框，再按才退级。半高窗点外部收起（录音中除外），全高对话点外部不关闭。
 - **音频与上下文**：当轮语音以 `input_audio` **原生发送给 MiMo 对话一次**；同一份 WAV 并行送 MiMo ASR，转写文字回填到消息并入库。音频 Blob 用完即弃：不写 localStorage、不进消息、不进后续上下文；重试/切会话/重启只发文字。ASR 30s 超时。
-- **播报**：自动朗读总开关默认开；关闭后语音/文字回答都只显示文字（单条回答仍可手动朗读）。窗口右上角/半高窗顶部的扬声器按钮随时静音/恢复，「停止朗读」只在播放中出现。
+- **播报**：自动朗读总开关默认开；关闭后语音/文字回答都只显示文字（单条回答仍可手动朗读）。两个形态顶部都有扬声器按钮随时静音/恢复，「停止朗读」只在播放中出现；开始录音、换段或关闭窗口先停止播报。
 - **语音消息呈现**：与打字消息同形同色；顶部 24 桶声纹装饰 + 转写 shimmer；不写「语音 / 转写结果如下」之类的文字标签。
-- **可预测性**：自动升级只有发送/语音结束两条；也可以随时手动展开。Esc 永远退一级；composer 点外部收起并保留草稿，chat 点外部不关闭；关闭后焦点回到入口按钮。
 
 ## 安装
 
 ### 直接安装
 
-从构建产物安装 `Windows Tablet Launcher 0.3.6`（NSIS 中文安装包，或 MSI zh-CN）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
+从构建产物安装 `Windows Tablet Launcher`（NSIS 中文安装包或 MSI zh-CN；本机 `release/` 里最新已构建的是 v0.3.6，源码当前版本 0.3.7 需自行 `npx tauri build`）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
 
 首次启动后：
 
@@ -165,8 +170,9 @@ docs/                   # 需求/设计/组件契约/发布报告
 - [PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) / [DECISIONS.md](docs/DECISIONS.md) —— 插件协议与关键决策
 - [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17 / v0.3.5 §18 / v0.3.6 §19）
 
-## 验证状态（v0.3.6）
+## 验证状态（v0.3.7）
 
+- v0.3.7 增量（用户反馈修复）：Agent 改为**语音优先**——半高窗成为纯语音形态（无文字输入框），语音回合结束**不再自动展开全高**（连续语音对话），全高对话只在显式展开后出现；空格默认永远是按住说话（修复“回答后按空格打进输入框”的根因：不再自动聚焦输入框）；全高对话的输入区改为单行 `[语音] [输入] [发送]`。视觉严格回到 Fluent 2 token（自造尺寸/圆角清零：语音主按钮用 `size=large`，间距/圆角/阴影/动效全取 token），交互按 HIG 思想收敛（入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 渐隐渐进披露、半高 detent、reduced-motion）。验证：新增 `scripts/verify-agent-voice-first.mjs` **198/198 PASS**（含“语音回合后观测不到 chat”“回答后空格再录音”“半高窗 textarea=0”“chat composer 单行三控件同轴”“窗口失焦取消任意路径录音”P2 回归）；`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/smoke-v031-ui.mjs` **26/26 PASS**；1440 dark / 1024 light / reduced-motion 三段 console error 0；`npm run typecheck` / `npm run build` exit 0；证据 `shots/v037-dev/REPORT.md`。
 - v0.3.6 增量（用户反馈修复）：**桌面小组件配置实时同步**——新增宿主 → 插件 `host:config` 增量推送，天气自动定位/城市/显示项、时钟/倒数日/番茄钟/久坐/待办等所有插件在 Tauri 打包版里改配置即时生效，不再需要重启。根因：宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）跨 origin，旧的 storage 事件同步在打包版从未生效。验证：跨 origin harness before 复现 / after **PASS**（settings 34ms、places 58ms 同步，iframe `host:config` 6 条、console error 0）；独立审计 + diff 评审 P0/P1=0；六插件产物重建；`npm run typecheck` / `npm run build` exit 0；全量基线回归全绿（verify-plugin ×6 / overlays 6/6 / widgets 25/25 / plug-and-play 12/12 / sedentary 9/9，console 0）；**release 真窗口 CDP 38/38 PASS**（真实 WebView2：升级重种 0.3.5→0.3.6、时钟/天气设置页改动后跨 origin 卡片 2s 内更新、iframe 未 reload、console 0）。
 - v0.3.5 增量：Agent 里说「我站起来了 / 我坐下了」**立即生效**（插件 `phrases` 由宿主直接执行，不再依赖模型调工具；语音先等 ASR 转写再发请求），卡片/详情无需再点按钮；久坐 UI 文案做减法（删除「休息中，坐下后开始新一轮」等状态机说明与每次操作的「已记录…」通知）。验证：短语单测 10/10；真实 MiMo + headless Edge 端到端 **12/12 PASS**；`scripts/verify-agent-surface.mjs` **109/109 PASS**。`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
 - v0.3.4 增量：久坐改为手动**「坐着 ↔ 站立」循环**——坐着点「我站起来了」、站立点「我坐下了」；久坐只累计坐姿，站立单独统计；提醒只在坐着时出现。Agent 新增 `standUp` / `sitDown` / `stats`（移除 `takeBreak`），复盘页按「起身次数」为主数值、久坐/站立分钟为次要指标。验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 **10/10 PASS**；复盘页集成检查 PASS（`sedentary.stats` 被发现并渲染）；`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
@@ -185,7 +191,7 @@ docs/                   # 需求/设计/组件契约/发布报告
 - ⚠️ **构建会把本地 `secrets.json` 打进 `dist/` 与安装包**。如果要公开分发安装包，请先移除该文件或改为运行时录入，否则等于公开你的 MiMo / 和风天气 Key。
 - 个人项目，未附开源许可证（默认保留所有权利）。
 - 语音 ASR/TTS 依赖云端 MiMo，受网络与配额影响；不本地跑大模型。
-- 不做唤醒词、常驻麦克风监听、人脸/摄像头；语音入口只有入口按钮、空格、输入框语音按钮。
+- 不做唤醒词、常驻麦克风监听、人脸/摄像头；语音入口只有入口按钮、按住空格、「点击说话」与全高输入区语音按钮。
 - Windows 10 LTSC 无 Mica/Acrylic 系统材质，界面用 Fluent 实色表面 + 阴影近似。
 - 真实安装器安装/卸载路径与 release 内真实录音链路未纳入自动化，需手动验证。
 

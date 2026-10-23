@@ -1,18 +1,22 @@
 /**
- * v0.3.0 Agent 浮空界面 E2E（mock 模式，假麦克风）。
+ * Agent 浮空界面 E2E（mock 模式，假麦克风）。
  *
- * 契约：docs/AGENT-SURFACE-CONTRACT.md
+ * v0.3.7（语音优先）适配：半高形态由旧「composer 输入窗」改为纯语音窗 `voice`；
+ * 语音回合结束不再自动 morph 到全高 chat（连续语音对话）；文字输入只在 chat；
+ * chat 输入区改为单行 [麦克风][输入][发送]；任何阶段切换都不自动聚焦 textarea。
+ *
+ * 契约：docs/AGENT-SURFACE-CONTRACT.md（v0.3.7 修订）+ 共享任务 task-1 contract
  * 用法（仓库根目录，dev server 在 http://localhost:5173）：
  *   node scripts/verify-agent-surface.mjs
  *   node scripts/verify-agent-surface.mjs --screenshots   # 默认就截图到 shots/v030-dev/
  *
  * 覆盖（Phase 1）：
  * - 入口形态：无 dock / 无机器人头像 / 56×56 / aria-label「开始语音提问」；
- * - 入口即录：点入口立即 recording + morph composer；停止→transcribing→chat；
+ * - 入口即录：点入口立即 recording + morph voice；停止→transcribing→**停留 voice**；
  * - 语音气泡：声纹装饰（24 桶）+ 转写文字入气泡、无「语音/转写结果」文字；
  * - 音频硬约束：localStorage 无 audio/base64、mock 请求无 input_audio；
  * - 播报：语音提问自动播报 + 停止；文字提问默认不播报；单条播报可停；
- * - 语义：Esc/⌄/X/点外部/焦点回归/草稿保留；空格按住发送、<300ms 取消、输入框内不触发；
+ * - 语义：Esc/⌄/X/点外部/焦点回归/语音窗无输入框/chat 单行 composer/空格语义；
  * - 三段尺寸/圆角/transitionDuration 符合契约 token 近似；reduced-motion 只保留 120ms opacity；
  * - 设置入口：Ctrl+, / 编辑工具栏「设置」/ 设置页「入口」组；Agent 设置对话框字段范围；
  * - 1440×960 dark / 1024×768 light / reduced-motion 截图；console error=0；横向溢出=0。
@@ -80,6 +84,18 @@ const SURFACE_STATE = `(() => {
   const rect = el.getBoundingClientRect();
   const entry = el.querySelector('[data-wtsl-agent-entry]');
   const active = document.activeElement;
+  const visible = (node) => {
+    if (!node || node.nodeType !== 1) return false;
+    const own = getComputedStyle(node);
+    if (own.display === 'none' || own.visibility === 'hidden') return false;
+    for (let current = node; current && current.nodeType === 1; current = current.parentElement) {
+      if (Number(getComputedStyle(current).opacity) < 0.05) return false;
+      if (current.hasAttribute && (current.hasAttribute('inert') || current.getAttribute('aria-hidden') === 'true')) return false;
+    }
+    const r = node.getBoundingClientRect();
+    return r.width > 1 && r.height > 1;
+  };
+  const textareas = [...el.querySelectorAll('textarea')];
   return {
     stage: el.getAttribute('data-stage'),
     motion: el.getAttribute('data-motion'),
@@ -94,8 +110,10 @@ const SURFACE_STATE = `(() => {
     transitionProperty: cs.transitionProperty,
     transitionTimingFunction: cs.transitionTimingFunction,
     entryCount: el.querySelectorAll('[data-wtsl-agent-entry]').length,
+    textareasInSurface: textareas.length,
+    visibleTextareas: textareas.filter(visible).length,
     entryRect: entry ? (() => { const r = entry.getBoundingClientRect(); return { w: Math.round(r.width * 100) / 100, h: Math.round(r.height * 100) / 100, aria: entry.getAttribute('aria-label') }; })() : null,
-    activeElement: { tag: active && active.tagName, aria: active && active.getAttribute && active.getAttribute('aria-label'), isEntry: Boolean(active && active.hasAttribute && active.hasAttribute('data-wtsl-agent-entry')) },
+    activeElement: { tag: active && active.tagName, aria: active && active.getAttribute && active.getAttribute('aria-label'), isTextarea: Boolean(active && active.tagName === 'TEXTAREA'), isEntry: Boolean(active && active.hasAttribute && active.hasAttribute('data-wtsl-agent-entry')) },
     overflow: { doc: document.documentElement.scrollWidth - document.documentElement.clientWidth, body: document.body.scrollWidth - document.body.clientWidth },
   };
 })()`;
@@ -196,25 +214,70 @@ async function sessionIdle(timeout = 30000) {
   );
 }
 
-/** 把浮层收敛到 collapsed（幂等，供各步骤独立从干净状态开始） */
+/** 在指定 pane 内按 aria-label 找可见按钮并原生 click()（跨 pane 的同名控件/隐藏层不会误点） */
+async function clickPaneButton(paneName, label) {
+  return evaluate(`(() => {
+    const pane = document.querySelector('[data-wtsl-agent-pane=${JSON.stringify(paneName)}]');
+    if (!pane) return false;
+    const visible = (node) => {
+      if (!node || node.nodeType !== 1) return false;
+      const own = getComputedStyle(node);
+      if (own.display === 'none' || own.visibility === 'hidden') return false;
+      for (let current = node; current && current.nodeType === 1; current = current.parentElement) {
+        if (Number(getComputedStyle(current).opacity) < 0.05) return false;
+        if (current.hasAttribute && (current.hasAttribute('inert') || current.getAttribute('aria-hidden') === 'true')) return false;
+      }
+      const r = node.getBoundingClientRect();
+      return r.width > 1 && r.height > 1;
+    };
+    const el = [...pane.querySelectorAll('[aria-label=${JSON.stringify(String(label))}]')].find(visible);
+    if (!el) return false;
+    el.click();
+    return true;
+  })()`);
+}
+
+/** 把浮层收敛到 collapsed（幂等，供各步骤独立从干净状态开始）。
+ *  v0.3.7：用 pane 内按钮 DOM click 收敛，避免 Esc 焦点/过渡导致的不稳定；Esc 链由专门用例覆盖。 */
 async function ensureCollapsed() {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     const state = await surfaceState();
-    if (state.stage === 'collapsed') return true;
+    if (!state) throw new Error('surface 不存在，无法恢复 collapsed');
+    if (state.stage === 'collapsed' && state.voiceStage === 'idle') {
+      await settle(380); // 等收起动画（200–300ms）落定，入口按钮恢复 56×56 后才可稳定点击
+      return true;
+    }
+    if (state.voiceStage !== 'idle') {
+      const cancelled = await clickPaneButton('voice', '取消录音');
+      if (!cancelled) await pressEscape();
+      await sleep(450);
+      continue;
+    }
     if (state.stage === 'chat') {
-      await pressEscape();
-    } else {
-      if (state.voiceStage !== 'idle') await pressEscape(); // 先取消录音/停止转写
-      await pressEscape();
+      const clicked = await clickPaneButton('chat', '关闭 Agent');
+      if (!clicked) await pressEscape();
+    } else if (state.stage === 'voice') {
+      const clicked = await clickPaneButton('voice', '收起 Agent');
+      if (!clicked) await pressEscape();
     }
     try {
       await waitStage('collapsed', 8000);
+      await settle(380);
       return true;
     } catch {
       /* 再来一轮 */
     }
   }
   throw new Error(`无法回到 collapsed（当前 ${JSON.stringify(await surfaceState())}）`);
+}
+
+/** 点右下角入口（进入 voice + 录音）。先收敛到 collapsed：收起动画中入口层
+ *  仍是整块大矩形，按旧坐标点击会在 mouseUp 落空；在 voice/chat 阶段入口层 pointer-events=none。 */
+async function clickEntry() {
+  await ensureCollapsed();
+  await clickSelector('[data-wtsl-agent-entry]');
+  await waitStage('voice', 15000);
+  await waitVoiceStage('recording', 20000);
 }
 
 async function spaceTapInPage(holdMs) {
@@ -322,7 +385,7 @@ async function clickTextButton(text, timeout = 20000) {
   await clickPoint(point.x, point.y);
 }
 
-async function pressKey(type, key, code, keyCode, modifiers = 0) {
+async function pressKey(type, key, code, keyCode, modifiers = 0, text = '') {
   await cdp.send('Input.dispatchKeyEvent', {
     type,
     key,
@@ -330,6 +393,7 @@ async function pressKey(type, key, code, keyCode, modifiers = 0) {
     windowsVirtualKeyCode: keyCode,
     nativeVirtualKeyCode: keyCode,
     modifiers,
+    ...(text && type === 'keyDown' ? { text, unmodifiedText: text } : {}),
   });
 }
 
@@ -366,7 +430,7 @@ async function screenshot(name) {
 // 断言片段
 // ---------------------------------------------------------------------------
 
-const OPEN_TIMING = { 'open-composer': 280, 'open-chat': 320, 'back-composer': 220, 'back-collapsed': 200, 'close-chat': 240 };
+const OPEN_TIMING = { 'open-voice': 300, 'open-chat': 300, 'back-voice': 250, 'back-collapsed': 200, 'close-chat': 250 };
 
 function durationMs(value) {
   const first = String(value || '').split(',')[0].trim();
@@ -451,8 +515,17 @@ async function installPageInstrumentation() {
 
 async function openMockSurface({ agentOpen = false } = {}) {
   const query = agentOpen ? '/?mock=1&agent=1' : '/?mock=1';
-  await cdp.navigate(`${BASE_URL}${query}`, { timeout: 180000 });
-  await waitFor(`Boolean(document.querySelector('[data-wtsl-agent-surface]'))`, 120000, 'Agent surface 未渲染');
+  // Vite dev server 偶发冷启动/重优化会让首个页面 15–60s 才挂载；给两次机会
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await cdp.navigate(`${BASE_URL}${query}`, { timeout: 180000 });
+    try {
+      await waitFor(`Boolean(document.querySelector('[data-wtsl-agent-surface]'))`, 120000, 'Agent surface 未渲染');
+      return;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await sleep(3000);
+    }
+  }
 }
 
 async function collectBaseAssertions(tag) {
@@ -509,17 +582,15 @@ async function runFullSession() {
         return true;
       })()`);
       const clickAt = Date.now();
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
+      await clickEntry();
       const recordingAt = Date.now();
       evidence.timings.clickToRecordingMs = recordingAt - clickAt;
       check('单击入口后进入录音（无需第二下）', true, `click→recording ${recordingAt - clickAt}ms`);
       await settle(500);
       const state = await surfaceState();
-      evidence.transitions['open-composer'] = state;
-      checkTransition(state, 'open-composer', 'button → composer');
-      checkGeometry(state, 'composer', '1440-dark', { width: 420, height: 422.4 });
+      evidence.transitions['open-voice'] = state;
+      checkTransition(state, 'open-voice', 'button → voice');
+      checkGeometry(state, 'voice', '1440-dark', { width: 420, height: 422.4 });
       await checkNoOverflow('1440-dark');
       evidence.screenshots.push(await screenshot('02-recording-1440-dark.png'));
       return JSON.stringify({ clickToRecordingMs: recordingAt - clickAt });
@@ -541,8 +612,23 @@ async function runFullSession() {
       return JSON.stringify(wave);
     });
 
-    await step('停止→transcribing→chat', async () => {
+    await step('停止→transcribing→停留 voice（绝不自动 morph 到 chat）', async () => {
       const beforeCount = await evaluate(`document.querySelectorAll('[aria-label^="语音消息："]').length`);
+      // 阶段观测：从停止录音到回答完成，data-stage 不允许出现 chat
+      await evaluate(`(() => {
+        const surface = document.querySelector('[data-wtsl-agent-surface]');
+        window.__stageLog = [];
+        if (!surface) return false;
+        const record = () => window.__stageLog.push({
+          at: Date.now(),
+          stage: surface.getAttribute('data-stage'),
+          voiceStage: surface.getAttribute('data-voice-stage'),
+        });
+        record();
+        window.__stageObserver = new MutationObserver(record);
+        window.__stageObserver.observe(surface, { attributes: true, attributeFilter: ['data-stage', 'data-voice-stage'] });
+        return true;
+      })()`);
       await clickAria('结束录音并发送');
       let transcribing = false;
       for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -557,15 +643,70 @@ async function runFullSession() {
         await sleep(40);
       }
       check('停止后出现 transcribing 状态', transcribing, `voiceStage=${await evaluate(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage')`)}`);
-      await waitStage('chat', 30000);
+      // 等语音回合完成：转写文字进 peek、voiceStage 回 idle、会话空闲
+      await waitFor(
+        `String(document.querySelector('[data-wtsl-agent-surface]')?.textContent || '').includes('帮我看看今天的待办')`,
+        30000,
+        '转写文字未出现',
+      );
+      await waitVoiceStage('idle', 30000);
+      await sessionIdle(40000);
+      await sleep(500);
+      const stayVoice = await surfaceState();
+      check('语音回合结束后 stage 仍是 voice（不自动展开 chat）', stayVoice.stage === 'voice', `stage=${stayVoice.stage}`);
+      const stageLog = await evaluate(`window.__stageLog || []`);
+      check(
+        '语音回合全程 data-stage 从未变成 chat',
+        !stageLog.some((item) => item.stage === 'chat'),
+        JSON.stringify(stageLog.filter((item) => item.stage === 'chat').slice(0, 4)),
+      );
+      const paneAudit = await evaluate(`(() => {
+        const visible = (node) => {
+          if (!node || node.nodeType !== 1) return false;
+          const own = getComputedStyle(node);
+          if (own.display === 'none' || own.visibility === 'hidden') return false;
+          for (let current = node; current && current.nodeType === 1; current = current.parentElement) {
+            if (Number(getComputedStyle(current).opacity) < 0.05) return false;
+            if (current.hasAttribute && (current.hasAttribute('inert') || current.getAttribute('aria-hidden') === 'true')) return false;
+          }
+          const r = node.getBoundingClientRect();
+          return r.width > 1 && r.height > 1;
+        };
+        const pane = document.querySelector('[data-wtsl-agent-pane="voice"]');
+        const surface = document.querySelector('[data-wtsl-agent-surface]');
+        const textareas = surface ? [...surface.querySelectorAll('textarea')] : [];
+        return {
+          voicePane: Boolean(pane),
+          voicePaneTextareas: pane ? pane.querySelectorAll('textarea').length : -1,
+          surfaceTextareas: textareas.length,
+          surfaceVisibleTextareas: textareas.filter(visible).length,
+          focusedTag: document.activeElement && document.activeElement.tagName,
+          focusedAria: document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('aria-label'),
+        };
+      })()`);
+      check('半高 voice 窗内 textarea 数 = 0（纯语音）', paneAudit.voicePane === true && paneAudit.voicePaneTextareas === 0, JSON.stringify(paneAudit));
+      check('语音回合后无可见输入框（空格不可能打出空格）', paneAudit.surfaceVisibleTextareas === 0, JSON.stringify(paneAudit));
+      check(
+        '语音回合后焦点不在 textarea',
+        paneAudit.focusedTag !== 'TEXTAREA' && paneAudit.focusedAria !== '给 Agent 发消息',
+        JSON.stringify(paneAudit),
+      );
+      check(
+        '语音回合后仍是半高几何',
+        stayVoice.width >= 360 && stayVoice.width <= 520 && stayVoice.height >= 300 && stayVoice.height <= 490,
+        `${stayVoice.width}×${stayVoice.height}`,
+      );
+      // 显式「展开对话」进入 chat，继续做气泡/播报断言
+      await clickAria('展开对话', 15000);
+      await waitStage('chat', 20000);
       const transitionState = await surfaceState();
       evidence.transitions['open-chat'] = transitionState;
-      checkTransition(transitionState, 'open-chat', 'composer → chat');
-      await settle(600); // 等 300ms 几何过渡结束再量尺寸
+      checkTransition(transitionState, 'open-chat', 'voice → chat');
+      await settle(600);
       const state = await surfaceState();
       checkGeometry(state, 'chat', '1440-dark', { width: 420, height: 920 });
       await sleep(300);
-      return JSON.stringify({ beforeCount, stage: state.stage });
+      return JSON.stringify({ beforeCount, stage: state.stage, stayedVoice: stayVoice.stage });
     });
 
     await step('语音气泡：转写文字 + 声纹 + 无文字标签', async () => {
@@ -622,6 +763,12 @@ async function runFullSession() {
       } else {
         check('播报中可停止（若播报已结束则由后续单条朗读步骤覆盖）', true, 'auto-speak 已结束，未截到 speaking 画面');
       }
+      const stoppedBefore = await surfaceState();
+      if (stoppedBefore.speaking) {
+        // 慢机/异步合成下可能在断言的瞬间仍在播报：停掉再断言，避免误报
+        await evaluate(`(() => { const el = document.querySelector('[aria-label="停止朗读"]'); if (el) el.click(); return Boolean(el); })()`);
+        await waitFor(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-speaking') !== 'true'`, 15000, '停止朗读失败').catch(() => {});
+      }
       const stopped = await surfaceState();
       check('停止后 speaking=false', stopped.speaking === false, String(stopped.speaking));
       return 'auto-speak';
@@ -651,64 +798,103 @@ async function runFullSession() {
       return 'storage/fetch clean';
     });
 
-    await step('Esc 语义：chat→composer→collapsed + 焦点回入口', async () => {
+    await step('Esc 语义：chat→voice→collapsed + 焦点回入口', async () => {
       await pressEscape();
-      await waitStage('composer', 15000);
-      const composerState = await surfaceState();
-      evidence.transitions['back-composer'] = composerState;
-      checkTransition(composerState, 'back-composer', 'chat → composer');
-      await pressEscape();
-      await waitStage('collapsed', 15000);
-      const collapsed = await surfaceState();
+      await waitStage('voice', 15000);
+      await settle(350); // 等 chat→voice（250ms）几何过渡落定再取样
+      const voiceState = await surfaceState();
+      evidence.transitions['back-voice'] = voiceState;
+      checkTransition(voiceState, 'back-voice', 'chat → voice');
+      // 弱机/HMR 抖动可能吞掉一次按键：最多重试 3 次，每次都是真实 Esc
+      let collapsed = null;
+      let escAttempts = 0;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        escAttempts += 1;
+        await pressEscape();
+        try {
+          await waitStage('collapsed', 5000);
+          collapsed = await surfaceState();
+          break;
+        } catch {
+          /* 再按一次 */
+        }
+      }
+      expect(collapsed, `Esc 无法从 voice 收起（尝试 ${escAttempts} 次，当前 ${JSON.stringify(await surfaceState())}）`);
+      await settle(350); // 等 voice→button（200ms）几何过渡落定再量尺寸/焦点
+      collapsed = await surfaceState();
       evidence.transitions['back-collapsed'] = collapsed;
-      checkTransition(collapsed, 'back-collapsed', 'composer → button');
+      checkTransition(collapsed, 'back-collapsed', 'voice → button');
       check('收起后焦点回到入口按钮', collapsed.activeElement.isEntry === true, JSON.stringify(collapsed.activeElement));
+      check('收起后焦点不在 textarea', collapsed.activeElement.isTextarea !== true, JSON.stringify(collapsed.activeElement));
       checkGeometry(collapsed, 'collapsed', '1440-dark', { width: 56, height: 56 });
       return 'Esc semantics ok';
     });
 
-    await step('草稿保留 + composer 点外部收起', async () => {
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape(); // 取消录音，回 composer
-      await waitStage('composer', 15000);
+    await step('语音窗点外部收起 + chat 草稿跨 voice 往返保留', async () => {
+      // 进 voice idle
+      await clickEntry();
+      await clickAria('取消录音');
       await waitVoiceStage('idle', 10000);
-      await clickSelector('textarea');
-      await insertText('草稿保留测试');
-      const draftBefore = await evaluate(`document.querySelector('textarea')?.value || ''`);
-      expect(draftBefore === '草稿保留测试', `草稿未输入：${draftBefore}`);
-      await clickPoint(40, 40); // 点外部
+      await settle(300);
+      // 点外部：voice → collapsed
+      await clickPoint(40, 40);
       await waitStage('collapsed', 15000);
       const outsideTimeline = await focusTimeline();
       evidence.focusOutside = outsideTimeline;
       const collapsed = await surfaceState();
       const lastOutside = outsideTimeline[outsideTimeline.length - 1];
-      check('composer 点外部收起', collapsed.stage === 'collapsed', collapsed.stage);
-      check('收起后焦点回入口', lastOutside.isEntry === true, JSON.stringify({ last: lastOutside, timeline: outsideTimeline }));
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
-      const draftAfter = await evaluate(`document.querySelector('textarea')?.value || ''`);
-      check('收起后草稿保留', draftAfter === '草稿保留测试', `draft=${draftAfter}`);
+      check('voice 点外部收起', collapsed.stage === 'collapsed', collapsed.stage);
+      check('收起后焦点回入口', lastOutside.isEntry === true, JSON.stringify({ last: lastOutside }));
+      check('收起后焦点不在 textarea', outsideTimeline.every((sample) => sample.isTextarea !== true), JSON.stringify(outsideTimeline));
+      // chat 输入草稿 → ⌄ 回 voice → 再展开：草稿应保留（Composer 常驻挂载）
+      await clickEntry();
+      await clickAria('取消录音');
+      await waitVoiceStage('idle', 10000);
+      await clickAria('展开对话');
+      await waitStage('chat', 20000);
+      await settle(450);
+      await clickSelector('[data-wtsl-agent-composer="chat"] textarea');
+      await insertText('草稿保留测试');
+      const draftBefore = await evaluate(`document.querySelector('[data-wtsl-agent-composer="chat"] textarea')?.value || ''`);
+      expect(draftBefore === '草稿保留测试', `草稿未输入：${draftBefore}`);
+      await clickAria('收起到语音窗');
+      await waitStage('voice', 15000);
+      await settle(450);
+      await clickAria('展开对话');
+      await waitStage('chat', 20000);
+      await settle(450);
+      const draftAfter = await evaluate(`document.querySelector('[data-wtsl-agent-composer="chat"] textarea')?.value || ''`);
+      check('chat → voice → chat 后草稿保留', draftAfter === '草稿保留测试', `draft=${draftAfter}`);
       // 清空草稿，避免影响后续发送
-      await evaluate(`(() => { const el = document.querySelector('textarea'); if (!el) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-      await clickAria('收起 Agent');
+      await evaluate(`(() => { const el = document.querySelector('[data-wtsl-agent-composer="chat"] textarea'); if (!el) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+      await clickAria('关闭 Agent');
       await waitStage('collapsed', 15000);
-      return 'draft kept';
+      return 'draft kept across voice';
     });
 
     await step('空格按住发送 / <300ms 取消 / 输入框内不触发', async () => {
-      // 长按发送（焦点在入口按钮，键盘守卫允许）
+      // 长按发送（v0.3.7：语音结束后停留 voice，不自动展开 chat）
+      await ensureCollapsed();
+      await sessionIdle(30000);
       await pressKey('keyDown', ' ', 'Space', 32);
       await waitVoiceStage('recording', 15000);
+      const duringLongPress = await surfaceState();
+      check('空格长按进入录音且 stage=voice', duringLongPress.stage === 'voice' && duringLongPress.voiceStage === 'recording', JSON.stringify({ stage: duringLongPress.stage, voiceStage: duringLongPress.voiceStage }));
       await sleep(700);
       await pressKey('keyUp', ' ', 'Space', 32);
-      await waitStage('chat', 30000);
-      const longPressChat = await surfaceState();
-      check('空格长按 → 录音 → 发送 → chat', longPressChat.stage === 'chat', longPressChat.stage);
+      await waitVoiceStage('transcribing', 15000);
+      check('空格松开进入 transcribing', true);
+      await waitFor(
+        `String(document.querySelector('[data-wtsl-agent-surface]')?.textContent || '').includes('我听到你的语音了')`,
+        40000,
+        '空格语音回合回答未出现',
+      );
+      await waitVoiceStage('idle', 30000);
+      await sessionIdle(40000);
+      await settle(600);
+      const longPressState = await surfaceState();
+      check('空格长按 → 录音 → 发送 → 停留 voice（不 morph chat）', longPressState.stage === 'voice', longPressState.stage);
+      check('空格语音回合后无可见输入框', longPressState.visibleTextareas === 0, JSON.stringify({ visible: longPressState.visibleTextareas, mounted: longPressState.textareasInSurface }));
       // 回 collapsed
       await ensureCollapsed();
       await sessionIdle(30000); // 上一轮语音回答结束前，空格会被 session.status!==idle 守卫忽略
@@ -730,8 +916,8 @@ async function runFullSession() {
         return { streams: streams.length, tracks, liveTracks: tracks.filter((item) => item.endsWith(':live')).length };
       })()`);
       check(
-        '空格 <300ms 取消（不发送、停留 composer、不残留录音）',
-        afterState.voiceStage === 'idle' && afterState.stage === 'composer' && laterState.voiceStage === 'idle' && after === before,
+        '空格 <300ms 取消（不发送、停留 voice、不残留录音）',
+        afterState.voiceStage === 'idle' && afterState.stage === 'voice' && laterState.voiceStage === 'idle' && after === before,
         JSON.stringify({ at1800: { stage: afterState.stage, voiceStage: afterState.voiceStage }, at3300: { stage: laterState.stage, voiceStage: laterState.voiceStage }, before, after }),
       );
       check('快速点按取消后麦克风轨道全部停止', mic.liveTracks === 0, JSON.stringify(mic));
@@ -740,39 +926,47 @@ async function runFullSession() {
         await pressEscape();
         await sleep(500);
       }
+      // 焦点在 chat textarea 内：空格必须打字，不触发录音
       await ensureCollapsed();
       await sessionIdle(20000);
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
+      await clickEntry();
+      await clickAria('取消录音');
       await waitVoiceStage('idle', 10000);
-      await clickSelector('textarea');
+      await clickAria('展开对话');
+      await waitStage('chat', 20000);
+      await settle(450);
+      await clickSelector('[data-wtsl-agent-composer="chat"] textarea');
       await insertText('空格不应录音');
       const beforeVoice = await evaluate(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage')`);
-      await pressKey('keyDown', ' ', 'Space', 32);
+      await pressKey('keyDown', ' ', 'Space', 32, 0, ' ');
       await sleep(400);
-      const duringVoice = await evaluate(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage')`);
+      const duringVoice = await evaluate(`(() => ({
+        voiceStage: document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-voice-stage'),
+        value: document.querySelector('[data-wtsl-agent-composer="chat"] textarea')?.value || '',
+        focused: document.activeElement && document.activeElement.tagName === 'TEXTAREA',
+      }))()`);
       await pressKey('keyUp', ' ', 'Space', 32);
-      check('焦点在 textarea 时空格不开始录音', beforeVoice === 'idle' && duringVoice === 'idle', `${beforeVoice}->${duringVoice}`);
-      await evaluate(`(() => { const el = document.querySelector('textarea'); if (!el) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+      check('焦点在 textarea 时空格不开始录音', beforeVoice === 'idle' && duringVoice.voiceStage === 'idle', JSON.stringify({ beforeVoice, duringVoice }));
+      check('焦点在 textarea 时空格被当作字符输入', String(duringVoice.value || '').includes('空格不应录音 '), JSON.stringify(duringVoice));
+      await evaluate(`(() => { const el = document.querySelector('[data-wtsl-agent-composer="chat"] textarea'); if (!el) return false; const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
       return 'space ok';
     });
 
     await step('文字提问默认不播报 + 单条朗读可停 + chat 点外不关', async () => {
       await ensureCollapsed();
       await sessionIdle(20000);
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
+      await clickEntry();
+      await clickAria('取消录音');
       await waitVoiceStage('idle', 10000);
-      await clickSelector('textarea');
+      await clickAria('展开对话');
+      await waitStage('chat', 20000);
+      await settle(450);
+      await clickSelector('[data-wtsl-agent-composer="chat"] textarea');
       await insertText('你好');
       await pressEnter();
-      await waitStage('chat', 20000);
+      await settle(400);
+      const textState = await surfaceState();
+      check('文字提问后 stage 仍是 chat（文字通道只存在于全高窗）', textState.stage === 'chat', textState.stage);
       await waitFor(`Boolean(document.querySelector('[aria-label="朗读这条回答"]'))`, 30000, '文字回答未完成（无单条朗读按钮）');
       await sleep(1800);
       const speaking = await evaluate(`document.querySelector('[data-wtsl-agent-surface]')?.getAttribute('data-speaking') === 'true'`);
@@ -806,39 +1000,31 @@ async function runFullSession() {
     await step('⌄ 收起 / X 关闭 / 焦点回归', async () => {
       await ensureCollapsed();
       await sessionIdle(20000);
-      // 进 chat（发一条文字），再测 ⌄
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
+      // 进 chat，再测 ⌄（收起到语音窗）
+      await clickEntry();
+      await clickAria('取消录音');
       await waitVoiceStage('idle', 10000);
-      await clickSelector('textarea');
-      await insertText('收起测试');
-      await pressEnter();
+      await clickAria('展开对话');
       await waitStage('chat', 20000);
       await settle(400);
-      await clickAria('收起到输入框');
-      await waitStage('composer', 15000);
-      await settle(350); // 等 220ms 几何过渡结束再点 X，避免点击落在过渡中的位置
-      check('⌄ 收起到 composer', true);
+      await clickAria('收起到语音窗');
+      await waitStage('voice', 15000);
+      await settle(350); // 等 250ms 几何过渡结束再点 X，避免点击落在过渡中的位置
+      check('⌄ 收起到 voice', true);
       await clickAria('收起 Agent');
       await waitStage('collapsed', 15000);
-      const composerXTimeline = await focusTimeline();
-      evidence.focusComposerX = composerXTimeline;
+      const voiceXTimeline = await focusTimeline();
+      evidence.focusVoiceX = voiceXTimeline;
       const collapsed = await surfaceState();
-      const lastComposerX = composerXTimeline[composerXTimeline.length - 1];
-      check('composer X 直接收成按钮', collapsed.stage === 'collapsed');
-      check('X 后焦点回入口', lastComposerX.isEntry === true, JSON.stringify({ last: lastComposerX, timeline: composerXTimeline }));
+      const lastVoiceX = voiceXTimeline[voiceXTimeline.length - 1];
+      check('voice X 直接收成按钮', collapsed.stage === 'collapsed');
+      check('voice X 后焦点回入口', lastVoiceX.isEntry === true, JSON.stringify({ last: lastVoiceX, timeline: voiceXTimeline }));
+      check('voice X 后焦点不在 textarea', voiceXTimeline.every((sample) => sample.isTextarea !== true), JSON.stringify(voiceXTimeline));
       // 进入 chat 再测 chat X
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
-      await clickSelector('textarea');
-      await insertText('关闭测试');
-      await pressEnter();
+      await clickEntry();
+      await clickAria('取消录音');
+      await waitVoiceStage('idle', 10000);
+      await clickAria('展开对话');
       await waitStage('chat', 20000);
       await settle(400);
       await clickAria('关闭 Agent');
@@ -855,22 +1041,23 @@ async function runFullSession() {
     await step('Agent 设置对话框：仅语音/模型/搜索', async () => {
       await ensureCollapsed();
       await sessionIdle(30000);
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
-      await pressEscape();
-      await waitStage('composer', 15000);
+      await clickEntry();
+      await clickAria('取消录音');
       await waitVoiceStage('idle', 10000);
-      const composerProbe = await surfaceState();
+      const voiceProbe = await surfaceState();
       check(
-        '整理后 composer 输入框存在',
-        await evaluate(`Boolean(document.querySelector('textarea'))`),
-        JSON.stringify({ stage: composerProbe.stage, voiceStage: composerProbe.voiceStage, width: composerProbe.width, height: composerProbe.height }),
+        '整理后 voice 窗无输入框（文字输入只在 chat）',
+        voiceProbe.stage === 'voice' && voiceProbe.visibleTextareas === 0,
+        JSON.stringify({ stage: voiceProbe.stage, voiceStage: voiceProbe.voiceStage, visibleTextareas: voiceProbe.visibleTextareas }),
       );
-      await clickSelector('textarea');
-      await insertText('打开设置');
-      await pressEnter();
+      await clickAria('展开对话');
       await waitStage('chat', 20000);
+      await settle(450);
+      check(
+        'chat 存在单行 composer 输入框',
+        await evaluate(`Boolean(document.querySelector('[data-wtsl-agent-composer="chat"] textarea'))`),
+        'chat composer textarea',
+      );
       await clickAria('更多');
       await waitFor(`Boolean(document.querySelector('[role="menu"]'))`, 15000, '更多菜单未打开');
       const item = await waitFor(
@@ -1020,18 +1207,16 @@ async function runLightSession() {
       return 'collapsed';
     });
     await step('light 录音与尺寸', async () => {
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitStage('composer', 15000);
-      await waitVoiceStage('recording', 20000);
+      await clickEntry();
       await sleep(600);
       const state = await surfaceState();
       evidenceDimsLight = state;
-      checkGeometry(state, 'composer', '1024-light', { width: 420, height: 337.92 });
+      checkGeometry(state, 'voice', '1024-light', { width: 420, height: 337.92 });
       await checkNoOverflow('1024-light');
       await screenshot('12-recording-1024-light.png');
       return JSON.stringify({ w: state.width, h: state.height });
     });
-    await step('light chat 与尺寸', async () => {
+    await step('light 语音回合停留 voice + chat 尺寸/气泡', async () => {
       await clickAria('结束录音并发送');
       let transcribingShot = false;
       for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -1046,18 +1231,25 @@ async function runLightSession() {
         await sleep(40);
       }
       check('light 转写态截图', transcribingShot, transcribingShot ? '03-transcribing-1024-light.png' : '未捕捉到 transcribing（窗口可能被慢机错过）');
-      await waitStage('chat', 40000);
+      await waitVoiceStage('idle', 40000);
+      await sessionIdle(40000);
+      await settle(500);
+      const voiceState = await surfaceState();
+      check('light 语音回合后仍停留 voice（不自动 morph chat）', voiceState.stage === 'voice', `stage=${voiceState.stage}`);
+      check('light 语音回合后无可见输入框', voiceState.visibleTextareas === 0, JSON.stringify({ visible: voiceState.visibleTextareas, mounted: voiceState.textareasInSurface }));
+      await waitFor(`String(document.querySelector('[data-wtsl-agent-surface]')?.textContent || '').includes('帮我看看今天的待办')`, 30000, 'light 转写文字未出现');
+      await screenshot('04-voice-reply-1024-light.png');
+      await clickAria('展开对话');
+      await waitStage('chat', 20000);
       await settle(700); // 等 300ms 几何过渡结束再量尺寸/截图
       const state = await surfaceState();
       checkGeometry(state, 'chat', '1024-light', { width: 420, height: 728 });
       await checkNoOverflow('1024-light');
-      await waitFor(`document.body.innerText.includes('帮我看看今天的待办')`, 30000, 'light 转写文字未出现');
-      await sleep(900);
-      await screenshot('04-chat-voice-bubble-1024-light.png');
+      await sleep(300);
       await screenshot('13-chat-1024-light.png');
       const errors = cdp.consoleErrors.slice();
       check('light console error=0', errors.length === 0, JSON.stringify(errors.slice(0, 3)));
-      return 'chat';
+      return 'voice stays / chat';
     });
     await step('light 空态截图', async () => {
       await evaluate(`(() => { localStorage.removeItem('agent.conversations'); localStorage.removeItem('agent.activeConversation'); return true; })()`);
@@ -1091,8 +1283,7 @@ async function runReducedMotionSession() {
     await openMockSurface();
     await waitCards(6);
     await step('reduced-motion：无尺寸过渡，仅 120ms opacity', async () => {
-      await clickSelector('[data-wtsl-agent-entry]');
-      await waitVoiceStage('recording', 20000);
+      await clickEntry();
       await sleep(500);
       const state = await surfaceState();
       const reduced = await evaluate(`(() => {
@@ -1112,8 +1303,19 @@ async function runReducedMotionSession() {
       await screenshot('21-recording-reduced-1440-dark.png');
       return JSON.stringify({ state: { w: state.width, h: state.height }, reduced });
     });
-    await step('reduced-motion chat 截图', async () => {
+    await step('reduced-motion 语音回合停留 voice + chat 截图', async () => {
       await clickAria('结束录音并发送');
+      await waitFor(
+        `String(document.querySelector('[data-wtsl-agent-surface]')?.textContent || '').includes('我听到你的语音了')`,
+        40000,
+        'reduced-motion 语音回答未出现',
+      );
+      await waitVoiceStage('idle', 30000);
+      await sessionIdle(40000);
+      await sleep(500);
+      const voiceState = await surfaceState();
+      check('reduced-motion：语音回合后仍停留 voice', voiceState.stage === 'voice', `stage=${voiceState.stage}`);
+      await clickAria('展开对话');
       await waitStage('chat', 40000);
       await sleep(800);
       await screenshot('22-chat-reduced-1440-dark.png');

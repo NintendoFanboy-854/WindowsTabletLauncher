@@ -30,16 +30,22 @@
   transition-property: width, height, border-color, box-shadow;
 }
 
-/* 半高输入窗 / 全高浮栏：只变宽高，圆角恒 12 */
-.wtsl-agent-surface[data-stage='composer'],
+/* 半高语音窗 / 全高浮栏：只变宽高，圆角恒 12 */
+.wtsl-agent-surface[data-stage='voice'],
 .wtsl-agent-surface[data-stage='chat'] {
   width: min(420px, 92vw);
   border-color: var(--colorNeutralStroke2);
   box-shadow: var(--shadow16);
 }
 
-.wtsl-agent-surface[data-stage='composer'] {
+/* 半高窗是纯语音形态：没有文字输入框，只留对话 peek + 语音条 */
+.wtsl-agent-surface[data-stage='voice'] {
   height: clamp(320px, 44vh, 440px);
+}
+
+/* 容器本身可编程聚焦（用于让空格继续指向“按住说话”），不画整框焦点环 */
+.wtsl-agent-surface:focus {
+  outline: none;
 }
 
 .wtsl-agent-surface[data-stage='chat'] {

@@ -391,3 +391,19 @@
     （23°→73°F），places push 58ms 生效（北京→上海），iframe console error 0。
   - `npm run typecheck` / `npm run build` / 六插件产物重建通过（产物已完成，与源码一致）。
   - release 真窗口（patched CDP 副本，`shots/v036-final/`，38 PASS / 0 FAIL）：升级重种 0.3.5→0.3.6；真实 WebView2 里设置页切时钟 12 小时制/天气自动定位开关后，跨 origin 卡片 360ms 内可见更新、iframe 71ms 收到 `host:config`（天气双向 75/60ms）、timeOrigin/探针证明未 reload、console 0。
+
+## D-30 Agent 语音优先：半高窗改为纯语音、取消自动升级、输入区单行（2026-10-23，v0.3.7 反馈）
+
+- 背景：用户反馈「按空格发语音 / 触屏点 chat 图标，期待的是连续语音对话，文字对话是兜底；现在语音一发完就自动半高→全高；半高窗里不该有文字输入框；回答完再按空格竟然打出空格；右下角对话框没必要分两行」。四条是同一个设计错误：把语音当成“填满文字对话的输入方式”，导致状态机把语音结果当作进入 chat 的理由，并自动把焦点塞进输入框。
+- 决策：
+  1. **三段语义重定义**：`collapsed` → `voice`（半高纯语音窗，原 `composer` 更名）→ `chat`（全高文字/历史浮栏）。**删除“发送/语音结束自动升级到 chat”**；进入 `chat` 只能显式操作（⌃ / peek / Enter / 受控打开）。语音回合结束（含 TTS 朗读）留在 `voice`，可立即再按空格/点「点击说话」继续下一轮 = 连续语音对话。
+  2. **半高窗是纯语音**：移除文字输入框、发送按钮与 peek 下方输入区；底部只留全宽 primary「点击说话」大按钮（idle）或声纹录音条（录/转写中）。文字输入只存在于 `chat` 的单行输入区。
+  3. **空格默认永远是按住说话**：不再在展开/语音结束时自动聚焦输入框（根因 bug）；只有用户主动点入 `chat` 的输入框后才打字；输入框内第一次 Esc 只退出输入框，第二次才退级。展开/收起/换层后焦点放在 surface 容器，收起后回入口按钮。
+  4. **全高输入区改单行**：`[语音] [Textarea] [发送/停止]` 同一行（Fluent Button/Textarea `size=large`，间距/高度全用 token），录音时整行换成声纹条；草稿跨 `chat → voice → chat` 保留。
+  5. **视觉严格回到 Fluent 2 token**：颜色/字号/间距/圆角/阴影/动效全部取 `tokens`/`motionTokens`，不自造尺寸（点击说话按钮用 `size=large` 的 40px，而不是 56px 自定高度）、不覆写按钮圆角；交互遵循 HIG 思想：入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 顶部渐隐做渐进披露、半高 detent 可停留可展开、reduced-motion 只留 120ms 透明度。
+- 否掉的方案：
+  - 「全高回答后自动收回半高」：仍保留“语音结果决定形态”的自动逻辑，且用户可能正在读长回答。
+  - 「半高窗保留一行文字输入」：用户明确“半高就是纯语音”；文字是兜底，需要显式展开。
+  - 「靠“输入框为空时允许空格录音”的启发式」：状态不可预测，且解决不了自动聚焦根因。
+- 兼容：`SurfaceStage` 由 `composer` 改为 `voice`（仅 UI 内部类型，不持久化）；`AgentSurface` props 不变（`open` 仍打开 `chat`）；session / 存储 / 音频链路不变；不迁移数据。
+- 验证：新增 `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风，voice 回合后观测不到 chat、回答后空格再录音、半高窗 textarea=0、chat 单行 composer 三控件同轴、焦点/Esc/录音取消、reduced-motion、console 0）；`scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 按新语义更新后全 PASS；`tsc --noEmit` / `npm run build` 通过；证据 `shots/v037-dev/`。
