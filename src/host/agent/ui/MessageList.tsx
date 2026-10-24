@@ -1,12 +1,23 @@
 /**
  * 消息列表：内部滚动，只有用户本来就停在底部时才自动跟随新内容。
  *
- * 空态只有 ChatSparkle 小标 + 少量可直接发送的建议（不写标题、不回显模型名）；
- * 生成/工具调用只给不打断的进度指示，不写“正在生成…”这类解释文字（必要 aria 保留）。
+ * 空态只有 ChatSparkle 小标 + 少量可直接发送的建议（不写标题、不回显模型名）。
+ * 进行中的反馈**不再由本列表承担**：它已并入轮次时间线（`MessageBubble` → `TurnTimeline`
+ * + `PendingLine`），一屏只有一个进行中指示器（FLUENT2 §12「不用多个 spinner 同时出现」；
+ * 旧实现在列表尾部再放一个 spinner，与工具卡里的 spinner 重复）。
+ *
+ * 内容轴：与语音窗/对话面板同一套内衬 16（`spacingHorizontalL`）；本列表**不随形态
+ * 切换重排**（父层按固定尺寸排版），所以展开/收起不会重置滚动位置。
+ *
+ * 滚动条**不参与布局**（`[data-wtsl-message-scroll]` 在 agent.css 里隐藏）：WebView2 的经典
+ * 滚动条会吃掉 15px 布局宽度，`stable` 只占右侧时内容盒相对容器中心左偏半个条宽（8.5px），
+ * `stable both-edges` 两侧都占时左缘又比 Composer 右偏 15px——两种都不是「和输入框同一条轴」。
+ * 触控产品的滚动靠滑动，不靠拖条，所以直接不显示滚动条：左右内衬严格 16、与 Composer 同线，
+ * 且滚动条出现/消失都不会引起回流。
  */
 
 import { useEffect, useRef, type ReactElement } from 'react';
-import { Button, Spinner, makeStyles, tokens } from '@fluentui/react-components';
+import { Button, makeStyles, tokens } from '@fluentui/react-components';
 import {
   ChatSparkleRegular,
   CheckmarkCircleRegular,
@@ -25,8 +36,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalL,
-    padding: tokens.spacingHorizontalM,
-    scrollbarGutter: 'stable',
+    padding: tokens.spacingHorizontalL,
   },
   empty: {
     margin: 'auto',
@@ -48,13 +58,6 @@ const useStyles = makeStyles({
   },
   suggestionButton: {
     justifyContent: 'flex-start',
-  },
-  progressRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    paddingInline: tokens.spacingHorizontalM,
-    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -85,7 +88,7 @@ export function MessageList({ session }: { session: AgentSession }) {
   }, [messages.length, contentLength, session.status, lastMessage?.status]);
 
   return (
-    <div className={styles.scroll} ref={containerRef} onScroll={handleScroll}>
+    <div className={styles.scroll} ref={containerRef} onScroll={handleScroll} data-wtsl-message-scroll>
       {messages.length === 0 ? (
         <div className={styles.empty}>
           <ChatSparkleRegular fontSize={24} className={styles.emptyMark} aria-hidden="true" />
@@ -106,36 +109,9 @@ export function MessageList({ session }: { session: AgentSession }) {
         </div>
       ) : (
         messages.map((message, index) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            session={session}
-            showReasoning={session.settings.thinking}
-            index={index}
-          />
+          <MessageBubble key={message.id} message={message} session={session} index={index} />
         ))
       )}
-
-      {session.status === 'streaming' ? (
-        <div
-          className={styles.progressRow}
-          role="status"
-          aria-label="正在生成回答"
-          data-wtsl-agent-animated="true"
-        >
-          <Spinner size="extra-tiny" />
-        </div>
-      ) : null}
-      {session.status === 'tools' ? (
-        <div
-          className={styles.progressRow}
-          role="status"
-          aria-label="正在调用工具"
-          data-wtsl-agent-animated="true"
-        >
-          <Spinner size="extra-tiny" />
-        </div>
-      ) : null}
     </div>
   );
 }

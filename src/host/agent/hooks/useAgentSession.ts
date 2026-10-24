@@ -46,18 +46,27 @@ import {
   saveConversations,
 } from '../storage';
 import { useSettings } from './useSettings';
-import type {
-  AgentErrorAction,
-  AgentSettings,
-  AgentTransport,
-  ChatContentPart,
-  ChatRequestMessage,
-  ChatToolCall,
-  Conversation,
-  Message,
-  SourceRef,
-  ToolCallRecord,
-  ToolDefinition,
+import {
+  appendDeltaBlock,
+  appendNoticeBlock,
+  closeBlocks,
+  prependNoticeBlock,
+  pushToolBlock,
+  pushToolRecord,
+  updateToolBlock,
+  withBlocks,
+  type AgentErrorAction,
+  type AgentSettings,
+  type AgentTransport,
+  type ChatContentPart,
+  type ChatRequestMessage,
+  type ChatToolCall,
+  type Conversation,
+  type Message,
+  type SourceRef,
+  type ToolCallRecord,
+  type ToolDefinition,
+  type TurnBlock,
 } from '../types';
 import { TtsPlayer } from '../voice/ttsPlayer';
 import { VoiceRecorder, type RecordedAudio } from '../voice/recorder';
@@ -447,6 +456,17 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     const buildBindings = (): ToolBinding[] => buildToolBindings(transport.listPluginTools());
     const currentSettings = (): AgentSettings => settingsRef.current;
 
+    /**
+     * 块归约器：**事件到达顺序即块序**。
+     * `content` / `reasoning` 同类原地追加，`tool_call` 到达即建块，不同类则新开一块；
+     * 归约后同步刷新 `content` / `reasoning` / `toolCalls` 三个投影（模型请求与 TTS 继续读它们）。
+     */
+    const applyBlocks = (updater: (blocks: TurnBlock[]) => TurnBlock[]): void => {
+      updateMessage(conversationId, assistantId, (message) =>
+        withBlocks(message, updater(message.blocks ?? [])),
+      );
+    };
+
     const voiceText = (): string =>
       voiceTurn?.transcript.text?.trim() || VOICE_TRANSCRIPT_PLACEHOLDER;
 
@@ -510,16 +530,10 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
             if (event.type === 'content') {
               accumulated += event.text;
               roundText += event.text;
-              updateMessage(conversationId, assistantId, (message) => ({
-                ...message,
-                content: message.content + event.text,
-              }));
+              applyBlocks((blocks) => appendDeltaBlock(blocks, 'text', event.text));
             } else if (event.type === 'reasoning') {
               roundReasoning += event.text;
-              updateMessage(conversationId, assistantId, (message) => ({
-                ...message,
-                reasoning: (message.reasoning ?? '') + event.text,
-              }));
+              applyBlocks((blocks) => appendDeltaBlock(blocks, 'thinking', event.text));
             } else if (event.type === 'sources') {
               updateMessage(conversationId, assistantId, (message) => ({
                 ...message,
@@ -532,6 +546,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
               }));
             } else if (event.type === 'tool_call') {
               pendingCalls.push(event.call);
+              // 到达即建块：不再攒到轮末批量写，工具的真实位置就是它在这里
+              applyBlocks((blocks) => pushToolBlock(blocks, event.call));
             }
           },
         );
@@ -549,26 +565,13 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
 
         if (pendingCalls.length === 0) {
           if (!accumulated.trim()) {
-            updateMessage(conversationId, assistantId, (message) => ({
-              ...message,
-              content: message.content || '（模型没有返回内容，可以重试一次）',
-            }));
+            // 没有正文也没有工具：补一条正文占位（与旧行为一致，仍走 text 块）
+            applyBlocks((blocks) =>
+              appendDeltaBlock(blocks, 'text', '（模型没有返回内容，可以重试一次）'),
+            );
           }
           break;
         }
-
-        updateMessage(conversationId, assistantId, (message) => ({
-          ...message,
-          toolCalls: [
-            ...(message.toolCalls ?? []),
-            ...pendingCalls.map((call) => ({
-              id: call.id,
-              name: call.name,
-              args: call.args,
-              status: 'running' as const,
-            })),
-          ],
-        }));
 
         history.push({
           role: 'assistant',
@@ -595,27 +598,18 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
               transport,
               signal,
             });
-            updateMessage(conversationId, assistantId, (message) => ({
-              ...message,
-              toolCalls: message.toolCalls?.map((record) =>
-                record.id === call.id
-                  ? { ...record, status: 'success', result: outcome.result }
-                  : record,
-              ),
-            }));
+            // 原地改那一块的状态：位置不动，失败/成功都留在它发生的地方
+            applyBlocks((blocks) =>
+              updateToolBlock(blocks, call.id, { status: 'success', result: outcome.result }),
+            );
             resultText = toolResultToText(outcome.result);
           } catch (toolError) {
             if (signal.aborted) throw abortError();
-            const message = errorMessage(toolError);
-            updateMessage(conversationId, assistantId, (previous) => ({
-              ...previous,
-              toolCalls: previous.toolCalls?.map((record) =>
-                record.id === call.id
-                  ? { ...record, status: 'error', error: message }
-                  : record,
-              ),
-            }));
-            resultText = `错误：${message}`;
+            const toolMessage = errorMessage(toolError);
+            applyBlocks((blocks) =>
+              updateToolBlock(blocks, call.id, { status: 'error', error: toolMessage }),
+            );
+            resultText = `错误：${toolMessage}`;
           }
           history.push({
             role: 'tool',
@@ -625,17 +619,21 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
         }
 
         if (round === MAX_TOOL_ROUNDS - 1) {
-          updateMessage(conversationId, assistantId, (message) => ({
-            ...message,
-            content: `${message.content}${message.content ? '\n\n' : ''}（工具调用轮次已达上限，先直接回答。）`,
-          }));
+          // 轮次上限不再污染正文：改成一条就地告知
+          applyBlocks((blocks) =>
+            appendNoticeBlock(blocks, {
+              level: 'warning',
+              code: 'round_limit',
+              text: '工具调用轮次已达上限，先直接回答',
+            }),
+          );
           break;
         }
         updateStatus('streaming');
       }
 
       updateMessage(conversationId, assistantId, (message) => ({
-        ...message,
+        ...withBlocks(message, closeBlocks(message.blocks ?? [])),
         status: 'done',
       }));
       updateStatus('idle');
@@ -649,20 +647,36 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       }
     } catch (turnError) {
       if (signal.aborted) {
+        // 「已停止」落在流停止的那一帧的末尾，不是页脚角落的图标
         updateMessage(conversationId, assistantId, (message) => ({
-          ...message,
+          ...withBlocks(
+            message,
+            appendNoticeBlock(closeBlocks(message.blocks ?? []), {
+              level: 'warning',
+              code: 'turn_aborted',
+              text: '已停止',
+            }),
+          ),
           status: 'aborted',
         }));
         updateStatus('idle');
         return;
       }
       const message = errorMessage(turnError);
+      const action = (turnError as { action?: AgentErrorAction }).action;
       updateMessage(conversationId, assistantId, (previous) => ({
-        ...previous,
+        ...withBlocks(
+          previous,
+          appendNoticeBlock(closeBlocks(previous.blocks ?? []), {
+            level: 'error',
+            code: 'stream_error',
+            text: message,
+            ...(action ? { action } : {}),
+          }),
+        ),
         status: 'error',
       }));
       updateStatus('idle');
-      const action = (turnError as { action?: AgentErrorAction }).action;
       setError({ message, retryable: true, ...(action ? { action } : {}) });
     } finally {
       // 无论成功/失败/中止，音频 data URL 都不留在内存里
@@ -710,10 +724,10 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     let baseMessages: Message[] = [...conversation.messages, userMessage];
     if (phraseTool) {
       const record = await runPhraseTool(phraseTool, controller.signal);
-      updateMessage(conversation.id, assistantMessage.id, (message) => ({
-        ...message,
-        toolCalls: [record],
-      }));
+      // 宿主先执行的那次工具调用也是一个真实发生过的块（落在轮的起点）
+      updateMessage(conversation.id, assistantMessage.id, (message) =>
+        withBlocks(message, pushToolRecord(message.blocks ?? [], record)),
+      );
       baseMessages = [...baseMessages, { ...assistantMessage, toolCalls: [record] }];
     }
 
@@ -1018,6 +1032,17 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
             ...message,
             transcriptStatus: 'failed',
           }));
+          // 「没听错的是你，是我没听清」：这条告知属于轮的起点，插在本轮第一块之前
+          updateMessage(conversation.id, assistantMessage.id, (message) =>
+            withBlocks(
+              message,
+              prependNoticeBlock(message.blocks ?? [], {
+                level: 'warning',
+                code: 'transcript_failed',
+                text: '没听清，可以重说一次',
+              }),
+            ),
+          );
           if (voiceTurnTokenRef.current === asrToken) {
             setVoice((previous) => ({
               ...previous,
@@ -1062,10 +1087,9 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       );
       if (phraseTool) {
         const record = await runPhraseTool(phraseTool, controller.signal);
-        updateMessage(conversation.id, assistantMessage.id, (message) => ({
-          ...message,
-          toolCalls: [record],
-        }));
+        updateMessage(conversation.id, assistantMessage.id, (message) =>
+          withBlocks(message, pushToolRecord(message.blocks ?? [], record)),
+        );
         baseMessages = [...baseMessages, { ...assistantMessage, toolCalls: [record] }];
       }
     }
@@ -1093,10 +1117,9 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
         if (!lateTool) return;
         void runPhraseTool(lateTool, controller.signal).then((record) => {
           if (record.status !== 'success') return;
-          updateMessage(conversation.id, assistantMessage.id, (message) => ({
-            ...message,
-            toolCalls: [...(message.toolCalls ?? []), record],
-          }));
+          updateMessage(conversation.id, assistantMessage.id, (message) =>
+            withBlocks(message, pushToolRecord(message.blocks ?? [], record)),
+          );
         });
       });
     }

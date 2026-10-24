@@ -6,7 +6,16 @@
  * UI-only 的 `input` / `voicePeaks` / `voiceDurationSec` / `transcriptStatus` 允许落库（纯数字/枚举）。
  */
 
-import type { Conversation, Message } from './types';
+import {
+  blocksFromLegacy,
+  closeBlocks,
+  type AgentErrorAction,
+  type Conversation,
+  type Message,
+  type NoticeCode,
+  type ToolCallRecord,
+  type TurnBlock,
+} from './types';
 
 export const CONVERSATIONS_STORAGE_KEY = 'agent.conversations';
 export const ACTIVE_CONVERSATION_STORAGE_KEY = 'agent.activeConversation';
@@ -80,6 +89,95 @@ function normalizeWebSearchUsage(raw: unknown): Message['webSearchUsage'] | unde
   return { toolUsage, pageUsage };
 }
 
+// ---------- 轮次块的白名单校验 ----------
+
+const NOTICE_CODES: readonly NoticeCode[] = [
+  'tool_failed',
+  'turn_aborted',
+  'transcript_failed',
+  'round_limit',
+  'stream_error',
+];
+
+const TOOL_STATUSES: readonly ToolCallRecord['status'][] = ['running', 'success', 'error'];
+
+function normalizeNoticeAction(raw: unknown): AgentErrorAction | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.label !== 'string' || typeof value.url !== 'string') return undefined;
+  if (!value.label.trim() || !value.url.trim()) return undefined;
+  return { label: value.label, url: value.url };
+}
+
+/** 工具记录：只保留契约字段，`result` 原样（它本来就是要回给模型的任意 JSON） */
+function normalizeToolRecord(raw: unknown): ToolCallRecord | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.id !== 'string' || !value.id) return null;
+  if (typeof value.name !== 'string' || !value.name) return null;
+  const status = TOOL_STATUSES.find((candidate) => candidate === value.status);
+  if (!status) return null;
+  const record: ToolCallRecord = { id: value.id, name: value.name, args: value.args, status };
+  if ('result' in value) record.result = value.result;
+  if (typeof value.error === 'string') record.error = value.error;
+  return record;
+}
+
+/**
+ * 单个块的校验：公共字段（`id/seq/open/createdAt`）+ kind 专属字段。
+ * 任何一项不合法 → 丢弃该块（宁可少一块，不可让整条会话读不出来）。
+ * 空的 `thinking` / `text` 块直接丢掉：它们只会渲染成一行没有内容的折叠条。
+ */
+function normalizeBlock(raw: unknown): TurnBlock | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const value = raw as Record<string, unknown>;
+  const id = typeof value.id === 'string' && value.id ? value.id : null;
+  const seq = typeof value.seq === 'number' && Number.isFinite(value.seq) ? value.seq : null;
+  if (!id || seq === null) return null;
+  const base = {
+    id,
+    seq: Math.max(0, Math.round(seq)),
+    open: value.open === true,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : nowIso(),
+  };
+
+  if (value.kind === 'thinking' || value.kind === 'text') {
+    if (typeof value.text !== 'string' || !value.text.trim()) return null;
+    return { ...base, kind: value.kind, text: value.text };
+  }
+
+  if (value.kind === 'tool') {
+    const call = normalizeToolRecord(value.call);
+    return call ? { ...base, kind: 'tool', call } : null;
+  }
+
+  if (value.kind === 'notice') {
+    if (typeof value.text !== 'string' || !value.text.trim()) return null;
+    const level = value.level;
+    if (level !== 'error' && level !== 'warning' && level !== 'info') return null;
+    const code = NOTICE_CODES.find((candidate) => candidate === value.code);
+    if (!code) return null;
+    const action = normalizeNoticeAction(value.action);
+    return { ...base, kind: 'notice', level, code, text: value.text, ...(action ? { action } : {}) };
+  }
+
+  return null;
+}
+
+/**
+ * 块列表的读取：
+ * - 按 `seq` 排序（数组顺序即到达顺序，排序只是防御乱序写盘）；
+ * - 恢复时把所有「增长中」的块收尾（上次崩溃留下的 `open=true` 不算数）。
+ */
+function normalizeBlocks(raw: unknown, options: NormalizeOptions): TurnBlock[] {
+  if (!Array.isArray(raw)) return [];
+  const blocks = raw
+    .map((item) => normalizeBlock(item))
+    .filter((item): item is TurnBlock => item !== null)
+    .sort((left, right) => left.seq - right.seq);
+  return options.restoring ? closeBlocks(blocks) : blocks;
+}
+
 function normalizeMessage(raw: unknown, options: NormalizeOptions): Message | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const value = raw as Record<string, unknown>;
@@ -128,6 +226,16 @@ function normalizeMessage(raw: unknown, options: NormalizeOptions): Message | nu
     } else {
       message.transcriptStatus = 'failed';
     }
+  }
+
+  // ---- 轮次块（唯一真相源） ----
+  // 老存档只有 content/reasoning/toolCalls：合成一份降级块，历史会话照常可读，不清空任何数据。
+  const blocks = normalizeBlocks(value.blocks, options);
+  if (blocks.length > 0) {
+    message.blocks = blocks;
+  } else if (role === 'assistant') {
+    const legacy = blocksFromLegacy(message);
+    if (legacy.length > 0) message.blocks = legacy;
   }
   return message;
 }

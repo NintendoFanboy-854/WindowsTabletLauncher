@@ -1,46 +1,98 @@
 /*
- * Agent 浮空界面（契约 docs/AGENT-SURFACE-CONTRACT.md §1/§3）。
+ * Agent 入口（右下保留格）与其三态（契约 docs/AGENT-SURFACE-CONTRACT.md §1/§3）。
  *
- * 这里只定义“形状 / 层级 / 关键帧”：尺寸、圆角、描边、阴影全部取 Fluent CSS 变量；
- * 动效时长与曲线由 TS 的 motionTokens 通过内联 transition / animation 注入，
- * 不在 CSS 里另写一套常量。舞台切换只改宽高，位置（right/bottom）与圆角不变。
+ * 这里只定义“形状 / 层级 / 关键帧”：尺寸与位置由 `entryGeometry.ts` 从桌面栅格推导后
+ * 以 CSS 变量注入（--wtsl-agent-inset-* / --wtsl-agent-width|height），圆角、描边、
+ * 阴影、材质全部取 Fluent CSS 变量；动效时长与曲线由 TS 的 motionTokens 通过内联
+ * transition 注入，不在 CSS 里另写一套常量。三态共用右下同一个锚点，只变宽高。
+ *
+ * 位置：桌面栅格为 (22,27)-(1418,895)；其下隔一个 widget gutter(12) 是说明条行
+ * (22,907)-(1418,933)（行高 = 说明条实测高度 H_p，1440×960 下 = 26）；chat 入口贴住
+ * 这一行的右下角 (1418,933)，即相对视口右留白 22、下留白 27（由 layout/breakpoints 的
+ * layoutFrame 算出，H_p 变了三个数一起变）；展开时向左上生长，右/下缘不动；
+ * 说明条按**下缘**对齐（不是中轴对齐），所以 chat 入口与说明条的下缘严格同线 = 933。
+ * 网格把右下角 1 格（col 7,row 4）保留为展开面板的视觉安全区（layout/grid.ts 的
+ * fabReservedCell，与收起态入口无关）。
  *
  * 减少动态效果（契约 §3）：连续动画（声纹 / shimmer / 脉冲）全部停掉；
- * 入场只保留 120ms opacity（.wtsl-agent-enter）。
+ * 入场只保留极短 opacity（.wtsl-agent-enter），时长取 motionTokens.durationUltraFast。
  */
+
+/*
+ * 消息列表的滚动条不参与布局（`MessageList.tsx` 的 `[data-wtsl-message-scroll]`）。
+ *
+ * 原因：WebView2 的经典滚动条会吃掉一段布局宽度，`scrollbar-gutter: stable` 只占右侧时
+ * 内容盒相对容器中心左偏半个条宽（8.5px），`stable both-edges` 两侧都占时左缘又比
+ * Composer 右偏 15px。触控产品的滚动靠滑动不靠拖条，所以这里直接不显示滚动条：
+ * 左右内衬严格相等、与 Composer 同一条轴，滚动条出现/消失也不会引起回流。
+ * 只隐藏视觉，不隐藏滚动能力（`overflow-y: auto` 保持不变）。
+ */
+[data-wtsl-message-scroll] {
+  scrollbar-width: none;
+}
+
+[data-wtsl-message-scroll]::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
 
 .wtsl-agent-surface {
   position: fixed;
-  right: var(--spacingHorizontalXL);
-  bottom: var(--spacingVerticalXL);
+  top: auto;
+  right: var(--wtsl-agent-inset-right);
+  bottom: var(--wtsl-agent-inset-bottom);
   z-index: 30;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: 56px;
-  height: 56px;
+  width: var(--wtsl-agent-width);
+  height: var(--wtsl-agent-height);
   overflow: hidden;
-  border: 1px solid var(--colorNeutralStroke1);
-  border-radius: var(--wtsl-card-radius, 12px);
+  border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+  border-radius: var(--borderRadius2XLarge);
   background-color: var(--colorNeutralBackground1);
   box-shadow: var(--shadow8);
   color: var(--colorNeutralForeground1);
   font-family: var(--fontFamilyBase);
-  /* 只过渡宽高 / 描边 / 阴影：不做位移与模糊往返（MOTION §5.1） */
-  transition-property: width, height, border-color, box-shadow;
+  /* 只过渡宽高 / 圆角 / 描边 / 阴影：不做位移与模糊往返（MOTION §5.1）。
+     圆角必须一起过渡——否则三态切换时圆角是瞬变的，会在收缩的第一帧把面板变成一个巨大胶囊。 */
+  transition-property: width, height, border-radius, border-color, box-shadow;
 }
 
-/* 半高语音窗 / 全高浮栏：只变宽高，圆角恒 12 */
+/*
+ * 三态**共用同一个圆角**（`borderRadius2XLarge`）：收起态不再切成圆形。
+ *
+ * 旧实现把收起态圆角改成 `borderRadiusCircular`(10000px)，而 `border-radius` 不在
+ * transition-property 里 → 点收起时圆角一帧内从 12 跳到 10000：516×906 的面板瞬间变成
+ * 一个大胶囊再缩到 56，肉眼就是"最大缩到最小时形态崩了"。
+ * 现在收起态是一个 56×56 的圆角矩形，和展开态同一族圆角，收起只是一次等比缩小。
+ */
+.wtsl-agent-surface[data-stage='collapsed'] {
+  /*
+   * 折叠态的录音胶囊 / 麦克风授权卡是 `floatLayer`（贴在 orb 上缘**之外**），
+   * 所以折叠态必须放开裁切；但**只在动画结束后**放开——动画期间由下面的
+   * `[data-morphing='true']` 强制 `overflow: hidden`，否则 516×906 的两块内容层
+   * （它们按固定尺寸锚在右下角，不随外框缩小）会在收缩过程中露到容器外面。
+   */
+  overflow: visible;
+}
+
+/* 形态切换动画进行中：一律裁切，动画结束（AgentSurface 清掉该属性）才允许溢出 */
+.wtsl-agent-surface[data-morphing='true'] {
+  overflow: hidden;
+}
+
+/*
+ * 语音窗 / 对话面板：与 widget 卡同一套材质（72% 中性面 + 单一模糊 token）与
+ * shadow64 浮层档。展开后必然覆盖右侧几列卡片，靠 shadow64 + 半透明材质表达
+ * “这是一层临时浮层”，而不是把卡片内容压在实色面板下面。
+ */
 .wtsl-agent-surface[data-stage='voice'],
 .wtsl-agent-surface[data-stage='chat'] {
-  width: min(420px, 92vw);
-  border-color: var(--colorNeutralStroke2);
-  box-shadow: var(--shadow16);
-}
-
-/* 半高窗是纯语音形态：没有文字输入框，只留对话 peek + 语音条 */
-.wtsl-agent-surface[data-stage='voice'] {
-  height: clamp(320px, 44vh, 440px);
+  background-color: color-mix(in srgb, var(--colorNeutralBackground1) 72%, transparent);
+  -webkit-backdrop-filter: blur(var(--wtsl-material-blur));
+  backdrop-filter: blur(var(--wtsl-material-blur));
+  box-shadow: var(--shadow64);
 }
 
 /* 容器本身可编程聚焦（用于让空格继续指向“按住说话”），不画整框焦点环 */
@@ -48,24 +100,21 @@
   outline: none;
 }
 
-.wtsl-agent-surface[data-stage='chat'] {
-  height: calc(100vh - 40px);
-}
-
-/* 悬停只对鼠标生效：surface hover + shadow16，不做 hover 缩放（契约 §3） */
+/* 悬停只对鼠标生效：保持 shadow8（入口的等级），描边升到 stroke1；不做 hover 缩放（契约 §3） */
 @media (hover: hover) {
   .wtsl-agent-surface[data-stage='collapsed']:hover {
-    box-shadow: var(--shadow16);
+    border-color: var(--colorNeutralStroke1);
+    box-shadow: var(--shadow8);
   }
 }
 
 /* 屏幕阅读器专用的状态文本（界面上不写“正在聆听/转写结果”等解释文字，契约 §5/§6） */
 .wtsl-agent-sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: var(--strokeWidthThin);
+  height: var(--strokeWidthThin);
   padding: 0;
-  margin: -1px;
+  margin: calc(var(--strokeWidthThin) * -1);
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -75,7 +124,7 @@
 @keyframes wtsl-agent-fade-rise {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(var(--spacingVerticalXS));
   }
   to {
     opacity: 1;
@@ -89,6 +138,22 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/*
+ * 轮次时间线里过程块的展开区：一次性淡入 + 一个 spacingXXS 的上移。
+ * 时长/曲线由 BlockRow 内联注入（motionTokens.durationFaster + curveDecelerateMid）；
+ * 减少动态效果下不挂这个 keyframe（只留内容本身），与契约 §3 一致。
+ */
+@keyframes wtsl-agent-expand {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--spacingVerticalXXS) * -1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -134,6 +199,15 @@
   }
 }
 
+/*
+ * 轮次时间线（TurnTimeline）：一条不断的竖线本身就是「顺序」的隐喻。
+ * 用逻辑属性写在 CSS 里而不是 Griffel 样式对象里：逻辑属性不在 Griffel 的类型表，
+ * 写在这里同样只用 token，且 LTR / RTL 都正确。
+ */
+.wtsl-turn-timeline {
+  border-inline-start: var(--strokeWidthThin) solid var(--colorNeutralStroke3);
+}
+
 /* 转写未回时的骨架条：中性色微光，不是发光渐变装饰（契约 §6） */
 .wtsl-agent-shimmer {
   background-image: linear-gradient(
@@ -151,10 +225,10 @@
     animation: none !important;
   }
 
-  /* 入场只保留 120ms opacity，无位移、无尺寸/阴影动画（契约 §3） */
+  /* 入场只保留极短 opacity，无位移、无尺寸/阴影动画（契约 §3） */
   .wtsl-agent-enter {
     animation-name: wtsl-agent-fade !important;
-    animation-duration: 120ms !important;
+    animation-duration: var(--durationUltraFast) !important;
     animation-delay: 0ms !important;
     animation-timing-function: linear !important;
     animation-iteration-count: 1 !important;

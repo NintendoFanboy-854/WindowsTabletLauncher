@@ -8,10 +8,15 @@
  * - `tts.readTextReplies` 取代旧的 `tts.autoPlay` / `tts.continuous`：
  *   `readTextReplies = old.tts.autoPlay === true`（continuous 是旧语音模式强制写的，不迁移）；
  * - `panelMode` 与 `face` 整块丢弃（浮空形态只有一套，人脸能力删除）。
+ *
+ * v0.4.x 新增：`panel.idleCollapseSeconds`（面板空闲自动收回档位，0 = 关闭，默认 10）。
+ * 老存档没有这个字段，归一化时补默认值；取值只认 `IDLE_COLLAPSE_PRESETS`，不用第二个 storage 键。
  */
 
 import {
   DEFAULT_SETTINGS,
+  IDLE_COLLAPSE_DEFAULT_SECONDS,
+  IDLE_COLLAPSE_PRESETS,
   MIMO_BASE_URL,
   MIMO_MODELS,
   type AgentSettings,
@@ -43,12 +48,29 @@ function clampNumber(raw: unknown, min: number, max: number, fallback: number): 
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * 空闲自动收回档位：只接受 `IDLE_COLLAPSE_PRESETS` 里的值（0/5/10/30/60）。
+ * 老存档没有该字段、被手改成越界值或不是数字时，一律回落到默认档（10 秒）——
+ * 不做「就近取档」，避免一次手改让行为悄悄变成另一个秒数。
+ *
+ * 只认「数字」或「非空数字字符串」：`Number(null)` / `Number('')` / `Number(false)`
+ * 都是 0，若直接转数字，一个坏值会被静默解释成「关闭自动收回」。
+ */
+function pickIdleCollapseSeconds(raw: unknown): number {
+  const value =
+    typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : Number.NaN;
+  return (IDLE_COLLAPSE_PRESETS as readonly number[]).includes(value)
+    ? value
+    : IDLE_COLLAPSE_DEFAULT_SECONDS;
+}
+
 /** 把任意来源的 JSON 归一化成完整设置（旧字段在这里迁移/丢弃） */
 export function normalizeSettings(raw: unknown): AgentSettings {
   const source = isRecord(raw) ? raw : {};
   const tts = isRecord(source.tts) ? source.tts : {};
   const search = isRecord(source.search) ? source.search : {};
   const mimo = isRecord(source.mimo) ? source.mimo : {};
+  const panel = isRecord(source.panel) ? source.panel : {};
 
   // 迁移：旧 tts.autoPlay → tts.readTextReplies；旧 continuous 不迁移（语音模式专用）
   const readTextReplies =
@@ -91,6 +113,10 @@ export function normalizeSettings(raw: unknown): AgentSettings {
           ? mimo.baseUrl.trim().replace(/\/+$/, '')
           : MIMO_BASE_URL,
     },
+    panel: {
+      // 向后兼容：老存档没有 panel.idleCollapseSeconds → 默认 10 秒
+      idleCollapseSeconds: pickIdleCollapseSeconds(panel.idleCollapseSeconds),
+    },
   };
 }
 
@@ -101,6 +127,7 @@ function mergeSettings(current: AgentSettings, patch: SettingsPatch): AgentSetti
     tts: { ...current.tts, ...patch.tts },
     search: { ...current.search, ...patch.search },
     mimo: { ...current.mimo, ...patch.mimo },
+    panel: { ...current.panel, ...patch.panel },
   });
 }
 

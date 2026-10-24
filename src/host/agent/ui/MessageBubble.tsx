@@ -1,17 +1,21 @@
 /**
- * 单条消息：用户气泡 / Agent 回答卡片（工具卡片、思考过程、来源、单条朗读）。
+ * 单条消息：用户气泡 / Agent 回答的**轮次时间线**。
+ *
+ * 一轮回复就是一条时间线（`TurnTimeline`）：块的顺序 = 事件到达的顺序，
+ * 「思考 → 工具 → 正文 → 再思考 → 再工具」交错出现，渲染层不做任何分类聚合。
+ * 数据来源是 `message.blocks`（唯一真相源）；老消息没有块时退回 `blocksFromLegacy` 的
+ * 降级顺序（思考 → 工具 → 正文），保证历史会话照常可读。
+ *
+ * 失败/停止就地显示在时间线里（`notice` 块）：「已停止」「请求失败」落在流停止的那一帧，
+ * 不是页脚角落的一个 12px 图标；失败轮仍然不留空气泡壳。
  *
  * 契约 §6：语音消息与打字消息同形同色，顶部只多一条声纹装饰；转写未回时声纹轻微
  * 起伏 + 两行 shimmer 骨架（不写文字标签），ASR 回填后文字淡入、声纹静止；转写失败
  * 用警告图标 + tooltip 表达，不上屏解释文字。消息不再有头像：身份只由入口/头部承担。
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Accordion,
-  AccordionHeader,
-  AccordionItem,
-  AccordionPanel,
   Button,
   Link,
   Text,
@@ -29,10 +33,13 @@ import {
   StopRegular,
 } from '@fluentui/react-icons';
 import type { AgentSession } from '../hooks/useAgentSession';
-import type { Message } from '../types';
+import { messageBlocks, type Message } from '../types';
+import { SessionErrorBar } from './AgentAlerts';
 import { stripSourceSection } from './markdown';
 import { MessageContent } from './MessageContent';
-import { ToolCallCard } from './ToolCallCard';
+import { PendingLine } from './PendingLine';
+import { TurnTimeline } from './TurnTimeline';
+import { isEmptyAssistantMessage, turnPhase, turnStartedAt } from './turnPhase';
 import { VoicePeaks } from './Waveform';
 
 const useStyles = makeStyles({
@@ -90,7 +97,7 @@ const useStyles = makeStyles({
   },
   shimmerLine: {
     display: 'block',
-    height: '10px',
+    height: tokens.spacingVerticalMNudge,
     borderRadius: tokens.borderRadiusCircular,
   },
   shimmerWide: {
@@ -107,7 +114,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    minHeight: '24px',
+    minHeight: tokens.spacingVerticalXXL,
     color: tokens.colorNeutralForeground3,
     paddingInline: tokens.spacingHorizontalXS,
   },
@@ -122,7 +129,18 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
   },
   errorIcon: {
-    color: tokens.colorPaletteRedForeground1,
+    color: tokens.colorStatusDangerForeground1,
+  },
+  /**
+   * 失败轮的唯一内容：错误提示条自己就是这一轮的视觉主体。
+   * 不再套一层正文为空的圆角气泡壳（那个壳只会留下一条没有内容的灰条）。
+   */
+  inlineFailure: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    minWidth: 0,
+    maxWidth: '100%',
   },
   caret: {
     display: 'inline-block',
@@ -154,12 +172,6 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
     flexShrink: 0,
   },
-  reasoning: {
-    color: tokens.colorNeutralForeground2,
-    fontSize: tokens.fontSizeBase200,
-    whiteSpace: 'pre-wrap',
-    overflowWrap: 'anywhere',
-  },
 });
 
 /** 来源 chips 首屏上限（docs/DENSITY.md · Agent：最多 3 条，其余折叠） */
@@ -183,13 +195,11 @@ function formatDuration(seconds: number): string {
 export interface MessageBubbleProps {
   message: Message;
   session: AgentSession;
-  /** 是否展示“思考过程”折叠区 */
-  showReasoning: boolean;
   /** 列表内序号：用于气泡 20ms 错峰 */
   index: number;
 }
 
-export function MessageBubble({ message, session, showReasoning, index }: MessageBubbleProps) {
+export function MessageBubble({ message, session, index }: MessageBubbleProps) {
   const styles = useStyles();
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const sources = message.sources ?? [];
@@ -200,14 +210,31 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
   const transcriptPending = isVoice && message.transcriptStatus === 'pending';
   const transcriptFailed = isVoice && message.transcriptStatus === 'failed';
   const isStreaming = message.status === 'streaming';
+  const busy = isStreaming && session.status !== 'idle';
   const speaking = session.speakingMessageId === message.id;
   const canSpeak =
     message.role === 'assistant' && message.status === 'done' && Boolean(message.content.trim());
   // 来源只保留 chips：有 annotations 时去掉正文末尾的“来源：”清单
-  const displayContent = sources.length ? stripSourceSection(message.content) : message.content;
+  // （正文已经拆成 text 块，所以按块逐个剥，而不是对投影后的 content 剥）
+  const rawBlocks = messageBlocks(message);
+  const blocks = useMemo(() => {
+    if (sources.length === 0) return rawBlocks;
+    return rawBlocks.map((block) =>
+      block.kind === 'text' ? { ...block, text: stripSourceSection(block.text) } : block,
+    );
+  }, [rawBlocks, sources.length]);
+  const displayContent = sources.length
+    ? stripSourceSection(message.content)
+    : message.content;
   const spokenLabel = isVoice
     ? `语音消息：${message.content || (transcriptFailed ? '未识别出文字' : '正在识别')}`
     : undefined;
+  /**
+   * 失败即这一轮的全部内容（没有正文、思考、步骤、来源）：不渲染气泡壳，
+   * 错误提示条（`MessageBar` + 重试）内联在轮次容器里——失败本身成为视觉主体。
+   */
+  const failureOnly =
+    !isUser && isEmptyAssistantMessage(message) && message.status === 'error' && !busy;
 
   return (
     <div
@@ -220,24 +247,41 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
         animationFillMode: 'both',
       }}
       aria-label={spokenLabel}
+      data-wtsl-agent-turn-failure={failureOnly ? 'true' : undefined}
     >
       <div className={`${styles.column} ${isUser ? styles.userColumn : ''}`}>
-        <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}>
-          {message.toolCalls?.map((record) => (
-            <ToolCallCard key={record.id} record={record} />
-          ))}
+        {failureOnly ? (
+          session.error ? (
+            <div className={styles.inlineFailure}>
+              <SessionErrorBar
+                error={session.error}
+                onRetry={() => void session.retry()}
+                onDismiss={session.dismissError}
+              />
+            </div>
+          ) : blocks.length > 0 ? (
+            /* 重启/切会话后内存里的 session.error 已经没了：用时间线里的 notice 就地说明，
+               仍然不画空气泡壳（失败轮不留壳的判定继续成立） */
+            <div className={styles.inlineFailure}>
+              <TurnTimeline blocks={blocks} />
+            </div>
+          ) : null
+        ) : (
+          <div className={`${styles.bubble} ${isUser ? styles.userBubble : styles.assistantBubble}`}>
+          {!isUser ? (
+            <div className={styles.contentFade}>
+              <TurnTimeline blocks={blocks} />
+            </div>
+          ) : null}
 
-          {!isUser && showReasoning && message.reasoning ? (
-            <Accordion collapsible>
-              <AccordionItem value="reasoning">
-                <AccordionHeader size="small">思考过程</AccordionHeader>
-                <AccordionPanel>
-                  <Text as="p" className={styles.reasoning}>
-                    {message.reasoning}
-                  </Text>
-                </AccordionPanel>
-              </AccordionItem>
-            </Accordion>
+          {/* 进行中状态行：首 token 之前这里就是唯一的可见变化；停止动作归输入区（状态与操作分离） */}
+          {busy ? (
+            <PendingLine
+              phase={turnPhase(session.status, message)}
+              startedAt={turnStartedAt(message)}
+              onStop={session.stop}
+              showStop={false}
+            />
           ) : null}
 
           {isVoice ? (
@@ -271,7 +315,7 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
                 }}
               />
             </div>
-          ) : displayContent ? (
+          ) : isUser && displayContent ? (
             <div
               className={`${styles.contentFade} wtsl-agent-enter`}
               style={{
@@ -285,19 +329,7 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
             </div>
           ) : null}
 
-          {transcriptFailed ? (
-            <div className={styles.plainVoiceRow}>
-              <Tooltip content="没有识别出文字" relationship="label">
-                <AlertRegular
-                  className={styles.errorIcon}
-                  aria-label="没有识别出文字"
-                  fontSize={16}
-                />
-              </Tooltip>
-            </div>
-          ) : null}
-
-          {isStreaming ? (
+          {isStreaming && displayContent ? (
             <span
               className={styles.caret}
               data-wtsl-agent-animated="true"
@@ -310,6 +342,18 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
             >
               ▍
             </span>
+          ) : null}
+
+          {transcriptFailed ? (
+            <div className={styles.plainVoiceRow}>
+              <Tooltip content="没有识别出文字" relationship="label">
+                <AlertRegular
+                  className={styles.errorIcon}
+                  aria-label="没有识别出文字"
+                  fontSize={16}
+                />
+              </Tooltip>
+            </div>
           ) : null}
 
           {sources.length ? (
@@ -347,6 +391,7 @@ export function MessageBubble({ message, session, showReasoning, index }: Messag
             </div>
           ) : null}
         </div>
+        )}
 
         <div className={styles.statusRow}>
           <Text size={200}>{formatTime(message.createdAt)}</Text>

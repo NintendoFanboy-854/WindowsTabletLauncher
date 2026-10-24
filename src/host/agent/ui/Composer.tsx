@@ -20,6 +20,7 @@ import {
 import { SendRegular, SoundWaveCircleRegular, StopRegular } from '@fluentui/react-icons';
 import type { AgentSession } from '../hooks/useAgentSession';
 import { AgentAlerts } from './AgentAlerts';
+import { isEmptyAssistantMessage } from './turnPhase';
 import { VoiceCapture } from './VoiceCapture';
 import { useVoiceControls } from './useVoiceControls';
 
@@ -85,6 +86,17 @@ export function Composer({ session, onOpenSettings }: ComposerProps) {
   const busy = session.status !== 'idle';
   const canSend = draft.trim().length > 0 && !busy && !recording && !transcribing;
   const voice = useVoiceControls(session);
+  /**
+   * 失败轮已经内联渲染了同一条错误（`MessageBubble` 的轮次容器），这里不再重复一遍：
+   * 「同一条错误只有一处渲染」。判据 = 最后一条助手消息为空且失败 + 会话里确有错误。
+   */
+  const messages = session.conversation?.messages ?? [];
+  const lastAssistant = [...messages].reverse().find((item) => item.role === 'assistant');
+  const errorRenderedInTurn =
+    Boolean(session.error) &&
+    Boolean(lastAssistant) &&
+    lastAssistant?.status === 'error' &&
+    isEmptyAssistantMessage(lastAssistant);
 
   // 输入框自动增高，最多 3 行（超出由 CSS max-height 截住、内部滚动）
   useLayoutEffect(() => {
@@ -116,7 +128,11 @@ export function Composer({ session, onOpenSettings }: ComposerProps) {
 
   return (
     <div className={styles.root} data-wtsl-agent-composer="chat">
-      <AgentAlerts session={session} onOpenSettings={onOpenSettings} />
+      <AgentAlerts
+        session={session}
+        onOpenSettings={onOpenSettings}
+        suppressTurnError={errorRenderedInTurn}
+      />
 
       <div className={styles.card}>
         {recording || transcribing ? (

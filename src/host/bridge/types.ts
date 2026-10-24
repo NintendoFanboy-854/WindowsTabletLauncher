@@ -16,7 +16,15 @@ export const PROTOCOL_VERSION = 2;
 /** 宿主注入给插件的主题：直接给 Fluent token 的最终颜色值 */
 export interface ThemePayload {
   colorScheme: 'dark' | 'light';
-  [token: string]: string;
+  /** 身份色（manifest.identityHue → shared palette 同档 L/C 的具体颜色） */
+  wtslIdentity?: string;
+  /** 身份色 BorderActive：仅保留给 2px 状态强调，插件默认不用 */
+  wtslIdentityBorder?: string;
+  /** 身份色 Background2：仅保留给淡底场景，插件默认不用 */
+  wtslIdentitySurface?: string;
+  /** 当前 hue 名，仅诊断用；插件不应据此分支 */
+  wtslIdentityHue?: string;
+  [token: string]: string | undefined;
 }
 
 export interface AgentToolDecl {
@@ -306,6 +314,11 @@ export interface PluginManifest {
   id: string;
   name: string;
   version: string;
+  /**
+   * 插件身份色。只能从白名单取（blue/pink/orange/green/purple/teal）；
+   * 宿主把它映射成 `--wtsl-identity`，插件不能提交任意 hex。
+   */
+  identityHue: string;
   /** 没有组件、只后台运行的插件 */
   background?: boolean;
   widgets: WidgetManifest[];
