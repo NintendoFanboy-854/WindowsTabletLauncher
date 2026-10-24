@@ -4,13 +4,13 @@
  *
  * 材质：Fluent web 端没有 Acrylic token（DESIGN.md §6），卡片用
  * colorNeutralBackground* 的半透明混合 + 项目 token `--wtsl-material-blur`。
- * 圆角：项目 token `--wtsl-card-radius`（12px，修正 Fluent v9 borderRadiusXLarge=8px
- * 与 FLUENT2 §5 规范的偏差，见 AUDIT V-01/V-02）。
+ * 圆角：Fluent v9 已提供 `borderRadius2XLarge` = 12px（不是 8），直接引用该 token，
+ * 项目不再自造 `--wtsl-card-radius`（P0-1）。
  */
 import { makeStyles, tokens, motionTokens } from '@fluentui/react-components';
 
-/** 卡片圆角：项目 token（12px），不再用 calc 自造数值 */
-export const CARD_RADIUS = 'var(--wtsl-card-radius)';
+/** 卡片圆角：Fluent `borderRadius2XLarge`（12px），不再自造项目变量 */
+export const CARD_RADIUS = tokens.borderRadius2XLarge;
 
 /**
  * 卡片材质底色（v0.4.0）：壁纸层可见之后，卡片要用「比壁纸亮」的 Fluent 表面 token
@@ -98,6 +98,10 @@ export const useStyles = makeStyles({
   /**
    * 卡片内容区：承载 iframe，并接住宿主边缘（6px 内衬）的 hover。
    * 缩放放在内部的 contentLayer 上，让 hover 的 1.015 倍只长进内衬，不裁到 Card 外。
+   *
+   * 唯一内容轴：宿主 6（SNudge）+ 共享 CardRoot 16（L）= 22。
+   * 16 由系统共享层强制，插件传 className/style 也不能改 padding/gap；
+   * 宿主不再读取或让渡任何由插件声明的 22px 边距路径。
    */
   gestureArea: {
     position: 'absolute',
@@ -137,7 +141,7 @@ export const useStyles = makeStyles({
     cursor: 'grab',
     touchAction: 'none',
     opacity: 0,
-    transform: 'translateY(-4px) scale(0.985)',
+    transform: `translateY(calc(${tokens.spacingVerticalXS} * -1)) scale(0.985)`,
     transformOrigin: 'center center',
     pointerEvents: 'none',
     // 退出走退出类 token（MOTION §1/§3：150ms curveAccelerateMid），
@@ -156,7 +160,7 @@ export const useStyles = makeStyles({
   /**
    * AUDIT V-13：编辑 chrome 直接压在插件首行上（todo 工具栏 / 天气城市名）。
    * 用一层不占布局的顶部渐变压暗遮罩给标题和按钮当底，高度 =
-   * 40px 触控目标 + 上下 spacingS，下方渐隐到透明，不遮插件主体。
+   * 顶部操作带 44px 触控目标 + 上下 spacingS，下方渐隐到透明，不遮插件主体。
    */
   editScrim: {
     position: 'absolute',
@@ -174,7 +178,7 @@ export const useStyles = makeStyles({
     top: tokens.spacingHorizontalXS,
     left: tokens.spacingHorizontalXS,
     zIndex: 3,
-    // 3 个 40px 触控按钮 + 间距，留出标题空间（小卡片上由 truncate 省略）
+    // 3 个 44px 触控按钮 + 间距，留出标题空间（小卡片上由 truncate 省略）
     maxWidth: `max(0px, calc(100% - ${tokens.spacingHorizontalXXXL} * 4.5))`,
     paddingTop: tokens.spacingHorizontalXXS,
     paddingBottom: tokens.spacingHorizontalXXS,
@@ -224,7 +228,7 @@ export const useStyles = makeStyles({
     boxShadow: tokens.shadow2,
     color: tokens.colorNeutralForeground3,
     opacity: 0,
-    transform: 'translateX(-50%) translateY(-2px)',
+    transform: `translateX(-50%) translateY(calc(${tokens.spacingVerticalXXS} * -1))`,
     pointerEvents: 'none',
     transitionProperty: 'opacity, transform',
     transitionDuration: `${motionTokens.durationFast}ms`,
@@ -238,7 +242,7 @@ export const useStyles = makeStyles({
     position: 'absolute',
     top: tokens.spacingHorizontalM,
     left: '50%',
-    transform: 'translateX(-50%) translateY(-6px)',
+    transform: `translateX(-50%) translateY(calc(${tokens.spacingVerticalSNudge} * -1))`,
     zIndex: 10,
     display: 'flex',
     alignItems: 'center',
@@ -273,32 +277,39 @@ export const useStyles = makeStyles({
     paddingRight: tokens.spacingHorizontalXS,
     whiteSpace: 'nowrap',
   },
+  /**
+   * 分页指示器：底部居中、常驻状态指示，不承载材质/投影（material.md 只允许
+   * acrylic 给瞬态浮层）。只改颜色，不改形状/尺寸；pointer-events:none 让滑动手势
+   * 穿透到桌面。
+   */
   indicator: {
     position: 'absolute',
-    bottom: tokens.spacingHorizontalM,
+    bottom: tokens.spacingVerticalM,
     left: '50%',
     transform: 'translateX(-50%)',
     zIndex: 6,
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    padding: `${tokens.spacingHorizontalXS} ${tokens.spacingHorizontalM}`,
+    height: `calc(${tokens.spacingVerticalS} + ${tokens.spacingVerticalS})`,
+    paddingInline: tokens.spacingHorizontalM,
+    paddingBlock: tokens.spacingVerticalXS,
     borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: MATERIAL_BACKGROUND,
-    backdropFilter: 'blur(var(--wtsl-material-blur))',
-    boxShadow: tokens.shadow4,
+    backgroundColor: 'transparent',
+    boxShadow: 'none',
+    pointerEvents: 'none',
   },
   indicatorDot: {
     width: tokens.spacingHorizontalS,
     height: tokens.spacingHorizontalS,
     borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: tokens.colorNeutralStroke1,
-    transitionProperty: 'background-color, width',
+    backgroundColor: tokens.colorNeutralForeground3,
+    transitionProperty: 'background-color',
     transitionDuration: `${motionTokens.durationNormal}ms`,
     transitionTimingFunction: motionTokens.curveDecelerateMid,
   },
   indicatorDotActive: {
-    backgroundColor: tokens.colorBrandBackground,
+    backgroundColor: tokens.colorNeutralForeground1,
   },
   indicatorCapsule: {
     color: tokens.colorNeutralForeground2,

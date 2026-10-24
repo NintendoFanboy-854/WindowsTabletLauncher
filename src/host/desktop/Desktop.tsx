@@ -45,6 +45,7 @@ import {
   clampPage,
   clearLayout,
   compareReadingOrder,
+  layoutFrame,
   layoutNeedsReflow,
   moveWidgetToPage,
   notifyDesktopPresenceChanged,
@@ -61,6 +62,7 @@ import {
   loadLayout,
   setActivePage,
   tryMoveWidget,
+  useFooterPillHeight,
   widgetKey,
 } from '../layout';
 import type { LayoutState } from '../layout';
@@ -106,6 +108,8 @@ export interface DesktopProps {
   editModeRequest?: number;
   /** App 层「重置布局」请求（自增 token）：清除 wtsl.layout 后按 manifest 默认摆放重算 */
   layoutResetRequest?: number;
+  /** 编辑模式变化：App 层据此隐藏 Agent 入口（编辑模式只允许编辑 chrome） */
+  onEditModeChange?: (editing: boolean) => void;
   /** 编辑模式「设置」/ Enter：交给 App 导航到设置页对应插件分区 */
   onOpenPluginSettings?: (pluginId: string) => void;
   /** 编辑模式「设置」按钮：交给 App 打开设置页（v0.3.0 桌面 dock 删除后的触控入口） */
@@ -277,7 +281,19 @@ function reconcileLayout(
     return { widgets: placed, pages: pagesUsed(placed, 1), activePage: 0, removed: [] };
   }
 
-  const refreshed = filterRemoved(refreshWidgets(state, catalog), catalog);
+  // 旧布局可能把卡片放在右下角 Agent 入口（右下保留格）（上一轮入口在右上，历史存档无此约束）。
+  // 首次加载时 metrics 已经就绪，reflow effect 不一定再触发，所以在合并目录时补一次。
+  let refreshed = filterRemoved(refreshWidgets(state, catalog), catalog);
+  if (layoutNeedsReflow(refreshed.widgets, columns, rows)) {
+    const reflowed = reflowLayout(refreshed.widgets, columns, rows, refreshed.pages);
+    const pages = Math.max(refreshed.pages, reflowed.pages);
+    refreshed = {
+      widgets: reflowed.widgets,
+      pages,
+      activePage: clampPage(refreshed.activePage, pages),
+      removed: refreshed.removed,
+    };
+  }
   const present = new Set(
     refreshed.widgets.map((widget) => widgetKey(widget.pluginId, widget.widgetId)),
   );
@@ -307,6 +323,7 @@ export default function Desktop({
   active = true,
   editModeRequest,
   layoutResetRequest,
+  onEditModeChange,
   onOpenPluginSettings,
   onOpenSettings,
   onOpenAgent,
@@ -332,7 +349,18 @@ export default function Desktop({
   disabledPluginsRef.current = disabledPlugins;
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const { viewport, metrics, origin } = useViewportMetrics(rootRef);
+  const { viewport, metrics } = useViewportMetrics(rootRef);
+  /**
+   * 网格原点一律由 `layoutFrame` 给出：它把说明条实测高度 `H_p` 算进「网格 + gutter +
+   * 说明条」整块居中，所以网格上缘会随说明条内容高度变化（1440×960 / H_p=26 下 y = 27）。
+   * 不用 `useViewportMetrics` 的 `origin`：那条路径只有首帧估计值、没有实测值，
+   * 说明条内容一变高就会偏出几像素。
+   */
+  const pillHeight = useFooterPillHeight();
+  const origin = useMemo(() => {
+    const grid = layoutFrame(metrics, viewport.width, viewport.height, pillHeight).grid;
+    return { x: grid.left, y: grid.top };
+  }, [metrics, viewport.width, viewport.height, pillHeight]);
 
   // 主题注入：从 FluentProvider 实际生效的 CSS 变量读 token，发给每个插件 iframe
   // （必须读 provider 内部的元素；读 body 拿不到 provider 上定义的变量。
@@ -347,6 +375,11 @@ export default function Desktop({
 
   const [layout, setLayout] = useState<LayoutState | null>(null);
   const [editMode, setEditMode] = useState(readInitialEditMode);
+  const editModeChangeRef = useRef(onEditModeChange);
+  editModeChangeRef.current = onEditModeChange;
+  useEffect(() => {
+    editModeChangeRef.current?.(editMode);
+  }, [editMode]);
   const [focusedUid, setFocusedUid] = useState<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<number | null>(null);
   const [dragView, setDragView] = useState<DragView | null>(null);
@@ -440,6 +473,11 @@ export default function Desktop({
   }, [plugins]);
   const catalogRef = useRef(catalog);
   catalogRef.current = catalog;
+  /** 身份色按插件下发；manifest 校验保证值一定在白名单内 */
+  const pluginById = useMemo(
+    () => new Map(plugins.map((plugin) => [plugin.id, plugin])),
+    [plugins],
+  );
 
   useEffect(() => {
     if (pluginsLoading) return;
@@ -1264,6 +1302,7 @@ export default function Desktop({
                       src={src}
                       bridge={bridge}
                       theme={theme}
+                      identityHue={pluginById.get(widget.pluginId)?.identityHue}
                       notify={notify}
                       onRequestEditMode={handleCardRequestEditMode}
                       onFocus={handleCardFocus}

@@ -69,4 +69,15 @@ export function applyColorSchemeToDocument(scheme: ColorScheme): void {
   root.dataset.theme = scheme;
   root.style.colorScheme = scheme;
   if (document.body) document.body.style.colorScheme = scheme;
+  /*
+   * 画布底色兜底（v0.4.1）：`html` 此前没有 background，只有 `body` 有——
+   * 靠的是 CSS「html 无背景时 body 背景向画布传播」这条规则。规则本身没错，
+   * 但它把「窗口底色」寄托在 body 确实铺满视口上：body 一旦高度不占满
+   * （早期首帧、以后的布局重构、打印/尺寸极端），画布就回落到浏览器默认的
+   * 纯白，在深色壁纸上就是一条白边。
+   * 这里把同一个项目 token 也写到 `html` 上，画布永远不是 UA 默认色。
+   * 只引用 styles.css 里已有的 `--wtsl-desktop-backdrop`（DESIGN §6 允许的
+   * 壁纸 token），不新增颜色、不写字面色值。
+   */
+  root.style.setProperty('background', 'var(--wtsl-desktop-backdrop)');
 }

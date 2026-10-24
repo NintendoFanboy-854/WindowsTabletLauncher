@@ -14,6 +14,8 @@ export interface PluginManifest {
   id: string;
   name: string;
   version?: string;
+  /** 身份色白名单值；旧 loader 也做同一道校验 */
+  identityHue?: string;
   widgets: WidgetDecl[];
 }
 

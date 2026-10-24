@@ -14,7 +14,7 @@ import { createMotionComponent, makeStyles, motionTokens, tokens } from '@fluent
 
 const PageMotion = createMotionComponent({
   keyframes: [
-    { opacity: 0, transform: 'translateY(6px)' },
+    { opacity: 0, transform: `translateY(${tokens.spacingVerticalSNudge})` },
     { opacity: 1, transform: 'translateY(0px)' },
   ],
   duration: motionTokens.durationNormal,
@@ -31,6 +31,14 @@ const PageMotion = createMotionComponent({
 const useStyles = makeStyles({
   // motion 工厂动画的单个 child 必须是 DOM 元素；同时撑满 host-root 给页面高度
   frame: {
+    /*
+     * 页面层必须显式定位并抬到 wallpaper(0) 之上。壁纸是 fixed + z-index:0 的
+     * 定位元素；普通静态流页面即使有不透明底色也会被它盖住（设置页整屏透壁纸的
+     * 根因）。层级数值只引用 styles.css 的 --wtsl-layer-page，不在这里写魔数。
+     */
+    position: 'relative',
+    zIndex: 'var(--wtsl-layer-page)',
+    isolation: 'isolate',
     height: '100%',
     minHeight: 0,
     color: tokens.colorNeutralForeground1,

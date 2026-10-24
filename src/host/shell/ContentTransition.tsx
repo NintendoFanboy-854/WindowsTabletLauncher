@@ -9,14 +9,14 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { motionTokens } from '@fluentui/react-components';
+import { motionTokens, tokens } from '@fluentui/react-components';
 
 import { useMediaQuery } from '../pages/shared/useMediaQuery';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
-/** 内容进入位移（MOTION §5：4px 上移，比页面级 6px 更轻） */
-const CONTENT_OFFSET = '4px';
+/** 内容进入位移（MOTION §5：1 个 spacing XS 上移，比页面级 SNudge 更轻） */
+const CONTENT_OFFSET = tokens.spacingVerticalXS;
 
 export interface ContentTransitionProps {
   /** 内容标识：变化时重放一次淡入（同一值不重播） */

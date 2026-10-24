@@ -45,6 +45,8 @@ import type {
 } from '../bridge/types';
 import type { GridMetrics } from '../layout';
 import { useMediaQuery } from '../pages/shared/useMediaQuery';
+import { withIdentityTheme } from '../plugins';
+import type { IdentityHue } from '../plugins';
 import { CARD_MATERIAL, CARD_RADIUS, useStyles } from './desktop.styles';
 import { EDIT_CARD_SCALE, EDIT_TOUCH_TARGET } from './interaction';
 import { WidgetFrame } from './WidgetFrame';
@@ -82,6 +84,8 @@ export interface WidgetCardProps {
   bridge: HostBridge;
   /** FluentProvider 现读的主题 token（插件 init 用） */
   theme?: ThemePayload;
+  /** manifest 声明的身份 hue；宿主映射成 shared palette 同档颜色再下发 */
+  identityHue?: IdentityHue;
   notify(text: string): void;
   /** 插件 SDK 长按（plugin:request-edit-mode）→ 宿主进编辑模式并选中该卡 */
   onRequestEditMode(widget: WidgetInstance): void;
@@ -107,6 +111,7 @@ export function WidgetCard({
   src,
   bridge,
   theme,
+  identityHue,
   notify,
   onRequestEditMode,
   onFocus,
@@ -122,6 +127,15 @@ export function WidgetCard({
   const frameRef = useRef<WidgetFrameHandle>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+
+  /**
+   * 身份色属于插件实例，不属于全局主题：同一 ThemePayload 按 manifest hue 派生一份，
+   * 卡片 iframe 与它打开的详情浮层拿到同一份主题（浮层复用这里的 theme）。
+   */
+  const frameTheme = useMemo(
+    () => (theme && identityHue ? withIdentityTheme(theme, identityHue) : theme),
+    [theme, identityHue],
+  );
 
   /** iframe 内 SDK 转发的 hover（鼠标/笔） */
   const [frameHover, setFrameHover] = useState(false);
@@ -399,8 +413,6 @@ export function WidgetCard({
     })`,
     width,
     height,
-    padding: 0,
-    gap: 0,
     borderRadius: CARD_RADIUS,
     ...CARD_MATERIAL,
     boxShadow: editMode || (hoverActive && !visiblePress) ? tokens.shadow8 : tokens.shadow4,
@@ -488,7 +500,7 @@ export function WidgetCard({
           <WidgetFrame
             ref={frameRef}
             bridge={bridge}
-            theme={theme}
+            theme={frameTheme}
             title={widget.title}
             instanceUid={widget.uid}
             pluginId={widget.pluginId}

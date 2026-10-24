@@ -80,6 +80,45 @@ function occupy(occupied: Set<string>, rect: CellRect): void {
   }
 }
 
+/**
+ * 右下角保留格：网格最后一列 × 最后一行的 1×1 格。
+ *
+ * **它服务的是展开后的面板，不是收起态的入口**：收起态的 orb 已经挪到网格**之外**的
+ * 底部条右端（见 `agent/ui/entryGeometry` 与 `breakpoints.layoutFrame`），
+ * 与网格内放什么卡片无关。保留格留的是「展开面板落点周围的视觉安全区」：
+ * 对话面板是 3 列宽、从网格上缘铺到底部条下缘的 `position: fixed` 浮层，
+ * 它盖住网格右下角时，这一格空着才不会出现“卡片正好被面板右缘切掉一角”的观感。
+ *
+ * 行为保持不变（不因入口迁出网格而删除保留格）：删掉它会改动所有放置/移动/重排路径，
+ * 收益只是多出一格可用位置，不值得在本次几何调整里连带改动。
+ *
+ * 保留格不参与居中计算：网格四边留白由 `breakpoints.layoutFrame` 决定，
+ * 这一格只是「面板展开时的落脚位」，8×5 下恒为 (col 7, row 4)。
+ *
+ * 命名说明：函数名 `fabReservedCell` / `overlapsFabReserved` 沿用历史命名（改函数名会
+ * 波及全部放置/移动/改尺寸/重排调用点，收益不值），但它服务的是 **Agent 面板**，
+ * 用户可见与文档层一律称「Agent 入口」。
+ */
+export function fabReservedCell(columns: number, rows: number): CellRect {
+  return { col: Math.max(0, columns - 1), row: Math.max(0, rows - 1), w: 1, h: 1 };
+}
+
+/** 矩形是否命中 Agent 入口（右下保留格） */
+export function overlapsFabReserved(rect: CellRect, columns: number, rows: number): boolean {
+  return rectsOverlap(rect, fabReservedCell(columns, rows));
+}
+
+/** 在已占用集合里补上 Agent 入口（右下保留格）（所有页都保留：入口在每一页都可见） */
+function withFabReserved(
+  occupied: ReadonlySet<string>,
+  columns: number,
+  rows: number,
+): Set<string> {
+  const next = new Set(occupied);
+  occupy(next, fabReservedCell(columns, rows));
+  return next;
+}
+
 /** 在指定页里按“从左到右、从上到下”找第一个放得下 w×h 的空位 */
 export function findFirstFit(
   occupied: ReadonlySet<string>,
@@ -116,7 +155,7 @@ export function autoPlace(
   columns: number,
   rows: number,
 ): WidgetInstance[] {
-  const occupied = new Set<string>();
+  const occupied = withFabReserved(new Set<string>(), columns, rows);
   const declaredPages = pagesUsed(widgets, 1);
   let maxPage = declaredPages - 1;
   const placed: WidgetInstance[] = [];
@@ -150,7 +189,10 @@ export function autoPlace(
     if (!position) {
       page = maxPage + 1;
       maxPage = page;
-      position = { col: 0, row: 0 };
+      // 新页也要避开右下角保留格；极端窄网格放不下时退回 (0,0)，由调用方决定是否接受。
+      position =
+        findFirstFit(withFabReserved(new Set<string>(), columns, rows), size[0], size[1], columns, rows) ??
+        { col: 0, row: 0 };
     }
 
     occupy(occupied, { ...position, w: size[0], h: size[1] });
@@ -180,7 +222,7 @@ export function placeWidget(
   const startPage = Math.max(0, Math.min(totalPages - 1, Math.floor(activePage) || 0));
 
   for (let page = startPage; page < totalPages; page++) {
-    const occupied = occupancyOf(widgets, page);
+    const occupied = withFabReserved(occupancyOf(widgets, page), columns, rows);
     const found = findFirstFit(occupied, size[0], size[1], columns, rows);
     if (found) {
       return {
@@ -195,8 +237,11 @@ export function placeWidget(
   }
 
   const page = totalPages;
+  const empty = withFabReserved(new Set<string>(), columns, rows);
+  const fallback =
+    findFirstFit(empty, size[0], size[1], columns, rows) ?? { col: 0, row: 0 };
   return {
-    widgets: [...widgets, { ...instance, page, col: 0, row: 0, size }],
+    widgets: [...widgets, { ...instance, page, col: fallback.col, row: fallback.row, size }],
     pages: page + 1,
     page,
   };
@@ -222,7 +267,7 @@ export function reflowLayout(
   let pageCursor = 0;
 
   const placeOnPage = (page: number, list: WidgetInstance[]): void => {
-    const occupied = occupancyOf(output, page);
+    const occupied = withFabReserved(occupancyOf(output, page), columns, rows);
     for (const widget of list) {
       const size = normalizeSize(widget.size, columns, rows);
       const found = findFirstFit(occupied, size[0], size[1], columns, rows);
@@ -265,6 +310,7 @@ export function layoutNeedsReflow(widgets: WidgetInstance[], columns: number, ro
   for (const widget of widgets) {
     const rect = rectOf(widget);
     if (!rectFitsInGrid(rect, columns, rows)) return true;
+    if (overlapsFabReserved(rect, columns, rows)) return true;
     if (widget.page < 0 || widget.page >= pages) return true;
   }
   for (let page = 0; page < pages; page++) {
@@ -313,6 +359,7 @@ export function tryMoveWidget(
   if (page === moved.page && col === moved.col && row === moved.row) return null;
 
   const targetRect: CellRect = { col, row, w: size[0], h: size[1] };
+  if (overlapsFabReserved(targetRect, columns, rows)) return null;
   const others = widgets.filter((widget) => widget.uid !== uid && widget.page === page);
   const collisions = others.filter((widget) => rectsOverlap(targetRect, rectOf(widget)));
 
@@ -352,7 +399,7 @@ export function resizeWidget(
   const next = normalizeSize(size, columns, rows);
   if (next[0] === target.size[0] && next[1] === target.size[1]) return null;
 
-  const occupied = occupancyOf(widgets, target.page, uid);
+  const occupied = withFabReserved(occupancyOf(widgets, target.page, uid), columns, rows);
   const sameRect: CellRect = { col: target.col, row: target.row, w: next[0], h: next[1] };
   if (rectFitsInGrid(sameRect, columns, rows) && canPlace(occupied, sameRect)) {
     return replaceWidget(widgets, uid, { size: next });
@@ -381,7 +428,7 @@ export function moveWidgetToPage(
   if (!moved) return null;
   const size = normalizeSize(moved.size, columns, rows);
   const targetPage = Math.max(0, Math.floor(page));
-  const occupied = occupancyOf(widgets, targetPage, uid);
+  const occupied = withFabReserved(occupancyOf(widgets, targetPage, uid), columns, rows);
 
   let position: { col: number; row: number } | null = null;
   if (target) {
