@@ -25,6 +25,7 @@ import {
   applyColorSchemeToDocument,
   onSystemColorSchemeChange,
   readThemeMode,
+  reconcileWindowGeometry,
   resolveThemeMode,
   syncAutostartOnStartup,
   useBingWallpaper,
@@ -61,6 +62,17 @@ export default function App() {
   useEffect(() => {
     applyColorSchemeToDocument(colorScheme);
   }, [colorScheme]);
+
+  /*
+   * 窗口几何自校正（v0.4.1 白带修复）：Windows 上窗口可能以「最大化」姿态起来——
+   * 窗口矩形铺满显示器、客户区却只有工作区大小，WebView2 只铺满客户区，于是窗口
+   * 底部 40 逻辑 px 成了非客户区，被系统按窗口主题画成纯白（深色主题下画黑）。
+   * 那条带子在视口之外，CSS 覆盖不到，只能把窗口状态摆正。详见 shell/windowGeometry.ts。
+   * 非 Tauri（开发服务器 / 截图）与窗口模式下是空操作。
+   */
+  useEffect(() => {
+    void reconcileWindowGeometry();
+  }, []);
 
   // 先把 public/secrets.json 里的本地密钥写进 localStorage，再渲染界面，
   // 避免插件 iframe 用空配置初始化。
@@ -154,6 +166,9 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
     navigate('desktop');
   }, [navigate]);
 
+  /** 桌面编辑模式：进入后 Agent 入口（右下保留格）必须隐藏（编辑模式只允许编辑 chrome） */
+  const [desktopEditing, setDesktopEditing] = useState(false);
+
   /** 「外观 → 重置布局」：桌面层清掉 wtsl.layout 后按 manifest 默认摆放重算 */
   const [layoutResetRequest, setLayoutResetRequest] = useState(0);
   const resetLayout = useCallback(() => {
@@ -187,7 +202,6 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
           notify={notify}
           themeMode={themeMode}
           onThemeModeChange={onThemeModeChange}
-          onOpenAgent={openAgent}
           initialPluginId={settingsTarget.pluginId}
           settingsRequestToken={settingsTarget.token}
           onEditDesktopLayout={editDesktopLayout}
@@ -228,6 +242,7 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
             colorScheme={colorScheme}
             editModeRequest={editModeRequest}
             layoutResetRequest={layoutResetRequest}
+            onEditModeChange={setDesktopEditing}
             onOpenPluginSettings={openSettings}
             onOpenSettings={() => openSettings()}
             onOpenAgent={openAgent}
@@ -238,11 +253,11 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
       {/* 壁纸说明只在桌面页出现（设置/复盘/插件页是不透明全屏页，壁纸被盖住） */}
       {page === 'desktop' && wallpaper ? <WallpaperCredit wallpaper={wallpaper} /> : null}
-      {/* Agent 只有浮空形态：桌面页显示右下角入口按钮，其它页面由设置页「入口」打开 chat */}
+      {/* Agent 只有浮空形态：桌面页显示右下角入口按钮；编辑模式/其它页面隐藏入口 */}
       <AgentSurface
         open={agentOpen}
         onOpenChange={setAgentOpen}
-        hideEntry={page !== 'desktop'}
+        hideEntry={page !== 'desktop' || desktopEditing}
       />
     </div>
   );

@@ -32,23 +32,33 @@ const useStyles = makeStyles({
   /**
    * 浮层 surface 的自然尺寸（container transform 的终点由它决定）：
    * 1440 下 880×680，1024×768 下 880×553（min(72vh, 680px)）。
-   * 圆角/阴影沿用 Fluent DialogSurface token；动画期间由内联样式接管定位与尺寸。
+   * 圆角起止同值（卡片 12）；动画期间由内联样式接管定位与尺寸。
    */
   surface: {
     width: 'min(880px, 92vw)',
     maxWidth: '92vw',
     height: 'min(72vh, 680px)',
+    borderRadius: tokens.borderRadius2XLarge,
     boxShadow: tokens.shadow64,
   },
   body: {
     height: '100%',
     minHeight: 0,
   },
+  /**
+   * 宿主唯一内容内衬：DialogSurface 自身 24 + DialogContent 16 = 40。
+   * 插件 detail 骨架的横向 padding 归零（_shared/ui.jsx），避免插件再叠一条内容轴。
+   */
   content: {
     height: '100%',
     minHeight: 0,
-    padding: 0,
+    padding: tokens.spacingHorizontalL,
     overflow: 'hidden',
+    boxSizing: 'border-box',
+  },
+  closeButton: {
+    minWidth: `calc(${tokens.spacingHorizontalXL} + ${tokens.spacingHorizontalXL})`,
+    minHeight: `calc(${tokens.spacingVerticalXL} + ${tokens.spacingVerticalXL})`,
   },
   /** 自定义 scrim：只负责透明度，点击关闭仍由 Fluent 的 backdrop 处理 */
   scrim: {
@@ -111,6 +121,7 @@ export function PluginOverlay({
               <Button
                 appearance="subtle"
                 size="large"
+                className={styles.closeButton}
                 icon={<Dismiss24Regular />}
                 aria-label="关闭浮层"
                 onClick={requestClose}

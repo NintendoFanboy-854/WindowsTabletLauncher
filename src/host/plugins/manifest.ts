@@ -10,6 +10,13 @@
  */
 
 import type { WidgetInstance, WidgetSize } from '../bridge/types';
+import { fabReservedCell, rectsOverlap } from '../layout/grid';
+import {
+  IDENTITY_HUES,
+  describeIdentityHue,
+  isIdentityHue,
+  type IdentityHue,
+} from './identity';
 import { normalizeSettingsSchema } from './settings';
 import type { NormalizedPlugin, NormalizedWidget } from './types';
 
@@ -76,8 +83,13 @@ function normalizeWidget(raw: unknown, index: number): NormalizedWidget | null {
 
 /**
  * 把 manifest.json 的原始 JSON 归一化。
+ *
+ * 身份色是设计契约的硬门槛：缺失或不在白名单时抛错，由 Manager 记录并跳过该插件。
+ * 这里不做默认 hue 回退——静默回退会让“六个插件一套色相”的保证失效。
+ *
  * @param raw manifest.json 的内容
  * @param dir 插件目录名（iframe 路径以它为准）
+ * @throws Error identityHue 缺失/非法时，message 包含插件目录与合法值白名单
  */
 export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -86,6 +98,14 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
   const rawId = typeof record.id === 'string' ? record.id.trim() : '';
   const id = ID_PATTERN.test(rawId) ? rawId : ID_PATTERN.test(dir) ? dir : null;
   if (!id) return null;
+
+  if (!isIdentityHue(record.identityHue)) {
+    throw new Error(
+      `插件「${id}」的 manifest.identityHue 非法：${describeIdentityHue(record.identityHue)}。` +
+        `只允许 ${IDENTITY_HUES.join(' / ')}（Fluent shared palette 同一档 L*/C*）。`,
+    );
+  }
+  const identityHue: IdentityHue = record.identityHue;
 
   const widgetsRaw = Array.isArray(record.widgets) ? record.widgets : [];
   const widgets: NormalizedWidget[] = [];
@@ -111,6 +131,7 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
 
   return {
     id,
+    identityHue,
     name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : id,
     version: typeof record.version === 'string' ? record.version : '0.0.0',
     background,
@@ -158,10 +179,12 @@ export function createDefaultInstances(
   if (cols < 1 || rows < 1) return [];
 
   const occupied = new Set<string>();
+  const reserved = fabReservedCell(cols, rows);
   const mark = (cell: string) => occupied.add(cell);
   const isFree = (rect: Rect): boolean => {
     if (rect.col < 0 || rect.row < 0) return false;
     if (rect.col + rect.w > cols || rect.row + rect.h > rows) return false;
+    if (rectsOverlap(rect, reserved)) return false;
     for (let col = rect.col; col < rect.col + rect.w; col += 1) {
       for (let row = rect.row; row < rect.row + rect.h; row += 1) {
         if (occupied.has(`${col}:${row}`)) return false;

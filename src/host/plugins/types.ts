@@ -12,6 +12,7 @@ import type {
   WidgetManifest,
   WidgetSize,
 } from '../bridge/types';
+import type { IdentityHue } from './identity';
 
 export type {
   GeoLocation,
@@ -103,7 +104,9 @@ export interface NormalizedSettingsSchema {
 }
 
 /** 归一化后的插件：旧格式（单 size）和新格式（多尺寸）都收口到这里 */
-export interface NormalizedPlugin extends Omit<PluginManifest, 'settings'> {
+export interface NormalizedPlugin extends Omit<PluginManifest, 'settings' | 'identityHue'> {
+  /** 归一化后的身份色：只可能是白名单里的 hue，非法值在 manifest 阶段被拒绝 */
+  identityHue: IdentityHue;
   /** manifest 的 background 声明（含组件级 background），决定是否挂常驻隐藏 iframe */
   background: boolean;
   /** 插件目录名（iframe URL 用它）；manifest.id 与目录名不一致时以目录名为准 */

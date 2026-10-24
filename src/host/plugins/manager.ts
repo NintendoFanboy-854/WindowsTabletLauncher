@@ -50,6 +50,8 @@ export class PluginManager {
   #initPromise: Promise<NormalizedPlugin[]> | null = null;
   #disposers: Array<() => void> = [];
   #options: PluginManagerOptions;
+  /** 最近一次扫描中被拒绝的插件（identityHue 等契约错误），供插件页展示 */
+  #problems: string[] = [];
 
   constructor(options: PluginManagerOptions = {}) {
     this.#options = options;
@@ -68,6 +70,11 @@ export class PluginManager {
 
   get plugins(): NormalizedPlugin[] {
     return this.#plugins;
+  }
+
+  /** 最近一次扫描的拒绝原因（不静默吞掉非法 manifest） */
+  get problems(): readonly string[] {
+    return this.#problems;
   }
 
   /** 初始化（幂等）：首次扫描插件目录 */
@@ -230,12 +237,26 @@ export class PluginManager {
     }
 
     const plugins: NormalizedPlugin[] = [];
+    const problems: string[] = [];
     const seenIds = new Set<string>();
     const seenDirs = new Set<string>();
     for (const record of records) {
-      if (record.error) console.warn(`[plugins] ${record.id}: ${record.error}`);
+      if (record.error) {
+        console.warn(`[plugins] ${record.id}: ${record.error}`);
+        problems.push(`${record.id}: ${record.error}`);
+      }
       if (!record.manifest || seenDirs.has(record.id)) continue;
-      const plugin = normalizeManifest(record.manifest, record.id);
+      let plugin: NormalizedPlugin | null = null;
+      try {
+        plugin = normalizeManifest(record.manifest, record.id);
+      } catch (error) {
+        // identityHue 等契约字段非法：拒绝加载并给出可定位的报错，不静默回退
+        const message = `${record.id}: ${toError(error).message}`;
+        console.error(`[plugins] 拒绝加载插件 ${message}`);
+        problems.push(`拒绝加载插件 ${message}`);
+        this.#report(new Error(`拒绝加载插件 ${message}`));
+        continue;
+      }
       if (!plugin) {
         console.warn(`[plugins] 跳过无法解析的 manifest: ${record.id}`);
         continue;
@@ -250,6 +271,7 @@ export class PluginManager {
     }
 
     this.#plugins = plugins;
+    this.#problems = problems;
     this.#byId = new Map(plugins.map((plugin) => [plugin.id, plugin]));
     this.#byDir = new Map(plugins.map((plugin) => [plugin.dir, plugin]));
     this.#emit();

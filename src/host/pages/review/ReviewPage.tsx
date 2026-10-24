@@ -58,9 +58,10 @@ const useStyles = makeStyles({
     alignContent: 'start',
     gap: tokens.spacingVerticalM,
     padding: tokens.spacingHorizontalL,
-    borderRadius: 'var(--wtsl-card-radius)',
+    borderRadius: tokens.borderRadius2XLarge,
     backgroundColor: tokens.colorNeutralBackground2,
-    minHeight: '140px',
+    /** 140 = 32×4 + 12，全部由 spacing ramp 推出，不写裸 px */
+    minHeight: `calc(${tokens.spacingVerticalXXXL} * 4 + ${tokens.spacingVerticalM})`,
   },
   wideCard: {
     gridColumn: '1 / -1',

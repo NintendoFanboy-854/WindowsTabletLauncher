@@ -6,148 +6,66 @@
  */
 
 import type { ThemePayload } from '../bridge/types';
+import {
+  IDENTITY_HUES,
+  IDENTITY_PALETTE,
+  registerIdentityPalette,
+  type IdentityThemePalette,
+} from './identity';
 
 /**
- * 插件可能用到的 Fluent 颜色 token。多给一些是为了插件换尺寸/换状态时不用回来加协议；
- * 只列出确实存在于当前 Fluent 主题里的（读不到就跳过）。
+ * 下发给插件的 Fluent token 白名单（收窄后的唯一清单）。
+ *
+ * 分组：neutral 前景/表面/描边 + brand 交互色 + 状态三组（danger/success/warning）。
+ * 不再下发：21 组 palette、全量 status、shadow*。身份色不在这张表里——它由
+ * `withIdentityTheme` 只交付当前 hue 的 3 档，插件拿不到其它色相。
  */
 const COLOR_TOKENS = [
-  // 中性背景
+  // 中性表面
   'colorNeutralBackground1',
   'colorNeutralBackground1Hover',
   'colorNeutralBackground1Pressed',
   'colorNeutralBackground1Selected',
   'colorNeutralBackground2',
   'colorNeutralBackground2Hover',
-  'colorNeutralBackground2Pressed',
   'colorNeutralBackground3',
-  'colorNeutralBackground3Hover',
-  'colorNeutralBackground3Pressed',
   'colorNeutralBackground4',
-  'colorNeutralBackground5',
-  'colorNeutralBackground6',
-  'colorNeutralBackgroundInverted',
-  'colorNeutralBackgroundStatic',
   // 中性前景
   'colorNeutralForeground1',
-  'colorNeutralForeground1Hover',
-  'colorNeutralForeground1Pressed',
-  'colorNeutralForeground1Selected',
   'colorNeutralForeground2',
-  'colorNeutralForeground2Hover',
-  'colorNeutralForeground2Pressed',
-  'colorNeutralForeground2BrandHover',
   'colorNeutralForeground3',
   'colorNeutralForeground4',
   'colorNeutralForegroundDisabled',
-  'colorNeutralForegroundInverted',
-  'colorNeutralForegroundInverted2',
-  'colorNeutralForegroundInvertedLink',
-  'colorNeutralForegroundInvertedLinkHover',
-  'colorNeutralForegroundInvertedLinkPressed',
-  'colorNeutralForegroundOnBrand',
-  // 中性描边
+  // 中性描边 / 焦点
   'colorNeutralStroke1',
-  'colorNeutralStroke1Hover',
-  'colorNeutralStroke1Pressed',
   'colorNeutralStroke2',
   'colorNeutralStroke3',
-  'colorNeutralStrokeAccessible',
-  'colorNeutralStrokeAccessibleHover',
-  'colorNeutralStrokeDisabled',
-  'colorNeutralStrokeFocus1',
-  'colorNeutralStrokeFocus2',
-  // 品牌色
+  'colorStrokeFocus1',
+  'colorStrokeFocus2',
+  'colorTransparentStroke',
+  // 品牌交互色（只给插件内 Fluent 控件复用宿主品牌色）
   'colorBrandBackground',
   'colorBrandBackgroundHover',
   'colorBrandBackgroundPressed',
   'colorBrandBackgroundSelected',
   'colorBrandBackground2',
-  'colorBrandBackground3',
-  'colorBrandBackgroundStatic',
   'colorBrandForeground1',
   'colorBrandForeground2',
-  'colorBrandForeground2Hover',
-  'colorBrandForeground2Pressed',
-  'colorBrandForegroundLink',
-  'colorBrandForegroundLinkHover',
-  'colorBrandForegroundLinkPressed',
   'colorBrandStroke1',
   'colorBrandStroke2',
-  'colorCompoundBrandBackground',
-  'colorCompoundBrandBackgroundHover',
-  'colorCompoundBrandBackgroundPressed',
-  'colorCompoundBrandStroke',
-  'colorCompoundBrandStrokeHover',
-  'colorCompoundBrandStrokePressed',
-  // subtle / 透明
-  'colorSubtleBackground',
-  'colorSubtleBackgroundHover',
-  'colorSubtleBackgroundPressed',
-  'colorSubtleBackgroundSelected',
-  'colorTransparentBackground',
-  'colorTransparentStroke',
-  // 状态色（提醒 / 错误 / 成功）
-  'colorPaletteRedForeground1',
-  'colorPaletteRedForeground2',
-  'colorPaletteRedBackground1',
-  'colorPaletteRedBackground2',
-  'colorPaletteRedBackground3',
-  'colorPaletteRedBorder1',
-  'colorPaletteRedBorder2',
+  // 状态三组：danger / success / warning（不做装饰，只表反馈）
   'colorStatusDangerBackground1',
-  'colorStatusDangerBackground2',
   'colorStatusDangerBackground3',
   'colorStatusDangerForeground1',
   'colorStatusDangerBorder1',
   'colorStatusSuccessBackground1',
-  'colorStatusSuccessBackground2',
   'colorStatusSuccessBackground3',
   'colorStatusSuccessForeground1',
   'colorStatusSuccessBorder1',
   'colorStatusWarningBackground1',
-  'colorStatusWarningBackground2',
   'colorStatusWarningBackground3',
   'colorStatusWarningForeground1',
   'colorStatusWarningBorder1',
-  'colorStatusInfoBackground1',
-  'colorStatusInfoBackground2',
-  'colorStatusInfoBackground3',
-  'colorStatusInfoForeground1',
-  'colorStatusInfoBorder1',
-  // 调色板（插件图标 / 热力图 / 分类色）
-  'colorPaletteBlueBackground2',
-  'colorPaletteBlueForeground2',
-  'colorPaletteBlueBorderActive',
-  'colorPaletteGreenBackground2',
-  'colorPaletteGreenForeground2',
-  'colorPaletteGreenBorderActive',
-  'colorPaletteYellowBackground2',
-  'colorPaletteYellowForeground2',
-  'colorPaletteYellowBorderActive',
-  'colorPaletteOrangeBackground2',
-  'colorPaletteOrangeForeground2',
-  'colorPaletteOrangeBorderActive',
-  'colorPaletteLightGreenBackground2',
-  'colorPaletteLightGreenForeground2',
-  'colorPaletteLightGreenBorderActive',
-  'colorPaletteMarigoldBackground2',
-  'colorPaletteMarigoldForeground2',
-  'colorPaletteMarigoldBorderActive',
-  'colorPalettePurpleBackground2',
-  'colorPalettePurpleForeground2',
-  'colorPalettePurpleBorderActive',
-  'colorPalettePinkBackground2',
-  'colorPalettePinkForeground2',
-  'colorPalettePinkBorderActive',
-  'colorPaletteTealBackground2',
-  'colorPaletteTealForeground2',
-  'colorPaletteTealBorderActive',
-  // 阴影（少数插件会用在浮层上）
-  'shadow2',
-  'shadow4',
-  'shadow8',
-  'shadow16',
 ] as const;
 
 function parseColor(value: string): [number, number, number] | null {
@@ -198,6 +116,21 @@ export function readFluentThemePayload(element?: HTMLElement | null): ThemePaylo
     const value = styles.getPropertyValue(`--${token}`).trim();
     if (value) theme[token] = value;
   }
+
+  // 身份色三档：只在宿主内存里登记，不进入 ThemePayload；withIdentityTheme 会按
+  // manifest.identityHue 只挑当前 hue 的三档交付。缺任一档会在那里显式抛错。
+  const identityPalette: IdentityThemePalette = {};
+  for (const hue of IDENTITY_HUES) {
+    const tokens = IDENTITY_PALETTE[hue];
+    const foreground = styles.getPropertyValue(`--${tokens.foreground}`).trim();
+    const border = styles.getPropertyValue(`--${tokens.border}`).trim();
+    const background = styles.getPropertyValue(`--${tokens.background}`).trim();
+    if (foreground && border && background) {
+      identityPalette[hue] = { foreground, border, background };
+    }
+  }
+  registerIdentityPalette(theme, identityPalette);
+
   theme.colorScheme = detectColorScheme(theme.colorNeutralBackground1);
   return theme;
 }

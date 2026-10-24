@@ -1,12 +1,62 @@
 :root {
   /*
+   * WTSL 绘制层级（唯一来源）。
+   *
+   * 壁纸是 `position: fixed; z-index: 0` 的定位元素；普通静态流里的页面即使有
+   * 不透明底色，也会画在它下面。因此所有整页容器都必须显式落到对应层，不能依赖
+   * DOM 顺序。数值只在这里声明，页面 / 桌面 / 浮层不得写各自的魔数：
+   * - wallpaper：必应壁纸（WallpaperLayer 负责引用）
+   * - desktop：常驻桌面层（非桌面页隐藏但保留挂载）
+   * - page：设置 / 复盘 / 插件管理等全屏页
+   * - overlay：Agent 浮空面板（agent.css 现有 z-index:30 与这里同值）
+   * - dialog：Fluent Dialog portal 之上仍可继续叠加的模态层
+   */
+  --wtsl-layer-wallpaper: 0;
+  --wtsl-layer-desktop: 10;
+  --wtsl-layer-page: 20;
+  --wtsl-layer-overlay: 30;
+  --wtsl-layer-dialog: 40;
+
+  /*
+   * 全屏页面磨砂底（唯一来源，与 --wtsl-desktop-backdrop 同处声明）。
+   *
+   * --wtsl-page-blur 与桌面卡片材质同一档模糊半径；--wtsl-page-surface-opacity
+   * 由 %TEMP% 的对比度反解脚本得出：壁纸取纯白 / 纯黑两个极端，正文 fg1 与
+   * 次要文字 fg3 均需 >=4.5:1。94% 在深色纯白壁纸下最差约 5.38:1，故取该值。
+   * 页面用「模糊装饰层 + 高不透明度内容层」两片叠出来，不能只把内容层做成实色，
+   * 否则 backdrop-filter 没有可透出的背景，磨砂不成立。
+   */
+  --wtsl-page-blur: 24px;
+  --wtsl-page-surface-opacity: 94%;
+
+  /*
+   * 页面内容层底色（唯一来源，PageScaffold 只引用这个变量）。
+   *
+   * 不能只写一条 `color-mix()`：该函数自 Chromium 111 才有（MDN BCD: css.types.color.color-mix
+   * = chrome 111）。Windows 10 1809 上跑的 Evergreen 运行时常见是 2021–2022 年的
+   * Chromium 96–100，它们会把整条声明当无效丢弃 —— 内容层因此没有底色，页面重新变透明，
+   * 正文直接压在壁纸上，也就是 0.4.x「设置页看不清字」的老 bug 原地复活。
+   *
+   * 所以分两档，且都由本文件决定，不依赖 Griffel 运行时样式与这份样式表的插入顺序：
+   * 1. 先给不透明 Fluent 中性底：所有运行时都认识，旧运行时取到的就是它；
+   * 2. 支持 color-mix 时换成 94% 半透明混合：新运行时取到的表达式与改动前**完全一致**，
+   *    渲染结果零变化。
+   * 兜底色只用 token，不引入裸色值。
+   *
+   * 注意：这两档的声明挂在 `[data-wtsl-page-surface]` 上（见下面「磨砂底的能力分档」），
+   * **不能写在 `:root`**。FluentProvider 把 `--colorNeutralBackground1` 注入到它自己的根
+   * 元素（类选择器规则，见 react-provider 的 `useFluentProviderThemeStyleTag`），html 上没有
+   * 这个 token；在 `:root` 上引用它会得到 guaranteed-invalid 值并继承下去，反而让
+   * `background-color` 整条失效（页面变透明）—— 那才是真正的回归。
+   */
+
+  /*
    * 项目 token 声明（DESIGN §6 允许的唯一非 Fluent 来源：Acrylic / 壁纸）。
    * - 壁纸：Fluent web 没有 Acrylic 背景，桌面壁纸是产品决定，颜色在此集中声明，
    *   页面内不散落 hex。壁纸有深色 / 亮色两套，跟随系统或设置页的主题偏好。
-   * - 卡片圆角：FLUENT2 §5 的卡片圆角为 12px；Fluent v9 的 borderRadiusXLarge
-   *   实际是 8px，这里用项目 token 统一页面卡片圆角（V-02）。
+   * - 卡片圆角不自造：Fluent v9 的 `borderRadius2XLarge` 就是 12px
+   *   （`@fluentui/tokens/lib/global/borderRadius.js`），页面直接用 token。
    */
-  --wtsl-card-radius: 12px;
   --wtsl-desktop-backdrop:
     radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%),
     radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%),
@@ -24,6 +74,65 @@
     #eef0f4;
   --wtsl-desktop-foreground: #1a1a1a;
   color-scheme: light;
+}
+
+/*
+ * 磨砂底的能力分档。顺序即优先级：后写的规则胜出（同一份样式表内，判定确定）。
+ *
+ * 三段的声明都挂在 `[data-wtsl-page-surface]`（PageScaffold 的内容层）上，理由见上：
+ * token 只在 FluentProvider 子树里定义，必须在使用处取值，写在 `:root` 会变成
+ * guaranteed-invalid 并继承下去。
+ *
+ * ① 兜底：不透明 Fluent 中性底 —— 旧运行时（没有 color-mix）取到的就是它；
+ * ② 支持 color-mix：按 --wtsl-page-surface-opacity（94%）把中性面混成半透明，
+ *    叠在 PageScaffold 的模糊层上形成磨砂 —— 表达式与改动前逐字相同；
+ * ③ 不支持 backdrop-filter：模糊层画不出来，此时半透明底等于让文字压在壁纸上，
+ *    于是退回不透明中性底（Chromium <76 就不再支持，实际已被 WebView2 ≥86 挡住，
+ *    这条是结构性保险，不是当前故障路径）。
+ *
+ * 特性查询里只出现关键字与数字，不写裸色值、不给布局写裸 px。
+ */
+[data-wtsl-page-surface='true'] {
+  --wtsl-page-surface-background: var(--colorNeutralBackground1);
+}
+
+@supports (background-color: color-mix(in srgb, currentColor 50%, transparent)) {
+  [data-wtsl-page-surface='true'] {
+    --wtsl-page-surface-background: color-mix(
+      in srgb,
+      var(--colorNeutralBackground1) var(--wtsl-page-surface-opacity),
+      transparent
+    );
+  }
+}
+
+@supports not (backdrop-filter: blur(0px)) {
+  [data-wtsl-page-surface='true'] {
+    --wtsl-page-surface-background: var(--colorNeutralBackground1);
+  }
+}
+
+/*
+ * 跨文件兜底（只在「不支持 color-mix」的运行时生效；新运行时整块被跳过，观感零变化）。
+ *
+ * 桌面卡片与 Agent 语音 / 对话浮层的材质底色同样是
+ * `color-mix(in srgb, <neutral> N%, transparent)`（见 desktop.styles.ts / agent.css）。
+ * 旧运行时丢掉的是整条 background-color，只剩 backdrop-filter 的模糊，等于文字直接压在
+ * 壁纸上。这里退回不透明中性底：牺牲那层磨砂观感，保住可读性。
+ *
+ * 选择器只挂两个已有的稳定钩子（WidgetCard 的 data-widget-card、
+ * AgentSurface 的 data-wtsl-agent-surface[data-stage]），不改动这两个文件的样式声明本身；
+ * 若那两个文件后续自己补 @supports 兜底，运行时的 Griffel 规则顺序在后，取值以它们为准。
+ */
+@supports not (background-color: color-mix(in srgb, currentColor 50%, transparent)) {
+  [data-widget-card='true'] {
+    background-color: var(--colorNeutralBackground1);
+  }
+
+  [data-wtsl-agent-surface='true'][data-stage='voice'],
+  [data-wtsl-agent-surface='true'][data-stage='chat'] {
+    background-color: var(--colorNeutralBackground1);
+  }
 }
 
 * {
@@ -50,6 +159,8 @@ body {
 
 .host-root {
   position: relative;
+  /* 让 wallpaper / desktop / page / overlay 的层级只在宿主内部比较，不参与外层 */
+  isolation: isolate;
   height: 100%;
   overflow: hidden;
 }
@@ -67,6 +178,8 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
+  /* 显式桌面层：壁纸 0 之上、全屏页 20 之下 */
+  z-index: var(--wtsl-layer-desktop);
 }
 
 .host-desktop-layer[data-active='false'] {
@@ -74,14 +187,39 @@ body {
   pointer-events: none;
 }
 
-/* ---------- 平板触控：Fluent 内建表单控件命中区 >=40（DESIGN 1.2 / AUDIT N-03） ---------- */
+/* ---------- 平板触控：所有可点控件命中区 >=44（Fluent layout.md 44×44 / HIG §6 同值） ---------- */
 
-.fui-Input,
-.fui-Switch,
-.fui-Checkbox,
-.fui-Radio,
-.fui-Slider,
-.fui-Dropdown {
-  min-height: 40px;
+/*
+ * 44 = spacingVerticalXXXL(32) + spacingVerticalM(12)：Fluent spacing ramp 没有 44 档，
+ * 用两个 token 相加表达契约值，不写裸 px。宿主与插件共享层同一口径。
+ */
+body .fui-Input,
+body .fui-Switch,
+body .fui-Checkbox,
+body .fui-Radio,
+body .fui-Slider,
+body .fui-Dropdown,
+body .fui-Button,
+body .fui-Tab,
+body .fui-MenuItem {
+  min-height: calc(var(--spacingVerticalXXXL) + var(--spacingVerticalM));
+}
+
+body .fui-Button,
+body .fui-Tab {
+  min-width: calc(var(--spacingHorizontalXXXL) + var(--spacingHorizontalM));
+}
+
+/*
+ * 把 44 命中区撑高之后，**垂直居中必须跟着补**。
+ *
+ * Fluent v9 的 MenuItem 是 `display:flex; align-items:start`，默认高度 32（内衬 6 + 行高 20 + 6）。
+ * 上面那条 `min-height: 44` 把盒子撑到 44，但内容仍靠上：实测 3 个菜单项都是
+ * 上 6 / 下 18，文字与图标明显偏上——桌面空白处右键菜单就是这么歪的。
+ * 这里不改任何高度/间距数值，只把对齐方式补成居中，让多出来的空间上下均分。
+ * 两行式菜单项（标题 + 副标题）同样适用：居中不会破坏它们的行内排布。
+ */
+body .fui-MenuItem {
+  align-items: center;
 }
 

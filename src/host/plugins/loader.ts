@@ -1,4 +1,5 @@
 import type { PluginManifest, WidgetInstance } from '../desktop/types';
+import { IDENTITY_HUES, isIdentityHue } from './identity';
 
 const BASE = '/plugins/';
 
@@ -20,7 +21,15 @@ export async function loadPlugins(): Promise<PluginManifest[]> {
   const plugins: PluginManifest[] = [];
   for (const id of ids) {
     const manifest = await getJson<PluginManifest>(`${BASE}${id}/manifest.json`);
-    if (manifest && Array.isArray(manifest.widgets)) plugins.push(manifest);
+    if (!manifest || !Array.isArray(manifest.widgets)) continue;
+    if (!isIdentityHue(manifest.identityHue)) {
+      console.error(
+        `[plugins] 拒绝加载 ${id}：manifest.identityHue 必须是 ${IDENTITY_HUES.join(' / ')}，` +
+          `实际为 ${JSON.stringify(manifest.identityHue)}`,
+      );
+      continue;
+    }
+    plugins.push(manifest);
   }
   return plugins;
 }
@@ -29,10 +38,13 @@ export async function loadPlugins(): Promise<PluginManifest[]> {
 export function createInstances(plugins: PluginManifest[], cols: number, rows: number): WidgetInstance[] {
   const instances: WidgetInstance[] = [];
   const occupied = new Set<string>();
+  /** 右下角 Agent 入口（右下保留格）：与 layout/grid 的 fabReservedCell 同义（旧 loader 也遵守） */
+  const reserved = `${Math.max(0, cols - 1)}:${Math.max(0, rows - 1)}`;
 
   const free = (col: number, row: number, w: number, h: number) => {
     for (let c = col; c < col + w; c++) {
       for (let r = row; r < row + h; r++) {
+        if (`${c}:${r}` === reserved) return false;
         if (occupied.has(`${c}:${r}`)) return false;
       }
     }

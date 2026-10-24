@@ -434,7 +434,9 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         <iframe
           ref={frameRef}
           src={src}
-          title={title ?? `${pluginId}/${widgetId}`}
+          // 用 aria-label 提供可访问名称；不要用 title，否则 WebView 会在指针停留时
+          // 弹出覆盖卡片内容的原生 tooltip（实机被误读成第二个 tab）。
+          aria-label={title ?? `${pluginId}/${widgetId}`}
           className={className}
           style={{ ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE), ...style }}
           allow="autoplay; clipboard-write; fullscreen"

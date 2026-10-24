@@ -2,8 +2,9 @@
  * 插件设置表单（E1）：按 manifest.settings schema 渲染，宿主不认识任何具体插件。
  *
  * 版式沿用设置页 token（DESIGN §8 / 契约 §2.1）：
- * - 内容 max-width 720 居中；section 标题 20 semibold、说明 12 fg3；
- * - 行高 48、控件 40（Input/Button/Radio 都用 size="large"）；
+ * - 与设置页共用同一条内容轴（由 PageScaffold maxContentWidth 定），分区内不再缩进；
+ * - section 标题 20 semibold、说明 12 fg3；
+ * - 行高 48（spacing ramp 32+16）、控件 40（Input/Button/Radio 都用 size="large"）；
  * - 即时保存：控件变更/失焦即写 `plugin.<pluginId>.<schema.key>`；
  * - 底部「恢复默认」在左、「保存」在右（保存是羡余：再写一次并 Toast，不跳转）；
  * - 未知字段/坏数据只提示，不写坏配置。
@@ -27,6 +28,7 @@ import {
 } from '@fluentui/react-components';
 import { Eye20Regular, EyeOff20Regular } from '@fluentui/react-icons';
 
+import { TOUCH_TARGET_CSS } from '../../design/metrics';
 import type { HostBridge } from '../../bridge';
 import { onPluginConfigChange } from '../../bridge/configBus';
 import type {
@@ -59,10 +61,9 @@ export interface PluginSettingsProps {
 type CommitHandler = (field: NormalizedSettingField, value: unknown) => boolean;
 
 const useStyles = makeStyles({
+  /** 与 SettingsPage 共用一条内容轴：不再自设 720px 居中，避免分区切换时正文横跳 */
   root: {
     width: '100%',
-    maxWidth: '720px',
-    marginInline: 'auto',
     display: 'grid',
     gap: tokens.spacingVerticalXXL,
     paddingTop: tokens.spacingVerticalXS,
@@ -96,7 +97,8 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: tokens.spacingHorizontalL,
-    minHeight: '48px',
+    /** 设置行高 48 = 32 + 16（spacing ramp） */
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
   },
   rowText: {
     display: 'grid',
@@ -110,7 +112,7 @@ const useStyles = makeStyles({
     justifyContent: 'flex-end',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
-    minHeight: '40px',
+    minHeight: TOUCH_TARGET_CSS,
     maxWidth: '100%',
   },
   input: {
@@ -138,7 +140,7 @@ const useStyles = makeStyles({
     minWidth: '132px',
   },
   radio: {
-    minHeight: '40px',
+    minHeight: TOUCH_TARGET_CSS,
   },
   footer: {
     display: 'flex',
@@ -150,8 +152,6 @@ const useStyles = makeStyles({
   },
   empty: {
     width: '100%',
-    maxWidth: '720px',
-    marginInline: 'auto',
     display: 'grid',
     gap: tokens.spacingVerticalS,
     paddingTop: tokens.spacingVerticalL,

@@ -96,6 +96,10 @@ const useStyles = makeStyles({
   table: {
     backgroundColor: 'transparent',
   },
+  /** 插件表行高：32 + 24 = 56（Fluent spacing ramp，不写裸 px） */
+  row: {
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalXXL})`,
+  },
   cardGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -105,7 +109,8 @@ const useStyles = makeStyles({
     display: 'grid',
     gap: tokens.spacingVerticalXS,
     padding: tokens.spacingHorizontalL,
-    borderRadius: 'var(--wtsl-card-radius)',
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalXXL})`,
+    borderRadius: tokens.borderRadius2XLarge,
     backgroundColor: tokens.colorNeutralBackground2,
   },
   cardHead: {
@@ -139,7 +144,7 @@ const useStyles = makeStyles({
     display: 'grid',
     placeItems: 'center',
     backgroundColor: tokens.colorBackgroundOverlay,
-    border: `2px dashed ${tokens.colorBrandStroke1}`,
+    border: `calc(${tokens.strokeWidthThick}) dashed ${tokens.colorBrandStroke1}`,
     zIndex: 1000,
     pointerEvents: 'none',
   },
@@ -383,6 +388,15 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
           </MessageBar>
         )}
 
+        {!loading && pluginManager.problems.length > 0 && (
+          <MessageBar intent="warning">
+            <MessageBarBody>
+              {`有 ${pluginManager.problems.length} 个插件未通过契约校验，已跳过：`}
+              {pluginManager.problems.join('；')}
+            </MessageBarBody>
+          </MessageBar>
+        )}
+
         {!loading && !error && plugins.length === 0 && (
           <EmptyState title="还没有插件" description="安装插件后这里会列出它们，也可以拖入插件压缩包安装。" />
         )}
@@ -401,7 +415,7 @@ export function PluginsPage({ manager, onBack, notify }: PluginsPageProps) {
                   </TableHeader>
                   <TableBody>
                     {plugins.map((plugin) => (
-                      <TableRow key={plugin.id}>
+                      <TableRow key={plugin.id} className={styles.row}>
                         <TableCell>
                           <div className={styles.pluginCell}>
                             <Text size={400}>{plugin.name}</Text>

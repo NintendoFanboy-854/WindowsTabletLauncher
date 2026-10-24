@@ -17,6 +17,14 @@ export type {
   ThemePayload,
 } from '../bridge/types';
 export { toError } from './errors';
+export {
+  IDENTITY_HUES,
+  IDENTITY_PALETTE,
+  describeIdentityHue,
+  isIdentityHue,
+  withIdentityTheme,
+  type IdentityHue,
+} from './identity';
 export { normalizeManifest, createDefaultInstances } from './manifest';
 export type { DefaultInstancesOptions } from './manifest';
 export {
