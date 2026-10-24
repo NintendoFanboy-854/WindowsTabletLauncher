@@ -23,7 +23,7 @@ public/plugins/<id>/
 - `public/plugins/_shared/host.js` —— `startHostCapture` / `useHostTheme` /
   `useHostSize` / `useStoredConfig` / `getOverlayView` / `requestOverlay` /
   `requestSettings` / `useAgentTools` / `useSettingsRequest` / `useHostCardGesture`。
-- `public/plugins/_shared/typography.js` —— 数字主信息的 Display XL 与 tabular-nums。
+- `public/plugins/_shared/typography.js` —— 数字主信息的 `HERO_TEXT`（`fontSizeHero900` / `lineHeightHero900`，40/52）与 tabular-nums。旧的 `Display XL` / `displayXl()` 已删除。
 - `public/plugins/_shared/motion.js` —— 共享动效（`FadeSlide` / `Collapse` / `CrossFade` /
   `SlidePage` / `useReducedMotion` / `useMotionTransition`）。
 - `public/plugins/_shared/ui.jsx` —— 共享 UI 基元（`CardRoot` / `CardHeader` / `Metric` /
@@ -74,7 +74,7 @@ createRoot(document.getElementById('root')).render(<Root />);
 2. **样式**：`makeStyles` + `tokens.*`；不写 hex、不写 px 字面量字号/间距/圆角/阴影、
    不自定义动效时长（用 `motionTokens`）。插件根节点尺寸用 `100%` / `vh` / `vw`。
 3. **主题**：根节点 `FluentProvider`，亮暗由宿主 `host:init/theme` 注入（宿主默认跟随系统亮暗，可固定深/浅）；独立打开时跟随 `prefers-color-scheme`。不在组件里判断亮暗或写死颜色。SDK 会记忆最近一次 init/theme，监听注册时自动补发；`host:init` 可能晚于首帧，宿主会在 init 后补发一次 `host:theme`，`useHostTheme` 会自动校正回退值。
-4. **触控目标**：所有可点击元素 ≥40×40 CSS px（平板）。
+4. **触控目标**：所有可点击元素 ≥44×44 CSS px（平板）。
 5. **状态**：hover / pressed / disabled / focus-visible 交给 Fluent 组件，不覆写焦点态。
 6. **设置 / 详情浮层**：不在 iframe 内做 Dialog / Drawer（会被卡片边界裁切）。做成独立视图：
    - 卡片里长按 / 设置入口 → `requestSettings('时钟设置')`；详情入口 → `requestOverlay('detail', '天气详情')`；
@@ -172,10 +172,10 @@ E3.1 起逐插件把旧的本地 `base.css` 引用换成这一行；本轮不改
 |---|---|---|
 | `CardRoot` | `onActivate`、`ariaLabel`、`className/style/children` | 卡片根容器；内部挂 `useHostCardGesture`，处理 `role="button"`、`tabIndex`、Enter/Space。内部 `button/input/[role=...]` 控件不会触发 `onActivate`。 |
 | `CardHeader` | `title`、`trailing` | 卡片顶部 12/16 fg3 标题行；普通流式（占 16px 内容高度），不放设置/齿轮。 |
-| `Metric` | `value`、`unit`、`label`、`caption`、`size` | 数字主信息；`size` 只允许 48/68/80/96/112。48/80/96/112 走项目 Display XL，68 走 Fluent Display（Hero1000）。标签/单位自动用 Fluent `Text`。 |
+| `Metric` | `value`、`unit`、`label`、`caption` | 数字主信息；**不接收 `size`**，固定 `fontSizeHero900` / `lineHeightHero900`（40/52，D-36 §1）。标签/单位自动用 Fluent `Text`（单位 `Base300`、标签 `Base200`）。 |
 | `ListRow` | `leading`、`title`、`subtitle`、`trailing`、`onClick`、`selected`、`titleSize` | 44 高列表行；无 `onClick` 是纯展示行，点击冒泡到卡片主体；有 `onClick` 时自己是 `role="button"`，不会触发卡片主操作。 |
 | `EmptyState` | `icon`、`title`、`description`、`action` | 空态：图标 + 标题 + 说明 + 一个主操作。 |
-| `TouchButton` / `ActionButton` | Fluent Button props | 统一 ≥40px 触控目标的 Fluent Button；`ActionButton` 是 `TouchButton` 的语义别名。 |
+| `TouchButton` / `ActionButton` | Fluent Button props | 统一 ≥44px 触控目标的 Fluent Button；`ActionButton` 是 `TouchButton` 的语义别名。 |
 | `DetailPage` | `children` | L1 根容器：flex column、100% 高、**透明背景**（宿主 `DialogSurface` 提供表面）。 |
 | `DetailHeader` | `children`、`trailing` | L1 header 56；左侧内容 + 右侧页面动作。L1 不放返回箭头。 |
 | `DetailToolbar` | `children` | 可选操作条 48；没有操作时不要占位。 |
@@ -198,10 +198,9 @@ export default function TodoCard() {
     <CardRoot
       ariaLabel="待办：今日 3 项，点击打开详情"
       onActivate={() => requestOverlay('detail', '待办详情')}
-      style={{ padding: tokens.spacingVerticalM, gap: tokens.spacingVerticalS }}
     >
       <CardHeader title="今日 · 3" trailing={<Text size={200}>2 项逾期</Text>} />
-      <Metric value="3" unit="项" label="今日待办" size={48} />
+      <Metric value="3" unit="项" label="今日待办" />
       <ListRow leading={<Checkbox ... />} title="写周报" subtitle="今天 18:00" />
     </CardRoot>
   );
@@ -386,7 +385,7 @@ E3.0 宿主从 L1 点「设置…」只导航、不自动关闭详情浮层；�
 - 自己画关闭按钮、Dialog、Drawer 或第二个浮层；X/Esc/遮罩归宿主，L2 用 `Subpage`。
 - 在 L2 里再 push L3，或用 Tabs 隐藏平级内容。
 - 在插件源码里写 hex、毫秒数、cubic-bezier、clamp 字号、10/11px 字号或 `lineHeight: 1`。
-- 用 `Metric` 的 Display XL 字号渲染标题/正文/标签；它只给数字主信息。
+- 用 `Metric` / `HeroText` 的 hero 字号渲染标题/正文/标签；它只给数字主信息（固定 40/52）。
 - 复制一份 iframe 外壳重置；应引用 `_shared/base.css`。
 
 ## 主信息与可访问性

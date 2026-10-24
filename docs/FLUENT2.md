@@ -25,9 +25,10 @@
 - 只允许用 Fluent token：`colorNeutralBackground*`（表面）、`colorNeutralForeground1/2/3`（文字层级）、`colorNeutralStroke*`（轮廓）、`colorBrandBackground*`（主操作）、`colorStatus*`（semantic）。
 - **不手写 hex**；需要新语义色先找 token。
 - 层级表达顺序：字号 → foreground 层级 → 间距。颜色最后用。
-- **identity 色例外**（v0.4.0，DECISIONS D-32）：每个插件允许一个 identity 色，只出现在卡片顶部 24×24 identity chip 与其 16px 图标
-  （≤10% 卡面积），固定映射到 Fluent shared palette 六种（blue/pink/orange/green/purple/teal 的 `colorPalette*Foreground2` +
-  `colorPalette*Background2`）；不承担状态/语义、不用于背景/边框、不新增 hex。
+- **identity 色例外**（Equal Except Hue v2）：每个插件在 manifest 声明一个 `identityHue`，只能取
+  blue/pink/orange/green/purple/teal；宿主映射到 Fluent shared palette 的同一档 `Foreground2`
+  （同 L* / 同 C*），只允许出现在 20px identity 图标（可选 1 处 2px 状态强调）。
+  不承担状态/语义、不用于卡背景/大数字/按钮填充/空态色块、不新增 hex，也不允许插件引用具体 palette token。
 - 深色/浅色主题都由 `FluentProvider` 切换，组件不硬编码主题；**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定为深色/亮色（DECISIONS D-06）。插件由宿主注入同一主题，独立打开时跟随系统。
 
 ## 3. 字体与字阶（官方 type ramp，Web）
@@ -49,7 +50,11 @@
 
 - 字体：`fontFamilyBase`（Segoe UI Variable），中文回退系统字体。
 - 组件内字号只取上表对应 token（`fontSizeBase100/200/300/400/500/600/700/800/900/1000`）。
-- 卡片 Primary 允许在 Large Title/Display 区间按视口 `clamp()` 缩放，但**比例参照 type ramp**，不临时拍脑袋。
+- **hero 数字统一上限**：所有插件主数字引用 `tokens.fontSizeHero900` / `tokens.lineHeightHero900`
+  （官方 Large Title：逻辑 40 / 52，200% DPI = 物理 80px）；不再按插件/尺寸选择 48/68/80/96/112，
+  也不再按视口 `clamp()` 放大。**不定义项目级字号变量**（纯 token 引用，见 §14 第 5 条）。
+  次级数字/标签/说明只用 `Text size` 与 `fontSizeBase*`（title3/body1/caption1）。
+  **所有尺寸档同字号**：hero 不随 1×1 / 2×1 / 3×2 放大或缩小；空带 ≤22% 与“行高 44 + 行距 4”同属硬门禁（DENSITY §1.1）。
 - 层级用 `colorNeutralForeground1/2/3` 区分，不靠加粗堆叠。
 
 ## 4. 布局与间距
@@ -61,7 +66,7 @@
 - 只用 `spacingHorizontal*/spacingVertical*` token（2/4/6/8/10/12/16/20/24/32/40/48）。
 - 卡片内分组：组间 ≥ `spacingVerticalM`，组内 ≤ `spacingVerticalXS`。
 - 不新增分割线/边框来表达分组（DENSITY 已列为硬规则）。
-- 页面级留白：桌面网格 gap 用 token（当前 14px 属于自定义值，密度返工时改为 `spacingHorizontalL`(16) 或 `spacingHorizontalM`(12)）。
+- 页面级留白：桌面网格 gutter **12**（`spacingHorizontalM`）、页边距由严格居中派生 **22 / 46**（`gridInsets`，1440×960 下；`spacingHorizontalXL` 的 20 只是推导 cell 的最小留白，不是最终页边距）；旧的 14px 自定义值已作废（host-impl §2.1、`breakpoints.ts`）。
 
 ## 5. 形状与圆角（官方 token）
 
@@ -76,9 +81,9 @@
 
 **本项目落地**：
 
-> **token 值映射注意**：Fluent 2 设计规范的圆角表（Medium 4 / Large 8 / X-Large 12）与 Fluent UI React v9 的 `borderRadius*` token 实际值不完全一致（v9：Medium 4 / Large 6 / X-Large 8）。本项目以设计规范为准，在项目层定义 `--wtsl-card-radius: 12px` 供卡片使用；组件内的小元素直接用 v9 token。
+> **token 值映射注意**：Fluent 2 设计规范的圆角表（Medium 4 / Large 8 / X-Large 12）与 Fluent UI React v9 的 `borderRadius*` token 实际值不完全一致（v9：Medium 4 / Large 6 / X-Large 8 / 2X-Large **12**）。**v9 已有 `borderRadius2XLarge = 12px`**，因此卡片直接引用该 token，项目不再自造 `--wtsl-card-radius`。
 
-- 卡片：**12px**（项目 token `--wtsl-card-radius`，不允许 calc 自造或混用 6/8/16）。
+- 卡片：**12px**（`tokens.borderRadius2XLarge`，不允许 calc 自造或混用 6/8/16）。
 - 按钮/输入框：Medium 4px；小徽章：Small 2px；圆形状态点：Circle。
 - 不允许出现规范之外的圆角数值。
 
@@ -89,7 +94,7 @@
 **本项目落地**：
 
 - 卡片：`shadow4`（普通）/ `shadow8`（浮起，如被拖动时）；菜单/浮层由 Fluent 组件自带。
-- 卡片轮廓用 `colorNeutralStroke2`（stroke 表达边界），**不要同时叠自定义大阴影**（当前 `0 18px 40px` 属于自定义值，需改）。
+- 卡片轮廓用 `colorNeutralStroke2`（stroke 表达边界），**不要同时叠自定义大阴影**（v0.3.0 之前的 `0 18px 40px` 是自定义值，已改为 `shadow4`→hover `shadow8` + `colorNeutralStroke2` 1px 描边，见 §14-2）。
 - 对话/抽屉的 scrim 用 Fluent 的 Smoke 语义（Dialog/Drawer 自带 backdrop）。
 
 ## 7. 材质
@@ -128,7 +133,7 @@
 **本项目落地**：
 
 - 界面图标统一 Fluent System Icons；导航/动作 Regular，选中态 Filled。
-- 常用尺寸 16 / 20 / 24；交互目标 ≥ 40×40（见无障碍）。
+- 常用尺寸 16 / 20 / 24（共享层 `ICON_SIZE` 阶梯是 16/20/24/32/48：32 给详情空态与内容图形，48 只给天气等内容图形；空态主图标另有 `EMPTY_STATE_ICON_SIZE_LARGE = 40`）；交互目标 ≥ 44×44（见无障碍）。
 - 唯一例外：天气现象图标用和风 SVG（Fluent 覆盖不全），只作为内容图形，尺寸/颜色按本规范排。
 
 ## 10. 无障碍（官方 A11y）
@@ -172,25 +177,25 @@
 | 2 | 卡片阴影 `0 18px 40px` 自定 | shadow4/8 + stroke | 同上 |
 | 3 | 每张卡片常驻标题栏/齿轮 | chrome on demand | task-15 处理 |
 | 4 | 待办列表元信息过密 | 渐进披露 | task-12 处理 |
-| 5 | 插件内字号未统一走 type ramp | 字阶表 | 已修（G2）：迁移 Fluent UI React 后由组件默认字阶保证；天气 forecast 的 clamp 字号已换成 `fontSizeBase*` token；仅图标/环形图等内容图形尺寸保留 clamp（不是字号） |
-| 6 | 桌面网格 gap 14px | 间距 ramp | 改为 12 或 16 |
+| 5 | 插件内字号未统一走 type ramp | 字阶表 | **Equal Except Hue v2 已修**：所有 hero 数字统一 `tokens.fontSizeHero900` / `lineHeightHero900`（40/52），其余文本走 `Text size` / `fontSizeBase*`；仅图标/环形图等内容图形保留像素尺寸 |
+| 6 | 桌面网格 gap 14px | 间距 ramp | **已改为 12**（`spacingHorizontalM`）；14 作废，见 host-impl §2.1 |
 | 7 | 天气图标非 Fluent | 仅内容图形例外 | 已记录，保持 |
 | 8 | CSS 近似材质 | Web 无官方材质 | 已记录，保持单一 token |
 | 9 | 插件自绘控件（clock/countdown/pomodoro/sedentary/todo） | 一律用 Fluent UI React 组件 | **已定案：全部迁移到 Fluent UI React + FluentProvider（DECISIONS D-02b），按严格规范执行** |
-| 10 | 数字型主信息使用 48–112px（超出 Fluent Display 68px 上限） | 官方字阶最大 Display 68/92 | **已定案：项目级 Display XL 例外（DECISIONS D-07），只用于数字主信息，48/80/96/112，走 `_shared/typography.js`；文本/标签不得使用** |
-| 11 | 六张卡各有一个 identity 色 | 颜色严格功能化（中性 + 品牌 + 语义） | **已定案：项目例外（DECISIONS D-32）**，只用于 24×24 identity chip 与 16px 图标（≤10% 面积），取 Fluent shared palette，不承担语义 |
+| 10 | 数字型主信息使用 48–112px（超出 Fluent Display 68px 上限） | 官方字阶最大 Display 68/92 | **Equal Except Hue v2 已收敛**：hero 统一 `fontSizeHero900`/`lineHeightHero900`（40/52），不再使用 48–112；文本/标签不得使用 hero token |
+| 11 | 六张卡各有一个 identity 色 | 颜色严格功能化（中性 + 品牌 + 语义） | **Equal Except Hue v2**：manifest `identityHue` → shared palette 同档；只用于 20px 图标（可选 2px 状态强调），不承担语义 |
 | 12 | 卡片顶部静态 identity 行（24px） | chrome on demand / 正常模式无标题栏 | **已定案：项目例外（DECISIONS D-33）**，静态无交互、不占点击热区、不计入信息预算 |
 | 13 | 桌面使用必应每日壁纸 | Fluent 2 不规定桌面壁纸（Windows 桌面本身靠壁纸/Mica） | **已定案（DECISIONS D-31）**：壁纸是桌面场景的内容层；比例不符用 cover 填充；说明文字仍用 Fluent 字阶/颜色 token |
 
 ## 15. 检查清单（每个组件/页面上线前）
 
 1. 颜色全部来自 Fluent token？有没有手写 hex？
-2. 字号是否落在 type ramp 上（10/12/14/16/20/24/28/32/40/68）？
+2. 字号是否落在 type ramp 上（10/12/14/16/20/24/28/32/40/68）？主数字是否统一 `fontSizeHero900`（40/52）？
 3. 间距是否来自 spacing ramp（含 2/6/10）？
 4. 圆角是否只用 0/2/4/8/12/Circle？
 5. 阴影是否只用 shadow4/8/16 且没有和自定大阴影叠加？
 6. 动效是否只用 motionTokens，没有自定义时长/曲线？
-7. 图标是否 Regular/Filled 得当、交互目标 ≥40×40？
+7. 图标是否 Regular/Filled 得当、交互目标 ≥44×44？
 8. 对比度（正文 4.5:1 / 大文本 3:1）是否达标？
 9. 加载态是否按 1s/3s 阈值选择（无/Spinner/进度条/AI 立即指示）？
 10. 文案是否短句、无句号、动词开头、空状态给了下一步？

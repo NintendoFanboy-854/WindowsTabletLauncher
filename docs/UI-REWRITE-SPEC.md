@@ -1,8 +1,11 @@
 # UI 重写规格 v2（2026-10-19）
 
-> **⚠️ 历史文档（2026-10-19 晚已部分被取代）**：卡片点击语义、设置归属、详情 L1/L2 层级、
-> 六插件尺寸内容与视觉规格，以 `docs/DESIGN-ROUND-SUMMARY.md`、`docs/PLUGIN-CONTRACT.md` 与
-> `docs/components/*.md` 为准；本文只保留字号/密度背景与历史验收记录，不再作为实现依据。
+> **⚠️ 历史文档（2026-10-19 晚已部分被取代；2026-10-24 字号/密度口径再次被取代）**：卡片点击语义、
+> 设置归属、详情 L1/L2 层级、六插件尺寸内容与视觉规格，以 `docs/DESIGN-ROUND-SUMMARY.md`、
+> `docs/PLUGIN-CONTRACT.md` 与 `docs/components/*.md` 为准；本文只保留历史验收记录，不再作为实现依据。
+> **§1.2 的 Display XL（48/80/96/112）与 §2 的分尺寸 padding 表已全部作废**：全档 hero 统一
+> `fontSizeHero900`/`lineHeightHero900`（40/52）、卡片 padding 16 / gap 8、行高 44（DENSITY §1.1、D-36）；
+> 下文的 48/68/96/112 只作历史值阅读，不得再实现。
 
 > 依据：第二版独立审计 `docs/audit2/REPORT-VISUAL.md`、`docs/audit2/REPORT-TYPE.md` +
 > `docs/DENSITY.md §2.1` 量化门禁 + `docs/DECISIONS.md` D-07（Display XL 例外）。
@@ -30,18 +33,16 @@
 - **绝对禁止**：`fontSizeBase700/800/900`（不存在，正确是 Hero700/800/900）、`lineHeight: 1`、10px 文本、任意 `clamp()` 字号。
 - 数字主值统一 `fontVariantNumeric: 'tabular-nums'`；不再额外加 `letter-spacing`。
 
-### 1.2 数字型主信息：项目 Display XL（D-07）
+### 1.2 数字型主信息：统一 Hero900（D-36 取代 D-07）
 
-只用于**数字主信息**（时间、温度、分钟、天数、计数），用 `public/plugins/_shared/typography.js`：
+只用于**数字主信息**（时间、温度、分钟、天数、计数），用 `public/plugins/_shared/typography.js` 的 `HERO_TEXT`：
 
 | 档 | px / 行高 | 用在哪 |
 |---|---|---|
-| XL-112 | 112 / 124 | clock 3×2 主时间 |
-| XL-96 | 96 / 104 | pomodoro/sedentary 3×2 主数字 |
-| XL-80 | 80 / 88 | sedentary 2×2 分钟数 |
-| XL-48 | 48 / 56 | 1×1 单值主数字、2×1 少量数字、weather 小尺寸温度 |
+| 全档 | **40 / 52** | `tokens.fontSizeHero900` / `tokens.lineHeightHero900`；所有尺寸档同字号，不放大、不缩小 |
 
-用法：`...displayXl(96)` 展开到 makeStyles；字重 Semibold。**不得**用于标题/正文/标签/按钮。
+~~XL-112 / XL-96 / XL-80 / XL-48~~ 已于 2026-10-24 作废（D-07 顶部注记、D-36 §1）；`displayXl()` / `DISPLAY_XL` 已从
+`typography.js` 删除。**不得**把 hero token 用于标题/正文/标签/按钮。
 
 ## 2. 间距系统（全部 spacing token）
 
@@ -54,10 +55,16 @@
 | 3×3 | 16 | 8 | 4 | 列表行高 ≥44 |
 | 4×2 | 12 纵 / 16 横 | 8 | 4 | 通栏/三栏 |
 
-- 图标与文字：20–24px 图标 gap 8；≥32px 图标 gap 12。
-- 禁止：0/2px 内容行距、各尺寸共用同一 padding、手写任意 `clamp()` padding。
+- **本表已作废（2026-10-24）**：所有尺寸档统一 padding 16（`spacingHorizontalL`/`VerticalL`）、组间距 8（`spacingVerticalS`）、
+  行距 4（`spacingVerticalXS`），由共享 `CardRoot` 强制（DENSITY §2.1、host-impl §3.2）；下表仅作历史记录。
+- 图标与文字：20px 图标 gap 8；32px 图标 gap 12。
+- 禁止：0/2px 内容行距、手写任意 `clamp()` padding、插件覆盖 CardRoot 的 padding/gap。
 
 ## 3. 每插件 × 每尺寸目标（主信息 / 次要 / 布局）
+
+> **§3 各表的历史值不构成口径**：表内 48/68/96/112 一律以 40/52 替代；todo `2×2` 由 4 行改 5 行；
+> weather `2×2` 逐时由 6 列改 4 列（296 宽放不下 6 列）；字段集合以 `wtsl-density-*` 四份规格与
+> `docs/components/*.md` 为准。
 
 > 所有字号以最终 1440×960 下 iframe 实际尺寸为准（1×1=152、2×1=328×152、2×2=328×328、
 > 3×2=504×328、3×3=504×504、4×2=680×328；1024/960 视口按比例小 ~10–15%，字号不变）。
@@ -119,6 +126,7 @@
    - **1×1**：图标+温度（48）水平居中；无城市/高低温。
    - **2×1**：左图标(48)+温度(48)，右现象 16 + 高低温 14；删掉城市（超预算）。
    - **2×2**：上块 0–55%：图标+温度(48)+现象 16+高低温 14+城市 12；下块 55–100%：6 列逐时（标签 14/图标 28/温度 16），上下分区，禁止 flex 居中留空。
+     > **2026-10-24 作废**：这里写的「6 列」已改为 **4 列**（296 宽放不下 6 列，6 列每列 42.7 装不下「降水 30%」约 48）；温度 48 也作废为 40。当前口径见 `docs/components/weather.md` 与 DENSITY §2.2。
    - **3×2**：左 42% 当前（图标+温度 **68**+现象 16+高低温 16+城市 12）；右 58% 7 天（标签 14/图标 24/高温 20/低温 14）。
    - **4×2**：左 55% 当前（温度 68）；中 30% AQI（环 88、值 24、标签 12、类别 14）；底 96px 7 天通栏（标签 14/高温 20/低温 14）。
 3. 微字号：逐时/AQI 标签 ≥12（推荐 14）、城市 12→14（空间允许时）、无 <12px 文本。
@@ -129,7 +137,7 @@
 
 1. `node scripts/build-plugin.mjs <id>` 成功，`app/app.js` 已重建。
 2. 该插件每个尺寸的 **before/after 截图**（1440×960 三档 iframe 尺寸；暗色一套即可，亮色抽查 1 张）。
-3. `node scripts/verify-widgets.mjs --plugin <id>` 通过（串行单 Edge，按真实 iframe 尺寸量测）：主信息字号/占比、主次比、最小字号、3×2 信息项递增、多块卡空带、静态 token 扫描。列表卡用"列表头 ≥28px"代替数值卡占比断言；单值卡不套空带规则。
+3. `node scripts/verify-widgets.mjs --plugin <id>` 通过（串行单 Edge，按真实 iframe 尺寸量测）：主信息字号/占比、主次比、最小字号、3×2 信息项递增、多块卡空带、静态 token 扫描。列表卡用行预算 / 行高 ≥44 / 行标题 16 的结构断言代替（“列表头 ≥28”口径已作废，DENSITY §2.1-2）；单值卡不套空带规则。
 4. 控制台 0 error。
 5. 报告里写：每尺寸主字号实测 px、信息项数、残留问题。
 6. 禁止改动：宿主 `src/**`、`_shared/**`（只允许 import typography.js）、其它插件、docs（Lead 统一改）。
@@ -143,11 +151,12 @@
 
 ## 6. 机器断言（verify-widgets.mjs 将实现）
 
-1. `maxFont ≥` 1×1/2×1 40、2×2 数值卡 40、3×2 数值卡 48、4×2 数值卡 56；列表卡 header ≥28。
-2. `maxFont / iframeHeight ≥` 1×1/2×1 30%、2×2 12.5%、3×2 15%、4×2 17%。
+1. `maxFont == 40`（全档 `fontSizeHero900`，2026-10-24 起不再按档提高）；`minFont ≥ 12`。
+   旧的“3×2 数值卡 48 / 4×2 56 / 列表头 ≥28”断言作废。
+2. ~~`maxFont / iframeHeight` 占比~~ 作废：hero 全档同字号后，占比只由卡高决定，不再区分档位（DENSITY §2.1-1）。
 3. `maxFont / secondTier ≥ 2.0`（数值卡）或 ≥1.5（列表卡）。
 4. `minFont ≥ 12` 且 `<12px` 文本数 = 0。
 5. 同插件 3×2 覆盖率 > 1×1 覆盖率；相邻尺寸信息项数 +1（按可见文本项计数）。
 6. 单块空带 ≤22% 卡高；多块卡内容带 ≥60%。
-7. `lineHeight` 不得等于 1×字号（除非 Display XL 使用规定行高）。
+7. `lineHeight` 不得等于 1×字号；hero 行高固定 `lineHeightHero900`（52）。
 8. 严重错误：任何 `fontSizeBase7xx/8xx/9xx`、`fontSize: 'clamp(`、`lineHeight: 1` 出现即 fail。

@@ -24,22 +24,27 @@ interface WorldClock {
 
 | 尺寸 | 内容 |
 |---|---|
-| `1×1` | 时间（Display XL 48），不显示秒/日期 |
-| `2×1` | 时间 68 + 秒 16 + 日期 16 |
-| `3×2` | 时间 112 + 秒 16 + 日期/星期 20 |
+| `1×1` | 时间 `fontSizeHero900`/`lineHeightHero900`（40/52），不显示秒/日期 |
+| `2×1` | 时间 40 + 秒 16（`Base400`）+ 日期 14（`Base300`，放 identity 行 trailing） |
+| `3×2` | 时间 40 + 秒 16 + 日期/星期 16（`Base400`）+ 世界时钟 3 行（城市 14 / 当地时间 24，行高 44） |
 
+- hero 全档同字号 40/52，不随尺寸放大（48/68/112 作废，DENSITY §2.1-8 / D-36 §1）。
 - 纯展示；点击卡片主体 / Enter / Space = 打开详情（宿主 `?view=detail`）。
 - 不响应长按/右键（长按归宿主编辑模式），无快捷操作。
 - 设置（12/24h、显示秒、日期格式）在宿主设置页「时钟」分区。
 
+- identity 行尾固定 `ChevronRight16Regular`（`CardIdentity disclosure`，`aria-hidden`）：整卡可点开详情的唯一视觉信号，非 `compact` 档全覆盖（空态与有内容态一致）；空态不写说明句（PLUGIN-CONTRACT §4.4.3）。
+
 ## 详情（L1，`?view=detail`）
 
-- **header 56**：当前时间 Display XL 48（tabular）+ 日期 14 fg3；右侧「添加城市」40、「设置…」40。
+- **header 56**：当前时间 40（`Hero900`，tabular）+ 日期 14 fg3；右侧「添加城市」40、「设置…」40。
 - **世界时钟**：section 标题 16 semibold + 上限提示 12 fg3 + 右侧「刷新」40（逐条用 Nominatim + timeapi.io 重新解析时区，失败保留原值，1.1s/条）；
   行高 48：城市 14 fg1 + 时区（12 fg3）/ 当地时间 24 semibold tabular（右对齐）/ 今天·明天·昨天 12 fg3 / 行尾 `⋯` 40 → 删除（即时生效，可重新添加）。
+  > 48 = `spacingVerticalXXXL`(32) + `spacingVerticalL`(16)，是**详情页的富行**（两行文字 + 行尾操作）；
+  > 卡片内的列表行仍是 `LIST_ROW_HEIGHT` 44（`ListRow`），两者不要混用（TOKEN-MAP §8/§12）。
   秒级刷新；时间格式跟随设置；时区用 `Intl.DateTimeFormat` 计算，不手写偏移。
 - **日期信息**：三列等宽（label 12 fg3 + value 20 semibold）：本周第 N 周 / 今年第 N 天 / 系统时区。
-- 空态：「还没有添加城市」+ primary「添加城市」。
+- 空态（卡片 3×2）：「没有世界时钟」+ Globe24Regular（中性）+ **secondary**「添加城市」（补 Add20Regular）；详情页空态：「还没有城市」+「添加城市」。空态不写说明句（PLUGIN-CONTRACT §4.4.3），入口由这两个动作按钮与 identity 行尾 chevron 承担。
 - 内容区滚动；header 固定。
 
 ## 详情（L2，添加城市）

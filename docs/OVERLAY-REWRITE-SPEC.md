@@ -3,6 +3,8 @@
 > **⚠️ 历史文档（已被取代）**：本规格里的 `?view=settings` 设置浮层、详情/编辑/全部任务视图的
 > 旧交互与骨架已由 `docs/PLUGIN-CONTRACT.md`（设置宿主化 + L1/L2 页栈）、
 > `docs/DESIGN-ROUND-SUMMARY.md` 与六份 `docs/components/*.md` 取代；仅保留历史参考。
+> **浮层几何以 host-impl §3.5 为准**：880×680、圆角 12、`shadow64`、`DialogContent` padding 16
+> （不是本文的 834×582 / 24 内衬）；列表行 44、设置行 48、控件 40。
 
 > 范围：六个插件在宿主全窗口 Fluent Dialog 里加载的 **设置 / 详情 / 编辑 / 全部任务** 视图
 > （`?view=settings|detail|edit|all`）。卡片视图已完成 v0.2 重写，本轮只动浮层视图。

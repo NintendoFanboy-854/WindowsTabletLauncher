@@ -5,11 +5,11 @@
 
 ## D-01 卡片圆角（V-01 / V-02）
 
-- **决策**：桌面卡片、页面卡片、弹层卡片统一 **12px**，定义为项目 token `--wtsl-card-radius: 12px`。
-- 背景：Fluent 2 设计规范圆角表为 Medium 4 / Large 8 / X-Large 12；Fluent UI React v9 的 `borderRadius*` token 实际值为 Medium 4 / Large 6 / X-Large 8，两套数值不完全一致（审计报告 V-02 指出）。
-- 以设计规范为准，在项目 token 层固定 12px，**不允许各组件用 calc 再算、也不允许混用 6/8/16/**。
-- 文档修订：`FLUENT2.md §5` 已补"token 值映射注意"。
-- 例外：Fluent 自带的 `Dialog` / `DialogSurface` 弹层按 Fluent 组件默认圆角（8px）渲染，不覆写项目 token；项目 token 用于卡片（桌面卡片 / 页面卡片）。
+- **决策（2026-10-24 更正）**：桌面卡片、页面卡片、弹层卡片统一 **12px**，直接使用 Fluent `tokens.borderRadius2XLarge`（v9 实际值 **12px**）。项目不再定义 `--wtsl-card-radius`。
+- 背景：Fluent 2 设计规范圆角表为 Medium 4 / Large 8 / X-Large 12；Fluent UI React v9 的 `borderRadius*` token 实际值为 Medium 4 / Large 6 / X-Large 8 / **2X-Large 12**。旧决策误判「v9 最大只有 8」而自造项目 token，已由独立审计 P0-1 证伪。
+- 卡片 12px 用 `borderRadius2XLarge`；**不允许各组件用 calc 再算、也不允许混用 6/8/16/**。
+- 文档修订：`FLUENT2.md §5`、`TOKEN-MAP.md §2` 已同步更正。
+- 例外：Fluent 自带的 `Dialog` / `DialogSurface` 弹层按 Fluent 组件默认圆角（8px）渲染，不覆写 token；卡片/浮层 surface 用 `borderRadius2XLarge`。
 - G2 补充：宿主插件设置/详情浮层（`?view=` 全窗口 Dialog）同样沿 Fluent 默认圆角（8px），已与审计口径对齐。
 
 ## D-02 插件控件实现策略（V-03）——已由 D-02b 取代
@@ -39,15 +39,22 @@
 ## D-04 内容列表与密度预算（V-09）
 
 - **决策**：组件声明的「内容列表」按**行**计为 1 个 Secondary 区块，不逐项累加；但必须遵守行数上限：
-  - todo：`2×2` ≤ 4 行、`3×2` ≤ 5 行、`3×3` ≤ 8 行、`4×2` 每栏 ≤ 5 行；行高 44 + 行距 4，行数按实际可用高度动态取 `min(cap, floor((avail + 4) / 48))`；超出显示「查看全部」或滚动渐隐。3×2 从 6 行改为 5 行是算术约束：328px 卡高 − padding 24 − composer 40 − 组间距 16 = 248px，6 行需要 284px；5 行 236px 可放下（计数由工具条/composer 占位承担，不再单占 28px 头）。3×3 同理，1024×768 下动态 6–7 行、1440 下 7–8 行。
-  - weather：`2×2` 逐时 ≤ 6；`3×2/4×2` 的 7 天每行=1 天，不计入 Secondary。
+  - **公式（2026-10-24 重算，取代“按卡高减工具条”的旧口径）**：`A = Hc − 24 − 8 − (Hf ? 52 + 8 : 0)`，
+    `N = min(cap, floor((A + 4) / 48))`，`Hc` 为 iframe 内容框高（已扣卡片 padding 16×2），
+    `Hf` 为 countdown featured 的 hero 行高 52；行高 44 + 行距 4 = 48。
+  - todo：`2×2` ≤ **5** 行（`Hc=296`、`A=264`，5 行 236、slack 28 = 卡高 8.5%；旧 cap 4 的 slack 76 =
+    23.2% > 22%，已作废）、`3×2` ≤ 5、`3×3` ≤ 8（`A=440`，公式 N=9 但 cap 8）、`4×2` 每栏 ≤ 5。
+  - countdown：`1×2` ≤ 3（`A=204`，公式 N=4 但 cap 3）、`2×2` ≤ 4、`3×2` ≤ 4、`3×3` ≤ 8（`A=380`，slack 0）。
+  - weather：逐时按**列**计，`2×2` 4 列、`3×2` 6 列（`4×2` 的 7 天每行=1 天，不计入 Secondary）。
+  - 旧口径「328 卡高 − padding 24 − composer 40 − 组间距 16 = 248」基于已删除的工具条/composer，作废；
+    细节与逐档 slack 见 `DENSITY.md §2.2`。
 - 文档修订：`DENSITY.md §2` 已补内容列表例外说明。
 
 ## D-05 其余 P2 处置
 
 | 项 | 处置 |
 |---|---|
-| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 ≥40×40；G2 后宿主页面按钮、编辑工具条、Agent 建议按钮已统一 large；G2b 后 Fluent 内建表单控件（Switch/Input/Radio/Checkbox/Slider/Dropdown）在宿主与插件 iframe 里统一 `min-height: 40px`（CSS 命中区规则）。按钮类实测 0 项 <40，内建控件命中区 40（Checkbox 内部图形尺寸除外） |
+| V-06 触控目标 | desktop-core / host-core / agent-core / 插件 owner 统一 **≥44×44**（Fluent `layout.md:57` 的 44×44，与 HIG §6 同值）。宿主与插件 iframe 的 Fluent 内建控件（Switch/Input/Radio/Checkbox/Slider/Dropdown/Button/Tab/MenuItem）统一 `min-height: calc(spacingVerticalXXXL + spacingVerticalM)` = 44（CSS 命中区规则）；`TOUCH_TARGET=44`、`LIST_ROW_HEIGHT=44`、L1 tabs=44。2026-10-24 收口复测：卡片可点元素 0 项 <44 |
 | V-10 预警组件 | plugin-weather 改 Fluent MessageBar/Badge |
 | V-11 空态死胡同 | countdown / pomodoro / todo 按任务卡补主操作 |
 | V-12 久坐重复值 | plugin-pack 改阈值/激励提示 |
@@ -69,6 +76,10 @@
 - 初始值时序（2026-10-20，P1 回归）：`host:init` 在 iframe `onLoad` 后发出，**可能晚于插件 React 首帧**（reload 后实测插件先按默认尺寸/主题渲染）。因此宿主在每次加载的 `init` 后立即补发一次幂等的 `host:resize` / `host:theme`；共享底座 `useHostSize` / `useHostTheme` 同时消费 `init` 与增量消息，保证 reload 后卡片内容与用户保存的尺寸档位、当前主题一致。
 
 ## D-07 Display XL：数字型主信息的项目字阶例外（新增，2026-10-19）
+
+> **已作废（2026-10-24，D-36 Equal Except Hue）**：`Display XL`（48/80/96/112）与 `displayXl()` /
+> `DISPLAY_XL` 已从 `public/plugins/_shared/typography.js` 删除；所有插件主数字改用 Fluent 官方
+> `tokens.fontSizeHero900` / `lineHeightHero900`（40/52），不再有项目级字号例外。以下条文仅作历史记录。
 
 - **背景**：Fluent 2 官方字阶（`references/fluentui-design/typography.md`）与 Fluent UI React v9 token
   （`node_modules/@fluentui/tokens/lib/global/fonts.js`）的最大角色都是 **Display 68px / 92px**
@@ -428,12 +439,17 @@
   - countdown = pink、pomodoro = orange、sedentary = green、todo = purple、weather = teal（同理取对应 palette token）
 - 限制：identity 色不承担状态/语义/数据含义（状态仍用 `colorStatus*` / 语义色）；不用于背景、边框、大面积填充；不新增项目 token。实现集中在 `public/plugins/_shared/ui.jsx` 的 `CARD_ACCENTS` / `CardIdentity` / `EmptyState.iconAccent`。
 - 否掉：给每卡配自定义主色（会变成 6 套小主题，和 Fluent token 体系冲突）；用 identity 色做卡片背景渐变（不是 Fluent 2）。
+- **修订（2026-10-24，D-36 §4）**：本条“24×24 chip 背景 + 16px 图标”作废；identity 只允许出现在
+  **20px 图标**（可选 1 处 2px 状态强调），不再有 chip 底色，也不用于空态色块。
 
 ## D-33 卡片静态 identity 行（2026-10-23，v0.4.0）
 
 - 背景：DENSITY「正常模式无 chrome」+ 去标题栏之后，卡片没有身份锚点，桌面读作"灰色矩形阵列"。
 - 决策：每张卡内容区第一行允许一条 **静态** identity 行：24px 高，identity chip（24×24）+ 12px 半粗 `colorNeutralForeground3` 组件名（≤4 字）+ 可选 trailing（原有计数 / 城市 / 状态）。1×1 卡只留 chip（`compact`）。
 - 边界：它不是 chrome——没有可交互控件、不常驻操作、不占点击热区；不改变「点击=主操作、长按=编辑」的交互契约。DENSITY §2 的 Primary/Secondary 信息预算不把 identity 行计入；其余门禁（最小 12px、主次字号比、空带、内容带、横向空洞）不变。
+- **修订（2026-10-24，D-36 §2）**：identity 行仍 24 高，但组成改为 **20px 图标 + 12px 标签**，
+  取消 24×24 chip 底色；`1×1` 只留 20px 图标。token 出处：`spacingVerticalXXL`（24）、图标档位 20、
+  `fontSizeBase200` / `lineHeightBase200`（12/16）。
 
 ## D-34 默认布局：填满首屏（2026-10-23，v0.4.0）
 
@@ -442,6 +458,7 @@
   weather 4×2 @ (0,0)、clock 3×2 @ (4,0)、todo 3×3 @ (0,2)、pomodoro 3×2 @ (3,2)、countdown 2×2 @ (6,2)、sedentary 2×1 @ (6,4)。
 - 兼容：老用户已保存的 `wtsl.layout` 不受影响；「重置布局」回落到新构图。其他分辨率按既有 clamp / 首个空位回退规则，不追求一致。
 - 实现修正（v0.4.0 落位时发现）：`src/host/plugins/manifest.ts` 原先用 `asWidgetSize` 校验 `cell`（尺寸语义，要求两维 ≥1），导致声明在**第一列/第一行**的坐标（0）被判非法、默认布局静默退化成“首个空位”装箱。已改为 `asGridCell`（坐标语义，允许 0）；默认构图的落位以本条为准。
+- **修订（2026-10-24，v0.4.5 布局居中轮）**：`breakpoints.gridOrigin` 取消 4px 吸附、改为严格居中，网格由 (20,44)-(1416,912) 变为 **(22,46)-(1418,914)**，四边留白 **22/22/46/46**（cell 164、gutter 12、8×5 全不变；22/46 的唯一定义处是新导出的 `gridInsets()`）。默认构图随之更正为：weather **3×2 @ (0,0)**、clock **3×2 @ (5,0)**、todo 3×3 @ (0,2)、pomodoro 3×2 @ (3,2)、countdown 2×2 @ (6,2)、sedentary **2×1 @ (5,4)**。与初版不同的两条：① clock 由 (4,0) 移入 (5,0)，使首行右缘与网格右缘 1418 齐平、首行中缝落在屏幕中线 720；② sedentary 由 (6,4) 显式钉到 (5,4)，否则它与右下保留格 (7,4) 相交、会被 first-fit 挤回首行 (3,0)。各组件 `sizes` / `defaultSize` 均未改，卡片尺寸不变。老用户已保存的 `wtsl.layout` 不受影响（`sanitizeLayout` 只在缺组件/越界时重排）。
 
 ## D-35 半高语音窗 idle 视觉锚点（2026-10-23，v0.4.0）
 
@@ -454,4 +471,18 @@
 - 明确不做：循环呼吸/脉冲/粒子/视差动画；**本轮新增动画时长 = 0**（进入仍走既有 motionTokens 过渡）。
 - 契约不变：voice 段无 textarea、顶栏 ⌃/朗读/✕、peek 最近 3 条、底部「点击说话」、录音时声纹替换。
 - 验证：`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/verify-agent-voice-first.mjs` 断言层全 PASS（198/200，2 条 FAIL 为并发环境 Edge teardown 竞态，非 UI 断言）；`npm run typecheck` exit 0。详见 `docs/AGENT-SURFACE-CONTRACT.md §14.6`。
+
+## D-36 Equal Except Hue：同权插件的视觉契约（2026-10-24，用户已认可）
+
+- 背景：六个插件同级，但分别自定义字号（48/68/80/96/112）、padding（8/12/16）、按钮层级（四个 accent）和 identity 色出现位置（chip 背景、空态色块），画面既无差异秩序也无统一秩序。
+- 决策：
+  1. **唯一 hero 字号**：直接引用 Fluent token `tokens.fontSizeHero900` / `tokens.lineHeightHero900`（逻辑 40/52，200% DPI = 物理 80px，官方 Large Title 档）。**不定义项目级字号变量**（第二遍复核删除了 `--wtsl-hero-size/-line-height` 这类手写像素 token）；所有插件主数字经共享 `HERO_TEXT` 取用，次级数字/标签/说明用 Fluent `Text size`（title3/body1/caption1）。
+  2. **唯一卡片栅格**：共享 `CardRoot` 提供 padding 16、gap 8；插件不再按尺寸覆盖 padding/gap。identity 行 24 高（20px 图标 + 12px 标签），hero 紧随其后。
+  3. **按钮层级**：插件内行动按钮默认 secondary/subtle；accent 只保留给状态（番茄“运行中”），同一页不同时点亮两个 accent。
+  4. **身份色契约**：manifest 顶层 `identityHue`（blue/pink/orange/green/purple/teal 白名单）；loader 缺失/非法即拒绝并报错；宿主映射到 shared palette 同档 `Foreground2`（orange → `colorPaletteDarkOrangeForeground2`，Fluent v9 没有 `colorPaletteOrangeForeground2`），随主题下发 `wtslIdentity`，插件写成 `--wtsl-identity`。只允许出现在 20px identity 图标（可选 1 处 2px 状态强调），禁止卡背景/大数字/按钮填充/空态色块。
+  5. **空态**：中性单色 24–32px 图标 + 12px caption，不再用彩色色块。
+  6. **材质**：宿主卡片统一 12px 圆角、`shadow4`（hover 8）+ 72% `colorNeutralBackground1` + blur + `colorNeutralStroke2`；插件不覆盖卡框。
+  7. **动效**：继续只走 `motionTokens`；插件共享 `motion.js` 已有 reducedMotion 变体，`base.css` 再为内联 transition 提供 reduce 兜底。
+- 实现：`src/host/plugins/identity.ts`、`src/host/plugins/manifest.ts`、`src/host/plugins/manager.ts`、`src/host/desktop/WidgetCard.tsx`、`public/plugins/_shared/{base.css,host.js,ui.jsx,typography.js}` 与六个插件 `src/**`；产物 `app/app.js` 已重建。
+- 验证：`npm run typecheck` exit 0；`npm run build` 通过（2227 modules，2.41s）。
 

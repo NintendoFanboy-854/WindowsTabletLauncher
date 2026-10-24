@@ -32,17 +32,20 @@ interface Task {
 - 行内只保留一个元信息；不显示备注、标签、子任务数。
 - 点击卡片主体或行 = 打开详情；勾选框 `stopPropagation`，不打开详情。
 - 无 `+`、输入框、菜单、搜索、视图切换、拖拽、长按/右键。
-- 空态：居中「今日没有待办」14 fg3，无按钮（详情里添加）。
+- 空态：2×2 起左对齐并顶到首行槽位（`align="start"`），1×1 走 `compact` 居中；`TaskListSquareLtr24Regular` + 标题（没有任务时「还没有待办」，今天空了时「今日没有待办」）+ **secondary** 按钮（没有任务时「添加待办」+ `Add20Regular`，否则「查看全部」+ `ChevronRight20Regular`）；不写说明句。
 
 | 尺寸 | 内容 |
 |---|---|
-| `1×1` | 今日未完成数 48 +「今日待办」14 +（有逾期）「已逾期 N」12 danger |
-| `2×2` | 头部「今日 · N」12 fg3 + 4 行 |
-| `3×2` | 头部 + 5 行 |
+| `1×1` | 今日未完成数 `fontSizeHero900`/`lineHeightHero900`（40/52）+「今日待办」14 +（有逾期）「已逾期 N」12 danger |
+| `2×2` | 头部「今日 · N」12 fg3 + 5 行 |
+| `3×2` | 头部 + 5 行（每行多清单名） |
 | `3×3` | 头部 + 8 行 |
 | `4×2` | 头部 + 5 行单列宽行（不做左右两栏） |
 
-行预算：2×2=4、3×2=5、3×3=8、4×2=5；超出由详情承载，不静默裁切。
+行预算（`A = Hc − 24 − 8`、`N = min(cap, floor((A + 4) / 48))`，见 DENSITY §2.2）：
+2×2=5、3×2=5、3×3=8、4×2=5；超出在 identity trailing 写「今日 X · 显示 Y」，不静默裁切。
+
+- identity 行尾固定 `ChevronRight16Regular`（`CardIdentity disclosure`，`aria-hidden`）：整卡可点开详情的唯一视觉信号，非 `compact` 档全覆盖（空态与有内容态一致）；空态不写说明句（PLUGIN-CONTRACT §4.4.3）。
 
 ## 详情（L1，`?view=detail`）
 
@@ -58,6 +61,9 @@ interface Task {
 - **月视图**：6×7 日格 44，格内最多 2 个任务点/计数；下方列出选中日任务。
 - **热力图**：16 周网格 + 图例 12 fg3；顶部统计一行（值 20）。
 - 所有视图共用 padding 24、行高 44、字号 12/14/16、无分割线。
+  > 2026-10-24 澄清：详情里的内衬由宿主给（`DialogSurface` 24 + `DialogContent` 16 = 内容轴 40），
+  > 插件根节点**不再加左右 padding**（PLUGIN-CONTRACT §4.3）；这里的 24 指宿主 `DialogSurface` 内衬，
+  > 不是插件自己的值。卡片内 padding 恒 16（`CardRoot` 强制）。
 
 ## 详情（L2，任务编辑，push）
 
@@ -85,8 +91,6 @@ interface Task {
       { "key": "defaultSort", "type": "enum", "label": "默认排序", "default": "manual",
         "options": [ { "value": "manual", "label": "手动" }, { "value": "due", "label": "截止时间" },
                      { "value": "priority", "label": "优先级" }, { "value": "created", "label": "创建时间" } ] },
-      { "key": "fontSize", "type": "enum", "label": "字号", "default": "default",
-        "options": [ { "value": "default", "label": "默认" }, { "value": "large", "label": "大" } ] },
       { "key": "weekStart", "type": "enum", "label": "一周起始日", "default": 1,
         "options": [ { "value": 1, "label": "周一" }, { "value": 0, "label": "周日" } ] }
     ]
@@ -95,6 +99,7 @@ interface Task {
 ```
 
 「默认清单」是动态数据，放在详情·清单管理（设为默认），不进 schema。
+原 `fontSize`（默认/大）设置已删除：行标题恒 `fontSizeBase400`（16），跨卡字号不一致违反 Equal Except Hue（D-36 §1）。
 
 ## Agent 工具（UI 路径 ↔ 工具）
 
@@ -114,7 +119,7 @@ interface Task {
 ## 边界与异常
 
 - 提醒：单写者 background iframe + `navigator.locks`（D-12）；本地日期去重。
-- 空清单/搜索无结果：空态一句话 + 主操作。
+- 空清单/搜索无结果：EmptyState 标题 + 一个次操作（「添加任务」/「清除搜索」），不写说明句。
 - 重复任务完成时生成下一次任务；原任务保留为已完成。
 - 软键盘弹出时详情表单内部滚动，不带动桌面。
 - 标题超长列表省略；时间/数字 tabular。

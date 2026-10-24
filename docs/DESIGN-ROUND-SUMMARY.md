@@ -9,6 +9,9 @@
 > - 逐插件规格：[components/](components/)
 > - 设计参考：[reference/APPLE-HIG.md](reference/APPLE-HIG.md)
 > - 历史规格（已部分被取代）：[OVERLAY-REWRITE-SPEC.md](OVERLAY-REWRITE-SPEC.md)、[UI-REWRITE-SPEC.md](UI-REWRITE-SPEC.md)
+>
+> **2026-10-24 口径**：hero 全档 40/52、卡片 padding 16 / gap 8、行高 44、2×2 行预算 5 行；本文旧数字已按
+> [DENSITY.md](DENSITY.md) §1.1–§2.2 与四份密度规格修正。
 
 ## 1. 设计原则
 
@@ -62,40 +65,40 @@
 
 ### 5.1 时钟（[clock.md](components/clock.md)）
 - 卡片：1×1 时间；2×1 时间+秒+日期；3×2 大时间+日期/星期。纯展示，点击=详情。
-- 详情 L1：时间 48 + 日期、世界时钟列表（≤8，秒级刷新）、日期信息；设置…跳宿主设置。
+- 详情 L1：时间 40（`Hero900`）+ 日期、世界时钟列表（≤8，秒级刷新）、日期信息；设置…跳宿主设置。
 - L2：添加城市（内置 ~40 城市搜索，时区用 IANA，禁止重复，添加后 pop）。
 - Agent：`clock.now`、`clock.settings.get/set`、`clock.world.list/add/remove`。
 
 ### 5.2 倒数日（[countdown.md](components/countdown.md)）
 - 卡片：1×1 最近一条；2×1 一条；2×2 列表；3×2 列表；纯展示，点击=详情；去掉 `+`/长按/右键。
-- 详情 L1：即将到来 / 已过去（折叠）两组；行 48，标题 16、天数 20、日期 12；今天 Badge、7 天内 Badge；行尾 ⋯ 编辑/删除（行内确认）。
-- L2：新建/编辑表单（标题/日期/颜色 7 色点/每年重复）；保存 pop、取消/返回 pop、X 关闭。
+- 详情 L1：即将到来 / 已过去（折叠）两组；行 44，标题 16、天数 20、日期 12；今天 Badge、7 天内 Badge；行尾 ⋯ 编辑/删除（行内确认）。
+- L2：新建/编辑表单（标题/日期/每年重复；**每事件自选颜色已移除**，见 density-countdown-todo §2.8）；保存 pop、取消/返回 pop、X 关闭。
 - 设置：显示已过去、强调 7 天内。
 - Agent：`countdown.list/add/update/remove/settings.get/set`。
 
 ### 5.3 久坐（[sedentary.md](components/sedentary.md)）
-- 卡片：1×1 状态点+分钟（无按钮）；2×1 起显示分钟+状态+「我起来了」40；点击=详情；去掉 ⋯ 菜单/长按。
+- 卡片：1×1 Badge+分钟 40（无按钮、无状态点）；2×1 起显示分钟 40+状态点+「我站起来了」40；点击=详情；去掉 ⋯ 菜单/长按。
 - 详情 L1：状态 16 + 辅助 12、我起来了、设置…；4 个统计块；最近 7 天列表（行 44）。
-- 设置：启用、阈值、再催间隔、空闲判定、强提醒、免打扰时段（timeRange）。
+- 设置：启用、阈值、再催间隔、强提醒（空闲判定/免打扰已按 D-25–D-27 移除）。
 - Agent：`sedentary.status/today/takeBreak/snooze/settings.get/set`；提醒只由 background iframe 调度。
 
 ### 5.4 番茄钟（[pomodoro.md](components/pomodoro.md)）
-- 卡片：1×1 时间+阶段+进度（无按钮）；2×1 起「开始/暂停」+「重置」；2×2+ 任务与今日统计；去掉 ⋯ 菜单/沉浸模式/长按。
+- 卡片：1×1 时间 40+阶段（无按钮、无进度条）；2×1 起「开始/暂停」+「重置」；2×2+ 任务、轮次与今日统计；去掉 ⋯ 菜单/沉浸模式/长按。
 - 详情 L1：阶段 Badge + 剩余 40 + 轮次；开始/暂停、重置、跳过、任务选择；一行四列统计；最近记录按天分组；清空记录（行内确认：清空今日/清空全部）。
 - L2：选择关联任务（来自待办的未完成任务，选中即关联并 pop）。
 - 设置：时长/轮数、自动开始、提示音、保持唤醒、白噪音类型/音量。
 - Agent：`pomodoro.start/pause/resume/stop/skip/reset/status/stats/clearStats/settings.get/set`。
 
 ### 5.5 待办（[todo.md](components/todo.md)）
-- 卡片：固定「今日」视图（逾期+今天），纯展示 + checkbox 勾选；1×1 计数；2×2 4 行、3×2 5 行、3×3 8 行、4×2 5 行单列；无 `+`/输入框/菜单/视图切换/拖拽。
+- 卡片：固定「今日」视图（逾期+今天），纯展示 + checkbox 勾选；1×1 计数 40；2×2 5 行、3×2 5 行、3×3 8 行、4×2 5 行单列；无 `+`/输入框/菜单/视图切换/拖拽。
 - 详情 L1：header（清单筛选 + 搜索 + 添加任务）+ 常显 Tabs（列表/日历/周/月/热力图）+ 分组列表；行 ⋯ 编辑/删除（行内确认）；已完成折叠 + 清空。
 - L2：任务编辑（标题/备注/清单/优先级/截止/提醒/重复/标签/子任务；保存/取消/删除）、清单管理（新建/重命名/删除/默认）。
-- 设置：显示已完成、默认排序、字号、一周起始；默认清单进详情清单管理。
+- 设置：显示已完成、默认排序、一周起始（`fontSize` 字号设置已删除，D-36 §1）；默认清单进详情清单管理。
 - Agent：在原有 lists/list/add/update/remove/addList/complete/subtask/search 基础上补 `renameList/removeList/removeSubtask/clearCompleted/settings.get/set` 与 `stats`。
 
 ### 5.6 天气（[weather.md](components/weather.md)）
-- 卡片：1×1 图标+温度；2×1 +现象+高低温；2×2 当前+逐时 6 列；3×2 当前+逐时 6 行（不放 7 天）；4×2 当前+AQI+等宽 7 天底栏；预警仅 3×2/4×2 紧凑 Badge；点击=详情；去掉城市菜单/刷新/设置/长按。
-- 详情 L1：城市/更新时间/刷新/设置 56；紧凑摘要（温度 48、AQI Badge）；单行 6 项环境信息；Tabs（逐时/7天/空气/生活指数/预警）；列表行 44；有预警默认进预警 Tab。
+- 卡片：1×1 图标+温度 40；2×1 +现象+高低温；2×2 当前+逐时 4 列；3×2 当前+逐时 6 列 × 4 行（不放 7 天）；4×2 当前+AQI+等宽 7 天底栏；预警仅 3×2/4×2 紧凑 Badge；点击=详情；去掉城市菜单/刷新/设置/长按。
+- 详情 L1：城市/更新时间/刷新/设置 56；紧凑摘要（温度 40、AQI Badge）；单行 6 项环境信息；Tabs（逐时/7天/空气/生活指数/预警）；列表行 44；有预警默认进预警 Tab。
 - L2：管理城市（搜索添加/删除/设为当前/系统定位或 ip.cn 网络定位）。
 - 设置：单位、刷新间隔、自动定位、显示 AQI/预警/分钟级降水、API Key/Host。
 - Agent：原有 current/hourly/daily/air/warning/queryPlace/places/addPlace/removePlace，补 `setCurrentPlace/locate/refresh/settings.get/set`。

@@ -27,20 +27,31 @@
     窄屏必须继续降列：320px 宽时 4 列 × 96px + 3 × 12px = 420px 会横向溢出，
     降到 2 列后 2 × 96px + 12px = 204px 才放得进屏幕（审计项 V-22）。
 
-- **行数** = `floor(可用高度 / cell)`，最少 4 行；页内**不滚动**，桌面始终是一屏（这是桌面环境的定义，不是限制）。
+- **行数** = `floor((可用高度 + 12) / (cell + 12))`（`breakpoints.ts` 的 `computeGridMetrics`），最少 4 行；页内**不滚动**，桌面始终是一屏（这是桌面环境的定义，不是限制）。
 - **竖屏不在产品目标内**：这是横屏平板桌面启动器，只保证横屏窗口（最小 960×640）；不为竖屏做专门适配、截图或验收。窄列断点（4/3/2 列）只作为极端 resize 的兜底，不属于验收范围。
 - **尺寸档位**（列跨 × 行跨）：`1×1`、`2×1`、`1×2`、`2×2`、`3×2`、`4×2`、`3×3`。插件在 manifest 里声明**它支持哪几档**，用户在编辑模式里切换。
+- **右下角 1 格为 Agent 入口的保留格**（8×5 下 = `(col 7, row 4)`，`fabReservedCell()`；函数名沿用历史命名，服务的是 Agent 入口）：放置、移动、改尺寸、重排全部跳过该格；入口方向**固定右下（不是右上）**，右/下安全边距 0（入口右缘/下缘与网格右缘 1418 / 下缘 914 齐平），编辑态隐藏（host-impl §2.3 / §3.3，TOKEN-MAP §6）。
 - **列数变少时的降级**：`w = min(w, 列数)`，`h` 不变；然后整页按“从左到右、从上到下”重排到第一个放得下的空位（避免重叠）。
 - 布局持久化用逻辑坐标（页、列、行、档位），不存像素。
 
 ### 1.2 小组件内部
 
 - 小组件是 iframe，**iframe 的视口就是卡片本身**：内部直接用 `vw / vh / % / clamp()`，不要写死像素。
-- 字阶、间距用 Fluent token 做基准；文本字号只用 `Text size` / `fontSizeBase*` / `fontSizeHero*`。数字型主信息可按 DECISIONS D-07 使用项目 `Display XL`（48/80/96/112），不得用于标题/正文/标签，不做 `lineHeight: 1`。间距按 DENSITY §2.1 的尺寸档映射，不再用任意 `clamp()`。
-- 触控目标不小于 **40×40 CSS px**（Fluent 的触控尺寸）。
-- **卡片 identity 行**（v0.4.0，D-33）：内容区第一行可放一条静态 identity 行——24×24 identity chip（Fluent shared palette）+
-  12px 半粗 `colorNeutralForeground3` 组件名（≤4 字），可选 trailing 放原顶部辅助信息；`1×1` 只留 chip。
+- **Equal Except Hue（v2，2026-10-24）**：卡片内容栅格统一为 4px 基线 → 8px 步长；padding 16（`spacingVerticalL` /
+  `spacingHorizontalL`）、组间距 8（`spacingVerticalS`）。数字型主信息统一 `tokens.fontSizeHero900` /
+  `tokens.lineHeightHero900`（逻辑 40 / 52，200% DPI = 物理 80px），不得再按插件/尺寸选 48/68/80/96/112，
+  也不定义项目级字号变量。文本字号只用 Fluent `Text size` / `fontSizeBase*` / `fontSizeHero*`，不做 `lineHeight: 1`。
+- 宿主在卡片与 iframe 之间留 **6px 内衬**（`spacingHorizontalSNudge`，接住 hover 1.015 的放大与描边），
+  因此屏幕上插件内容的实际边距 = 6 + 16 = 22px；插件侧只负责那 16px。
+- 触控目标不小于 **44×44 CSS px**（Fluent `layout.md:57` 与 HIG §6 同值）；卡片动作按钮统一 44 高。
+- **卡片 identity 行**（Equal Except Hue v2）：内容区第一行是 24px 静态 identity 行——20px 身份色图标 +
+  12px 半粗 `colorNeutralForeground3` 组件名（≤4 字），可选 trailing 放原顶部辅助信息；`1×1` 只留图标。
   它不是 chrome：没有可交互控件、不常驻操作、不占点击热区，不计入 DENSITY 的信息预算。
+- **图标只取档位**：`_shared/ui.jsx` 的 `ICON_SIZE` = 16 / 20 / 24 / 32 / 48；identity 用 20（`IDENTITY_ICON_SIZE`）、
+  空态紧凑档用 24（`EMPTY_STATE_ICON_SIZE`）、内容图形用 32 / 48。不缩放大图标、不写 `size={28}` 这类中间值
+  （`iconography.md:19-23`「按档位取、不缩放」）。
+- **进度带厚 4px = `tokens.strokeWidthThickest`**：Web 档 `strokeWidthThicker` 是 3px（`shapes.md:67-72`），
+  所以 4px 带只能取 Thickest；共享层以 `HERO_PROGRESS_THICKNESS_PX` 暴露（DENSITY §2.1-13）。
 - 每个组件文档里必须写清楚：各档位显示什么、**太小的时候砍掉什么**。
 - 加载态用 Fluent `Skeleton` / `Spinner`，错误态用 `MessageBar`，空状态用 Fluent 的空状态排版。
 
@@ -48,6 +59,9 @@
 
 - 页数不限；左右滑动切页（手指落在小组件上时手势归小组件）。
 - 页面指示点：页数超过 7 时折叠成“当前页/总页数”的小胶囊，避免指示点排一长串。
+  - 指示器**只改颜色**（2026-10-24 裁决）：容器透明、**无材质底、无投影**、`pointer-events: none`；
+    dot 8×8、dot 间距 4、容器高 16（8 + 4×2）、底距 12；当前页 `colorNeutralForeground1`、其余
+    `colorNeutralForeground3`，过渡只动 `background-color`（不用 brand/stroke；host-impl §3.4、TOKEN-MAP §7）。
 - 编辑模式下可增删页、调整顺序；拖到屏幕左右边缘停住会翻页。
 - 编辑模式工具条提供「添加组件」：把已启用但不在桌面的插件小组件加回当前页；删除是持久下桌
   （不卸载插件），重置布局恢复 manifest 默认摆放（D-19）。
@@ -77,6 +91,7 @@
     "id": "clock",
     "name": "时钟",
     "version": "0.2.0",
+    "identityHue": "blue",
     "widgets": [
       {
         "id": "clock",
@@ -135,8 +150,9 @@
 
 - **组件**：一律用 Fluent UI React v9（`@fluentui/react-components`）的 Button、Card、Dialog、Drawer、TabList、Menu、Toast、Skeleton、MessageBar、Spinner、Input、Switch、Slider…；不自己画控件。
 - **主题**：`FluentProvider` 深色 / 亮色两套，**默认跟随系统亮暗**（`prefers-color-scheme`），设置页可固定（见 DECISIONS D-06）；插件由宿主 `host:init/theme` 注入同一套主题。颜色全部取 `tokens.*`，不手写 hex。
-- **颜色例外**（v0.4.0，D-32）：每个插件允许一个 identity 色，只用于卡片顶部 24×24 identity chip 与 16px 图标（≤10% 卡面积），
-  固定映射到 Fluent shared palette 六种，不承担状态/语义、不用于背景/边框，不新增 hex 或项目 token（见 FLUENT2 §2）。
+- **颜色例外**（Equal Except Hue v2）：每个插件只在 manifest 声明一个 `identityHue`，宿主映射到 Fluent
+  shared palette 同档 L*/C*，只用于 20px identity 图标（可选 1 处 2px 状态强调）。不承担状态/语义、
+  不用于卡背景/大数字/按钮填充/空态色块，不新增 hex 或项目 token（见 FLUENT2 §2、PLUGIN-CONTRACT §2.2）。
 - **字体**：Fluent 字体 token（`fontFamilyBase` → Segoe UI Variable），字阶用 `fontSizeBase*` 档位。
 - **圆角 / 间距 / 阴影**：`borderRadius*`、`spacing*`、`shadow*` token。
 - **材质与壁纸**（v0.4.0，D-31）：桌面壁纸层画在 `FluentProvider` 内部最底层（provider 根背景透明，否则壁纸被盖住——v0.3.x 实测失效）。

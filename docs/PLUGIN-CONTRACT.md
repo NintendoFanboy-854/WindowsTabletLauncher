@@ -48,6 +48,7 @@
   "id": "clock",
   "name": "时钟",
   "version": "0.2.0",
+  "identityHue": "blue",
   "background": false,
   "widgets": [
     {
@@ -108,6 +109,38 @@
 - 配置存储：`plugin.<pluginId>.<settings.key>`，由宿主 `setConfig` 写入；写入后宿主向该插件的
   所有 iframe 推 `host:config`，插件用 `useStoredConfig`（或自定义 hook 里的 `plugin.onConfig`）
   即时同步。**不要用 storage 事件**（跨 origin 失效，见 §1 配置更新时序）。
+
+### 2.2 identityHue（Equal Except Hue）
+
+manifest 顶层必须声明一个身份 hue：
+
+```json
+{ "identityHue": "blue" }
+```
+
+- 白名单只有 `blue / pink / orange / green / purple / teal`，不接受任意 hex、rgb 或自定义调色板。
+- 宿主把 hue 映射到 Fluent shared palette 的同一档 `Foreground2 / BorderActive / Background2`，
+  其中 `Foreground2` 通过 `ThemePayload.wtslIdentity` 下发，插件把它写成 `--wtsl-identity`。
+  **插件代码不得引用具体 palette token 名或写死颜色**。
+- 非法/缺失的 `identityHue` 会被 loader 拒绝加载，并在插件管理页与 console 给出可定位的报错；
+  不做默认 hue 回退（静默回退会破坏“六个插件一套色相”的保证）。
+- 身份色只允许出现在 20px identity 图标；不得用于卡背景、大数字、按钮填充、空态色块。
+  状态（running / paused / alert / done）走 Fluent semantic token，不占用身份 hue。
+- **色相落点最终形态（2026-10-24）**：全库只有两处——① 20px identity 图标（`IDENTITY_ICON_SIZE`，
+  `_shared/ui.jsx`）；② 可选 1 处状态强调线，厚 `tokens.strokeWidthThick`（2px）。其余任何位置
+  （卡底、大数字、按钮填充、空态色块、图表、进度带）出现身份色即违规——进度带用 `colorBrandBackground`，
+  状态用 `colorStatus*`，都不是身份色。
+- **manifest 只存 hue 名**：`identityHue` 的值必须是白名单字符串本身，**不得**写 hex / rgb / 任意调色板值；
+  把 hue 解析成颜色的唯一位置是宿主 `withIdentityTheme`（`src/host/plugins/identity.ts`），插件侧只读
+  `--wtsl-identity`（= shared palette 同档 `Foreground2`）。插件代码里出现颜色字面量即违规。
+- **白名单是封闭集合，没有默认值**：`blue / pink / orange / green / purple / teal` 之外的
+  字符串、缺失、数字、对象一律在 `normalizeManifest` 阶段抛错；`PluginManager` 把该插件
+  记入 `problems` 并跳过，插件管理页可见。宿主运行时不再回退成中性色：主题里身份色
+  `Foreground2 / BorderActive / Background2` 任意一档解析不到，`withIdentityTheme` 直接抛错
+  （`src/host/plugins/identity.ts`），不静默降级。
+- 三档身份色由宿主按当前 manifest hue 只交付本插件的一份：`wtslIdentity`（Foreground2，
+  `--wtsl-identity` 的唯一来源）、`wtslIdentityBorder`、`wtslIdentitySurface`（契约保留，
+  默认不用于装饰）。插件不得引用其它 palette token 名，也不得用 border/surface 铺卡背景。
 
 ## 3. 卡片交互契约（触控优先）
 
@@ -173,6 +206,37 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 4. 卡片内容遵守 DENSITY 信息预算；详情级操作不出现在卡片上（含 `+`、齿轮、⋯菜单）。
 5. 按压/长按期间的视觉反馈由宿主统一提供，插件不自行加卡片级缩放/阴影动画。
 
+### 3.5 宿主独占的视觉属性（插件不得设置）
+
+| 属性 | 宿主唯一来源 | 插件不得做什么 |
+|---|---|---|
+| 卡壳 | `src/host/desktop/desktop.styles.ts` + `desktop.css`：12 圆角（`borderRadius2XLarge`）、1px 描边（`strokeWidthThin`）、`shadow4→8`、72% `colorNeutralBackground1` + `--wtsl-material-blur`（24）、6px 内衬（`spacingHorizontalSNudge`） | 不得自画卡框、边框、圆角、投影、材质、内衬 |
+| 字号 / 行高 / 字重 | Fluent `Text size` / `fontSizeBase*` / `fontSizeHero900`；唯一 hero 是 `_shared/ui.jsx` 的 `HeroText` | 不得写裸 px / `lineHeight:1` / `<12px` 文本；不得另造 hero |
+| 按钮层级 | `TouchButton` / `ActionButton` 的 secondary 默认；只有状态触发才 `primary` | 不得把多个按钮同时做成 accent 实心；不得自画按钮 |
+| 内边距 / 组间距 | `CardRoot` 强制 16 / 8；宿主 6px 内衬；合计内容轴 22 | 不得用 `className/style` 覆盖 CardRoot 的 padding/gap，不得在插件根节点再叠 padding |
+| 栅格 / 卡片尺寸 | `src/host/layout/**`：8×5、164 cell、12 gutter、居中留白 22 / 46（`gridInsets`）；右下角 1 格为 Agent 入口的保留格 | 不得改列数/步长/页边距；尺寸只能从 manifest 允许档位里选 |
+| 浮层几何 / 关闭 | `PluginOverlay`：880×680、12 圆角、`shadow64`、24+16 内容内衬、X/Esc/遮罩同义 | 不得自造浮层、关闭按钮或遮罩；L2 的←/取消只 pop 不关闭 |
+| 动效 | 宿主 `motionTokens` 与 `overlayMotion` | 不得写自定义时长/曲线；不得用循环呼吸表达状态 |
+
+> 唯一合法变量仍是 manifest 的 `identityHue` + 图标形状 + 内容 + 状态文案。
+> 违反上述任一项，宿主不保证像素稳定；评审时按硬门槛处理。
+
+### 3.5.1 插件不得设置的四类东西（2026-10-24 追加）
+
+上一节是「属性 → 唯一来源」的对照；这一节是**可直接判定的禁止清单**。四类属性全部由 `CardRoot` 与共享原语
+在**代码里强制**，不靠插件自觉；绕过写法（例：包一层 `<div style={{ padding: 16 }}>` 自造卡壳、给共享原语传
+`className` 改字号）与直接写属性同罪。
+
+| # | 不得设置 | 唯一来源 | 判定方式（静态扫描即可） |
+|---|---|---|---|
+| 1 | **卡壳**：圆角 / 描边 / 投影 / 材质 / 内衬 | 12（`borderRadius2XLarge`）、1（`strokeWidthThin`）、`shadow4→8`、72% `colorNeutralBackground1` + `--wtsl-material-blur` 24、6（`spacingHorizontalSNudge`）——全部来自宿主 `desktop.styles.ts` / `desktop.css` | 插件源码或样式里出现 `borderRadius` / `boxShadow` / `backdrop-filter` / 卡根 `border` 即违规 |
+| 2 | **字号层级**：hero / 行标题 / 标签 / 元信息的字号与行高 | hero 只能由 `HeroText`（`Metric` 内部用同一实现）产出；其余用 Fluent `Text size`（200–600）；行标题走 `ListRow`（16/22）；计数走 `TrailingCount`（12/16） | 出现 `fontSize` / `lineHeight` 字面量、`<12px` 文本、`lineHeight: 1`、`clamp()` 字号即违规；hero 不经 `HeroText` 也违规 |
+| 3 | **按钮层级**：强调等级与数量 | `TouchButton` / `ActionButton` 默认 secondary；只有「状态驱动的主操作」（开始/暂停、我站起来了）才 `primary`；同一卡片同一屏 ≤1 个 accent 实心 | 自绘按钮、非状态驱动处用 `appearance="primary"`、同一视区两个实心按钮即违规 |
+| 4 | **内外边距**：卡片 padding / 组间距 / 插件根节点再叠内边距 | `CardRoot` 强制 padding 16（`spacingHorizontalL` / `spacingVerticalL`）+ gap 8（`spacingVerticalS`）；宿主 6 内衬 → 内容轴 22；L1/L2 内衬由宿主 `DialogSurface` 24 + `DialogContent` 16 给 | 给 `CardRoot` 传 `style`/`className` 改 padding/gap、或插件根节点再写 padding 即违规（`CardRoot` 会覆盖，但代码仍按违规记） |
+
+> 一条换算兜底：文档/评审引用这四类数值时只写 token 名（`spacingVerticalL` 等），不写 `16` / `8` / `12`；
+> 数字与 token 的对照在 [TOKEN-MAP.md](TOKEN-MAP.md)，新增数值先查表再加。
+
 ## 4. 详情视图契约（页栈层级，L0 → L1 → L2）
 
 ### 4.1 层级模型
@@ -211,6 +275,140 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 
 - L1 内容 = **更多信息 + 具体操作**，不是把卡片放大；近距阅读（0.5–0.8m）用紧凑字号与更高密度。
 - 详情内不做“多形态切换”：表单、管理、添加都是 L2 子页，有明确返回路径；平级视图用 Tabs 常显。
+- 内衬由宿主给：`DialogSurface` 24 + `DialogContent` 16 = 40；插件 L1/L2 骨架横向 padding 已归零，
+  插件不得再给详情根节点加左右内边距（否则内容轴会跳）。
+- 密度上限：L1 首屏 ≤3 个信息区块、≤8 个列表行、每行 ≤2 个元信息；L2 ≤3 个表单字段组。
+  放不下时用 `DetailScroll` 滚动，不静默裁切。
+
+### 4.4 共享原语（下一批插件直接调用，接口稳定）
+
+全部来自 `public/plugins/_shared/ui.jsx`，只引用 Fluent token；插件不得复制实现或改其尺寸。
+
+| 原语 | 签名 / 关键 props | 用途与约束 |
+|---|---|---|
+| `HeroText` | `<HeroText>{value}</HeroText>` | 唯一主数字；固定 `fontSizeHero900` / `lineHeightHero900`，不接收 size；**任何尺寸档都不放大** |
+| `Metric` | `value` / `unit?` / `label?` / `caption?` / `reserveCaption=true` | HeroText + 单位 + label/caption；给了 label 时 meta 固定两行（38），总高恒 92，`reserveCaption={false}` 回旧 74 |
+| `DataRow` | `<DataRow label value unit? />`（2026-10-24 新增） | **只读数据行**：label 左（12 fg3）/ 值右（20 fg1 + tabular-nums，可带 12 单位）；行高 28（`lineHeightBase500`）；同一容器内多行共用一条值轴，节奏由容器 rowGap 控制 |
+| `ListStack` | `<ListStack inset?>{rows}</ListStack>` | 行距固定 4；`inset` 只在无 `CardRoot` 的 L1/L2 补首末 16 留白，卡片内保持 false |
+| `ListRow` | `leading` / `title` / `subtitle` / `trailing` / `onClick` / `selected` / `titleSize` | 固定行高 44（`LIST_ROW_HEIGHT`）；行内不写 padding；可点行自己处理 Enter/Space |
+| `EmptyState` | `icon` / `title` / `action` / `align='center'\|'start'` / **`compact=false`** / `...rest`（**无 `description`**） | 中性单色图标（24；**3×3 档自动升到 40 档位**，共享层按宿主尺寸判定，写入 `data-emphasized`，DENSITY §1.2）+ 一句标题（≤6 汉字）+ 一个次操作；**不接收说明文字**（§4.4.3）；禁止彩色块；卡片空态用 `align="start"`。组距 24（`spacingVerticalXXL`），`compact`（1×1 / 2×1 短卡）为图标槽 24 + 组距 4；插件不得覆盖 gap。`...rest` 透传 `data-*` / `aria-*` |
+| `MiniBars` | `values` / `labels?` / `max?` / `todayIndex?` / `size='default'\|'tall'` / `ariaLabel?`（2026-10-24 新增） | 迷你条带（7 天趋势）：N 列等宽、列距 4、轨道 24（`tall` 32）、条宽上限 32、`borderRadiusSmall`；颜色只两档（今天 `colorNeutralForeground1`、其余 `colorNeutralForeground3`），轨道 `colorNeutralBackground3`；自带 `role="img"` + `aria-label`；柱高是**数据**归一化值，不是设计值 |
+| `HeroProgress` | `value(0–1)` / `active=true` / `label?`（2026-10-24 新增） | 卡片内进度带：厚 `HERO_PROGRESS_THICKNESS_PX` 4（= `strokeWidthThickest`）、填充 `colorBrandBackground`、轨道 `colorNeutralBackground3`；`active=false` 时保留 4px 占位并 `visibility:hidden`（不重排、不出画、去掉 role）；宽度过渡 100ms `durationFaster` / `curveEasyEase`，reduced-motion 不加过渡 |
+| `StatusDot` | `tone='success'\|'warning'\|'danger'\|'info'\|'neutral'` / `label?` | 8×8 圆点；状态色只用 `colorStatus*Foreground1`，success 不常亮 |
+| `StatusLine` | `tone` + children | 圆点 + 12px caption，用于就地状态行；不用于分类/装饰 |
+| `TrailingCount` | `<TrailingCount total={n} shown={m} />` | 固定「共 X · 显示 Y」口径，12px fg3、tabular-nums；不占独立行 |
+| `CardIdentity` | `icon?` / `label?` / `trailing?` / `compact=false` / **`placeholder=false`** / **`disclosure=false`** / `...rest` | 24 高 identity 行（`CARD_IDENTITY_HEIGHT_PX`）；`trailing` 限高 24；图标 20（`IDENTITY_ICON_SIZE`）且是身份色唯一落点。**不传 `icon`** 时渲染 20×20 空槽（label 不左移，`data-card-identity-empty`）；**`placeholder`** 只保留 24 高空行（本档不放 identity，如 weather 1×1）；**`disclosure`** 在行尾追加 `ChevronRight16Regular`（整卡可点开详情的唯一视觉信号，§4.4.3） |
+| `CardDisclosure` | `<CardDisclosure />`（2026-10-24 新增） | 行尾 16px 中性 chevron，`aria-hidden="true"` + `data-card-disclosure="true"`；不抢命中区、不进 Tab 序列（点它等于点卡片）。自定义行（如早期自绘 identity 行）用它，不要在插件里手写 SVG/图标 |
+| `CardRoot` | `onActivate` / `ariaLabel` / children | 系统内容栅格 16 / 8 强制生效；插件传 style 也不能覆盖 padding/gap |
+
+常量（`ui.jsx` 导出，插件只许引用、不得复写数值）：
+`TOUCH_TARGET=44`、`LIST_ROW_HEIGHT=44`、`LIST_ROW_GAP=4`、`LIST_ROW_PITCH=48`、
+`CARD_PADDING_PX=16`、`CARD_GAP_PX=8`、`HERO_LINE_HEIGHT_PX=52`、`CARD_IDENTITY_HEIGHT_PX=24`、
+`ICON_SIZE={ XS:16, S:20, M:24, L:32, XL:48 }`（冻结）、`IDENTITY_ICON_SIZE=20`（= `ICON_SIZE.S`）、
+`EMPTY_STATE_ICON_SIZE=24`（= `ICON_SIZE.M`）、`EMPTY_STATE_ICON_SIZE_LARGE=40`（空态主图标专用档）、`HERO_PROGRESS_THICKNESS_PX=4`（= `strokeWidthThickest`）。
+
+新增共享原语必须同时更新本表与 `_shared/ui.jsx` 顶部用法注释；不得只在一个插件里本地实现。
+
+### 4.4.1 插件只能通过共享原语渲染（2026-10-24 追加）
+
+卡片、L1、L2 里的**结构**只允许用下面这组原语拼；插件负责的是「放哪些字段、文案、数据」，
+不是「长什么样」。白名单是封闭集合：
+
+`EmptyState` / `CardIdentity` / `CardDisclosure` / `ListRow` / `ListStack` / `DataRow` / `MiniBars` / `HeroProgress` /
+`StatusDot` / `TrailingCount` / `HeroText`（外加外壳 `CardRoot` / `CardHeader`、按钮 `TouchButton` / `ActionButton`、
+骨架 `Detail*` / `Subpage`）。
+
+规则：
+
+1. **不得复制实现**：插件里出现「自己画一遍」的同类结构（自绘 7 天条、自绘进度条、手写 label 左 / value 右的
+   data row、手写「共 X · 显示 Y」、自写空态块）一律按反模式处理，即使像素看起来一致。
+2. **不得改其尺寸**：原语的字号、行高、图标档位、间距都是系统值；`className` / `style` 只允许做定位
+   （margin/align/flex），不允许改 font/padding/height/border/shadow。
+3. **不得绕过语义钩子**：原语输出的 `data-*`（`data-wtsl-hero`、`data-card-identity`、`data-data-row`、
+   `data-mini-bars`、`data-hero-progress`、`data-empty-state`、`data-compact`）是验收脚本的定位依据，
+   插件不得覆盖或删除；`...rest` 只能**追加**属性。
+4. **缺原语时先补共享层**：需要一种新结构，先在 `_shared/ui.jsx` 实现并更新本节与 TOKEN-MAP，再在插件里用；
+   不允许「先在一个插件里试，成了再搬」。
+
+### 4.4.2 尺寸档位字段表：换字段集合，不放大字号（2026-10-24 追加）
+
+尺寸档变化时唯一允许改变的是**显示哪些字段**（以及列表行数，见 DENSITY §2.2），**不是字号**。
+
+```js
+import { defineSizeFields, sizeKeyOf } from '../../_shared/ui.jsx'; // ui.jsx:58 再导出 sizes.js
+
+const FIELDS = defineSizeFields(
+  {
+    '1x1': { identity: 'compact', seconds: false, worldClocks: 0 },
+    '2x1': { identity: 'full', seconds: true, worldClocks: 0 },
+    '3x2': { identity: 'full', seconds: true, worldClocks: 3 },
+  },
+  { defaultSizeKey: '2x1' },
+);
+
+FIELDS.fieldsFor(size);   // 接受 '3x2' / [3,2] / { columns, rows } / { width, height } / { w, h }
+FIELDS.countFor(size);    // 自检：相邻档字段项数必须 +1 以上（DENSITY §2.1-4）
+FIELDS.has('3x2');        // 是否声明了该档
+```
+
+- `SIZE_KEYS = 1x1 / 2x1 / 1x2 / 2x2 / 3x2 / 3x3 / 4x2`（与 manifest `sizes` 同一坐标系，冻结）。
+- `sizeKeyOf(size, fallback='2x1')` 只做**归一化**：非法输入返回 fallback，不抛错（宿主尺寸是外部输入）。
+- `defineSizeFields` 对**声明期**错误显式抛错：非法档位 key → `RangeError`；`defaultSizeKey` 不在表里 →
+  `RangeError`；空表 / 非对象 → `TypeError`；表与每档字段集 `Object.freeze`。**禁止**用静默回退掩盖拼错的档位。
+- 收益：同一张表的 `fieldsFor` 让「1×1 → 3×2」只增字段，不增字号；hero 仍由 `HeroText` 固定 40/52，
+  所以「放大字号来填满卡片」在结构上不可能发生（DENSITY §1.1-1）。
+- 例外：**列表行数**是尺寸档的合法差异（DENSITY §2.2 公式 + cap），不算放大字号。
+
+### 4.4.3 文案规则：可做的事由 affordance 承担，不写说明书（2026-10-24 追加）
+
+> 触发原因是用户原始指令：「不要防御性书写，用颜色、形状、图标、摆放位置来暗示可以做的工作，而不是用大量的文字。」
+> 依据：Fluent `content-design.md:24`「get to the point fast，prune every excess word」、
+> `onboarding.md`（空状态负责给下一步，不负责讲文档）、HIG §11「用交互教，而不是用教程教」、
+> HIG §4「不要只靠颜色」。
+
+**空态结构（固定，不允许增删元素）**：中性单色图标（24，`EMPTY_STATE_ICON_SIZE`；3×3 档自动用 40 档位，
+见 DENSITY §1.2）+ 一句标题（≤6 汉字）+ 一个次操作按钮。**不接收说明文字**——`EmptyState` 已删除
+`description` 参数，传了也不渲染（结构上杜绝）。3×3 档的空带超标是**结构性例外**：靠图标档位与垂直居中撑观感，
+不靠补一行说明文字解决。
+
+**允许出现在卡片上的文字**（穷举，超出即违规）：
+
+| 类别 | 约束 | 例 |
+|---|---|---|
+| 组件名 | ≤4 字 | 「天气」「待办」 |
+| 空态/状态标题 | ≤6 汉字 | 「还没有城市」「提醒已关闭」 |
+| 数据标签与单位 | 名词 + 单位，可带数量 | 「今日完成」「45 分钟」「逾期 3」「共 6 · 显示 5」 |
+| 按钮文字 | 动词 + 名词 ≤4 字 | 「添加城市」「打开设置」「重新获取」 |
+| 错误文案 | 一行，只说发生了什么 | 「天气不可用」「天气数据地址未设置」 |
+| 等待文案 | 动词进行时，≤1 行（FLUENT2 §12） | 「正在获取天气…」 |
+
+**禁止**：`在……里添加`、`卡片会显示……`、`你可以……`、`先记录一次……`、`点击说话`、`说点什么，或按住空格`、
+`换个关键词……`、`完成后会自动……`、`请检查/请稍后/请填写`。错误与校验文案只陈述事实，动作由按钮承担。
+
+**用 affordance 替代被删掉的文字**（唯一做法，不允许用更多小字补偿）：
+
+| 要表达的事 | 承载方式 |
+|---|---|
+| 可添加 | `Add20Regular` 图标 + 次操作按钮（`appearance="secondary"`） |
+| 可展开详情 | 标题行行尾 `ChevronRight16Regular`（`CardIdentity disclosure` / `CardDisclosure`），**不写「详情」** |
+| 可打开设置 | 齿轮图标（`Settings20Regular`）+「打开设置」 |
+| 可重试 | 回环箭头图标（`ArrowClockwise20Regular`） |
+| 状态（逾期/接近/该起身） | `StatusDot` 语义色 **+ 图标形状差异**（计时/警示/勾）+ 位置（identity 行尾），不只靠颜色 |
+| 下一次提醒 | 点 + `Timer16Regular` + 剩余分钟（数据）；完整语义交给 `aria-label` 与 `Tooltip` |
+| 正在运行 | `colorBrandBackground` 进度带（`HeroProgress`）+ accent 前景；空态**不得**用实心 accent |
+| 语音入口 | 大号圆形麦克风按钮（96×96）+ 待机细环；`aria-label` + `aria-keyshortcuts="Space"` + Tooltip |
+
+**按钮层级**：空态主操作一律 `secondary` / `subtle`；实心 `primary` 只属于「正在进行的动作」（开始/停止/发送）。
+
+**无障碍兜底（删字之后必须成立）**：每个被删掉语义务必落到 `aria-label`（读屏）与 Fluent `Tooltip`
+（鼠标可发现，`relationship="label"` 用于命名、`"description"` 用于补充说明）之一；
+**禁止原生 `title`**（会露出系统白框，见 iframe tooltip 旧账）。纯装饰（chevron、状态点）`aria-hidden="true"`，
+语义由容器 `CardRoot ariaLabel`（「…，点击打开详情」）承担。
+
+**几何连带约束**：去掉说明行后空态块变矮，`EmptyState` 组距因此固定为 24（`spacingVerticalXXL`），
+短卡（1×1 / 2×1）走 `compact`（图标槽 24、组距 4）。插件**不得**再用 `style={{ gap }}` 覆盖——
+六张卡的空态图标尺寸、颜色、组距必须逐像素一致（DENSITY §1.1-2 的 22% 空带门禁是这条的算术依据）。
+
 
 ## 5. 设置入口协议
 
