@@ -20,12 +20,17 @@
  * 3. **单向**：pill 只量**自己**（量的是它自己的 border-box），pill 的高度只由文字内容与
  *    自身 CSS 决定（`whiteSpace:nowrap` + 固定 padding + `maxWidth` 裁切，宽度变化不改高度）；
  *    布局变化（grid 下移、dock 上移）不会改变 pill 高度，因此不会形成「布局→测量→布局」的循环。
- * 4. **非法值**：0 / 负数 / NaN（容器未布局时的初值）直接丢弃，布局保持上一个有效值。
+ * 4. **非法值**：负数 / NaN（容器未布局时的初值）直接丢弃，布局保持上一个有效值。
+ *    **0 是合法值**，语义是「没有说明条」：用户隐藏说明条、或本机图片没填说明文字时上报 0，
+ *    `layoutFrame` 据此不再预留 pill 行与 gutter，网格自己在视口内上下居中（1440×960 下
+ *    上/下各 46）。0 与「还没测到」靠**是否渲染 pill** 区分，不靠哨兵值。
  *
  * 首帧策略：模块加载时值 = `FOOTER_PILL_ESTIMATE`（由 token 推算的 26，见 breakpoints.ts），
  * 所以第一帧就有一份可用的布局；pill 挂载后的第一次 ResizeObserver 回调给出实测值。
  * 估计值与实测值相等时（当前 CSS 下确实相等，都是 26）**不会发生任何重排**；
  * 若字体/缩放变了导致实测不同，则发生一次 1~2px 的收敛（网格整体上移或下移该差值的一半）。
+ * 同理，首帧就处于「没有说明条」状态（隐藏偏好已持久化 / 本机图无说明）时，
+ * 也会从估计值收敛到 0 一次（网格下移 19）。
  */
 import { useSyncExternalStore } from 'react';
 
@@ -44,10 +49,14 @@ export function readFooterPillHeight(): number {
 /**
  * 上报 pill 的实测高度（border-box，px）。取整 + 去重，重复/非法值不触发任何通知。
  *
+ * `0` 不是非法值，而是**「没有说明条」**的显式通道：隐藏说明条（或本机图无说明文字）
+ * 时必须上报 0，否则布局会停在最后一次实测的 26 上，网格出现上 27 / 下 65 的不对称。
+ * 只有负数与 NaN 被丢弃。
+ *
  * 只有真的变了才会通知订阅者，因此在 ResizeObserver 回调里直接调用是安全的。
  */
 export function reportFooterPillHeight(measured: number): void {
-  if (!Number.isFinite(measured) || measured <= 0) return;
+  if (!Number.isFinite(measured) || measured < 0) return;
   const next = Math.round(measured);
   if (next === pillHeight) return;
   pillHeight = next;

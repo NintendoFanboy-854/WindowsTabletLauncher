@@ -20,17 +20,33 @@
 | 5 行 | 桌面行数 | D（`floor((960 − 2×spacingHorizontalXL + 12) / 176) = 5`） |
 | 164 | 单元格边长 | D（`floor((1440 − 2×spacingHorizontalXL − 7×spacingHorizontalM) / 8) = 164`） |
 | 12 | 卡间距 gutter | T（`spacingHorizontalM` / `spacingVerticalM`） |
-| 22 | 页边距（左右）/ 网格原点 x | D（(1440 − 1396) / 2；`gridInsets`） |
+| 22 | 页边距（左右）/ 网格原点 x | D（(1440 − 1396) / 2；`layoutFrame().insetX`） |
 | 176 | 网格步长 | D（164 + 12） |
 | 1396 | 网格总宽 | D（8×164 + 7×12） |
 | 868 | 网格总高 | D（5×164 + 4×12） |
-| 46 | 页边距（上下）/ 网格原点 y | D（(960 − 868) / 2；`gridInsets`，不做 4px 吸附） |
+| 26 | 说明条实测高度 `H_p`（**布局输入**） | D（`lineHeightBase200` 16 + 2×`spacingVerticalXS` 4 + 2×`strokeWidthThin` 1；首帧估计 `FOOTER_PILL_ESTIMATE`，运行时由 `desktop/WallpaperLayer.tsx` 的 ResizeObserver 实测、经 `layout/footer` 的 `reportFooterPillHeight` 上报覆盖） |
+| 906 | 网格 + 一个 gutter + `H_p`（`unionH`） | D（868 + 12 + 26；`layoutFrame` 的 `frameInset` 与 chat 面板高同值） |
+| 27 | 顶部净空 / 网格原点 y | D（(960 − 906) / 2 = 27；上净空 = 960 − pill 下缘 933 = 27；`layoutFrame().insetY`，不做 4px 吸附） |
 | 22 | 右侧余量 | D（1440 − 1418 = 22，与左侧相等） |
-| 46 | 底部余量 | D（960 − 914 = 46，与顶部相等；分页容器与壁纸说明 pill 都落在带内） |
-| 1418 / 914 | 网格右下 | D（22 + 1396 / 46 + 868；`gridBounds`） |
+| 27 | 底部余量 | D（960 − 933 = 27，与顶部相等；933 = 网格下缘 895 + gutter 12 + `H_p` 26，说明条 pill 与 chat 入口共用这条下缘） |
+| 1418 / 895 | 网格右下 | D（22 + 1396 / 27 + 868；`layoutFrame().grid`） |
+| 907 / 933 | 说明条 pill 上缘 / 下缘 | D（网格下缘 895 + gutter 12；907 + `H_p` 26；`layoutFrame().pill`） |
 | 96–220 | 单元格 clamp 下限/上限 | C（可用性下限 96；上限 220，`breakpoints.ts`） |
 | 1280 / 900 / 480 / 360 | 列数断点 | C（`layout.md` 断点区间；项目分档） |
 | 22 | 卡内容轴 | D（`spacingHorizontalSNudge` 6 + `spacingHorizontalL` 16） |
+
+> **`H_p` 是布局输入（v0.6.0，`layout/breakpoints.ts` 的 `layoutFrame`）**：说明条高度由文字内容决定
+> （`<Text size={200}>` 行高 + 上下 padding + 描边），布局把它当**参数**用，而不是塞进一条写死的等高带子：
+> `unionH = 868 + 12 + H_p`，整块「网格 + 一个 gutter + 说明条」在视口内垂直居中。1440×960 / `H_p`=26 下
+> 网格 (22,27)-(1418,895)、pill (22,907)-(1418,933)、chat 入口 (1362,877)-(1418,933)（下缘 = pill 下缘 933）。
+> 上净空 = 下净空 = 27；网格下净空 65 = 12 + 26 + 27（与下净空配对的是 pill 下缘，不是网格下缘）。
+>
+> **`H_p` = 0 的语义（已实现，`layout/breakpoints.ts` 的 `normalizeFooterPillHeight` + `frameInset`）**：
+> 0 表示**没有说明条**（用户在设置里隐藏，或本机图片没填说明文字），不是「还没测到」；只有负数 / NaN
+> 才退回首帧估计。此时 pill 行与它上方的 gutter 一并消失：`unionH = 868`、`insetY = 46`、
+> 网格 (22,46)-(1418,914)、pill 退化为 `grid.bottom` 上的零高矩形 (22,914)-(1418,914)、
+> chat 入口 (1362,858)-(1418,914)（下缘贴网格下缘）、对话面板 516×868 → (902,46)-(1418,914)，
+> 上/下净空 46/46。上报侧由 `desktop/WallpaperLayer.tsx` 在说明条不渲染时 `reportFooterPillHeight(0)`。
 
 ## 2. 卡片外壳
 
@@ -104,15 +120,20 @@
 
 ## 6. Agent 入口（右下保留格）/ Agent 浮空
 
-> v0.4.2 起三态几何全部由 `src/host/agent/ui/entryGeometry.ts` 从栅格推导：
-> 锚点 = 网格右下角 (1418, 914)，安全距 0 → 1440×960 下 right 22 / bottom 46（= 网格留白）。
+> v0.4.2 起三态几何全部由 `src/host/agent/ui/entryGeometry.ts` 从栅格推导。
+> **v0.6.0 锚点修订**：锚点改取**底部条（说明条行）的右下角** (1418, **933**)，安全距 0 →
+> 1440×960 下 right 22 / bottom **27**（933 = 网格下缘 895 + gutter 12 + 说明条实测高 `H_p` 26；
+> bottom 27 = 960 − 933，与上净空相等）。入口**不再贴网格右下角**：它比 `g + H_p`(38) 高，
+> 上缘 877 向上越过网格下缘 895，那一格由保留格保证不放卡片（`layout/grid.ts` 的 `fabReservedCell`）。
+> **`H_p` = 0（没有说明条）时同一套规则退化为贴网格下缘**：锚点 (1418, **914**)、right 22 / bottom **46**、
+> entry (1362,858)-(1418,914)、面板 516×868（= 网格高）→ (902,46)-(1418,914)；不需要额外判断分支。
 > 面板宽高是 (cell, gutter) 的整数组合；严格居中后留白 ≡ 2 (mod 4)，三态边不再落 4 的倍数。
 
 | 数值 | 用途 | 出处 |
 |---:|---|---|
 | 56 | Agent 入口外框 | D（`spacingHorizontalXXXL` 32 + `spacingHorizontalXXL` 24） |
-| 0 | 入口/面板相对网格右缘、下缘的安全距 | D（`AGENT_GRID_SAFETY = 0`，入口与网格右缘/下缘齐平） |
-| 22 / 46 | 1440×960 下的 right / bottom 偏移 | D（视口 − 锚点：1440 − 1418、960 − 914） |
+| 0 | 入口/面板相对底部条右缘、下缘的安全距 | D（`AGENT_GRID_SAFETY = 0`；右缘 = 网格右缘 1418、下缘 = 说明条 pill 下缘 933，不是网格下缘） |
+| 22 / 27 | 1440×960 下的 right / bottom 偏移 | D（视口 − 锚点：1440 − 1418、960 − 933） |
 | Circular | 收起态圆角 | T（`borderRadiusCircular`） |
 | 12 | 展开后圆角（语音窗 / 对话面板） | T（`borderRadius2XLarge` 12） |
 | 1 | 描边 | T（`strokeWidthThin`；rest `colorNeutralStroke2`，hover `colorNeutralStroke1`） |
@@ -121,7 +142,7 @@
 | 58 | 入口命中区 | D（56 + 2×1px `inset`） |
 | 516 | 语音窗 / 对话面板宽 | D（3×cell + 2×gutter = 3×164 + 2×12） |
 | 340 | 语音窗高 | D（2×cell + gutter = 2×164 + 12） |
-| 868 | 对话面板高 | D（914 − 46：锚点到网格上缘 = 5×164 + 4×12） |
+| 906 | 对话面板高 | D（网格高 868 + gutter 12 + `H_p` 26：顶边 = 网格上缘 27、下缘 = pill 下缘 933） |
 | 16 | 面板内衬 | T（`spacingHorizontalL` / `spacingVerticalL`） |
 | 8 | 面板内元素间距 | T（`spacingHorizontalS` / `spacingVerticalS`） |
 | 16 | 消息间距 / 消息列表内边距 | T（`spacingVerticalL` / `spacingHorizontalL`） |

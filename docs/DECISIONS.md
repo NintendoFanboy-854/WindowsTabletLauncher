@@ -430,6 +430,7 @@
   5. 卡片材质回到 `colorNeutralBackground1` 72% + 既有 `--wtsl-material-blur` + `colorNeutralStroke2` 1px 描边（`FLUENT2.md §6/§7`），暗色卡片才重新"浮"在壁纸上。
 - 不新增设计 token：颜色/字号/间距/圆角/阴影全部取 Fluent token；只沿用既有两个项目 token（卡片圆角、材质模糊）与既有 `--wtsl-material-blur` 引用点。
 - 否掉：把必应图片打进 `public/` 随仓库分发（版权与体积）；随机图片 API（不可复现）；`background-size: 100% 100%` 拉伸铺满。
+- **修订（2026-10-25，v0.6.0，D-37）**：§4「只在桌面页出现，不新增入口、不抢小组件」按本轮修订为「不新增**另一个**入口控件」——那条 12px 说明在 v0.6.0 变成按钮，同时是「欣赏壁纸」模式的**唯一**入口（点击进入 / 再点或 Esc 退出，只在本次会话内有效、不持久化）。§2 的三源兜底（bimg → apifox → 原生）同时作废，改为只走必应官方归档。
 
 ## D-32 组件 identity 色（2026-10-23，v0.4.0，用户拍板"开吧"）
 
@@ -459,6 +460,7 @@
 - 兼容：老用户已保存的 `wtsl.layout` 不受影响；「重置布局」回落到新构图。其他分辨率按既有 clamp / 首个空位回退规则，不追求一致。
 - 实现修正（v0.4.0 落位时发现）：`src/host/plugins/manifest.ts` 原先用 `asWidgetSize` 校验 `cell`（尺寸语义，要求两维 ≥1），导致声明在**第一列/第一行**的坐标（0）被判非法、默认布局静默退化成“首个空位”装箱。已改为 `asGridCell`（坐标语义，允许 0）；默认构图的落位以本条为准。
 - **修订（2026-10-24，v0.4.5 布局居中轮）**：`breakpoints.gridOrigin` 取消 4px 吸附、改为严格居中，网格由 (20,44)-(1416,912) 变为 **(22,46)-(1418,914)**，四边留白 **22/22/46/46**（cell 164、gutter 12、8×5 全不变；22/46 的唯一定义处是新导出的 `gridInsets()`）。默认构图随之更正为：weather **3×2 @ (0,0)**、clock **3×2 @ (5,0)**、todo 3×3 @ (0,2)、pomodoro 3×2 @ (3,2)、countdown 2×2 @ (6,2)、sedentary **2×1 @ (5,4)**。与初版不同的两条：① clock 由 (4,0) 移入 (5,0)，使首行右缘与网格右缘 1418 齐平、首行中缝落在屏幕中线 720；② sedentary 由 (6,4) 显式钉到 (5,4)，否则它与右下保留格 (7,4) 相交、会被 first-fit 挤回首行 (3,0)。各组件 `sizes` / `defaultSize` 均未改，卡片尺寸不变。老用户已保存的 `wtsl.layout` 不受影响（`sanitizeLayout` 只在缺组件/越界时重排）。
+- **修订（2026-10-25，v0.6.0 说明条参与布局，D-37）**：说明条实测高度 `H_p` 成为布局输入后，垂直居中改为「网格 + 一个 gutter + `H_p`」整块居中：网格由 (22,46)-(1418,914) 变为 **(22,27)-(1418,895)**，四边留白 **22/22/27/65**（cell 164、gutter 12、8×5 与上一条的默认构图坐标全不变；`layoutFrame` 是唯一定义处，`gridInsets` 只作派生视图）。底部余量 27 = 960 − 933，`933` = 网格下缘 895 + gutter 12 + `H_p` 26 = 说明条 pill 下缘 = chat 入口下缘。网格下净空 65 不是不对称：与上净空 27 配对的是 **pill 下缘**，不是网格下缘。`H_p`=0（隐藏说明条）时网格单独上下居中、回到 22/22/46/46。
 
 ## D-35 半高语音窗 idle 视觉锚点（2026-10-23，v0.4.0）
 
@@ -485,4 +487,22 @@
   7. **动效**：继续只走 `motionTokens`；插件共享 `motion.js` 已有 reducedMotion 变体，`base.css` 再为内联 transition 提供 reduce 兜底。
 - 实现：`src/host/plugins/identity.ts`、`src/host/plugins/manifest.ts`、`src/host/plugins/manager.ts`、`src/host/desktop/WidgetCard.tsx`、`public/plugins/_shared/{base.css,host.js,ui.jsx,typography.js}` 与六个插件 `src/**`；产物 `app/app.js` 已重建。
 - 验证：`npm run typecheck` exit 0；`npm run build` 通过（2227 modules，2.41s）。
+
+## D-37 壁纸三模式 / 欣赏壁纸 / 一次性解释文本 / 说明条参与布局（2026-10-25，v0.6.0）
+
+- 背景：v0.4.0 的壁纸只有「一天一张、12h TTL、三源兜底（bimg → apifox → 原生）」一种形态，说明是左下角一条静态文本。用户要能换图（钉住喜欢的、用自己拍的），并且能在桌面完整看这张图；而「完整看图」需要一个入口，说明条是桌面上唯一能承载它的东西。同时说明条高度本来就是由文字内容决定的，布局却把它当成固定留白——两件事在本轮一起解决。
+- 决策：
+  1. **数据层固定必应官方归档**（`shell/wallpaper.ts`）：`HPImageArchive.aspx?format=js&idx=<n>&n=8&mkt=zh-CN`，`mkt` 是常量 `zh-CN`（第三方镜像的 `url` 与文案常落后官方，且它们无法保证 mkt 一致）。4K 只能由 `urlbase + '_UHD.jpg'` 拼出（3840×2160），不补 `&w=`/`&h=`。历史最多 **15 天**：`idx=0&n=8` 与 `idx=7&n=8` 两页合并去重（`idx>=8` 只是重复最后 8 条）。缩略图没有独立参数，用官方 1080p `url` 懒加载。
+  2. **三模式互斥**：`auto`（按**本地日期**选「日期不晚于今天」的最新一条，不用固定 TTL；`autoUpdate=false` 时保留当前图、跨天也不跟）、`pinned`（`pin(entry)` 后忽略日期变化，`refresh()` 不动 current）、`local`（本机图片，二进制在 IndexedDB，键按文件内容寻址 `local:<内容哈希>`，说明文字按内容地址挂）。设置页同一时刻只渲染当前模式那一组控件；模式状态存 `wtsl.wallpaper.v2`（只存元数据，不含二进制；`v1` 只读一次做迁移、迁移后不删旧键）。
+  3. **说明条高度 `H_p` 是布局输入，不是固定留白**：`layoutFrame(metrics, vw, vh, H_p)` 把整块「网格 + 一个 gutter + 说明条」在视口内垂直居中，1440×960 / `H_p`=26 → `unionH` 906、`insetY` 27、网格 (22,27)-(1418,895)、pill (22,907)-(1418,933)；**chat 入口下缘 = pill 下缘 933**（right 22 / bottom 27，不是网格下缘 895）。`H_p` 由说明条自己的 ResizeObserver 量 border-box 后经 `reportFooterPillHeight` 上报（取整 + 去重 + 丢弃 NaN/负数），首帧用 token 推算的 `FOOTER_PILL_ESTIMATE`=26（`lineHeightBase200` 16 + 2×`spacingVerticalXS` 4 + 2×`strokeWidthThin` 1），实测与估计相等时不产生重排。**`H_p`=0 的语义 = 没有说明条 → 网格单独上下居中（22/22/46/46，入口下缘贴 914、面板 868）**，已落地：`normalizeFooterPillHeight` 只拒绝负数 / NaN，0 是合法值。
+  4. **说明条即欣赏壁纸入口**：说明条改为 `<button type="button" aria-pressed>`（点击进入 / 再点退出 / Esc 退出，会话内状态、不持久化；隐藏说明条或离开桌面页自动退出）。视觉高度保持 26（这是它继续作为 `H_p` 的前提），44×44 命中区由 `::after` 用 `calc(-(44−26)/2 - strokeWidthThin)` 外扩，不改 padding、不占布局高度。进入时卡片只做 opacity（+ MOTION §3/§6 已有的 4–8px 量级 `translateY`）淡出、`inert`、不重排，编辑 chrome / 分页点 / Agent 入口一并淡出/隐藏。
+  5. **一次性解释文本**（`agent/oneshot/**`）：欣赏模式下对当前必应图发**一次**独立调用——不碰 `useAgentSession`、不写会话、不产生气泡、不接 TTS；请求强制 `web_search`（覆盖 settings 快照，不受设置页开关影响），模型没检索就判失败不落库；输出按提示词约束 + 客户端 `sanitize.ts` 二次降级成纯文本 ≤120 字；缓存键 = `${内容地址}|${mkt}|${PROMPT_VERSION}`，存独立 IndexedDB 库 `wtsl.wallpaper-note`；失败行记 `lastFailureAt`，**24h 内不再重试**（配置类错误不写冷静期），同键并发只发一次请求。本机图片不发请求（没有可搜的元数据）。
+- 否掉的方案：
+  - **中轴对齐**（说明条与 chat 入口按垂直中线对齐）：26 高的 pill 与 56 高的入口按中轴对齐时底边差 `(56−26)/2` = 15，肉眼就是「没对齐」；改为**下缘共线**（两者都取 `layoutFrame().pill.bottom`），入口上缘越过网格下缘是这条规则的必然结果，不是算错（`entryGeometry.ts` 的注释与 `breakpoints.ts` 的 `axis` 字段都按这个口径写的）。
+  - **把说明条并入网格**（恢复一条等高带子：网格下缘固定 914、底部 46 恒定）：说明条高度由文字内容（语言、字阶、缩放、是否本机图）决定，写死带子等于再引入第二套「真实高度 vs 预留高度」的口径，v0.6.0 前的不对称 bug 正是这么来的；宁可让网格随 `H_p` 动，也不让说明条被裁在带子里。
+  - **为 Windows 10 1809 / 旧 WebView2（Chromium 96–100）单独做降级适配**：目标设备是 Win10 19044 的 Evergreen 运行时；页面级 94% 材质已有 `@supports` 分档（`styles.css:32-51`、`PageScaffold.tsx:48-65`），说明条这一层不再加第二套机制。已知残留：旧运行时会把 `color-mix(…78%…)` 整条丢弃 → 说明条没有底色（描边与文字仍在，布局与可读性不受影响）；真要覆盖 1809，按同一 `@supports` 口径补一条不透明中性底，不新开降级路径。
+  - **bimg / apifox 作主源**（沿用 D-31 §2 的三源兜底）：镜像落后官方、`mkt` 无法保证，且多源让「今天这张图是哪张」不可复现；改单一官方源后失败只体现 `status`（不产生任何用户可见文案）。
+- 兼容与数据：`wtsl.wallpaper.v1` 只读一次迁移到 `v2`，旧键保留（回滚路径）；`--wtsl-desktop-backdrop` 等旧壁纸变量不再是数据来源；「说明条是否显示」单独存 `wtsl.wallpaper.ui`（`captionHidden`，缺字段/坏数据回落默认）。
+- 文档落点：几何口径 `TOKEN-MAP §1/§6`、`AGENT-SURFACE-CONTRACT §1/§14.1/§20`、`components/agent.md`、`DENSITY §1.1-5`、`DESIGN §1.1/§6`、`FLUENT2 §5/§7/§14`、`PLUGIN-CONTRACT §栅格`；动效 `MOTION §5.2`；数据层与模式在 `DESIGN §6`。
+- 实现状态：`H_p`=0 通道已落地——`layout/footer.ts` 只拒绝负数/NaN（0 合法），`layout/breakpoints.ts` 的 `normalizeFooterPillHeight` 把 0 当有效值、`frameInset` 不再为 pill 行预留 gutter，`desktop/WallpaperLayer.tsx` 在说明条不渲染时上报 0；隐藏说明条后网格 (22,46)-(1418,914)、入口 (1362,858)-(1418,914)、对话面板 516×868，与显示态共用同一个 `layoutFrame`。
 

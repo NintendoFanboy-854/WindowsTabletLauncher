@@ -11,6 +11,7 @@
 //! - `wtsl://` 自定义协议：把插件目录里的静态文件喂给 iframe
 
 mod autostart;
+mod bingarchive;
 mod iplocate;
 mod location;
 mod micsite;
@@ -271,6 +272,7 @@ pub fn run() {
             set_keep_awake,
             get_location,
             ip_locate,
+            bingarchive::fetch_bing_archive,
             ensure_mic_permission,
             open_mic_privacy_settings,
             plugin_env,

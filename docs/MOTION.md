@@ -116,6 +116,20 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 - Reduced Motion：只保留 120ms 透明度，无尺寸/阴影/位移动画；声纹/脉冲静止。
 - 入场方向定义出场方向：永远从右下角长出、原路收回；关闭后焦点回入口按钮。
 
+### 5.2 欣赏壁纸模式（v0.6.0）
+
+桌面进入「欣赏壁纸」时只做一次**退场**、退出时做一次**回场**，不新增第三套时长口径——两类过渡直接套 §1 用途表：
+
+| 过渡 | 归类（§1） | 允许的做法 |
+|---|---|---|
+| 进入欣赏壁纸（卡片淡出、`PageIndicator` 与编辑 chrome 淡出） | 「退出类（浮层收回、chrome 淡出）」 | 只做 opacity（卡片可叠一个 §3/§6 已有的 4–8px 量级 `translateY`）；**不允许 scale**（§10 不做跨 iframe 内容缩放，卡片容器也不缩放）；不碰 width/height，不触发布局 |
+| 退出欣赏壁纸（卡片回场） | 「常规进出」 | 同上的属性集合，方向不变；回场不叠错峰 |
+| 说明条上方的解释文本淡入 | 「常规进出」 | 只 opacity（可叠同一量级 `translateY`），**延迟为 0**——§8 禁止「为动画延迟内容渲染」；等文本回来前元素保持不可见（`opacity: 0` 先挂一帧），不做骨架屏 / spinner / 打字机（§6） |
+
+- **不新增错峰**：§6「明确不做 stagger 逐项入场」仍然有效。若将来确实要给桌面卡片分批退场，必须先在本文登记这条例外、再把新数值登记进 `TOKEN-MAP §11`，不得在组件里用「token × 系数」派生出一档未登记时长。
+- **reduced-motion**：按 §7「只保留 ≤100ms 纯 opacity 淡入淡出」——位移置 0、错峰置 0、无尺寸/阴影过渡。
+- 本文不复制实现里的毫秒数值：具体档位以 §1 表为准（v0.6.0 实现已按 §1 收敛：卡片退场走 `durationFast` + `curveAccelerateMid`、回场走 `durationNormal` + `curveDecelerateMid`、解释文本 `durationNormal` + `curveDecelerateMid` 且延迟 0、无错峰；本文不另立第二套数字）。
+
 ## 6. 插件内部动效（全部按 Fluent motion）
 
 插件通过共享 `_shared/motion.js` 使用统一封装（内部只用 `motionTokens` 与 `createPresenceComponent`），

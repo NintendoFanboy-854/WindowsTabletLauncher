@@ -17,22 +17,25 @@
 
 ## 1. 三段形态
 
-> **v0.4.2 几何修订**：三态统一到桌面栅格。锚点 = 网格右下角 `(1418, 914)`，安全距 **0**
-> （`AGENT_GRID_SAFETY = 0`，入口右缘/下缘与网格右缘/下缘齐平）；1440×960 下即 right 22 / bottom 46。
-> 收敛态 56×56 圆（`borderRadiusCircular`），语音窗 516×340、对话面板 516×868
-> （3 列宽 / 2 行高 / 5 行高，见 `agent/ui/entryGeometry.ts` 的算式）。三态只变宽高，
-> 锚点与圆角规则：orb 圆形、展开后 `borderRadius2XLarge`(12)。
+> **v0.4.2 几何修订（v0.6.0 锚点修订，`layout/breakpoints.ts` 的 `layoutFrame`）**：三态统一到桌面栅格。
+> 锚点 = **底部条（说明条行）右下角** `(1418, 933)`，安全距 **0**
+> （`AGENT_GRID_SAFETY = 0`，入口右缘/下缘与底部条右缘/下缘齐平）；1440×960 下即 right 22 / bottom **27**。
+> 收敛态 56×56 圆（`borderRadiusCircular`），语音窗 516×340、对话面板 516×**906**
+> （3 列宽 / 2 行高 / 网格高 868 + 一个 gutter 12 + 说明条实测高 `H_p` 26，见 `agent/ui/entryGeometry.ts` 的算式）。
+> 三态只变宽高，锚点与圆角规则：orb 圆形、展开后 `borderRadius2XLarge`(12)。
 >
-> **入口偏移只用一个口径**：安全距 0 是**相对网格轴**的（锚点就是网格右缘 1418 / 下缘 914，
-> 不内缩）。CSS `right: 22` / `bottom: 46` 只是因为网格自身的右/下留白就是 22 / 46
-> （`gridInsets` 由严格居中的 `gridOrigin` 派生：1440 − 1418 = 22、960 − 914 = 46）。
-> 不存在「视口 right 20」的第二种口径；若写成视口 20，orb 右缘会到 1420、越过网格右缘 2，三态也不再共锚点。
+> **入口偏移只用一个口径**：安全距 0 是**相对底部条轴**的（锚点就是底部条右缘 1418 / 下缘 933，
+> 不内缩）。CSS `right: 22` / `bottom: 27` 只是因为底部条自身的右缘/下缘就是这两个值
+> （`layoutFrame` 由「网格 + 一个 gutter + 说明条实测高」整块严格居中派生：1440 − 1418 = 22、960 − 933 = 27）。
+> 入口**不再贴网格右下角**（网格下缘是 895，比入口下缘高 38 = gutter 12 + `H_p` 26）：入口上缘 877 会向上
+> 越过网格下缘，右下 1 格由保留格保证不放卡片（`layout/grid.ts` 的 `fabReservedCell`）。
+> 不存在「视口 right 20」的第二种口径；若写成视口 20，orb 右缘会到 1420、越过底部条右缘 2，三态也不再共锚点。
 
 | 阶段 | 尺寸（1440×960） | 表面/层级 | 内容 |
 |---|---|---|---|
 | collapsed（Agent 入口 orb） | 56×56 | surface1 + stroke2（hover stroke1）+ shadow8 + Circular | `ChatSparkle20Regular` 品牌色图标；无文字、无机器人、无麦克风 |
 | voice（半高纯语音窗） | 516×340 | 72% surface1 + blur（`--wtsl-material-blur`）+ stroke2 + shadow64 + 圆角 12 | 顶部：⌃ 展开对话 / 朗读开关 /（播报中）停止朗读 / ✕ 关闭；中部：**最近 2 条**消息的 peek（底部对齐、顶部渐隐，整块可点/Enter 展开；无消息时 ChatSparkle 空态）；底部：进行中状态行（`正在思考…` / `正在调用工具：<名>` / `正在生成…` + 已用秒数 + 停止生成）→「点击说话」主按钮 / 录音条；录音/转写时中部换成声纹带，peek 与展开暂隐 |
-| chat（全高对话面板） | 516×868 | 同材质 + stroke2 + shadow64 + 圆角 12 | 头部：[ChatSparkle 小标] + 右侧 朗读开关（常驻）/（仅播报中）停止朗读 / ⌄（收起到语音窗）/ ⋯ 菜单 / X（关闭）；消息列表；底部同一输入组件（不重挂） |
+| chat（全高对话面板） | 516×906 | 同材质 + stroke2 + shadow64 + 圆角 12 | 头部：[ChatSparkle 小标] + 右侧 朗读开关（常驻）/（仅播报中）停止朗读 / ⌄（收起到语音窗）/ ⋯ 菜单 / X（关闭）；消息列表；底部同一输入组件（不重挂） |
 
 - 内衬统一 16（`spacingHorizontalL` / `spacingVerticalL`），面板内元素间距 8（`spacingHorizontalS`）。
 - **半高 peek 容量 = 2 条**（v0.4.2 收口）：340 − voiceTop 56 − voiceDock 92 ≈ 192 可用；一条满 3 行气泡
@@ -283,7 +286,7 @@ interface AgentSettings {
 |---|---|---|---|
 | `collapsed` Agent 入口 orb | 56×56（Circular） | `ChatSparkle20Regular`（录音态换成 `SoundWaveCircleRegular` + 品牌底） | 触控/笔点按或按住空格 → **留在本层立即录音**（出现录音胶囊，§18）；录音结束、转写回来 → `voice`；鼠标点按仍先展开再录 |
 | `voice` 半高纯语音窗 | 516×340（3 列 × 2 行） | 顶部：⌃ 展开对话（录音/转写中禁用）/ 朗读开关 /（播报中）停止朗读 / ✕ 关闭；中部：**最近 2 条**消息 peek（底部对齐、顶部渐隐；点击或 Enter 展开，空格=说话）；底部：进行中状态行（思考 / 调用工具 / 生成 + 已用秒数 + 停止生成）→ **「点击说话」大按钮**（全宽、primary、`size=large`）或录音条（声纹 + 取消 X + 停止 ■）。**没有文字输入框。** | 显式 ⌃ / 点 peek / Enter → `chat`；Esc / ✕ / 点外部 → `collapsed`（录音中先取消）；语音回合结束**留在本层** |
-| `chat` 全高对话面板 | 516×868（3 列 × 5 行，顶边落网格上缘 46） | 头部：ChatSparkle + 朗读开关 /（播报中）停止朗读 / ⌄ 收起到语音窗 / ⋯ 菜单 / ✕ 关闭；消息列表；底部**单行输入区**：`[语音] [输入框] [发送]`（录音/转写时整行换成声纹条） | ⌄ → `voice`（不是关闭）；✕ / Esc / 点外部 → `collapsed`（同一关闭语义）；发送文字/语音回合**留在本层** |
+| `chat` 全高对话面板 | 516×**906**（3 列 × 5 行，顶边落网格上缘 27；906 = 网格高 868 + gutter 12 + `H_p` 26） | 头部：ChatSparkle + 朗读开关 /（播报中）停止朗读 / ⌄ 收起到语音窗 / ⋯ 菜单 / ✕ 关闭；消息列表；底部**单行输入区**：`[语音] [输入框] [发送]`（录音/转写时整行换成声纹条） | ⌄ → `voice`（不是关闭）；✕ / Esc / 点外部 → `collapsed`（同一关闭语义）；发送文字/语音回合**留在本层** |
 
 - **不再有自动形态升级**。`open` 受控入口（设置页「打开 Agent」/ `?agent=1`）仍打开 `chat`。
 - 半高语音窗是「语音对话的家」：回答会被朗读（`tts.autoRead` 开时）并显示在 peek 里，用户可立即再按住
@@ -657,4 +660,44 @@ TurnBlock = ThinkingBlock | TextBlock | ToolBlock | NoticeBlock
 - 全局开关打开 → 全部过程块展开；再单独收起一块 → 只有那一块收起（双向）。
 - 老存档（无 `blocks`）加载不崩、不丢消息，顺序为 reasoning→tools→content。
 - `MessageList` 不再有横向偏移（`scrollbarGutter: stable both-edges`），气泡左缘与输入区左缘同一条竖线。
+
+## 20. v0.6.0 修订（欣赏壁纸：说明条即入口 + 一次性解释文本）
+
+> 范围：本节只登记**属于 Agent 侧**的两件东西——`agent/oneshot/**` 的一次性解释调用，以及它与
+> 桌面层说明条（`desktop/WallpaperLayer.tsx` 的 `WallpaperCredit`）的接缝。壁纸数据层（三模式 / 官方源 /
+> 15 天历史）归 `shell/wallpaper.ts`，登记在 DECISIONS D-37 与 DESIGN §6；动效见 MOTION §5.2。
+
+### 20.1 说明条是欣赏壁纸模式的唯一入口
+
+- 说明条本身是 `<button type="button">`（`aria-pressed`、`aria-label` 含完整版权、`title` 放完整版权），
+  点一下进入 / 再点退出；Esc 退出（`App.tsx` 的 `useGlobalShortcuts`）。**不新增第二个入口**：
+  D-31 §4「不新增入口」按本轮修订为「不新增**另一个**入口控件」。
+- 视觉高度仍是 26（`lineHeightBase200` 16 + 2×`spacingVerticalXS` 4 + 2×`strokeWidthThin` 1），
+  44×44 命中区由 `::after` 绝对定位外扩 `calc(-9px - strokeWidthThin)` 得到，**不改 padding、不占布局高度**——
+  这是它继续充当布局输入 `H_p` 的前提（`layout/footer.ts` 的 `reportFooterPillHeight`）。
+- 退出路径：Esc / 再点说明条 / 设置里打开「隐藏说明条」/ 离开桌面页（`App.tsx`：`captionHidden` 与 `page !== 'desktop'`
+  两个 effect 强制 `gallery = false`）。进入时若 Agent 浮层开着，先收起（只留壁纸与说明条）。
+- 模式状态**只在本次会话内有效，不持久化**（`useState`，不写 localStorage）。
+
+### 20.2 一次性解释文本（`agent/oneshot/**`）
+
+| 项 | 口径 | 依据 |
+|---|---|---|
+| 独立性 | 不碰 `useAgentSession`，不写 `agent.conversations` / `activeConversation`，不产生消息气泡、不接 TTS、不暴露输入接口 | `oneshot/generate.ts` 文件头 |
+| 触发 | **只在欣赏壁纸模式、且当前是必应图**时请求；`local` 模式不发请求（本机图没有可搜的元数据） | `desktop/WallpaperLayer.tsx` 的 `noteInput` |
+| 联网搜索 | 强制：请求前用 `withForcedSearch()` 覆盖 settings 快照（`search.enabled/forceSearch = true`），不受设置页联网搜索开关影响；**模型没调用检索（无 `sources` 且 `web_search_usage.toolUsage = 0`）直接判失败、不落库** | `oneshot/generate.ts` 的 `withForcedSearch` / `searched` |
+| 输出形态 | 纯文本 ≤120 字（2–3 句、无 Markdown、无套话）；以提示词约束 + 客户端 `sanitize.ts` 二次降级，模型不听话时以客户端为准 | `oneshot/prompt.ts` 的 `SYSTEM_PROMPT`、`sanitize.ts` |
+| 缓存键 | `${内容地址}\|${mkt}\|${PROMPT_VERSION}`（内容地址 = 必应 `hsh`，缺失时退化到绝对化 `urlbase`）；改提示词只改 `PROMPT_VERSION`，旧条目自然 miss（不迁移、不删） | `oneshot/cache.ts` 的 `cacheKeyFor`、`prompt.ts` 的 `PROMPT_VERSION`、`shell/wallpaper.ts` 的 `wallpaperEntryKey` |
+| 存储 | 独立 IndexedDB 库 `wtsl.wallpaper-note`（不与会话共享键、不读 `storage.ts`）；库不可用一律当 miss | `oneshot/cache.ts` 文件头 |
+| 失败退避 | 失败行 `text` 空 + `lastFailureAt` 非零 → 24h 内不再请求；配置类错误（未开通 web_search）不写冷静期，补上配置即可立刻重试 | `oneshot/cache.ts` 的 `RETRY_AFTER_FAILURE_MS` / `isSuppressed`、`generate.ts` 的 `isConfigError` |
+| 并发 / 超时 | 同键并发只发一次请求（模块级 `inFlight`）；单次请求 45s 兜底；失败静默（不抛给 UI、不打 `console.error`） | `generate.ts` 的 `inFlight` / `REQUEST_TIMEOUT_MS` |
+| 渲染 | 只在 `gallery` 为真时渲染，位于说明条上方、绝对定位、不参与 `H_p` 测量；走既有 `MessageContent` 渲染器 | `desktop/WallpaperLayer.tsx` 的 `note` / `gallery ? … : null` |
+
+### 20.3 与三态几何的关系
+
+说明条被隐藏后 `H_p` = 0（语义「没有说明条」），**同一个 `layoutFrame` 直接给出另一组值**，不需要第二套规则：
+`unionH` = 网格高 868、网格 (22,46)-(1418,914)（上/下 46/46）、pill 退化为 `grid.bottom` 上的零高矩形、
+chat 入口下缘贴网格下缘 (1362,858)-(1418,914)、对话面板 516×868 → (902,46)-(1418,914)。
+0 通道在实现侧成立：`layout/footer.ts` 只拒绝负数/NaN（0 合法，说明条不渲染时上报 0），
+`layout/breakpoints.ts` 的 `normalizeFooterPillHeight` 把 0 当有效值。
 

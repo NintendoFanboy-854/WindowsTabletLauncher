@@ -214,7 +214,7 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 | 字号 / 行高 / 字重 | Fluent `Text size` / `fontSizeBase*` / `fontSizeHero900`；唯一 hero 是 `_shared/ui.jsx` 的 `HeroText` | 不得写裸 px / `lineHeight:1` / `<12px` 文本；不得另造 hero |
 | 按钮层级 | `TouchButton` / `ActionButton` 的 secondary 默认；只有状态触发才 `primary` | 不得把多个按钮同时做成 accent 实心；不得自画按钮 |
 | 内边距 / 组间距 | `CardRoot` 强制 16 / 8；宿主 6px 内衬；合计内容轴 22 | 不得用 `className/style` 覆盖 CardRoot 的 padding/gap，不得在插件根节点再叠 padding |
-| 栅格 / 卡片尺寸 | `src/host/layout/**`：8×5、164 cell、12 gutter、居中留白 22 / 46（`gridInsets`）；右下角 1 格为 Agent 入口的保留格 | 不得改列数/步长/页边距；尺寸只能从 manifest 允许档位里选 |
+| 栅格 / 卡片尺寸 | `src/host/layout/**`：8×5、164 cell、12 gutter、居中留白 22 / 27（`layoutFrame`；底部 27 = 960 − 933，933 是说明条 pill 与 chat 入口共用的下缘）；右下角 1 格为 Agent 入口的保留格 | 不得改列数/步长/页边距；尺寸只能从 manifest 允许档位里选 |
 | 浮层几何 / 关闭 | `PluginOverlay`：880×680、12 圆角、`shadow64`、24+16 内容内衬、X/Esc/遮罩同义 | 不得自造浮层、关闭按钮或遮罩；L2 的←/取消只 pop 不关闭 |
 | 动效 | 宿主 `motionTokens` 与 `overlayMotion` | 不得写自定义时长/曲线；不得用循环呼吸表达状态 |
 

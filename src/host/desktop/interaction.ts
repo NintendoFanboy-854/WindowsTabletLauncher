@@ -5,6 +5,8 @@
  * 数值来源都写在注释里，不拍脑袋。
  */
 
+import { TOUCH_TARGET } from '../design/metrics';
+
 /** 长按进编辑模式：DESIGN.md §2 规定 500ms */
 export const LONG_PRESS_MS = 500;
 
@@ -37,12 +39,15 @@ export const WHEEL_RESET_MS = 500;
 /**
  * 编辑模式卡片缩放（MOTION §2「进入编辑模式 0.97 → 0.96」/ §3「卡片 1→0.96」）。
  * E2 早期取 0.97，E4 对齐规范改为 0.96。
- * 编辑 chrome 的触控目标要按这个缩放反算，保证屏幕上实际命中区仍 ≥40×40（AUDIT V-06）。
+ * 编辑 chrome 的触控目标要按这个缩放反算，保证屏幕上实际命中区仍 ≥44（D-05 / FLUENT2 §9）。
  */
 export const EDIT_CARD_SCALE = 0.96;
 
-/** 触控目标基准：DESIGN.md §1.2 规定不小于 40×40 CSS px */
-export const TOUCH_TARGET_SIZE = 40;
-
-/** 编辑模式下按钮的布局尺寸（反算缩放后屏幕实测仍 ≥40） */
-export const EDIT_TOUCH_TARGET = Math.ceil(TOUCH_TARGET_SIZE / EDIT_CARD_SCALE);
+/**
+ * 编辑模式下 chrome 按钮的**布局尺寸**：把 44 的目标按 0.96 缩放反算成布局尺寸，
+ * 屏幕上实测才不会低于 44（44 / 0.96 = 45.8 → 46）。
+ *
+ * 触控目标的唯一出口是 `design/metrics` 的 `TOUCH_TARGET`（44，DENSITY §1.1-6
+ * 「共享原语的常量是唯一出口」）：这里 import 它，不再另立一个 40 的重复常量。
+ */
+export const EDIT_TOUCH_TARGET = Math.ceil(TOUCH_TARGET / EDIT_CARD_SCALE);

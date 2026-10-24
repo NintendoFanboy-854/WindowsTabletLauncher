@@ -24,6 +24,18 @@
  * 于是上净空 = 下净空 = 27（下净空 = vh − pill.bottom），说明条上缘到网格下缘 = 12 =
  * widget 之间的 gutter。所有数由 `layoutFrame` 算出，代码里不写死。
  *
+ * **`H_p = 0` 表示「没有说明条」**（用户在设置页隐藏说明条，或本机图片没有填说明文字），
+ * 不是「还没测到」。此时不保留 pill 那一行、也不再留 pill 上方的 gutter：`unionH = Hg`，
+ * 网格自己在视口内上下居中，chat 入口下缘贴网格下缘（其顶点仍高于网格下缘，见
+ * `FOOTER_HEIGHT`）。1440×960 两种状态对比（同样是 `layoutFrame` 的输出）：
+ *
+ * ```text
+ * 有说明条 H_p=26   unionH = 868 + 12 + 26 = 906   insetY = 27   grid (22,27)-(1418,895)  上/下 27/27
+ * 无说明条 H_p=0    unionH = 868                   insetY = 46   grid (22,46)-(1418,914)  上/下 46/46
+ *                   pill = grid.bottom 上的零高矩形（914/914）   entry 下缘 = grid.bottom
+ * ```
+ * 归一化只拒绝负数与 NaN（容器未布局时的测量值），见 `layoutFrame` 的 `H_p` 语义说明。
+ *
  * 窄屏（<480）必须降列：320px 宽时 4 列 × 96px + 3 × 12px = 420px 必然横向溢出，
  * 降到 2 列后 2 × 96px + 12px = 204px < 280px 可用宽，网格能完整放进屏幕。
  *
@@ -41,7 +53,8 @@ export const GRID_GAP = tokenPx(webLightTheme.spacingHorizontalM);
 /**
  * Fluent spacingHorizontalXL = 20：推导 cell / row 时的**最小**留白。
  * 它不是最终四边留白——最终留白由 `layoutFrame` 的「网格 + g + 说明条整块居中」决定
- * （1440×960 / H_p=26 下水平 22 / 上 27 / 网格下净空 65），浮层对齐请用 `layoutFrame`。
+ * （1440×960 / H_p=26 下水平 22 / 上 27 / 网格下净空 65；H_p=0 时上/下都是 46），
+ * 浮层对齐请用 `layoutFrame`。
  */
 export const GRID_PADDING = tokenPx(webLightTheme.spacingHorizontalXL);
 
@@ -165,14 +178,18 @@ export interface LayoutFrame {
   /**
    * 说明条 pill 所在的一整行（左缘/宽度与网格齐平，供 dock 定位）：
    * `top = grid.bottom + gap`、`height = pillHeight`；1440×960 / H_p=26 下 (22,907)-(1418,933)。
+   *
+   * **H_p=0（没有说明条）时退化为 `grid.bottom` 上的零高矩形**：`top = bottom = grid.bottom`，
+   * 不占行、不留 gutter。
    */
   pill: FrameRect;
-  /** 说明条实测高度（调用方传入的 `H_p`，回显出来免得下游再量一遍） */
+  /** 说明条实测高度（调用方传入的 `H_p`，回显出来免得下游再量一遍；0 = 没有说明条） */
   pillHeight: number;
   /**
    * chat 入口所在的带子：左右与网格齐平，`bottom = pill.bottom`、
    * `height = FOOTER_HEIGHT`。它**不从 grid.bottom 起算**：入口比 pill 高，
-   * 上缘会越过网格下缘（1440×960 下 footer.top 877 < grid.bottom 895）。
+   * 上缘会越过网格下缘（1440×960 / H_p=26 下 footer.top 877 < grid.bottom 895；
+   * H_p=0 时 footer 落回 `(22,858)-(1418,914)`，下缘 = 网格下缘）。
    */
   footer: FrameRect;
   /**
@@ -200,8 +217,22 @@ function frameRect(left: number, top: number, right: number, bottom: number): Fr
 }
 
 /**
+ * `H_p` 的语义归一：**0 表示「没有说明条」**，负数 / NaN（容器未布局时的测量值）才退回首帧估计。
+ *
+ * 这条语义是「隐藏说明条后网格仍对称」的前提：`H_p = 0` 时必须真的当成没有底部条
+ * （不预留 gutter、不保留 pill 行），否则网格会停在旧高度上，出现上 27 / 下 65 的不对称。
+ */
+function normalizeFooterPillHeight(pillHeight: number): number {
+  if (!Number.isFinite(pillHeight) || pillHeight < 0) return FOOTER_PILL_ESTIMATE;
+  return pillHeight;
+}
+
+/**
  * 初始偏移 = 「网格 + 一个 gutter + 说明条」整块在视口内居中：x 左右等分，
  * y 把 `g + H_p` 算进总高，于是上净空 = 下净空（1440×960 / H_p=26 下都是 27）。
+ *
+ * `H_p = 0`（没有说明条）时整块就是网格本身：`g` 与 `H_p` 都不计入，
+ * 网格自己上下居中（1440×960 下 46/46），入口下缘贴网格下缘。
  *
  * 只有整块比视口还大（极窄/极矮窗口里 cell 被 96 下限顶住）时才夹到 0：那时网格贴
  * 屏幕左上，说明条可能落到视口下缘之外——这是有意的降级，与旧实现同样的取舍。
@@ -212,7 +243,9 @@ function frameInset(
   viewportHeight: number,
   pillHeight: number,
 ): { x: number; y: number } {
-  const unionHeight = metrics.height + metrics.gap + pillHeight;
+  const pillH = normalizeFooterPillHeight(pillHeight);
+  // 没有说明条时不再为 pill 行预留 gutter：整块高度就是网格高度
+  const unionHeight = metrics.height + (pillH > 0 ? metrics.gap + pillH : 0);
   return {
     x: Math.max(0, (viewportWidth - metrics.width) / 2),
     y: Math.max(0, (viewportHeight - unionHeight) / 2),
@@ -224,6 +257,9 @@ function frameInset(
  *
  * `pillHeight` 是说明条**实测**高度（`layout/footer` 的 store，首帧用
  * `FOOTER_PILL_ESTIMATE`），它是布局的输入而不是被塞进某个写死的带子里。
+ * **`H_p = 0` 表示「没有说明条」**（用户隐藏说明条 / 本机图无说明文字）：pill 行与它上方的
+ * gutter 一并消失，网格自己在视口内上下居中。
+ *
  * 1440×960 / cell 164 / gutter 12 / 8 列 / 5 行 / H_p=26 代入：
  * ```text
  * Hg     = 5×164 + 4×12 = 868                       （行数由 computeGridMetrics 派生）
@@ -239,9 +275,17 @@ function frameInset(
  * panel.chat = 906 高 → (902, 27)–(1418, 933)         [顶边 = grid.top；906 = 868 + 12 + 26]
  * panel.voice = 340 高 → (902, 593)–(1418, 933)       [340 = 2×164 + 12]
  * ```
+ * 隐藏说明条后（同一函数、H_p=0，隐藏前后都是它的输出）：
+ * ```text
+ * unionH = 868,  insetY = (960 − 868)/2 = 46        → grid (22, 46)–(1418, 914)，上/下 46/46
+ * pill   = (22, 914)–(1418, 914)                    [零高，top = bottom = grid.bottom]
+ * footer = (22, 858)–(1418, 914)                    [入口下缘贴网格下缘 = 914]
+ * entry  = 56×56 → (1362, 858)
+ * panel.chat = 868 高 → (902, 46)–(1418, 914)
+ * ```
  * 说明条自身高度由文字内容决定，这里只消费调用方量到的 `H_p`，不量、不猜：
  * 它的上下缘来自 `pill`，与 chat 入口的**下缘**共线（`pill.bottom`），
- * 与网格的间距恰好是一个 widget gutter（`metrics.gap`）。
+ * 与网格的间距恰好是一个 widget gutter（`metrics.gap`）；没有说明条时两者同时贴网格下缘。
  */
 export function layoutFrame(
   metrics: GridMetrics,
@@ -249,9 +293,9 @@ export function layoutFrame(
   viewportHeight: number,
   pillHeight: number,
 ): LayoutFrame {
-  // 非法输入（NaN / 0 / 负数，例如容器未布局时的测量值）退回首帧估计，不让几何变成 NaN
-  const pillH =
-    Number.isFinite(pillHeight) && pillHeight > 0 ? pillHeight : FOOTER_PILL_ESTIMATE;
+  // 0 合法（= 没有说明条）；只把负数 / NaN 退回估计值，不让几何变成 NaN
+  const pillH = normalizeFooterPillHeight(pillHeight);
+  const hasFooterBar = pillH > 0;
   const inset = frameInset(metrics, viewportWidth, viewportHeight, pillH);
   const grid = frameRect(
     inset.x,
@@ -259,13 +303,10 @@ export function layoutFrame(
     inset.x + metrics.width,
     inset.y + metrics.height,
   );
-  // 说明条与网格之间只隔一个 widget gutter（g = metrics.gap = spacingHorizontalM）
-  const pill = frameRect(
-    grid.left,
-    grid.bottom + metrics.gap,
-    grid.right,
-    grid.bottom + metrics.gap + pillH,
-  );
+  // 说明条与网格之间只隔一个 widget gutter（g = metrics.gap = spacingHorizontalM）；
+  // 没有说明条时不隔 gutter，pill 退化为 grid.bottom 上的零高矩形
+  const pillTop = grid.bottom + (hasFooterBar ? metrics.gap : 0);
+  const pill = frameRect(grid.left, pillTop, grid.right, pillTop + pillH);
   // chat 入口下缘 = 说明条下缘（同一个值，不是两套规则）；右缘 = 网格右缘
   const entryTop = pill.bottom - FOOTER_HEIGHT;
   const footer = frameRect(grid.left, entryTop, grid.right, pill.bottom);
@@ -291,7 +332,8 @@ export function layoutFrame(
       y: entryTop,
     },
     panel: {
-      // 对话面板顶边落在网格上缘、下缘落在 pill 下缘：高度 = Hg + g + H_p（= unionH）
+      // 对话面板顶边落在网格上缘、下缘落在 pill 下缘：高度 = Hg + g + H_p（= unionH）；
+      // 没有说明条（H_p=0）时正好等于网格高 Hg（1440×960 下 868）
       chat: frameRect(
         footer.right - panelWidth,
         grid.top,
@@ -317,7 +359,8 @@ export function layoutFrame(
  *
  * **严格居中，但整块居中而不是网格单独居中**：横向 (vw − 网格宽)/2，纵向把
  * 「gutter + 说明条实测高度」算进总高：(vh − 网格高 − g − H_p)/2（1440×960 / H_p=26
- * 下 = 22 / 27）。不做 4px 吸附——吸附会把 22 压成 20、把 27 压成 24，整块偏左 2、偏上 3。
+ * 下 = 22 / 27；H_p=0 时 = 22 / 46）。不做 4px 吸附——吸附会把 22 压成 20、把 27 压成 24，
+ * 整块偏左 2、偏上 3。
  *
  * `pillHeight` 缺省取 `FOOTER_PILL_ESTIMATE`（首帧估计）：这是为了兼容仍以 3 参调用的
  * 旧调用方（`desktop/useViewportMetrics`），它们拿不到实测值。需要与说明条实测高度
@@ -362,6 +405,8 @@ export function gridBounds(
  * 所以上下净空不相等——「网格 + g + pill 整块居中」的必然结果，不是算错。
  * 与下净空配对的是 **pill 的下缘**（vh − pill.bottom = 27 = 上净空）；
  * 需要说明条/入口自己的矩形请直接用 `layoutFrame().pill` / `.footer`。
+ *
+ * **H_p=0（没有说明条）时下净空 = 上净空 = 46**：此时 vh − grid.bottom 就是上净空本身。
  *
  * 由 `gridOrigin` 派生，**不在别处重复写 22 / 27**，避免再出现「某处按 20、某处按 22」
  * 的第二套口径。

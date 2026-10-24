@@ -13,7 +13,7 @@
  * - hover / press 的缩放加在 iframe 内层 wrapper 上，Card 本身只保留定位 translate
  *   与编辑模式 scale；缩放值、时长、曲线全部来自 MOTION §2 与 motionTokens。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import {
   Button,
@@ -53,8 +53,9 @@ import { WidgetFrame } from './WidgetFrame';
 import type { WidgetFrameHandle } from './WidgetFrame';
 
 /**
- * AUDIT V-06 / DESIGN §1.2：平板触控目标不小于 40×40 CSS px。
- * 编辑模式卡片有 0.97 缩放，按钮布局尺寸要反算（EDIT_TOUCH_TARGET），屏幕上实测才不会低于 40。
+ * D-05 / FLUENT2 §9：可点元素不小于 44×44 CSS px。
+ * 编辑模式卡片有 0.96 缩放，按钮布局尺寸要反算（EDIT_TOUCH_TARGET = ceil(44 / 0.96) = 46），
+ * 屏幕上实测才不会低于 44。
  */
 const TOUCH_TARGET: CSSProperties = {
   minWidth: EDIT_TOUCH_TARGET,
@@ -76,6 +77,8 @@ export interface WidgetCardProps {
   metrics: GridMetrics;
   origin: { x: number; y: number };
   editMode: boolean;
+  /** 欣赏壁纸模式：只淡出 + 轻微下移，不改卡片几何 */
+  gallery: boolean;
   focused: boolean;
   dragging: boolean;
   /** 插件管理器生成的 iframe 地址（PluginManager.widgetFrameSrc） */
@@ -106,6 +109,7 @@ export function WidgetCard({
   metrics,
   origin,
   editMode,
+  gallery,
   focused,
   dragging,
   src,
@@ -146,6 +150,8 @@ export function WidgetCard({
   const [releasing, setReleasing] = useState(false);
   /** 刚退出编辑模式：卡片 0.96→1 用 150ms 加速（MOTION §3「退出」），不是回弹的 100ms */
   const [leavingEdit, setLeavingEdit] = useState(false);
+  /** 刚退出欣赏壁纸：回场按「常规进出」200ms 减速（MOTION §1），窗口结束后回普通过渡 */
+  const [leavingGallery, setLeavingGallery] = useState(false);
 
   const pressRef = useRef<PressPhase | null>(null);
   const downTimerRef = useRef(0);
@@ -300,6 +306,33 @@ export function WidgetCard({
     return () => window.clearTimeout(timer);
   }, [editMode]);
 
+  // 进入欣赏壁纸：先清掉 press / hover 视觉，避免卡片容器淡出时内容还在缩放。
+  useLayoutEffect(() => {
+    if (!gallery) return;
+    clearDownTimer();
+    clearReleaseTimer();
+    pressRef.current = null;
+    setPressPhase(null);
+    setReleasing(false);
+    setHostHover(false);
+    setFrameHover(false);
+  }, [clearDownTimer, clearReleaseTimer, gallery]);
+
+  // 退出欣赏壁纸：回场是「常规进出」（MOTION §1：200ms 减速），不错峰。
+  // layout effect 确保第一帧就用回场曲线，避免先按普通过渡画一帧再改曲线。
+  const wasGalleryRef = useRef(gallery);
+  useLayoutEffect(() => {
+    const wasGallery = wasGalleryRef.current;
+    wasGalleryRef.current = gallery;
+    if (!wasGallery || gallery) {
+      setLeavingGallery(false);
+      return undefined;
+    }
+    setLeavingGallery(true);
+    const timer = window.setTimeout(() => setLeavingGallery(false), motionTokens.durationNormal);
+    return () => window.clearTimeout(timer);
+  }, [gallery]);
+
   // 兜底：指针在 iframe 外抬起（宿主文档收到 pointerup）时也要回弹，避免按压状态卡死
   useEffect(() => {
     if (pressPhase === null) return undefined;
@@ -329,8 +362,8 @@ export function WidgetCard({
   const width = widthCells * metrics.cell + (widthCells - 1) * metrics.gap;
   const height = heightCells * metrics.cell + (heightCells - 1) * metrics.gap;
 
-  const hoverActive = !editMode && !dragging && (hostHover || frameHover);
-  const visiblePress = editMode || dragging ? null : pressPhase;
+  const hoverActive = !editMode && !gallery && !dragging && (hostHover || frameHover);
+  const visiblePress = editMode || gallery || dragging ? null : pressPhase;
 
   // ---- 内容层 scale / 过渡（MOTION §2，全部来自 motionTokens） ----
   let contentDuration: number = motionTokens.durationFaster;
@@ -402,21 +435,48 @@ export function WidgetCard({
     cardDuration = motionTokens.durationFaster;
     cardCurve = motionTokens.curveDecelerateMin;
   }
+  if (gallery) {
+    // 进入欣赏壁纸 = 退出类（MOTION §1：chrome 淡出 / 浮层收回）：
+    // 150ms + curveAccelerateMid，与桌面 chrome 的 galleryChromeHidden 同一组参数。
+    cardDuration = reducedMotion ? motionTokens.durationFaster : motionTokens.durationFast;
+    cardCurve = motionTokens.curveAccelerateMid;
+  } else if (leavingGallery) {
+    // 回场 = 常规进出（MOTION §1）：200ms + curveDecelerateMid，与 chrome 回场同参数。
+    cardDuration = reducedMotion ? motionTokens.durationFaster : motionTokens.durationNormal;
+    cardCurve = motionTokens.curveDecelerateMid;
+  }
+
+  /** 欣赏壁纸不做逐项错峰：MOTION §6「明确不做 stagger 逐项入场」，§5.1 的 20ms 只给气泡 */
+  const galleryOffset = gallery && !reducedMotion ? tokens.spacingVerticalSNudge : '0';
+  const galleryMotion = gallery || leavingGallery;
+  /**
+   * 欣赏壁纸分支里完全不出现 `scale()`：只保留定位 translate 与退出用的
+   * translateY，避免 iframe 因缩放重新栅格化。
+   */
+  const cardTransform = gallery
+    ? `translate(${x}px, ${y}px) translateY(${galleryOffset})`
+    : `translate(${x}px, ${y}px) scale(${editMode && !reducedMotion ? EDIT_CARD_SCALE : 1})`;
 
   const cardStyle: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
-    // 定位 translate 与编辑模式 scale 留在 Card 上；hover/press 只动内层内容
-    transform: `translate(${x}px, ${y}px) scale(${
-      editMode && !reducedMotion ? EDIT_CARD_SCALE : 1
-    })`,
+    // 定位 translate 与编辑模式 scale 留在 Card 上；hover/press 只动内层内容。
+    // 欣赏壁纸只额外叠 translateY，不碰 width/height，因此不会触发网格重排。
+    transform: cardTransform,
     width,
     height,
     borderRadius: CARD_RADIUS,
     ...CARD_MATERIAL,
+    opacity: gallery ? 0 : 1,
+    pointerEvents: gallery ? 'none' : undefined,
     boxShadow: editMode || (hoverActive && !visiblePress) ? tokens.shadow8 : tokens.shadow4,
-    transitionProperty: 'transform, width, height, opacity, box-shadow',
+    // 欣赏壁纸只动容器 opacity 与 translateY；减少动效时只保留 opacity
+    transitionProperty: galleryMotion
+      ? reducedMotion
+        ? 'opacity'
+        : 'transform, opacity'
+      : 'transform, width, height, opacity, box-shadow',
     transitionDuration: `${cardDuration}ms`,
     transitionTimingFunction: cardCurve,
   };
@@ -481,6 +541,8 @@ export function WidgetCard({
       data-widget-card="true"
       data-widget-uid={widget.uid}
       data-widget-page={widget.page}
+      data-gallery={gallery ? 'true' : undefined}
+      inert={gallery}
       data-hover={hoverActive ? 'true' : undefined}
       data-press={visiblePress ?? undefined}
       onFocus={() => onFocus(widget)}

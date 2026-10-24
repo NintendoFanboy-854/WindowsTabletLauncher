@@ -278,6 +278,25 @@ export const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   /**
+   * 欣赏壁纸模式：只让桌面 chrome 淡出，不参与网格几何。
+   *
+   * 两个方向各按 MOTION §1 的用途取参数，与卡片（`WidgetCard` 的 gallery 分支）同一组：
+   * - 进入欣赏 = 退出类（chrome 淡出）：`durationFast`(150) + `curveAccelerateMid`；
+   * - 退出欣赏 = 常规进出：`durationNormal`(200) + `curveDecelerateMid`。
+   * 两条曲线显式声明——只换时长会让 chrome 与卡片错拍（一个加速、一个减速）。
+   */
+  galleryChrome: {
+    transitionProperty: 'opacity',
+    transitionDuration: `${motionTokens.durationNormal}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
+  galleryChromeHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+    transitionDuration: `${motionTokens.durationFast}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMid,
+  },
+  /**
    * 分页指示器：底部居中、常驻状态指示，不承载材质/投影（material.md 只允许
    * acrylic 给瞬态浮层）。只改颜色，不改形状/尺寸；pointer-events:none 让滑动手势
    * 穿透到桌面。

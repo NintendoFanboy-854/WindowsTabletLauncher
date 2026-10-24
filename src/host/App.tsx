@@ -28,12 +28,14 @@ import {
   reconcileWindowGeometry,
   resolveThemeMode,
   syncAutostartOnStartup,
-  useBingWallpaper,
   useGlobalShortcuts,
   useHostPage,
   writeThemeMode,
 } from './shell';
-import type { BingWallpaper, ColorScheme, HostPage, ThemeMode } from './shell';
+import type { ColorScheme, HostPage, ThemeMode } from './shell';
+import { useWallpaper } from './shell/wallpaper';
+import type { WallpaperState } from './shell/wallpaper';
+import { useWallpaperUi } from './shell/wallpaperUi';
 
 /** 截图/调试用：`?agent=1` 直接打开 Agent 面板 */
 function readAgentParam(): boolean {
@@ -50,8 +52,10 @@ export default function App() {
   const [systemScheme, setSystemScheme] = useState<ColorScheme>(() => resolveThemeMode('system'));
   const [seeded, setSeeded] = useState(false);
   const bridge = useMemo(() => getHostBridge(), []);
-  /** 必应每日壁纸（v0.4.0）：后台取数，失败时桌面停在 Fluent 中性底色 */
-  const wallpaper = useBingWallpaper();
+  /** 壁纸数据层（v0.6.0）：自动 / 固定 / 本机三态统一从这里取 */
+  const wallpaper = useWallpaper();
+  /** 说明条显示偏好（设置页写、桌面层读） */
+  const { captionHidden } = useWallpaperUi();
 
   // 跟随系统：订阅 Windows 亮暗模式变化
   useEffect(() => onSystemColorSchemeChange(setSystemScheme), []);
@@ -102,7 +106,8 @@ export default function App() {
         <NotificationsProvider bridge={bridge}>
           <HostShell
             bridge={bridge}
-            wallpaper={wallpaper}
+            wallpaper={wallpaper.state}
+            captionHidden={captionHidden}
             themeMode={themeMode}
             colorScheme={colorScheme}
             onThemeModeChange={changeTheme}
@@ -115,14 +120,22 @@ export default function App() {
 
 interface HostShellProps {
   bridge: HostBridge;
-  wallpaper: BingWallpaper | null;
+  wallpaper: WallpaperState;
+  captionHidden: boolean;
   themeMode: ThemeMode;
   /** 解析后的亮暗（system 模式下跟随系统），桌面层据此重新读 token 下发给插件 */
   colorScheme: ColorScheme;
   onThemeModeChange: (mode: ThemeMode) => void;
 }
 
-function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChange }: HostShellProps) {
+function HostShell({
+  bridge,
+  wallpaper,
+  captionHidden,
+  themeMode,
+  colorScheme,
+  onThemeModeChange,
+}: HostShellProps) {
   const { notify } = useHostNotifications();
   const [page, navigate] = useHostPage();
 
@@ -133,6 +146,25 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
   const back = useCallback(() => navigate('desktop'), [navigate]);
   const [agentOpen, setAgentOpen] = useState<boolean>(readAgentParam);
   const openAgent = useCallback(() => setAgentOpen(true), []);
+
+  /** 欣赏壁纸模式（只在本次会话内有效，不持久化） */
+  const [gallery, setGallery] = useState(false);
+  const toggleGallery = useCallback(() => {
+    setAgentOpen(false);
+    setGallery((previous) => !previous);
+  }, []);
+
+  // 说明条被隐藏时没有入口，模式必须一起退出；离开桌面页同样退出。
+  useEffect(() => {
+    if (captionHidden) setGallery(false);
+  }, [captionHidden]);
+  useEffect(() => {
+    if (page !== 'desktop') setGallery(false);
+  }, [page]);
+  // 欣赏壁纸只留壁纸：Agent 面板若开着，进入时一并收起。
+  useEffect(() => {
+    if (gallery) setAgentOpen(false);
+  }, [gallery]);
 
   /**
    * 设置页的目标插件分区。`plugin:request-host-settings` / 编辑模式「设置」都走这里；
@@ -153,6 +185,10 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
   useGlobalShortcuts({
     notify,
     onEscape: () => {
+      if (gallery) {
+        setGallery(false);
+        return;
+      }
       if (page !== 'desktop') navigate('desktop');
     },
     // Ctrl+,：从任何页面打开设置（v0.3.0 起桌面 dock 已删除，这是设置的主入口之一）
@@ -239,6 +275,7 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
             bridge={bridge}
             notify={notify}
             active={page === 'desktop'}
+            gallery={gallery}
             colorScheme={colorScheme}
             editModeRequest={editModeRequest}
             layoutResetRequest={layoutResetRequest}
@@ -252,12 +289,19 @@ function HostShell({ bridge, wallpaper, themeMode, colorScheme, onThemeModeChang
 
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}
       {/* 壁纸说明只在桌面页出现（设置/复盘/插件页是不透明全屏页，壁纸被盖住） */}
-      {page === 'desktop' && wallpaper ? <WallpaperCredit wallpaper={wallpaper} /> : null}
-      {/* Agent 只有浮空形态：桌面页显示右下角入口按钮；编辑模式/其它页面隐藏入口 */}
+      {page === 'desktop' ? (
+        <WallpaperCredit
+          wallpaper={wallpaper}
+          gallery={gallery}
+          captionHidden={captionHidden}
+          onToggleGallery={toggleGallery}
+        />
+      ) : null}
+      {/* Agent 只有浮空形态：桌面页显示右下角入口按钮；编辑模式/其它页面/欣赏壁纸隐藏入口 */}
       <AgentSurface
         open={agentOpen}
         onOpenChange={setAgentOpen}
-        hideEntry={page !== 'desktop' || desktopEditing}
+        hideEntry={page !== 'desktop' || desktopEditing || gallery}
       />
     </div>
   );

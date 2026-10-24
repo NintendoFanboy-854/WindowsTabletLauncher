@@ -11,7 +11,7 @@
  * 宿主不写死任何插件 id、名称或设置字段。
  */
 
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import {
   Button,
   Dropdown,
@@ -54,6 +54,8 @@ import { quitApplication } from '../../shell/useGlobalShortcuts';
 import { PageScaffold } from '../shared/PageScaffold';
 import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
 import { PluginSettings } from './PluginSettings';
+import { SettingsGroup, SettingsRow } from './SettingsBlocks';
+import { WallpaperSettings } from './WallpaperSettings';
 
 /** 平板触控目标 ≥44（Fluent layout.md 44×44 / HIG §6）：Fluent Tab 默认 38px，这里统一抬到 44 */
 const TAB_TOUCH_TARGET = { minHeight: TOUCH_TARGET_CSS };
@@ -170,42 +172,6 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXXL,
     minWidth: 0,
   },
-  group: {
-    display: 'grid',
-    gap: tokens.spacingVerticalL,
-    minWidth: 0,
-  },
-  groupHead: {
-    display: 'grid',
-    gap: tokens.spacingVerticalXXS,
-  },
-  groupHint: {
-    color: tokens.colorNeutralForeground3,
-  },
-  groupBody: {
-    display: 'grid',
-    gap: tokens.spacingVerticalL,
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalM,
-    /** 设置行高 48 = 32 + 16，全部来自 spacing ramp */
-    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
-  },
-  rowText: {
-    display: 'grid',
-    gap: tokens.spacingVerticalXXS,
-    minWidth: 0,
-  },
-  rowControl: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    flexWrap: 'wrap',
-  },
   description: {
     color: tokens.colorNeutralForeground3,
   },
@@ -240,54 +206,6 @@ const useStyles = makeStyles({
     minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalM})`,
   },
 });
-
-interface SettingsGroupProps {
-  title: string;
-  hint?: string;
-  children: ReactNode;
-}
-
-function SettingsGroup({ title, hint, children }: SettingsGroupProps) {
-  const styles = useStyles();
-  return (
-    <section className={styles.group} aria-label={title}>
-      <header className={styles.groupHead}>
-        <Text size={500} weight="semibold">
-          {title}
-        </Text>
-        {hint && (
-          <Text size={200} className={styles.groupHint}>
-            {hint}
-          </Text>
-        )}
-      </header>
-      <div className={styles.groupBody}>{children}</div>
-    </section>
-  );
-}
-
-interface SettingsRowProps {
-  label: string;
-  description?: string;
-  children?: ReactNode;
-}
-
-function SettingsRow({ label, description, children }: SettingsRowProps) {
-  const styles = useStyles();
-  return (
-    <div className={styles.row}>
-      <div className={styles.rowText}>
-        <Text size={400}>{label}</Text>
-        {description && (
-          <Text size={200} className={styles.description}>
-            {description}
-          </Text>
-        )}
-      </div>
-      {children && <div className={styles.rowControl}>{children}</div>}
-    </div>
-  );
-}
 
 export function SettingsPage({
   onBack,
@@ -496,6 +414,8 @@ export function SettingsPage({
           </MessageBar>
         )}
       </SettingsGroup>
+
+      <WallpaperSettings />
     </>
   );
 

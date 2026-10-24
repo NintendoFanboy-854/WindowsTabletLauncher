@@ -1,25 +1,43 @@
 /**
- * 桌面壁纸层（v0.4.0）：必应每日壁纸 + 壁纸说明。
+ * 桌面壁纸层（v0.6.0）：必应每日壁纸 / 本机图片 + 壁纸说明 + 欣赏壁纸模式入口。
  *
- * 用户要求（2026-10-23）：
- * - 用原生必应壁纸接口（API 实际域 `api.bimg.cc`，文档站 `api-bimg-cc.apifox.cn`），UHD 4K；
- * - 屏幕比例与壁纸不一致时用“填充”（`object-fit: cover`），不拉伸；
- * - 带上图片描述，但用符合设计原则的方式（安静、低层级、不抢小组件）。
+ * 数据来自 `shell/wallpaper.ts` 的 `useWallpaper()`：
+ * - auto / pinned 用 `state.current`（`imageUrl`、`title`、`copyright`）；
+ * - local 用 `state.local`（`url`、`name`、`caption`）。
  *
- * 视觉全部取 Fluent token：底色 `colorNeutralBackground3`、说明卡面用与桌面卡片一致的
- * `colorNeutralBackground1` + 既有材质 token、文字 `colorNeutralForeground2/3`。
+ * 说明条是「欣赏壁纸」模式的唯一入口：按钮自身保持 26 高的视觉尺寸（这个高度会
+ * 通过 `reportFooterPillHeight` 反向驱动桌面网格，不能改），44×44 的命中区由
+ * `::after` 绝对定位外扩，不占布局、不改 padding。
+ *
+ * 解释文本只在欣赏壁纸模式下出现，位置在说明条上方；它不参与布局测量，
+ * 因此不会改变说明条高度或网格几何。文本走 Agent 现有 Markdown 渲染器。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, motionTokens, tokens } from '@fluentui/react-components';
 
-import { wallpaperCredit, type BingWallpaper } from '../shell/wallpaper';
-import type { ColorScheme } from '../shell/themeMode';
+import { useWallpaperNote } from '../agent/oneshot/describeWallpaper';
+import { MessageContent } from '../agent/ui/MessageContent';
+import { useReducedMotion } from '../agent/ui/useReducedMotion';
+import { TOUCH_TARGET } from '../design/metrics';
 import {
+  FOOTER_PILL_ESTIMATE,
   computeGridMetrics,
   layoutFrame,
   reportFooterPillHeight,
   useFooterPillHeight,
 } from '../layout';
+import type { WallpaperEntry, WallpaperState } from '../shell/wallpaper';
+import type { ColorScheme } from '../shell/themeMode';
+
+/**
+ * 说明条视觉高度（首帧估计）= 26，命中区目标 44。
+ *
+ * 绝对定位伪元素的包含块是按钮的 padding box，而按钮有 1px 描边；
+ * 因此从 26 的 border-box 外扩到 44，除 `(44 - 26) / 2 = 9` 外还要再减一条描边，
+ * 实际 inset 为 calc(-9px - strokeWidthThin) ≈ -10px。式子保留 9 的来源，
+ * 不写死 `-10px`。
+ */
+const CREDIT_HIT_INSET = `calc(-${(TOUCH_TARGET - FOOTER_PILL_ESTIMATE) / 2}px - ${tokens.strokeWidthThin})`;
 
 const useWallpaperStyles = makeStyles({
   root: {
@@ -73,21 +91,72 @@ const useWallpaperStyles = makeStyles({
     justifyContent: 'flex-start',
     pointerEvents: 'none',
   },
+  /** 说明条与其上方解释文本的定位上下文；自身高度只由按钮决定 */
+  creditStack: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'flex-end',
+    minWidth: 0,
+    maxWidth: '100%',
+  },
+  /**
+   * 说明条按钮。视觉尺寸（padding / border / 行高）与旧 div 完全一致；
+   * 只额外加 `::after` 命中区、hover/active 底色和键盘焦点环。
+   */
   credit: {
+    appearance: 'none',
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    maxWidth: '420px',
+    // 旧 pill 的 420 上限：用 spacing token 组合出同值（13×32 + 4）
+    maxWidth: `calc(${tokens.spacingHorizontalXXXL} * 13 + ${tokens.spacingHorizontalXS})`,
     boxSizing: 'border-box',
+    margin: 0,
     padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
     borderRadius: tokens.borderRadiusCircular,
     border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
     backdropFilter: 'blur(var(--wtsl-material-blur))',
     boxShadow: tokens.shadow4,
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
+    cursor: 'pointer',
     whiteSpace: 'nowrap',
+    overflow: 'visible',
+    textAlign: 'left',
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    ':hover': {
+      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 88%, transparent)`,
+    },
+    ':active': {
+      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
+    },
+    ':focus-visible': {
+      outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
+      outlineOffset: tokens.strokeWidthThin,
+    },
+    /*
+     * 44×44 命中区：伪元素绝对定位外扩，不改变按钮 border-box。
+     * 这是说明条高度能继续作为布局输入（H_p=26）的前提。
+     */
+    '::after': {
+      content: "''",
+      position: 'absolute',
+      inset: CREDIT_HIT_INSET,
+      borderRadius: tokens.borderRadiusCircular,
+      pointerEvents: 'auto',
+    },
+  },
+  /** 文本裁切放在内层：按钮本身必须 overflow:visible，伪元素命中区才不会被裁掉 */
+  creditContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+    maxWidth: '100%',
     overflow: 'hidden',
+    whiteSpace: 'nowrap',
   },
   creditLine: {
     minWidth: 0,
@@ -102,37 +171,93 @@ const useWallpaperStyles = makeStyles({
   creditTitle: {
     flexShrink: 0,
     color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
   },
   creditMeta: {
     color: tokens.colorNeutralForeground3,
   },
+  /**
+   * 解释文本：浮在说明条上方，绝对定位，不参与 pill 高度测量。
+   *
+   * 材质与说明条同一套（半透明中性面 + 单一 blur token + 大圆角），否则 14px 文字
+   * 直接压在必应照片上，亮天/雪景下的对比度会低于 FLUENT2 §10 的 4.5:1。
+   * 动效按 MOTION §1「常规进出」：`durationNormal`(200) + `curveDecelerateMid`，
+   * **不设延迟**（§8「禁止为动画延迟内容渲染」，120ms 曾是自造时长）。
+   */
+  note: {
+    position: 'absolute',
+    left: 0,
+    bottom: `calc(100% + ${tokens.spacingVerticalS})`,
+    width: 'max-content',
+    // 12×XXXL(32)=384；窄屏再用网格两侧留白 token 夹住，避免文字伸出视口
+    maxWidth: `min(calc(${tokens.spacingHorizontalXXXL} * 12), calc(100vw - ${tokens.spacingHorizontalXL} * 2))`,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalL}`,
+    borderRadius: tokens.borderRadiusXLarge,
+    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow4,
+    color: tokens.colorNeutralForeground1,
+    opacity: 0,
+    transform: `translateY(${tokens.spacingVerticalSNudge})`,
+    pointerEvents: 'none',
+    transitionProperty: 'opacity, transform',
+    transitionDuration: `${motionTokens.durationNormal}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+  },
+  noteVisible: {
+    opacity: 1,
+    transform: 'none',
+  },
+  /** 减少动效：100ms 纯 opacity，无位移（MOTION §7「≤100ms 淡入」） */
+  noteReduced: {
+    transform: 'none',
+    transitionProperty: 'opacity',
+    transitionDuration: `${motionTokens.durationFaster}ms`,
+  },
 });
 
 export interface WallpaperLayerProps {
-  wallpaper: BingWallpaper | null;
+  wallpaper: WallpaperState;
   colorScheme: ColorScheme;
+}
+
+interface WallpaperImage {
+  key: string;
+  url: string;
+  mode: 'local' | 'remote';
+}
+
+function resolveImage(wallpaper: WallpaperState): WallpaperImage | null {
+  if (wallpaper.mode === 'local') {
+    if (!wallpaper.local?.url) return null;
+    return { key: wallpaper.local.key, url: wallpaper.local.url, mode: 'local' };
+  }
+  const entry = wallpaper.current;
+  if (!entry) return null;
+  return { key: entry.key, url: entry.imageUrl, mode: 'remote' };
 }
 
 /** 全屏壁纸层：画在桌面内容下方，不拦指针。 */
 export function WallpaperLayer({ wallpaper, colorScheme }: WallpaperLayerProps) {
   const styles = useWallpaperStyles();
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const image = resolveImage(wallpaper);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const handleError = useCallback(() => {
-    setFailedUrl(wallpaper?.url ?? null);
-  }, [wallpaper?.url]);
-  const visible = Boolean(wallpaper && failedUrl !== wallpaper.url);
+    setFailedKey(image?.key ?? null);
+  }, [image?.key]);
+  const visible = Boolean(image && failedKey !== image.key);
 
   return (
     <div className={styles.root} aria-hidden="true" data-wallpaper-layer="true">
-      {visible && wallpaper ? (
+      {visible && image ? (
         <img
           className={styles.image}
-          src={wallpaper.url}
+          src={image.url}
           alt=""
           draggable={false}
           decoding="async"
           onError={handleError}
-          data-wallpaper-source={wallpaper.source}
+          data-wallpaper-mode={image.mode}
         />
       ) : null}
       {/* 暗色压暗以保证小组件上的文字可读；亮色只做极轻的压暗 */}
@@ -163,35 +288,126 @@ function useViewportSize(): { width: number; height: number } {
   return size;
 }
 
+interface CreditModel {
+  title: string;
+  location: string;
+  full: string;
+}
+
+/** 从版权串提取地点短句（保留旧说明条的两段式展示，不把作者压到脸上） */
+function locationOf(copyright: string): string {
+  const withoutAuthor = copyright.split(/\s*[（(]/)[0]?.trim() ?? '';
+  return withoutAuthor
+    .split(/[，,]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('，');
+}
+
+function resolveCredit(wallpaper: WallpaperState): CreditModel | null {
+  if (wallpaper.mode === 'local') {
+    const local = wallpaper.local;
+    if (!local) return null;
+    const caption = local.caption.trim();
+    const name = local.name.trim();
+    if (!caption && !name) return null;
+    // 本机图片没有版权串；说明文字本身就是标题，不重复拼进 aria-label。
+    return { title: caption || name, location: '', full: '' };
+  }
+
+  const entry: WallpaperEntry | null = wallpaper.current;
+  if (!entry) return null;
+  const title = entry.title.trim() || '必应壁纸';
+  return { title, location: locationOf(entry.copyright), full: entry.copyright.trim() };
+}
+
 /**
- * 壁纸说明：安静地待在桌面左下角，两行 12px，标题 + 地点短句；
- * 完整版权放 `aria-label`/`title`，不展开成另一套界面。
+ * 壁纸说明（左下角）：点击进入 / 退出「欣赏壁纸」模式。
  *
- * 位置不再写死 `bottom: 8`，也不落在一条写死高 56 的带子里：整块挂在 `layoutFrame().pill`
- * （1440×960 / H_p=26 下为 (22,907)-(1418,933)），上缘 = 网格下缘 + 一个 widget gutter。
- * 它自己的高度由文字内容决定，并且**反向成为布局的输入**：
- * `ResizeObserver` 量自身 border-box 高度 → `reportFooterPillHeight`（`layout/footer` 的
- * 取整去重 store）→ 本组件与桌面层、Agent 入口都通过 `useFooterPillHeight` 订阅，
- * 于是 grid 的 insetY、pill 的 top、chat 入口的 bottom 在下一帧一起按新的 H_p 重算。
+ * `captionHidden` 为真时整条不渲染（本机图片没有说明文字时同理，由 `credit === null` 体现）。
+ * 这两种「没有说明条」的情形都必须上报 `H_p = 0`：`0` 在 `layout/footer` 里是**合法值**，
+ * 语义是「没有说明条」，`layoutFrame` 据此不再预留 pill 行与 gutter，网格自己在视口内
+ * 上下居中（1440×960 下上/下各 46）、入口下缘贴网格下缘。
+ * 跳过上报会让布局停在最后一次实测的 26 上，出现上 27 / 下 65 的不对称。
  */
-export function WallpaperCredit({ wallpaper }: { wallpaper: BingWallpaper }) {
+export interface WallpaperCreditProps {
+  wallpaper: WallpaperState;
+  gallery: boolean;
+  captionHidden: boolean;
+  onToggleGallery: () => void;
+}
+
+export function WallpaperCredit({
+  wallpaper,
+  gallery,
+  captionHidden,
+  onToggleGallery,
+}: WallpaperCreditProps) {
   const styles = useWallpaperStyles();
-  const credit = wallpaperCredit(wallpaper);
+  const credit = useMemo(() => resolveCredit(wallpaper), [wallpaper]);
   const viewport = useViewportSize();
   const pillHeight = useFooterPillHeight();
-  const pillRef = useRef<HTMLDivElement | null>(null);
+  const reducedMotion = useReducedMotion();
+  const pillRef = useRef<HTMLButtonElement | null>(null);
+  const [noteVisible, setNoteVisible] = useState(false);
 
-  // 只观测 pill 自身：量的是 border-box（padding + 描边 + 行高），与布局无关，
-  // 因此不会出现「布局变 → 尺寸变 → 再改布局」的回环。取整与去重在 store 里完成。
+  /**
+   * 一次性说明只在欣赏壁纸模式、且当前是必应图时请求；本机图片没有模型可搜的元数据。
+   */
+  const noteInput = useMemo(() => {
+    if (!gallery || !credit || captionHidden) return null;
+    if (wallpaper.mode === 'local') return null;
+    const entry = wallpaper.current;
+    if (!entry) return null;
+    return {
+      key: entry.key,
+      market: entry.market,
+      title: entry.title,
+      copyright: entry.copyright,
+      date: entry.date,
+    };
+  }, [captionHidden, credit, gallery, wallpaper.current, wallpaper.mode]);
+
+  const { text: noteText } = useWallpaperNote(noteInput);
+  const noteKey = noteInput?.key ?? '';
+  const hasCredit = Boolean(credit);
+
+  // 换图（或退出再进入）时先回到隐藏态，等新文本回来再淡入。
   useEffect(() => {
+    setNoteVisible(false);
+  }, [noteKey]);
+
+  // 只观测 pill 自身：量的是 border-box（padding + 描边 + 行高），与布局无关。
+  // 没有说明条时上报 0（= 无底部条，见组件文档），这样隐藏前后网格都对称。
+  // hasCredit 入依赖：首帧壁纸还没到时组件返回 null，图片就绪后要重新挂观察器。
+  useEffect(() => {
+    if (captionHidden || !hasCredit) {
+      reportFooterPillHeight(0);
+      return undefined;
+    }
     const element = pillRef.current;
-    if (!element) return;
+    if (!element) return undefined;
     const measure = () => reportFooterPillHeight(element.getBoundingClientRect().height);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [captionHidden, hasCredit]);
+
+  /**
+   * 文本就绪后再切到可见态：元素先在 DOM 里以 opacity 0 挂一帧，
+   * 下一帧加类名才会触发过渡（不做骨架屏 / spinner）。
+   */
+  useEffect(() => {
+    if (!gallery || !noteText) {
+      setNoteVisible(false);
+      return undefined;
+    }
+    if (noteVisible) return undefined;
+    const frame = window.requestAnimationFrame(() => setNoteVisible(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [gallery, noteText, noteVisible]);
 
   const frame = useMemo(
     () =>
@@ -205,32 +421,59 @@ export function WallpaperCredit({ wallpaper }: { wallpaper: BingWallpaper }) {
   );
   const { pill } = frame;
 
+  if (captionHidden || !credit) return null;
+
+  const label = credit.full ? `壁纸：${credit.title}。${credit.full}` : `壁纸：${credit.title}`;
+  const noteClassName = mergeClasses(
+    styles.note,
+    noteVisible && styles.noteVisible,
+    reducedMotion && styles.noteReduced,
+  );
+
   return (
     <div
       className={styles.creditDock}
       style={{ left: pill.left, top: pill.top, width: pill.width, height: pill.height }}
     >
-      <div
-        ref={pillRef}
-        className={styles.credit}
-        data-wallpaper-credit="true"
-        data-wallpaper-source={wallpaper.source}
-        aria-label={`壁纸：${credit.title}。${credit.full}`}
-        title={credit.full}
-      >
-        <Text size={200} weight="semibold" className={mergeClasses(styles.creditLine, styles.creditTitle)}>
-          {credit.title}
-        </Text>
-        {credit.location ? (
-          <>
-            <Text size={200} className={styles.creditDivider} aria-hidden="true">
-              ·
-            </Text>
-            <Text size={200} className={mergeClasses(styles.creditLine, styles.creditMeta)}>
-              {credit.location}
-            </Text>
-          </>
+      <div className={styles.creditStack}>
+        {gallery ? (
+          <div
+            className={noteClassName}
+            data-wallpaper-note="true"
+            aria-live="polite"
+          >
+            {noteText ? <MessageContent text={noteText} /> : null}
+          </div>
         ) : null}
+        <button
+          ref={pillRef}
+          type="button"
+          className={styles.credit}
+          data-wallpaper-credit="true"
+          data-gallery={gallery ? 'true' : undefined}
+          aria-pressed={gallery}
+          aria-label={label}
+          title={credit.full || undefined}
+          onClick={(event) => {
+            // 把焦点收回宿主文档，确保 iframe 里的旧焦点不会吞掉 Esc
+            event.currentTarget.focus({ preventScroll: true });
+            onToggleGallery();
+          }}
+        >
+          <span className={styles.creditContent}>
+            <span className={mergeClasses(styles.creditLine, styles.creditTitle)}>{credit.title}</span>
+            {credit.location ? (
+              <>
+                <span className={styles.creditDivider} aria-hidden="true">
+                  ·
+                </span>
+                <span className={mergeClasses(styles.creditLine, styles.creditMeta)}>
+                  {credit.location}
+                </span>
+              </>
+            ) : null}
+          </span>
+        </button>
       </div>
     </div>
   );

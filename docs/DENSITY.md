@@ -33,7 +33,7 @@
 
 3. **行节奏**：行高 44（`LIST_ROW_HEIGHT`）+ 行距 4（`spacingVerticalXS`）= 48 pitch；行数按 §2.2 公式取，放不下必须在 identity 行 trailing 写“共 X · 显示 Y”，禁止静默裁切。
 4. **卡内栅格**：padding 16（`spacingHorizontalL` / `spacingVerticalL`）+ gap 8（`spacingVerticalS`），由 `CardRoot` 强制；宿主 6（`spacingHorizontalSNudge`）+ 插件 16 = 内容轴 22。
-5. **Agent 入口（右下保留格）**：56×56 圆形 orb，锚点 = 网格右下角 (1418, 914)、安全距 0（`AGENT_GRID_SAFETY`）→ 1440×960 下 right 22 / bottom 46、z30、右下 1 格保留格；语音窗 516×340、对话面板 516×868（3 列宽，见 `agent/ui/entryGeometry.ts`）；编辑态隐藏（`agent.css`、`AGENT-SURFACE-CONTRACT §1`）。**方向固定为右下，不是右上**：上一轮把入口放到右上的实现已回退，旧存档若把卡片留在 (7,4)，`reconcileLayout` 会重排（host-impl §2.3）。
+5. **Agent 入口（右下保留格）**：56×56 圆形 orb，锚点 = **底部条（说明条行）右下角 (1418, 933)**、安全距 0（`AGENT_GRID_SAFETY`）→ 1440×960 下 right 22 / bottom 27（= 上净空；933 = 网格下缘 895 + gutter 12 + 说明条实测高 `H_p` 26）、z30、右下 1 格保留格；语音窗 516×340、对话面板 516×**906**（3 列宽；906 = 网格高 868 + gutter 12 + `H_p` 26，见 `agent/ui/entryGeometry.ts`）；编辑态与欣赏壁纸模式隐藏（`agent.css`、`AGENT-SURFACE-CONTRACT §1`）。**方向固定为右下，不是右上**：上一轮把入口放到右上的实现已回退，旧存档若把卡片留在 (7,4)，`reconcileLayout` 会重排（host-impl §2.3）。
 6. **数值出处**：文档新增数值必须是 Fluent token 或由 token 推导的整数；逐个数值的 token 出处见 [TOKEN-MAP.md](TOKEN-MAP.md)。共享原语的常量是唯一出口（`ICON_SIZE` 16/20/24/32/48、`IDENTITY_ICON_SIZE` 20、`EMPTY_STATE_ICON_SIZE` 24、`EMPTY_STATE_ICON_SIZE_LARGE` 40、`CARD_IDENTITY_HEIGHT_PX` 24、`HERO_PROGRESS_THICKNESS_PX` 4、`TOUCH_TARGET` 44、`LIST_ROW_HEIGHT` 44）；宿主侧同值常量在 `src/host/design/metrics.ts`。插件调用点直接写 `20` / `24` / `32` / `44` 字面量，与写 `37px` 同罪。
 
 ### 1.2 结构性例外：3×3 空态空带 31–33%（2026-10-24 判断性复核）

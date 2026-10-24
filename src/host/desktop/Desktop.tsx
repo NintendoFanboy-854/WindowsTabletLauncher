@@ -29,6 +29,7 @@ import {
   Spinner,
   Text,
   mergeClasses,
+  motionTokens,
   useThemeClassName,
 } from '@fluentui/react-components';
 import {
@@ -67,6 +68,7 @@ import {
 } from '../layout';
 import type { LayoutState } from '../layout';
 import type { ColorScheme } from '../shell/themeMode';
+import { useReducedMotion } from '../agent/ui/useReducedMotion';
 import { usePluginPreferences } from '../pages/plugins/preferences';
 import { getPluginManager, readFluentThemePayload, usePlugins } from '../plugins';
 import type { NormalizedPlugin, NormalizedWidget, PluginManager } from '../plugins';
@@ -104,6 +106,11 @@ export interface DesktopProps {
    * 旧行为里的“离开桌面 = 重挂载桌面”。
    */
   active?: boolean;
+  /**
+   * 欣赏壁纸模式（App 持有，不持久化）。为真时卡片只做 opacity + translateY 淡出，
+   * 网格几何不变；桌面手势全部停用，点空白处不会退出。
+   */
+  gallery?: boolean;
   /** App 层「编辑桌面布局」请求（自增 token）：active 时进入编辑模式 */
   editModeRequest?: number;
   /** App 层「重置布局」请求（自增 token）：清除 wtsl.layout 后按 manifest 默认摆放重算 */
@@ -321,6 +328,7 @@ export default function Desktop({
   manager: managerProp,
   bridge: bridgeProp,
   active = true,
+  gallery = false,
   editModeRequest,
   layoutResetRequest,
   onEditModeChange,
@@ -330,6 +338,7 @@ export default function Desktop({
   colorScheme,
 }: DesktopProps) {
   const styles = useStyles();
+  const reducedMotion = useReducedMotion();
   const manager = managerProp ?? getPluginManager();
   const bridge = bridgeProp ?? getHostBridge();
   const notifyRef = useRef(notifyProp ?? noop);
@@ -398,6 +407,8 @@ export default function Desktop({
   viewportRef.current = viewport;
   const editModeRef = useRef(editMode);
   editModeRef.current = editMode;
+  const galleryRef = useRef(gallery);
+  galleryRef.current = gallery;
   const focusedUidRef = useRef(focusedUid);
   focusedUidRef.current = focusedUid;
   const cardNodesRef = useRef(new Map<string, HTMLDivElement>());
@@ -691,6 +702,18 @@ export default function Desktop({
     swipeRef.current = null;
     setSwipeOffset(null);
   }, [active]);
+
+  // 进入欣赏壁纸：退出编辑与所有浮层/手势，只保留壁纸与说明条。
+  useEffect(() => {
+    if (!gallery) return;
+    exitEditMode();
+    setContextMenu(null);
+    dragRef.current = null;
+    const swipe = swipeRef.current;
+    if (swipe?.longPressTimer != null) window.clearTimeout(swipe.longPressTimer);
+    swipeRef.current = null;
+    setSwipeOffset(null);
+  }, [exitEditMode, gallery]);
 
   // App「外观 → 编辑桌面布局」：回到桌面后进入编辑模式（token 只在请求时变化）
   const handledEditRequestRef = useRef(editModeRequest ?? 0);
@@ -1035,6 +1058,8 @@ export default function Desktop({
 
   const handleRootPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     lastPointerTypeRef.current = event.pointerType;
+    // 欣赏壁纸模式：点壁纸空白处不退出，也不启动滑动/长按/编辑
+    if (galleryRef.current) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     // Portal 内容（Fluent Dialog/Menu/Toast）的 pointerdown 会沿 React 树冒泡到桌面根节点，
     // 但 DOM 上不在根节点内；这里抢指针会把浮层按钮的 click 重定向到桌面，必须放行。
@@ -1119,6 +1144,7 @@ export default function Desktop({
    */
   const handleRootContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
+    if (galleryRef.current) return;
     if (lastPointerTypeRef.current !== 'mouse') return;
     if (editModeRef.current) return;
     const target = event.target;
@@ -1133,7 +1159,7 @@ export default function Desktop({
 
   // 触控板双指 / 鼠标滚轮翻页：累计一个单元格的滚动距离算一次翻页
   const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    if (editModeRef.current) return;
+    if (galleryRef.current || editModeRef.current) return;
     const target = event.target;
     if (
       target instanceof Element &&
@@ -1163,6 +1189,8 @@ export default function Desktop({
     // 若不拦，对话框里的 Tab/方向键/Enter/Delete 会被桌面 roving focus / 删除快捷键抢走。
     const keyTarget = event.target as Node;
     if (keyTarget !== document.body && !event.currentTarget.contains(keyTarget)) return;
+    // 欣赏壁纸模式：卡片已 inert，桌面不参与 Tab/方向键/Enter/Delete
+    if (galleryRef.current) return;
     const state = layoutRef.current;
     if (!state) return;
     const ordered = state.widgets
@@ -1273,7 +1301,7 @@ export default function Desktop({
         aria-hidden="true"
       />
 
-      <div className={styles.pagesViewport}>
+      <div className={styles.pagesViewport} inert={gallery}>
         <div
           className={mergeClasses(styles.track, swipeOffset !== null && styles.trackDragging)}
           style={trackStyle}
@@ -1296,7 +1324,8 @@ export default function Desktop({
                       widget={widget}
                       metrics={metrics}
                       origin={origin}
-                      editMode={editMode}
+                      editMode={editMode && !gallery}
+                      gallery={gallery}
                       focused={focusedUid === widget.uid}
                       dragging={dragView?.uid === widget.uid}
                       src={src}
@@ -1335,7 +1364,7 @@ export default function Desktop({
 
       {layout && (
         <EditToolbar
-          visible={editMode}
+          visible={editMode && !gallery}
           pages={layout.pages}
           activePage={layout.activePage}
           onAddPage={handleAddPage}
@@ -1349,7 +1378,7 @@ export default function Desktop({
 
       {layout && (
         <AddWidgetDialog
-          open={addWidgetOpen}
+          open={addWidgetOpen && !gallery}
           candidates={addCandidates}
           disabledPluginNames={disabledWidgetPluginNames}
           onAdd={(candidate) => addWidget(candidate.pluginId, candidate.widgetId)}
@@ -1357,7 +1386,18 @@ export default function Desktop({
         />
       )}
 
-      {layout && <PageIndicator total={layout.pages} active={layout.activePage} />}
+      {layout && (
+        <div
+          className={mergeClasses(styles.galleryChrome, gallery && styles.galleryChromeHidden)}
+          style={{
+            transitionDuration: reducedMotion ? `${motionTokens.durationFaster}ms` : undefined,
+          }}
+          aria-hidden={gallery}
+          inert={gallery}
+        >
+          <PageIndicator total={layout.pages} active={layout.activePage} />
+        </div>
+      )}
 
       {/* 鼠标右键菜单：浮层挂 Portal，位置用虚拟 target 取自光标点 */}
       {contextMenu && (
@@ -1432,13 +1472,13 @@ export default function Desktop({
         </div>
       )}
 
-      {showLoading && (
+      {!gallery && showLoading && (
         <div className={styles.centerHint}>
           <Spinner label="正在加载桌面…" />
         </div>
       )}
 
-      {!showLoading && showPluginError && (
+      {!gallery && !showLoading && showPluginError && (
         <div className={styles.centerHint} data-no-desktop-gesture="true">
           <div className={styles.centerHintCard}>
             <MessageBar intent="warning">

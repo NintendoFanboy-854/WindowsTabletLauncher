@@ -66,7 +66,7 @@
 - 只用 `spacingHorizontal*/spacingVertical*` token（2/4/6/8/10/12/16/20/24/32/40/48）。
 - 卡片内分组：组间 ≥ `spacingVerticalM`，组内 ≤ `spacingVerticalXS`。
 - 不新增分割线/边框来表达分组（DENSITY 已列为硬规则）。
-- 页面级留白：桌面网格 gutter **12**（`spacingHorizontalM`）、页边距由严格居中派生 **22 / 46**（`gridInsets`，1440×960 下；`spacingHorizontalXL` 的 20 只是推导 cell 的最小留白，不是最终页边距）；旧的 14px 自定义值已作废（host-impl §2.1、`breakpoints.ts`）。
+- 页面级留白：桌面网格 gutter **12**（`spacingHorizontalM`）、页边距由「网格 + 一个 gutter + 说明条实测高」整块严格居中派生 **22 / 27**（`layoutFrame`，1440×960 / `H_p`=26 下；底部 27 = 960 − 933，说明条 pill 下缘 933 也是 chat 入口下缘；`spacingHorizontalXL` 的 20 只是推导 cell 的最小留白，不是最终页边距）；旧的 14px 自定义值与 46/46 口径均已作废（host-impl §2.1、`breakpoints.ts`）。
 
 ## 5. 形状与圆角（官方 token）
 
@@ -108,6 +108,10 @@
 - **v0.4.0 壁纸/材质修复**（DECISIONS D-31）：桌面壁纸层画在 `FluentProvider` 内部最底层（provider 根背景必须透明，否则 v0.3.x 的壁纸被
   `colorNeutralBackground1` 实色盖住）；壁纸用必应每日壁纸 UHD 4K，比例不符时 `object-fit: cover` 填充不拉伸；卡片底色改用
   `colorNeutralBackground1` 72% + 模糊 + `colorNeutralStroke2` 1px 描边，暗色下才浮在壁纸之上。左下角壁纸说明只用 12px / `colorNeutralForeground2/3`。
+- **v0.6.0 壁纸修订**（DECISIONS D-37）：说明条从静态文本变成**按钮**——同一套 12px/`fg2`·`fg3` 字阶，底色加
+  `color-mix(in srgb, colorNeutralBackground1 78%, transparent)` + 既有单一模糊 token + `borderRadiusCircular`，
+  hover/active 只改同一中性面的 `color-mix` 百分比（88% / 72%），不引入新色值；焦点环用 `colorStrokeFocus2`；44×44 命中区由 `::after` 外扩，
+  **不改变 26 的视觉高度**（它仍是桌面网格布局的输入 `H_p`）。说明条同时是「欣赏壁纸」模式的入口（点击 / Esc 退出）。
 - 弹层/菜单/遮罩一律用 Fluent 组件自带的材质与 scrim，不自己画。
 
 ## 8. 动效（官方原则 + 时长/曲线）
@@ -185,7 +189,7 @@
 | 10 | 数字型主信息使用 48–112px（超出 Fluent Display 68px 上限） | 官方字阶最大 Display 68/92 | **Equal Except Hue v2 已收敛**：hero 统一 `fontSizeHero900`/`lineHeightHero900`（40/52），不再使用 48–112；文本/标签不得使用 hero token |
 | 11 | 六张卡各有一个 identity 色 | 颜色严格功能化（中性 + 品牌 + 语义） | **Equal Except Hue v2**：manifest `identityHue` → shared palette 同档；只用于 20px 图标（可选 2px 状态强调），不承担语义 |
 | 12 | 卡片顶部静态 identity 行（24px） | chrome on demand / 正常模式无标题栏 | **已定案：项目例外（DECISIONS D-33）**，静态无交互、不占点击热区、不计入信息预算 |
-| 13 | 桌面使用必应每日壁纸 | Fluent 2 不规定桌面壁纸（Windows 桌面本身靠壁纸/Mica） | **已定案（DECISIONS D-31）**：壁纸是桌面场景的内容层；比例不符用 cover 填充；说明文字仍用 Fluent 字阶/颜色 token |
+| 13 | 桌面使用必应每日壁纸 | Fluent 2 不规定桌面壁纸（Windows 桌面本身靠壁纸/Mica） | **已定案（DECISIONS D-31）**：壁纸是桌面场景的内容层；比例不符用 cover 填充；说明文字仍用 Fluent 字阶/颜色 token。**D-37 追加**：来源固定必应官方归档 `HPImageArchive.aspx`（`mkt=zh-CN`），模式分自动/固定/本机三种；说明条成为「欣赏壁纸」入口（系统无对应组件，属桌面场景例外） |
 
 ## 15. 检查清单（每个组件/页面上线前）
 

@@ -8,7 +8,7 @@
    * - wallpaper：必应壁纸（WallpaperLayer 负责引用）
    * - desktop：常驻桌面层（非桌面页隐藏但保留挂载）
    * - page：设置 / 复盘 / 插件管理等全屏页
-   * - overlay：Agent 浮空面板（agent.css 现有 z-index:30 与这里同值）
+   * - overlay：Agent 浮空面板（agent.css 仍写着 30，待改为引用本变量）
    * - dialog：Fluent Dialog portal 之上仍可继续叠加的模态层
    */
   --wtsl-layer-wallpaper: 0;
@@ -18,7 +18,7 @@
   --wtsl-layer-dialog: 40;
 
   /*
-   * 全屏页面磨砂底（唯一来源，与 --wtsl-desktop-backdrop 同处声明）。
+   * 全屏页面磨砂底（唯一来源）。
    *
    * --wtsl-page-blur 与桌面卡片材质同一档模糊半径；--wtsl-page-surface-opacity
    * 由 %TEMP% 的对比度反解脚本得出：壁纸取纯白 / 纯黑两个极端，正文 fg1 与
@@ -51,28 +51,27 @@
    */
 
   /*
-   * 项目 token 声明（DESIGN §6 允许的唯一非 Fluent 来源：Acrylic / 壁纸）。
-   * - 壁纸：Fluent web 没有 Acrylic 背景，桌面壁纸是产品决定，颜色在此集中声明，
-   *   页面内不散落 hex。壁纸有深色 / 亮色两套，跟随系统或设置页的主题偏好。
-   * - 卡片圆角不自造：Fluent v9 的 `borderRadius2XLarge` 就是 12px
-   *   （`@fluentui/tokens/lib/global/borderRadius.js`），页面直接用 token。
+   * 项目字体栈（DESIGN §6 允许的唯一非 Fluent 来源）。
+   * 壁纸与桌面底色不再在这里声明：D-31 之后它们由 `desktop/WallpaperLayer` 负责
+   * （`position: fixed` 铺满 + Fluent 中性底兜底），`body` 上那两套渐变/前景色已成死代码，
+   * 连同 4 处裸 hex 一并删除。
+   *
+   * 卡片圆角不自造：Fluent v9 的 `borderRadius2XLarge` 就是 12px
+   * （`@fluentui/tokens/lib/global/borderRadius.js`），页面直接用 token。
+   *
+   * 画布兜底色（唯一用途：React 挂载前的首帧，以及 `shell/themeMode.ts` 写到 html 上的那一层）：
+   * 用 CSS 系统色 `Canvas` 而不是手写 hex / 渐变：它随 `color-scheme` 自动明暗，
+   * 与主题偏好天然同步，也不需要两套 `[data-theme]` 分支。
+   * 壁纸铺满之后由 `desktop/WallpaperLayer`（fixed inset:0 + Fluent 中性底）接管，
+   * 这个值不再可见；`body` 自己不再画底色（见下方 body 规则）。
    */
-  --wtsl-desktop-backdrop:
-    radial-gradient(1200px 800px at 15% -10%, rgba(90, 120, 200, 0.35), transparent 60%),
-    radial-gradient(900px 700px at 110% 110%, rgba(150, 90, 200, 0.25), transparent 55%),
-    #0e0f13;
-  --wtsl-desktop-foreground: #f3f3f3;
+  --wtsl-desktop-backdrop: Canvas;
   --wtsl-desktop-font: 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
   color-scheme: dark;
 }
 
-/* 亮色模式：壁纸改成浅色低饱和渐变，前景/滚动条/原生控件跟随 */
+/* 亮色模式：配色方案跟随设置页主题偏好（底色由壁纸层与 FluentProvider 决定） */
 :root[data-theme='light'] {
-  --wtsl-desktop-backdrop:
-    radial-gradient(1200px 800px at 12% -10%, rgba(120, 165, 235, 0.45), transparent 62%),
-    radial-gradient(900px 700px at 110% 108%, rgba(190, 150, 235, 0.32), transparent 58%),
-    #eef0f4;
-  --wtsl-desktop-foreground: #1a1a1a;
   color-scheme: light;
 }
 
@@ -148,8 +147,8 @@ body,
 
 body {
   overflow: hidden;
-  background: var(--wtsl-desktop-backdrop);
-  color: var(--wtsl-desktop-foreground);
+  /* 底色由 `desktop/WallpaperLayer` 负责（fixed 铺满 + colorNeutralBackground3 兜底） */
+  background: transparent;
   font-family: var(--wtsl-desktop-font);
   -webkit-font-smoothing: antialiased;
   user-select: none;
