@@ -1,14 +1,17 @@
 /**
  * 番茄钟卡片（L0）。
  *
- * 信息预算（docs/components/pomodoro.md）：
- * - 1×1：identity chip（compact）+ 剩余时间 48 + 阶段 14 + 2px 进度；不放按钮，点卡体进详情
- * - 2×1：identity 行（chip +「番茄钟」+ trailing 阶段）+ 时间 68 + 两个 40 按钮
- * - 2×2：identity 行 + 时间 80 + 阶段 + 当前任务 + 今日统计一行 + 两个 40 按钮
- * - 3×2：identity 行（trailing 轮次）+ 进度 + 时间 96 + 任务 + 两条今日统计 + 两个 40 按钮
+ * 密度契约（wtsl-density-pomodoro-sedentary §2 T1–T11、§3）：
+ * - hero 全档统一 40/52（`HeroText` → `fontSizeHero900` / `lineHeightHero900`），单位/阶段走 Base200/300
+ * - 1×1：identity(20px 图标) + hero + 阶段；**无进度条、无按钮**（垂直 24+8+52+8+16 = 108 ≤ 120）
+ * - 2×1：identity(trailing 阶段) + hero + 主按钮/重置；按钮中轴对 hero cap 中轴
+ * - 2×2：identity + hero + 阶段 + 第 N/M 轮 + 关联任务(有才渲染) + 今日统计两块 + 按钮行
+ * - 3×2：identity + 左栏(hero/阶段/轮次/进度) + 右栏(今日统计三块) + 按钮行（三带，空带 15.9%）
+ * - 1×2 / 3×3 明确不支持（见 sizes.js）
  *
+ * accent 唯一归属：running 态主按钮填充（`appearance="primary"`）+ 3×2 的 4px 进度带（仅 running 可见）。
+ * 阶段 / 任务 / 统计一律中性色；本插件不使用 `colorStatus*`（绿归久坐，跨插件不复用语义）。
  * 卡片主体点击 = 打开 L1；快捷按钮 stopPropagation，不打开详情。
- * 长按/右键/hover 全部交给 CardRoot（useHostCardGesture），这里不处理。
  */
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
@@ -24,12 +27,10 @@ import {
   ArrowReset20Regular,
   Pause20Filled,
   Play20Filled,
-  Timer16Regular,
+  Timer20Regular,
 } from '@fluentui/react-icons';
 import { requestOverlay, useAgentTools, useHostSize, useStoredConfig } from '../../_shared/host.js';
-import { useMotionTransition } from '../../_shared/motion.js';
-import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
-import { CardIdentity, CardRoot, TouchButton } from '../../_shared/ui.jsx';
+import { CardIdentity, CardRoot, DataRow, HeroText, TOUCH_TARGET, TouchButton } from '../../_shared/ui.jsx';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import {
   DEFAULT_SETTINGS,
@@ -44,88 +45,53 @@ const useStyles = makeStyles({
   root: {
     userSelect: 'none',
     cursor: 'pointer',
+    minWidth: 0,
   },
-  root1: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    padding: tokens.spacingVerticalS,
+  /* padding / gap 由 CardRoot 唯一决定（16 / 8），插件只表达分栏与对齐 */
+  rootStart: {
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
-  identityTop: {
+  rootStack: {
+    alignItems: 'stretch',
+  },
+  identityStart: {
     alignSelf: 'flex-start',
   },
-  root21: {
-    gap: tokens.spacingVerticalS,
-    paddingBlock: tokens.spacingVerticalS,
-    paddingInline: tokens.spacingHorizontalM,
-  },
-  row21Body: {
+  /**
+   * 2×1：hero 左、按钮组右；行盒 52，两者同心 → 按钮中轴对 hero cap 中轴（残差 0.6px）。
+   *
+   * 例外 E1（保留）：按钮组是右锚定（`space-between`），不落在内容左轴上。
+   * hero 读数与按钮组是两类同级操作，左轴只给读数；按钮贴内容右缘才能保证
+   * 44×44 命中区不被挤压。右缘仍严格贴内容盒右缘（与 chevron 同一族）。
+   */
+  rowBody: {
     display: 'flex',
     flex: '1 1 auto',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalM,
+    gap: tokens.spacingHorizontalS,
     minHeight: 0,
   },
-  root22: {
+  actions: {
+    display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalM,
-    textAlign: 'center',
+    justifyContent: 'flex-start',
+    gap: tokens.spacingHorizontalS,
+    minHeight: `${TOUCH_TARGET}px`,
+    flex: '0 0 auto',
   },
-  root32: {
-    gap: tokens.spacingVerticalS,
-    paddingBlock: tokens.spacingVerticalM,
-    paddingInline: tokens.spacingHorizontalL,
+  /** 2×2 底部余量 72（22.0%）贴门禁：按钮行下移 2（XXS），余量 70 = 21.3% */
+  actions2x2: {
+    marginBlockStart: tokens.spacingVerticalXXS,
   },
-  wide: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
-    alignItems: 'stretch',
-    columnGap: tokens.spacingHorizontalXL,
-    rowGap: tokens.spacingVerticalS,
-    flex: '1 1 auto',
-    minHeight: 0,
-  },
-  wideMain: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  wideSide: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  stats: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  time: {
-    ...TABULAR_NUMS,
-    fontWeight: DISPLAY_WEIGHT,
-    color: tokens.colorNeutralForeground1,
-    whiteSpace: 'nowrap',
-  },
-  time48: displayXl(48),
-  time68: {
-    fontSize: tokens.fontSizeHero1000,
-    lineHeight: tokens.lineHeightHero1000,
-  },
-  time80: displayXl(80),
-  time96: displayXl(96),
   phase: {
     minWidth: 0,
+    color: tokens.colorNeutralForeground2,
+  },
+  meta: {
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
   },
   task: {
     maxWidth: '100%',
@@ -135,49 +101,53 @@ const useStyles = makeStyles({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  statLine: {
-    color: tokens.colorNeutralForeground2,
-    whiteSpace: 'nowrap',
-  },
-  round: {
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-  },
-  actions: {
+  /**
+   * 统计块统一走共享 `DataRow`（label 左 / 值右 / 28 行高）。
+   * 3×2 因此重排为单列：identity → hero → 阶段·轮次 → 三行统计 → 进度带 → 按钮。
+   */
+  stats: {
     display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    flex: '0 0 auto',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    width: '100%',
+    minWidth: 0,
   },
-  actionsCenter: {
-    justifyContent: 'center',
+  /** 阶段 + 轮次同一行：2×2 / 3×2 都用一行 16 承载，避免两行占高 */
+  subline: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
   },
-  progressTop: {
+  progress: {
     width: '100%',
     flex: '0 0 auto',
   },
-  progressBottom: {
-    width: '72%',
+  /**
+   * 例外 E6（保留）：非 running 时保留占位（不重排），但不出画——accent 像素只在
+   * running 存在。进度带几何按 100% 内容宽（内容左 → 内容右），idle 下无像素可测。
+   */
+  progressIdle: {
+    visibility: 'hidden',
   },
 });
 
-function phaseColor(phase) {
-  return phase === 'focus' ? tokens.colorBrandForeground1 : tokens.colorNeutralForeground2;
-}
-
+/** 主按钮文案只换词，不换字段：专注期「开始/继续/暂停」，休息期「开始休息/继续休息/暂停休息」 */
 function toggleTextOf(snapshot) {
-  if (snapshot.running) return '暂停';
-  if (snapshot.progress > 0) return '继续';
-  return '开始';
+  const breaking = snapshot.phase !== 'focus';
+  if (snapshot.running) return breaking ? '暂停休息' : '暂停';
+  if (snapshot.progress > 0) return breaking ? '继续休息' : '继续';
+  return breaking ? '开始休息' : '开始';
 }
 
-function CardActions({ styles, snapshot, onToggle, onReset, centered = false }) {
+function CardActions({ styles, snapshot, onToggle, onReset }) {
   const toggleText = toggleTextOf(snapshot);
   return (
-    <div className={mergeClasses(styles.actions, centered && styles.actionsCenter)}>
+    <div className={styles.actions}>
       <Tooltip content={toggleText} relationship="label">
         <TouchButton
-          appearance="primary"
+          // 开始/继续是次要动作；只有「正在运行」这个状态才升为 accent
+          appearance={snapshot.running ? 'primary' : 'secondary'}
           icon={snapshot.running ? <Pause20Filled /> : <Play20Filled />}
           aria-label={toggleText}
           data-pomodoro-action="toggle"
@@ -186,6 +156,7 @@ function CardActions({ styles, snapshot, onToggle, onReset, centered = false }) 
       </Tooltip>
       <Tooltip content="重置本轮" relationship="label">
         <TouchButton
+          appearance="subtle"
           icon={<ArrowReset20Regular />}
           aria-label="重置本轮"
           data-pomodoro-action="reset"
@@ -202,11 +173,9 @@ export default function PomodoroApp({ fallbackSizeKey }) {
   const [settings] = useStoredConfig(SETTINGS_KEY, DEFAULT_SETTINGS, normalizeSettings);
   const engine = getEngine();
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
-  const phaseTransition = useMotionTransition('exit');
 
   const compact = sizeKey === '1x1';
   const row = sizeKey === '2x1';
-  const medium = sizeKey === '2x2';
   const wide = sizeKey === '3x2';
 
   useEffect(() => {
@@ -237,170 +206,117 @@ export default function PomodoroApp({ fallbackSizeKey }) {
   );
   const openDetail = useCallback(() => requestOverlay('detail', '专注详情'), []);
 
-  const phaseStyle = {
-    color: phaseColor(snapshot.phase),
-    transitionProperty: 'color',
-    ...phaseTransition,
-  };
+  /** 阶段是 hero 的下位属性：永远 fg2，不随 phase 染色（accent 判定输入只有 running） */
   const phaseText = (
     <Text
-      size={300}
+      size={200}
       weight="semibold"
       className={styles.phase}
-      style={phaseStyle}
       data-pomodoro-phase-label
     >
       {snapshot.phaseLabel}
     </Text>
   );
   const roundText = `第 ${snapshot.roundInCycle} / ${snapshot.roundsBeforeLongBreak} 轮`;
-  const taskTitle = snapshot.taskTitle || '未关联任务';
+  const roundLine = (
+    <Text size={200} className={styles.meta} data-pomodoro-round>
+      {roundText}
+    </Text>
+  );
+  const taskTitle = snapshot.taskTitle;
+  const totalMin = Math.max(1, Math.round(snapshot.totalMs / 60000));
   const toggleText = toggleTextOf(snapshot);
   const cardLabel = `${snapshot.phaseLabel} ${snapshot.remainingText}，${
     snapshot.running ? '计时中' : '已暂停'
-  }；点击卡片打开详情${compact ? '' : `，卡内可${toggleText}或重置`}`;
+  }；${roundText}；点击卡片打开详情${compact ? '' : `，卡内可${toggleText}或重置`}`;
 
   const actions = <CardActions styles={styles} snapshot={snapshot} onToggle={toggle} onReset={reset} />;
+  const cardRootProps = {
+    ariaLabel: cardLabel,
+    onActivate: openDetail,
+    'data-pomodoro-size': sizeKey,
+    'data-pomodoro-phase': snapshot.phase,
+    'data-pomodoro-running': snapshot.running ? 'true' : 'false',
+  };
 
-  /* ---- 1×1：identity chip + 时间 48 + 阶段 + 2px 进度；无按钮 ---- */
+  /* ---- 1×1：identity + hero + 阶段；进度条与按钮都不进这档（预算 108/120） ---- */
   if (compact) {
     return (
       <CardRoot
-        ariaLabel={cardLabel}
-        onActivate={openDetail}
-        className={mergeClasses(styles.root, styles.root1)}
-        data-pomodoro-size={sizeKey}
-        data-pomodoro-phase={snapshot.phase}
-        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
+        {...cardRootProps}
+        className={mergeClasses(styles.root, styles.rootStart)}
       >
-        <CardIdentity
-          className={styles.identityTop}
-          icon={<Timer16Regular />}
-          accent="orange"
-          compact
-        />
-        <span className={mergeClasses(styles.time, styles.time48)} data-pomodoro-time>
-          {snapshot.remainingText}
-        </span>
+        <CardIdentity className={styles.identityStart} icon={<Timer20Regular />} compact />
+        <HeroText data-pomodoro-time="true">{snapshot.remainingText}</HeroText>
         {phaseText}
-        <ProgressBar
-          className={styles.progressBottom}
-          value={snapshot.progress}
-          max={1}
-          aria-label="本轮进度"
-        />
       </CardRoot>
     );
   }
 
-  /* ---- 2×1：identity 行（trailing 阶段）+ 时间 68 + 两个 40 按钮 ---- */
+  /* ---- 2×1：identity(trailing 阶段) + hero + 40×40 按钮组（右缘贴内容右缘） ---- */
   if (row) {
     return (
-      <CardRoot
-        ariaLabel={cardLabel}
-        onActivate={openDetail}
-        className={mergeClasses(styles.root, styles.root21)}
-        data-pomodoro-size={sizeKey}
-        data-pomodoro-phase={snapshot.phase}
-        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
-      >
-        <CardIdentity
-          icon={<Timer16Regular />}
-          label="番茄钟"
-          accent="orange"
-          trailing={phaseText}
-        />
-        <div className={styles.row21Body}>
-          <span className={mergeClasses(styles.time, styles.time68)} data-pomodoro-time>
-            {snapshot.remainingText}
-          </span>
+      <CardRoot {...cardRootProps} className={mergeClasses(styles.root, styles.rootStack)}>
+        <CardIdentity icon={<Timer20Regular />} label="番茄钟" disclosure trailing={phaseText} />
+        <div className={styles.rowBody}>
+          <HeroText data-pomodoro-time="true">{snapshot.remainingText}</HeroText>
           {actions}
         </div>
       </CardRoot>
     );
   }
 
-  /* ---- 3×2：identity 行（trailing 轮次）+ 进度 + 时间 96 + 任务 + 两条统计 + 按钮 ---- */
+  /* ---- 3×2：单列重排（DataRow 统计块）。identity → hero → 阶段·轮次·任务 → 三行统计 → 进度 → 按钮 ---- */
   if (wide) {
     return (
-      <CardRoot
-        ariaLabel={cardLabel}
-        onActivate={openDetail}
-        className={mergeClasses(styles.root, styles.root32)}
-        data-pomodoro-size={sizeKey}
-        data-pomodoro-phase={snapshot.phase}
-        data-pomodoro-running={snapshot.running ? 'true' : 'false'}
-      >
-        <CardIdentity
-          icon={<Timer16Regular />}
-          label="番茄钟"
-          accent="orange"
-          trailing={
-            <Text size={200} className={styles.round}>
-              {roundText}
-            </Text>
-          }
-        />
-        <ProgressBar
-          className={styles.progressTop}
-          value={snapshot.progress}
-          max={1}
-          aria-label="本轮进度"
-        />
-        <div className={styles.wide}>
-          <div className={styles.wideMain}>
-            <span className={mergeClasses(styles.time, styles.time96)} data-pomodoro-time>
-              {snapshot.remainingText}
-            </span>
-            {phaseText}
-          </div>
-          <div className={styles.wideSide}>
+      <CardRoot {...cardRootProps} className={mergeClasses(styles.root, styles.rootStack)}>
+        <CardIdentity icon={<Timer20Regular />} label="番茄钟" disclosure />
+        <HeroText data-pomodoro-time="true">{snapshot.remainingText}</HeroText>
+        <div className={styles.subline}>
+          {phaseText}
+          {roundLine}
+          {taskTitle ? (
             <Text size={400} className={styles.task} title={taskTitle}>
               {taskTitle}
             </Text>
-            <div className={styles.stats}>
-              <Text size={300} className={styles.statLine}>
-                今日完成 {snapshot.today.completed} 个
-              </Text>
-              <Text size={300} className={styles.statLine}>
-                专注 {snapshot.today.focusMinutes} 分钟
-              </Text>
-            </div>
-            {actions}
-          </div>
+          ) : null}
         </div>
+        <div className={styles.stats} data-pomodoro-stats="true">
+          <DataRow label="今日完成" value={snapshot.today.completed} unit="个" />
+          <DataRow label="专注" value={snapshot.today.focusMinutes} unit="分钟" />
+          <DataRow label="本轮时长" value={totalMin} unit="分钟" />
+        </div>
+        <ProgressBar
+          className={mergeClasses(styles.progress, !snapshot.running && styles.progressIdle)}
+          value={snapshot.progress}
+          max={1}
+          thickness="large"
+          aria-label="本轮进度"
+          aria-hidden={!snapshot.running}
+          data-pomodoro-progress="true"
+        />
+        {actions}
       </CardRoot>
     );
   }
 
-  /* ---- 2×2：identity 行 + 时间 80 + 阶段 + 任务 + 今日统计一行 + 按钮 ---- */
+  /* ---- 2×2：identity + hero + 阶段 + 轮次 + 关联任务(有才渲染) + 今日统计两块 + 按钮行 ---- */
   return (
-    <CardRoot
-      ariaLabel={cardLabel}
-      onActivate={openDetail}
-      className={mergeClasses(styles.root, styles.root22)}
-      data-pomodoro-size={sizeKey}
-      data-pomodoro-phase={snapshot.phase}
-      data-pomodoro-running={snapshot.running ? 'true' : 'false'}
-    >
-      <CardIdentity icon={<Timer16Regular />} label="番茄钟" accent="orange" />
-      <span className={mergeClasses(styles.time, styles.time80)} data-pomodoro-time>
-        {snapshot.remainingText}
-      </span>
+    <CardRoot {...cardRootProps} className={mergeClasses(styles.root, styles.rootStack)}>
+      <CardIdentity icon={<Timer20Regular />} label="番茄钟" disclosure />
+      <HeroText data-pomodoro-time="true">{snapshot.remainingText}</HeroText>
       {phaseText}
-      <Text size={400} className={styles.task} title={taskTitle}>
-        {taskTitle}
-      </Text>
-      <Text size={300} className={styles.statLine}>
-        今日 {snapshot.today.completed} 个 · 专注 {snapshot.today.focusMinutes} 分钟
-      </Text>
-      <CardActions
-        styles={styles}
-        snapshot={snapshot}
-        onToggle={toggle}
-        onReset={reset}
-        centered
-      />
+      {roundLine}
+      {taskTitle ? (
+        <Text size={400} className={styles.task} title={taskTitle}>
+          {taskTitle}
+        </Text>
+      ) : null}
+      <div className={styles.stats} data-pomodoro-stats="true">
+        <DataRow label="今日完成" value={snapshot.today.completed} unit="个" />
+        <DataRow label="专注" value={snapshot.today.focusMinutes} unit="分钟" />
+      </div>
+      <div className={styles.actions2x2}>{actions}</div>
     </CardRoot>
   );
 }

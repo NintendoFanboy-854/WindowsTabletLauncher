@@ -5,6 +5,7 @@ export const SUPPORTED_SIZES = {
   '2x1': [2, 1],
   '2x2': [2, 2],
   '3x2': [3, 2],
+  '3x3': [3, 3],
 };
 
 export const DEFAULT_SIZE_KEY = '2x1';

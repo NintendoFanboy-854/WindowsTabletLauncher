@@ -157,7 +157,7 @@ export default function SedentaryDetail() {
 
   const postureButton = (
     <ActionButton
-      appearance="primary"
+      appearance="secondary"
       icon={standing ? <ArrowDownRegular /> : <ArrowUpRegular />}
       onClick={togglePosture}
       disabled={!settings.enabled}

@@ -19,16 +19,10 @@ export const SETTINGS_KEY = 'settings';
 export const DEFAULT_SETTINGS = {
   showCompleted: true,
   defaultSort: 'manual',
-  fontSize: 'default',
   weekStart: 1,
 };
 
 export const SORT_OPTIONS = SORTS.map((sort) => ({ value: sort.value, label: sort.label }));
-
-export const FONT_SIZE_OPTIONS = [
-  { value: 'default', label: '默认' },
-  { value: 'large', label: '大' },
-];
 
 export const WEEK_START_OPTIONS = [
   { value: 1, label: '周一' },
@@ -44,7 +38,6 @@ export function normalizeSettings(raw) {
     showCompleted:
       typeof source.showCompleted === 'boolean' ? source.showCompleted : DEFAULT_SETTINGS.showCompleted,
     defaultSort: SORT_VALUES.has(source.defaultSort) ? source.defaultSort : DEFAULT_SETTINGS.defaultSort,
-    fontSize: source.fontSize === 'large' ? 'large' : 'default',
     weekStart: source.weekStart === 0 ? 0 : 1,
   };
 }
@@ -59,19 +52,11 @@ export function validateSetting(key, value) {
       return typeof value === 'boolean' ? null : 'showCompleted 需要是布尔值';
     case 'defaultSort':
       return SORT_VALUES.has(value) ? null : `defaultSort 只能是 ${[...SORT_VALUES].join(' / ')}`;
-    case 'fontSize':
-      return value === 'default' || value === 'large' ? null : 'fontSize 只能是 default / large';
     case 'weekStart':
       return value === 0 || value === 1 ? null : 'weekStart 只能是 0（周日）或 1（周一）';
     default:
       return `未知设置项 ${key}`;
   }
-}
-
-/** 字号设置：只切换 Fluent type ramp 档位（+100），不做连续缩放 */
-export function textSizeFor(settings, baseSize) {
-  const bump = settings?.fontSize === 'large' ? 100 : 0;
-  return Math.min(600, baseSize + bump);
 }
 
 /** 读取宿主配置（independent iframe 下 SDK 用 localStorage 兜底） */

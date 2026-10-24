@@ -27,11 +27,15 @@ export function layoutKind(sizeKey) {
   }
 }
 
-/** 卡片行预算（docs/components/todo.md：2×2=4、3×2=5、3×3=8、4×2=5；1×1 无列表） */
-export function rowBudgetFor(sizeKey) {
+/**
+ * 卡片每档的行数上限（D-04）。实际行数还要由 iframe 高度代入公式：
+ * N = min(cap, floor((Hc − 24 − 8 + 4) / 48))。
+ * 2×2 的 cap 已按算术空带修正为 5。
+ */
+export function rowCapFor(sizeKey) {
   switch (sizeKey) {
     case '2x2':
-      return 4;
+      return 5;
     case '3x2':
       return 5;
     case '3x3':

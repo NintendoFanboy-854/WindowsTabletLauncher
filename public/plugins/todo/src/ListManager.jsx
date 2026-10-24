@@ -23,11 +23,11 @@ import {
   Star16Filled,
   Star16Regular,
 } from '@fluentui/react-icons';
-import { ActionButton, Subpage } from '../../_shared/ui.jsx';
+import { ActionButton, LIST_ROW_HEIGHT, Subpage, TOUCH_TARGET } from '../../_shared/ui.jsx';
 import { FadeSlide } from '../../_shared/motion.js';
 import { store } from '../js/store.js';
 import { useTodoStore } from './todoData.js';
-import { ListColorDot, EllipsisText, useNewIds } from './parts.jsx';
+import { ListGlyph, EllipsisText, useNewIds } from './parts.jsx';
 
 const useStyles = makeStyles({
   list: {
@@ -40,7 +40,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
   },
   main: {
@@ -64,10 +64,10 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXXS,
     flexShrink: 0,
   },
-  iconButton: { minWidth: '40px', minHeight: '40px' },
-  star: { color: tokens.colorBrandForeground1 },
+  iconButton: { minWidth: `${TOUCH_TARGET}px`, minHeight: `${TOUCH_TARGET}px` },
+  /** 默认清单只用图标形状（Filled / Regular）区分，不用颜色 */
   starIdle: { color: tokens.colorNeutralForeground3 },
-  danger: { color: tokens.colorPaletteRedForeground1 },
+  danger: { color: tokens.colorStatusDangerForeground1 },
   confirm: {
     display: 'flex',
     alignItems: 'center',
@@ -171,7 +171,7 @@ export function ListManager({ onClosed }) {
               createList();
             }}
           />
-          <ActionButton appearance="primary" icon={<Add20Regular />} onClick={createList}>
+          <ActionButton appearance="secondary" icon={<Add20Regular />} onClick={createList}>
             新建
           </ActionButton>
         </div>
@@ -218,7 +218,7 @@ export function ListManager({ onClosed }) {
                       saveRename();
                     }}
                   />
-                  <ActionButton appearance="primary" onClick={saveRename}>
+                  <ActionButton appearance="secondary" onClick={saveRename}>
                     保存
                   </ActionButton>
                   <ActionButton appearance="secondary" onClick={() => setRenaming(null)}>
@@ -234,7 +234,7 @@ export function ListManager({ onClosed }) {
                       </EllipsisText>
                     </Text>
                   </div>
-                  <ActionButton appearance="primary" onClick={() => requestRemove(list)}>
+                  <ActionButton appearance="secondary" onClick={() => requestRemove(list)}>
                     确认删除
                   </ActionButton>
                   <ActionButton appearance="secondary" onClick={() => setConfirmDelete(null)}>
@@ -243,7 +243,7 @@ export function ListManager({ onClosed }) {
                 </div>
               ) : (
                 <div className={styles.row}>
-                  <ListColorDot color={list.color} />
+                  <ListGlyph />
                   <div className={styles.main}>
                     <Text size={300} className={styles.name} title={list.name}>
                       <EllipsisText>{list.name}</EllipsisText>

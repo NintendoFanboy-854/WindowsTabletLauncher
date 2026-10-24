@@ -26,7 +26,7 @@ import {
 import {
   ArrowNext20Regular,
   ArrowReset20Regular,
-  History20Regular,
+  History24Regular,
   Pause20Filled,
   Play20Filled,
   Search20Regular,
@@ -44,6 +44,7 @@ import {
   EmptyState,
   ListRow,
   Subpage,
+  TOUCH_TARGET,
   useNow,
   useSubpageClose,
 } from '../../_shared/ui.jsx';
@@ -166,7 +167,7 @@ const useStyles = makeStyles({
   dayHeading: {
     display: 'flex',
     alignItems: 'center',
-    height: '28px',
+    height: tokens.lineHeightBase500,
     color: tokens.colorNeutralForeground3,
   },
   rowTime: {
@@ -223,15 +224,15 @@ const useStyles = makeStyles({
   pickerGroupHead: {
     display: 'flex',
     alignItems: 'center',
-    height: '28px',
+    height: tokens.lineHeightBase500,
     color: tokens.colorNeutralForeground3,
   },
   checkboxCell: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: '40px',
-    minHeight: '40px',
+    minWidth: `${TOUCH_TARGET}px`,
+    minHeight: `${TOUCH_TARGET}px`,
   },
 });
 
@@ -545,7 +546,7 @@ export default function PomodoroDetail() {
 
       <DetailToolbar className={styles.toolbar}>
         <ActionButton
-          appearance="primary"
+          appearance="secondary"
           icon={snapshot.running ? <Pause20Filled /> : <Play20Filled />}
           onClick={toggle}
           data-detail-action="toggle"
@@ -604,12 +605,11 @@ export default function PomodoroDetail() {
                 <RecordsList sessions={sessions} />
               ) : (
                 <EmptyState
-                  icon={<History20Regular />}
-                  title="还没有专注记录"
-                  description="开始一轮专注，完成的番茄会出现在这里"
+                  icon={<History24Regular />}
+                  title="还没有记录"
                   action={
                     <ActionButton
-                      appearance="primary"
+                      appearance="secondary"
                       icon={<Play20Filled />}
                       onClick={() => sendCommand('start')}
                       data-detail-action="start-focus"

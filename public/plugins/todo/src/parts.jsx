@@ -19,15 +19,12 @@ import {
   Delete20Regular,
   Edit20Regular,
   Flag16Filled,
+  Flag16Regular,
+  List20Regular,
   MoreHorizontal20Regular,
 } from '@fluentui/react-icons';
-import { ListRow, TouchButton } from '../../_shared/ui.jsx';
-import { useMotionTransition } from '../../_shared/motion.js';
-import { fmtDate, fmtDue, priorityMeta, startOfDay, toDate } from '../js/date.js';
-import { textSizeFor } from '../js/config.js';
-
-/** 平板触控目标（DESIGN §1.2）：勾选/图标按钮至少 40×40 */
-const TOUCH_TARGET = 40;
+import { LIST_ROW_HEIGHT, ListRow, TOUCH_TARGET, TouchButton } from '../../_shared/ui.jsx';
+import { fmtDate, fmtDue, isSameDay, priorityMeta, startOfDay, toDate } from '../js/date.js';
 
 const useStyles = makeStyles({
   ellipsis: {
@@ -37,6 +34,9 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  },
+  ellipsisMuted: {
+    color: tokens.colorNeutralForeground3,
   },
   groupHead: {
     display: 'flex',
@@ -76,18 +76,22 @@ const useStyles = makeStyles({
     minWidth: `${TOUCH_TARGET}px`,
     minHeight: `${TOUCH_TARGET}px`,
   },
+  /** 优先级只用形状二态，单色；颜色只留给逾期（danger），今天用字重。 */
   flag: {
     flexShrink: 0,
+    color: tokens.colorNeutralForeground3,
   },
-  flagHigh: { color: tokens.colorPaletteRedForeground1 },
-  flagMedium: { color: tokens.colorPaletteMarigoldForeground1 },
-  flagLow: { color: tokens.colorPaletteBlueForeground2 },
   meta: {
     color: tokens.colorNeutralForeground3,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   },
-  metaAlert: { color: tokens.colorPaletteRedForeground2 },
+  metaAlert: { color: tokens.colorStatusDangerForeground1 },
+  /** 今天不占 accent：中性前景 + 半粗，与逾期（danger）区分 */
+  metaToday: {
+    color: tokens.colorNeutralForeground1,
+    fontWeight: tokens.fontWeightSemibold,
+  },
   rowTrailing: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -114,7 +118,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXXS,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
     borderRadius: tokens.borderRadiusMedium,
     cursor: 'pointer',
@@ -125,18 +129,12 @@ const useStyles = makeStyles({
     minWidth: 0,
     color: tokens.colorNeutralForeground1,
   },
-  dot: {
-    width: tokens.spacingHorizontalM,
-    height: tokens.spacingHorizontalM,
-    borderRadius: tokens.borderRadiusCircular,
+  /** 清单行首图标：中性单色，替代旧的 palette 颜色点（色相只由 identityHue 提供） */
+  listGlyph: {
     flexShrink: 0,
+    color: tokens.colorNeutralForeground3,
   },
 });
-
-/** 清单颜色：store 存 Fluent palette token 名，直接映射到 CSS 变量（不写 hex） */
-export function listColorVar(color) {
-  return `var(--${color || 'colorPaletteBlueForeground2'})`;
-}
 
 /**
  * 单行省略文本。
@@ -145,38 +143,49 @@ export function listColorVar(color) {
  * 同时命中 white-space/overflow，合并后只剩 `white-space: normal`，中文标题会换行
  * 把 44 行撑高。这里用一层显式 ellipsis span 保证单行（字号仍继承外层 Text）。
  */
-export function EllipsisText({ children }) {
+export function EllipsisText({ children, muted = false }) {
   const styles = useStyles();
-  return <span className={styles.ellipsis}>{children}</span>;
+  return (
+    <span className={mergeClasses(styles.ellipsis, muted && styles.ellipsisMuted)}>
+      {children}
+    </span>
+  );
 }
 
-/** 优先级旗标 16：只在 priority > 0 时出现（docs/components/todo.md 卡片/行规格） */
+/**
+ * 优先级旗标 16：形状二态（Filled / Regular）+ 中性色。
+ * 不用 palette 三色，避免与「逾期」的 danger 同屏抢语义。
+ */
 export function PriorityFlag({ priority, className }) {
   const styles = useStyles();
-  if (!priority) return null;
   const meta = priorityMeta(priority);
-  const colorClass =
-    priority >= 3 ? styles.flagHigh : priority === 2 ? styles.flagMedium : styles.flagLow;
+  const Icon = priority > 0 ? Flag16Filled : Flag16Regular;
   return (
-    <Flag16Filled
-      aria-label={`优先级：${meta.label}`}
-      className={mergeClasses(styles.flag, colorClass, className)}
+    <Icon
+      aria-label={priority > 0 ? `优先级：${meta.label}` : '无优先级'}
+      className={mergeClasses(styles.flag, className)}
     />
   );
 }
 
-/** 行内单个元信息：截止时间 / 逾期（12 fg3，逾期 danger；不做多枚 chip） */
+/** 行内单个元信息：截止时间 / 逾期（12；逾期 danger、今天 accent、其余 fg3） */
 export function TaskMeta({ task, now, className }) {
   const styles = useStyles();
   const due = toDate(task.dueAt);
   if (!due) return null;
   const overdue = due < startOfDay(now);
+  const isToday = !overdue && isSameDay(due, now);
   const text = overdue ? `已逾期 · ${fmtDate(due, now)}` : fmtDue(due, now);
   return (
     <Text
       size={200}
       truncate
-      className={mergeClasses(styles.meta, overdue && styles.metaAlert, className)}
+      className={mergeClasses(
+        styles.meta,
+        overdue && styles.metaAlert,
+        isToday && styles.metaToday,
+        className,
+      )}
     >
       {text}
     </Text>
@@ -222,11 +231,9 @@ export function GroupHead({ label, count, trailing }) {
  * L1 任务行：44 高（ListRow）+ checkbox 40 + 旗标 16 + 标题 16 + 元信息 12 + 行尾 ⋯ 40。
  * 点行 → push L2 任务编辑；勾选就地完成；⋯ → 编辑/删除；删除在行内二次确认。
  */
-export function TaskRow({ task, now, settings, onOpen, onToggle, onRemove }) {
+export function TaskRow({ task, now, onOpen, onToggle, onRemove }) {
   const styles = useStyles();
   const [confirming, setConfirming] = useState(false);
-  const motionStyle = useMotionTransition('normal');
-  const doneOpacity = task.done ? 0.55 : 1;
 
   if (confirming) {
     return (
@@ -238,7 +245,7 @@ export function TaskRow({ task, now, settings, onOpen, onToggle, onRemove }) {
           取消
         </TouchButton>
         <TouchButton
-          appearance="primary"
+          appearance="secondary"
           onClick={() => {
             setConfirming(false);
             onRemove?.(task.id);
@@ -259,12 +266,8 @@ export function TaskRow({ task, now, settings, onOpen, onToggle, onRemove }) {
           <PriorityFlag priority={task.priority} />
         </span>
       }
-      title={
-        <EllipsisText>
-          {task.title}
-        </EllipsisText>
-      }
-      titleSize={textSizeFor(settings, 400)}
+      title={<EllipsisText muted={task.done}>{task.title}</EllipsisText>}
+      titleSize={400}
       trailing={
         <span className={styles.rowTrailing}>
           <TaskMeta task={task} now={now} />
@@ -297,7 +300,6 @@ export function TaskRow({ task, now, settings, onOpen, onToggle, onRemove }) {
         </span>
       }
       onClick={() => onOpen?.(task.id)}
-      style={{ opacity: doneOpacity, transitionProperty: 'opacity', ...motionStyle }}
     />
   );
 }
@@ -321,16 +323,16 @@ export function MiniTaskRow({ task, onOpen, onToggle }) {
     >
       <TaskCheck task={task} onToggle={onToggle} />
       <Text size={200} className={styles.miniTitle}>
-        <EllipsisText>{task.title}</EllipsisText>
+        <EllipsisText muted={task.done}>{task.title}</EllipsisText>
       </Text>
     </div>
   );
 }
 
-/** 清单颜色点（12 / tokens.spacingHorizontalM） */
-export function ListColorDot({ color }) {
+/** 清单行首图标（20，中性单色）：不再用 palette 颜色点区分清单 */
+export function ListGlyph() {
   const styles = useStyles();
-  return <span className={styles.dot} style={{ backgroundColor: listColorVar(color) }} aria-hidden="true" />;
+  return <List20Regular className={styles.listGlyph} aria-hidden="true" />;
 }
 
 /**

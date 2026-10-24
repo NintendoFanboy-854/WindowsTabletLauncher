@@ -34,14 +34,13 @@ function enrich(task) {
   return {
     ...task,
     listName: list?.name,
-    listColor: list?.color,
   };
 }
 
 function resolveSettingsPatch(args = {}) {
   if (args.patch && typeof args.patch === 'object' && !Array.isArray(args.patch)) return args.patch;
   const patch = {};
-  for (const key of ['showCompleted', 'defaultSort', 'fontSize', 'weekStart']) {
+  for (const key of ['showCompleted', 'defaultSort', 'weekStart']) {
     if (Object.prototype.hasOwnProperty.call(args, key)) patch[key] = args[key];
   }
   return patch;
@@ -163,10 +162,10 @@ export const TOOL_DECLS = [
   },
   {
     name: 'todo.addList',
-    description: '新建清单（可选 color：Fluent palette token 名）',
+    description: '新建清单（不再接受颜色：色相只由 manifest.identityHue 决定）',
     parameters: {
       type: 'object',
-      properties: { name: { type: 'string' }, color: { type: 'string' } },
+      properties: { name: { type: 'string' } },
       required: ['name'],
     },
   },
@@ -219,13 +218,13 @@ export const TOOL_DECLS = [
   },
   {
     name: 'todo.settings.get',
-    description: '读取待办设置（显示已完成 / 默认排序 / 字号 / 一周起始日）',
+    description: '读取待办设置（显示已完成 / 默认排序 / 一周起始日）',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'todo.settings.set',
     description:
-      '修改待办设置。patch 可含 showCompleted(boolean) / defaultSort(manual|due|priority|created) / fontSize(default|large) / weekStart(0=周日,1=周一)。',
+      '修改待办设置。patch 可含 showCompleted(boolean) / defaultSort(manual|due|priority|created) / weekStart(0=周日,1=周一)。',
     parameters: {
       type: 'object',
       properties: {
@@ -234,7 +233,6 @@ export const TOOL_DECLS = [
           properties: {
             showCompleted: { type: 'boolean' },
             defaultSort: { type: 'string', enum: ['manual', 'due', 'priority', 'created'] },
-            fontSize: { type: 'string', enum: ['default', 'large'] },
             weekStart: { type: 'number', enum: [0, 1] },
           },
         },
@@ -305,7 +303,7 @@ async function run(name, args = {}) {
     case 'todo.removeSubtask':
       return enrich(store.removeSubtask(args.taskId, args.subtaskId));
     case 'todo.addList':
-      return listSummary(store.addList(args.name, args.color));
+      return listSummary(store.addList(args.name));
     case 'todo.renameList': {
       if (!args.name || !String(args.name).trim()) throw new Error('清单名不能为空');
       return listSummary(store.updateList(args.id, { name: args.name }));

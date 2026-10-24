@@ -5,7 +5,7 @@
  * 走的是同一条代码路径，只是不联网。URL 加 ?mock=1 或设置里打开「演示数据」即可。
  */
 
-import { dateOnly } from './format.js';
+import { aqiTone, dateOnly } from './format.js';
 
 export const MOCK_PLACES = [
   { id: '101010100', name: '北京', adm1: '北京市', adm2: '北京', lat: 39.92, lon: 116.41, country: '中国', tz: 'Asia/Shanghai' },
@@ -105,7 +105,7 @@ function mockWarnings(place) {
       severity: 'minor',
       severityText: '一般',
       colorCode: 'blue',
-      color: 'rgb(30, 80, 200)',
+      tone: 'info',
       startTime: isoLocal(new Date(now - 40 * 60000)),
       endTime: isoLocal(new Date(now + 12 * 3600000)),
       text: '预计未来 12 小时内北京大部分地区将出现 6 级左右偏北风，阵风可达 7 到 8 级，请注意防范。',
@@ -118,7 +118,7 @@ function mockWarnings(place) {
       severity: 'moderate',
       severityText: '较重',
       colorCode: 'yellow',
-      color: 'rgb(230, 180, 0)',
+      tone: 'warning',
       startTime: isoLocal(new Date(now - 5 * 3600000)),
       endTime: isoLocal(new Date(now + 30 * 3600000)),
       text: '预计未来 3 天北京市最高气温将持续在 35℃ 以上，请注意防暑降温。',
@@ -130,7 +130,6 @@ function mockWarnings(place) {
 function mockAir(random) {
   const aqi = 42 + Math.round(random() * 70);
   const category = aqi <= 50 ? '优' : aqi <= 100 ? '良' : aqi <= 150 ? '轻度污染' : '中度污染';
-  const color = aqi <= 50 ? { red: 0, green: 228, blue: 0, alpha: 1 } : aqi <= 100 ? { red: 255, green: 255, blue: 0, alpha: 1 } : { red: 255, green: 126, blue: 0, alpha: 1 };
   const pm2p5 = Math.round(aqi * 0.55);
   const pm10 = Math.round(aqi * 0.8);
   const no2 = 18 + Math.round(random() * 20);
@@ -142,7 +141,7 @@ function mockAir(random) {
     aqiDisplay: String(aqi),
     level: aqi <= 50 ? '1' : aqi <= 100 ? '2' : aqi <= 150 ? '3' : '4',
     category,
-    color: `rgb(${color.red}, ${color.green}, ${color.blue})`,
+    tone: aqiTone(aqi),
     primary: 'PM2.5',
     pollutants: {
       pm2p5: { value: pm2p5, unit: 'μg/m³', name: 'PM2.5' },
@@ -164,8 +163,8 @@ function mockAir(random) {
       sensitive: aqi <= 100 ? '极少数异常敏感人群应减少户外活动。' : '儿童、老年人及心脏病、呼吸系统疾病患者应减少长时间、高强度的户外锻炼。',
     },
     indexes: [
-      { code: 'cn-mee', name: 'AQI (中国)', aqi, aqiDisplay: String(aqi), level: aqi <= 50 ? '1' : aqi <= 100 ? '2' : '3', category, color: `rgb(${color.red}, ${color.green}, ${color.blue})`, primary: 'PM2.5' },
-      { code: 'us-epa', name: 'AQI (US)', aqi: Math.round(aqi * 0.7), aqiDisplay: String(Math.round(aqi * 0.7)), level: aqi <= 50 ? '1' : '2', category: aqi <= 50 ? 'Good' : 'Moderate', color: `rgb(${color.red}, ${color.green}, ${color.blue})`, primary: 'PM2.5' },
+      { code: 'cn-mee', name: 'AQI (中国)', aqi, aqiDisplay: String(aqi), level: aqi <= 50 ? '1' : aqi <= 100 ? '2' : '3', category, tone: aqiTone(aqi), primary: 'PM2.5' },
+      { code: 'us-epa', name: 'AQI (US)', aqi: Math.round(aqi * 0.7), aqiDisplay: String(Math.round(aqi * 0.7)), level: aqi <= 50 ? '1' : '2', category: aqi <= 50 ? 'Good' : 'Moderate', tone: aqiTone(Math.round(aqi * 0.7)), primary: 'PM2.5' },
     ],
   };
 }

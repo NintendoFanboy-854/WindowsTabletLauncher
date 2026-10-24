@@ -2,12 +2,13 @@
  * 模板卡片（L0）。
  *
  * 只演示共享骨架的接法：
+ * - CardIdentity 是内容区第一行（20px 身份色图标 + 组件名），照抄即符合 Equal Except Hue；
  * - CardRoot 负责卡片手势、键盘 Enter/Space 与内部控件过滤；
  * - 卡体点击请求 L1 详情；快捷按钮 stopPropagation + CardRoot 的控件过滤，不打开详情；
  * - 1×1 按 DENSITY 只留主数值与标签；2×2 / 3×2 才出现列表行和快捷操作。
  */
 
-import { Add20Regular } from '@fluentui/react-icons';
+import { Add20Regular, Apps20Regular } from '@fluentui/react-icons';
 import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
   requestOverlay,
@@ -15,7 +16,7 @@ import {
   useHostSize,
   useStoredConfig,
 } from './shared/host.js';
-import { CardHeader, CardRoot, ListRow, Metric, TouchButton } from './shared/ui.jsx';
+import { CardIdentity, CardRoot, ListRow, Metric, TouchButton } from './shared/ui.jsx';
 import { useDemoCount } from './demo.js';
 import {
   DEFAULT_SETTINGS,
@@ -30,21 +31,13 @@ const AGENT_TOOLS = [SUMMARY_TOOL];
 
 const useStyles = makeStyles({
   root: {
-    padding: tokens.spacingVerticalS,
-    gap: tokens.spacingVerticalXS,
+    justifyContent: 'flex-start',
   },
   rootCompact: {
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
-  rootMedium: {
-    padding: tokens.spacingVerticalM,
-    gap: tokens.spacingVerticalS,
-  },
-  rootLarge: {
-    paddingBlock: tokens.spacingVerticalM,
-    paddingInline: tokens.spacingHorizontalL,
-    gap: tokens.spacingVerticalS,
-  },
+  rootMedium: {},
+  rootLarge: {},
   actions: {
     display: 'flex',
     alignItems: 'center',
@@ -90,8 +83,10 @@ export default function Card() {
         large && styles.rootLarge,
       )}
     >
-      <CardHeader
-        title="模板示例"
+      <CardIdentity
+        icon={<Apps20Regular />}
+        label="模板"
+        compact={compact}
         trailing={large ? <Text size={200}>3×2</Text> : undefined}
       />
 
@@ -99,7 +94,6 @@ export default function Card() {
         value={count}
         unit={settings.unit}
         label={compact ? '示例进度' : '已完成示例'}
-        size={compact ? 48 : large ? 80 : 68}
       />
 
       {!compact ? (
@@ -111,7 +105,7 @@ export default function Card() {
 
       {!compact ? (
         <div className={styles.actions}>
-          <TouchButton appearance="primary" icon={<Add20Regular />} onClick={handleQuickAdd}>
+          <TouchButton appearance="secondary" icon={<Add20Regular />} onClick={handleQuickAdd}>
             增加 {settings.step} {settings.unit}
           </TouchButton>
           {settings.showHint ? (

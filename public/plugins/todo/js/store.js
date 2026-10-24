@@ -21,17 +21,13 @@ export const KEYS = {
   settings: 'todo.settings',
 };
 
-/** 清单颜色只用 Fluent palette token 名（文档：color 为 Fluent token 名） */
-export const LIST_COLORS = [
-  'colorPaletteBlueForeground2',
-  'colorPaletteGreenForeground2',
-  'colorPaletteMarigoldForeground2',
-  'colorPaletteBerryForeground2',
-  'colorPaletteTealForeground2',
-  'colorPalettePurpleForeground2',
-  'colorPaletteDarkOrangeForeground2',
-  'colorPaletteCranberryForeground2',
-];
+/**
+ * 清单不再携带颜色。
+ *
+ * Equal Except Hue：色相的唯一来源是 `manifest.identityHue`，由宿主解析成
+ * `--wtsl-identity` 三档下发；插件数据层不得保存 `colorPalette*` 色名，也不得
+ * 让清单各自选色。清单之间用图标 + 名称 + 顺序区分（DENSITY §2 层级手段）。
+ */
 
 export const SORTS = [
   { value: 'manual', label: '手动' },
@@ -44,7 +40,6 @@ export const DEFAULT_SETTINGS = {
   defaultListId: null,
   showCompleted: true,
   defaultSort: 'manual',
-  fontSize: 'default',
   weekStart: 1,
   /** 内部状态：{ [taskId]: 已触发提醒的 remindAt ISO } —— 保证“只补一次” */
   reminders: {},
@@ -171,14 +166,13 @@ export class TodoStore {
           .map((list, index) => ({
             id: typeof list.id === 'string' && list.id ? list.id : uid(),
             name: list.name,
-            color: typeof list.color === 'string' && list.color ? list.color : LIST_COLORS[index % LIST_COLORS.length],
             order: Number.isFinite(list.order) ? list.order : index,
           }))
           .sort((a, b) => a.order - b.order)
       : [];
 
     if (!lists.length) {
-      lists.push({ id: uid(), name: '我的待办', color: LIST_COLORS[0], order: 0 });
+      lists.push({ id: uid(), name: '我的待办', order: 0 });
     }
 
     const listIds = new Set(lists.map((list) => list.id));
@@ -279,10 +273,6 @@ export class TodoStore {
 
   taskById(taskId) {
     return this.state.tasks.find((task) => task.id === taskId) || null;
-  }
-
-  listColor(listId) {
-    return this.listById(listId)?.color || LIST_COLORS[0];
   }
 
   nextOrder(listId) {
@@ -608,13 +598,12 @@ export class TodoStore {
     this.emit();
   }
 
-  addList(name, color) {
+  addList(name) {
     const trimmed = String(name ?? '').trim();
     if (!trimmed) throw new Error('清单名不能为空');
     const list = {
       id: uid(),
       name: trimmed,
-      color: color || LIST_COLORS[this.state.lists.length % LIST_COLORS.length],
       order: this.nextListOrder(),
     };
     this.state.lists.push(list);
@@ -627,7 +616,6 @@ export class TodoStore {
     const list = this.listById(listId);
     if (!list) throw new Error(`找不到清单 ${listId}`);
     if (typeof patch.name === 'string' && patch.name.trim()) list.name = patch.name.trim();
-    if (typeof patch.color === 'string' && patch.color) list.color = patch.color;
     this.persistLists();
     this.emit();
     return list;

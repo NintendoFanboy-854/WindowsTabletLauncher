@@ -4,36 +4,50 @@
  * 纯展示：不提供快捷写操作、设置、加号或行级入口；点击卡片任意位置打开 L1，
  * 长按 / hover / 右键一律交给宿主的 CardRoot 手势。
  *
- * 尺寸档位（docs/components/countdown.md）：
- * - 1×1：最近一条事件的天数 + 标题；
- * - 2×1：一条事件的标题、日期与天数；
- * - 2×2：未来优先的列表（按行预算）；
- * - 3×2：同列表，多 1 行并显示事件总数。
+ * 密度规则（wtsl-density-countdown-todo.md）：
+ * - identity 行恒 24，hero 只出现在 featured 块（40/52），不再占 identity 行；
+ * - 行高 44、行距 4，行数由可用高度唯一决定：
+ *   A = Hc − 24 − 8 − (52 + 8)，N = min(cap, floor((A + 4) / 48))；
+ * - 2×2 与 3×2 的 iframe 同为 328 高，所以行数同为 4；
+ *   3×2 / 3×3 用多出的宽度在每行显示日期（不增行数）；
+ * - 溢出不在卡内滚动：identity 行尾恒写 TrailingCount「共 X · 显示 Y」。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
-import { CalendarLtr16Regular, CalendarLtr48Regular } from '@fluentui/react-icons';
+import { Text, makeStyles, tokens, webLightTheme } from '@fluentui/react-components';
+import {
+  Add20Regular,
+  CalendarLtr20Regular,
+  CalendarLtr24Regular,
+  ChevronRight20Regular,
+} from '@fluentui/react-icons';
 import { plugin } from '/plugin-sdk.js';
 import { requestOverlay, useAgentTools, useHostSize } from '../../_shared/host.js';
 import {
   CardIdentity,
   CardRoot,
+  CARD_GAP_PX,
+  CARD_PADDING_PX,
   EmptyState,
+  HERO_LINE_HEIGHT_PX,
+  HeroText,
   ListRow,
-  Metric,
+  ListStack,
+  LIST_ROW_GAP,
+  LIST_ROW_PITCH,
   TouchButton,
+  TrailingCount,
   useNow,
 } from '../../_shared/ui.jsx';
-import { TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
+import { TABULAR_NUMS } from '../../_shared/typography.js';
 import { DEFAULT_SIZE_KEY, sizeKeyOf } from './sizes.js';
 import { usePluginConfig } from './data/config.js';
 import {
-  COLOR_OPTIONS,
   DEFAULT_SETTINGS,
   ITEMS_KEY,
   SETTINGS_KEY,
   displayText,
+  listEntries,
   normalizeItems,
   normalizeSettings,
   toDateString,
@@ -43,8 +57,17 @@ import {
   toolSettingsGet,
   toolSettingsSet,
   toolUpdate,
-  visibleEntries,
 } from './data/items.js';
+
+/** Fluent spacingVerticalXXL(24)：identity 行高，JS 侧反推行数时使用 */
+const IDENTITY_HEIGHT_PX = Number.parseFloat(webLightTheme.spacingVerticalXXL);
+
+/** 各列表档的行数上限（D-04；行数本身仍由高度公式决定） */
+const LIST_ROW_CAP = {
+  '2x2': 4,
+  '3x2': 4,
+  '3x3': 8,
+};
 
 const AGENT_TOOLS = [
   {
@@ -67,11 +90,6 @@ const AGENT_TOOLS = [
         title: { type: 'string', description: '事件标题' },
         targetDate: { type: 'string', description: '目标日期 YYYY-MM-DD' },
         repeatYearly: { type: 'boolean', description: '是否每年重复（生日/纪念日）' },
-        color: {
-          type: 'string',
-          description: '事件状态色：accent / blue / green / orange / red / purple / teal',
-          enum: COLOR_OPTIONS.map((color) => color.id),
-        },
       },
       required: ['title', 'targetDate'],
       additionalProperties: false,
@@ -79,7 +97,7 @@ const AGENT_TOOLS = [
   },
   {
     name: 'countdown.update',
-    description: '修改一条倒数日的标题、日期、重复或颜色',
+    description: '修改一条倒数日的标题、日期或重复设置',
     parameters: {
       type: 'object',
       properties: {
@@ -87,11 +105,6 @@ const AGENT_TOOLS = [
         title: { type: 'string', description: '新标题' },
         targetDate: { type: 'string', description: '新的目标日期 YYYY-MM-DD' },
         repeatYearly: { type: 'boolean', description: '是否每年重复' },
-        color: {
-          type: 'string',
-          description: '事件状态色：accent / blue / green / orange / red / purple / teal',
-          enum: COLOR_OPTIONS.map((color) => color.id),
-        },
       },
       required: ['id'],
       additionalProperties: false,
@@ -131,34 +144,16 @@ const useStyles = makeStyles({
     boxSizing: 'border-box',
     color: tokens.colorNeutralForeground1,
   },
-  /* 尺寸档 padding / gap 按 DENSITY §2.1 的映射 */
-  pad1: {
-    padding: tokens.spacingVerticalS,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: tokens.spacingVerticalXS,
-    textAlign: 'center',
-  },
-  pad21: {
-    paddingBlock: tokens.spacingVerticalS,
-    paddingInline: tokens.spacingHorizontalM,
-    gap: tokens.spacingVerticalXS,
-    justifyContent: 'center',
-  },
-  pad22: {
-    padding: tokens.spacingVerticalM,
-    gap: tokens.spacingVerticalS,
-  },
-  pad32: {
-    paddingBlock: tokens.spacingVerticalM,
-    paddingInline: tokens.spacingHorizontalL,
-    gap: tokens.spacingVerticalS,
+  /* padding / gap 由 CardRoot 唯一决定（16 / 8），插件不再按尺寸漂移 */
+  identityRow: {
+    alignSelf: 'stretch',
+    minWidth: 0,
   },
   singleContent: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: tokens.spacingVerticalXS,
+    alignItems: 'flex-start',
+    gap: tokens.spacingVerticalXXS,
     minWidth: 0,
     maxWidth: '100%',
   },
@@ -170,72 +165,56 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: tokens.spacingHorizontalM,
+    gap: tokens.spacingHorizontalS,
     width: '100%',
     minWidth: 0,
+    minHeight: tokens.lineHeightHero900,
   },
-  titleBlock: {
+  featured: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXXS,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+    width: '100%',
     minWidth: 0,
-    flex: '1 1 auto',
+    minHeight: tokens.lineHeightHero900,
   },
-  titleText: {
+  featuredTitle: {
+    flex: '1 1 auto',
+    minWidth: 0,
     color: tokens.colorNeutralForeground1,
   },
-  metricRight: {
-    flex: '0 0 auto',
-    alignItems: 'flex-end',
+  featuredDays: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    gap: tokens.spacingHorizontalXXS,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
-  /** identity 行铺满内容宽度；1×1 只露 chip，2×1 起 chip + 标签 + 行尾 auxiliary。 */
-  identityRow: {
-    alignSelf: 'stretch',
-    minWidth: 0,
-  },
-  /** 短卡（1×1 / 2×1）空态：卡片自身 padding 已留白，EmptyState 不再叠 24 内边距。 */
+  /** 空态容器：水平左对齐；垂直居中由 EmptyState 自身负责。 */
   emptyShort: {
-    padding: 0,
+    flex: 1,
+    minHeight: 0,
   },
-  /** 2×2 / 3×2 空态：identity 行下方占满剩余高度、居中。 */
   emptyFill: {
     flex: 1,
     minHeight: 0,
   },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
-    minHeight: 0,
-    overflow: 'hidden',
-    flex: '0 1 auto',
-  },
-  /** 列表卡主层（DENSITY §2.1）：事件总数 28/48px 放在 identity 行尾。 */
-  countLine: {
+  rowTrailing: {
     display: 'inline-flex',
     alignItems: 'baseline',
-    gap: tokens.spacingHorizontalXS,
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalS,
     minWidth: 0,
   },
-  countValue: {
-    fontSize: tokens.fontSizeHero700,
-    lineHeight: tokens.lineHeightHero700,
-    fontWeight: tokens.fontWeightSemibold,
-    fontVariantNumeric: 'tabular-nums',
-    color: tokens.colorNeutralForeground1,
-    whiteSpace: 'nowrap',
-  },
-  /** 3×2 的列表头主层放大到 Display XL 48（D-07：只用于数字型主信息）。 */
-  countValueWide: {
-    ...displayXl(48),
-  },
-  countLabel: {
+  rowDate: {
     color: tokens.colorNeutralForeground3,
     whiteSpace: 'nowrap',
   },
   daysRow: {
     display: 'inline-flex',
     alignItems: 'baseline',
+    justifyContent: 'flex-end',
     gap: tokens.spacingHorizontalXXS,
     whiteSpace: 'nowrap',
   },
@@ -244,13 +223,14 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground1,
   },
   daysMuted: {
+    ...TABULAR_NUMS,
     color: tokens.colorNeutralForeground3,
     whiteSpace: 'nowrap',
   },
-  listFooter: {
-    flexShrink: 0,
-    textAlign: 'right',
-    color: tokens.colorNeutralForeground3,
+  /** 「今天」不占 accent：中性前景 + 半粗，与「已过」的 fg3 区分 */
+  daysToday: {
+    color: tokens.colorNeutralForeground1,
+    fontWeight: tokens.fontWeightSemibold,
   },
 });
 
@@ -268,41 +248,73 @@ function useViewportHeight() {
   return height;
 }
 
-function primaryTextOf(entry) {
-  if (entry.status === 'today') return '今天';
-  return String(Math.abs(entry.days));
+/**
+ * 唯一行数公式：A = Hc − 24 − 8 − (52 + 8)，N = min(cap, floor((A + 4) / 48))。
+ * `+4` 是最后一行下方不必再留行距；`Hc` 为 iframe 高减 CardRoot 上下 16。
+ */
+function rowBudgetFor(viewportHeight, cap) {
+  const contentHeight = Math.max(0, viewportHeight - CARD_PADDING_PX * 2);
+  const available = Math.max(
+    0,
+    contentHeight -
+      IDENTITY_HEIGHT_PX -
+      CARD_GAP_PX -
+      (HERO_LINE_HEIGHT_PX + CARD_GAP_PX),
+  );
+  return Math.max(
+    0,
+    Math.min(cap, Math.floor((available + LIST_ROW_GAP) / LIST_ROW_PITCH)),
+  );
 }
 
-function primaryUnitOf(entry) {
-  if (entry.status === 'today') return '';
-  return entry.status === 'past' ? '天前' : '天';
-}
-
-/** 卡片列表行尾的天数：未来「还有 N 天」、今天「今天」、过去「已过 N 天」 */
-function CardDays({ entry, large }) {
+/** featured 的主数字：今天用 accent，过去整块降级，未来数字用 fg1。 */
+function FeaturedDays({ entry }) {
   const styles = useStyles();
-  const size = large ? 500 : 400;
-  if (entry.status === 'past') {
-    return (
-      <Text size={300} className={styles.daysMuted}>
-        已过 {Math.abs(entry.days)} 天
-      </Text>
-    );
-  }
+  const isToday = entry.status === 'today';
+  const isPast = entry.status === 'past';
+  return (
+    <span className={styles.featuredDays}>
+      {isToday ? null : (
+        <Text size={200} className={styles.daysMuted}>
+          {isPast ? '已过' : '还有'}
+        </Text>
+      )}
+      <HeroText
+        className={isToday ? styles.daysToday : isPast ? styles.daysMuted : undefined}
+      >
+        {isToday ? '今天' : Math.abs(entry.days)}
+      </HeroText>
+      {isToday ? null : (
+        <Text size={200} className={styles.daysMuted}>
+          天
+        </Text>
+      )}
+    </span>
+  );
+}
+
+/** 列表行尾：前缀 12 fg3 + 数字 20 semibold + 单位 12 fg3，右缘成列。 */
+function CardDays({ entry }) {
+  const styles = useStyles();
   if (entry.status === 'today') {
     return (
-      <Text size={size} weight="semibold">
+      <Text size={400} weight="semibold" className={styles.daysToday}>
         今天
       </Text>
     );
   }
+  const past = entry.status === 'past';
   return (
     <span className={styles.daysRow}>
       <Text size={200} className={styles.daysMuted}>
-        还有
+        {past ? '已过' : '还有'}
       </Text>
-      <Text size={size} weight="semibold" className={styles.daysValue}>
-        {entry.days}
+      <Text
+        size={500}
+        weight="semibold"
+        className={past ? styles.daysMuted : styles.daysValue}
+      >
+        {Math.abs(entry.days)}
       </Text>
       <Text size={200} className={styles.daysMuted}>
         天
@@ -345,9 +357,10 @@ export default function CountdownCard({ fallbackSizeKey }) {
     [setSettings],
   );
 
-  const allEntries = useMemo(
-    () => visibleEntries(items, settings, today),
-    [items, settings, today],
+  const allEntries = useMemo(() => listEntries(items, today), [items, today]);
+  const visible = useMemo(
+    () => (settings.showPast ? allEntries : allEntries.filter((entry) => entry.days >= 0)),
+    [allEntries, settings.showPast],
   );
 
   // Agent 工具与 UI 共用同一组数据操作；工具声明只在卡片视图注册一次。
@@ -380,7 +393,7 @@ export default function CountdownCard({ fallbackSizeKey }) {
   useEffect(() => {
     if (!itemsLoaded) return;
     const todayKey = toDateString(new Date(now));
-    for (const entry of allEntries) {
+    for (const entry of visible) {
       if (entry.status !== 'today') continue;
       const remindKey = `countdown.reminded:${entry.item.id}:${todayKey}`;
       try {
@@ -391,53 +404,53 @@ export default function CountdownCard({ fallbackSizeKey }) {
       }
       plugin.notify(`今天是「${entry.item.title}」`);
     }
-  }, [allEntries, itemsLoaded, now]);
+  }, [visible, itemsLoaded, now]);
 
   const openDetail = useCallback(() => requestOverlay('detail', '全部事件'), []);
-  const near = allEntries[0];
+  const near = visible[0];
   const compact = sizeKey === '1x1';
   const row = sizeKey === '2x1';
-  const wide = sizeKey === '3x2';
-
-  const rootClass = mergeClasses(
-    styles.root,
-    compact
-      ? styles.pad1
-      : row
-        ? styles.pad21
-        : wide
-          ? styles.pad32
-          : styles.pad22,
-  );
+  const wide = sizeKey === '3x2' || sizeKey === '3x3';
 
   if (!itemsLoaded) {
-    return <CardRoot ariaLabel="倒数日，正在加载" onActivate={openDetail} className={rootClass} />;
+    return <CardRoot ariaLabel="倒数日，正在加载" onActivate={openDetail} className={styles.root} />;
   }
 
-  if (!allEntries.length) {
+  if (!visible.length) {
+    const noData = items.length === 0;
     const shortCard = compact || row;
+    const title = noData ? '还没有倒数日' : '没有未来事件';
     return (
       <CardRoot
-        ariaLabel="倒数日：还没有倒数日，点击打开详情添加"
+        ariaLabel={`倒数日：${title}，点击打开详情`}
         onActivate={openDetail}
-        className={rootClass}
+        className={styles.root}
       >
         {shortCard ? null : (
           <CardIdentity
-            icon={<CalendarLtr16Regular />}
+            icon={<CalendarLtr20Regular />}
             label="倒数日"
-            accent="pink"
             className={styles.identityRow}
+            disclosure
           />
         )}
+        {/*
+          例外 E5（保留）：2×1 短卡走居中态（图标 / 标题 / 按钮整组居中），
+          不跟内容轴左对齐。120 高里居中比左对齐稳；若左对齐，按钮会顶到右边界。
+          三件套共用同一居中轴（E5 只要求中心共线，不要求盒左 = 内容轴）。
+        */}
         <EmptyState
-          icon={<CalendarLtr48Regular />}
-          iconAccent="pink"
-          title="还没有倒数日"
-          description={shortCard ? null : '添加一个重要的日子，卡片会显示剩余天数'}
+          align={shortCard ? 'center' : 'start'}
+          compact={shortCard}
+          icon={<CalendarLtr24Regular />}
+          title={title}
           action={
-            <TouchButton appearance="primary" onClick={openDetail}>
-              添加倒数日
+            <TouchButton
+              appearance="secondary"
+              icon={noData ? <Add20Regular /> : <ChevronRight20Regular />}
+              onClick={openDetail}
+            >
+              {noData ? '添加事件' : '查看全部'}
             </TouchButton>
           }
           className={shortCard ? styles.emptyShort : styles.emptyFill}
@@ -446,28 +459,20 @@ export default function CountdownCard({ fallbackSizeKey }) {
     );
   }
 
-  const ariaLabel =
-    compact || row
-      ? `倒数日：${near.item.title}，${displayText(near)}；点击打开详情`
-      : `倒数日：共 ${allEntries.length} 项，最近 ${near.item.title}，${displayText(near)}；点击打开详情`;
+  const ariaLabel = `倒数日：${near.item.title}，${displayText(near)}；点击打开详情`;
 
   if (compact) {
     return (
-      <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
+      <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={styles.root}>
         <CardIdentity
-          icon={<CalendarLtr16Regular />}
+          icon={<CalendarLtr20Regular />}
           label="倒数日"
-          accent="pink"
           compact
           className={styles.identityRow}
         />
         <div className={styles.singleContent}>
-          <Metric
-            value={primaryTextOf(near)}
-            unit={primaryUnitOf(near)}
-            size={48}
-          />
-          <Text size={300} truncate className={styles.singleTitle}>
+          <FeaturedDays entry={near} />
+          <Text size={400} truncate className={styles.singleTitle}>
             {near.item.title}
           </Text>
         </div>
@@ -477,12 +482,12 @@ export default function CountdownCard({ fallbackSizeKey }) {
 
   if (row) {
     return (
-      <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
+      <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={styles.root}>
         <CardIdentity
-          icon={<CalendarLtr16Regular />}
+          icon={<CalendarLtr20Regular />}
           label="倒数日"
-          accent="pink"
           className={styles.identityRow}
+          disclosure
           trailing={
             <Text size={200} truncate>
               {near.subtitle}
@@ -490,68 +495,56 @@ export default function CountdownCard({ fallbackSizeKey }) {
           }
         />
         <div className={styles.row21}>
-          <div className={styles.titleBlock}>
-            <Text size={400} weight="semibold" truncate className={styles.titleText}>
-              {near.item.title}
-            </Text>
-          </div>
-          <Metric
-            className={styles.metricRight}
-            value={primaryTextOf(near)}
-            unit={primaryUnitOf(near)}
-            size={48}
-          />
+          <Text size={400} weight="semibold" truncate className={styles.featuredTitle}>
+            {near.item.title}
+          </Text>
+          <FeaturedDays entry={near} />
         </div>
       </CardRoot>
     );
   }
 
-  // 2×2 / 3×2：identity 行（含事件总数主层）之下，按 iframe 高度计算能完整放下的行数，避免静默裁切。
-  const verticalPadding = 12;
-  /** 卡片根 gap（styles.pad22 / pad32 的 spacingVerticalS = 8） */
-  const rowGap = 8;
-  // 列表主层放在 identity 行尾：2×2 用 28px（36 高），3×2 用 48px（56 高）；剩余高度按 44 行高 + 4 行距排。
-  const identityHeight = wide ? 56 : 36;
-  const available = Math.max(44, viewportHeight - verticalPadding * 2 - identityHeight - rowGap);
-  // DENSITY §2：2×2 最多 4 项 Secondary；3×2 多 1–2 行，并保留列表主层。
-  const maxRows = wide ? 5 : 4;
-  const rowCount = Math.max(1, Math.min(maxRows, Math.floor(available / 48)));
-  const visibleRows = allEntries.slice(0, rowCount);
-  const hiddenCount = allEntries.length - visibleRows.length;
+  // 2×2 / 3×2 / 3×3：identity 24 + featured 52 + N 行（44 / 4），溢出只写 identity trailing。
+  const cap = LIST_ROW_CAP[sizeKey] ?? 4;
+  const rowCount = rowBudgetFor(viewportHeight, cap);
+  const shown = visible.slice(0, rowCount + 1);
+  const rows = shown.slice(1);
+  const listAria = `倒数日：共 ${visible.length} 项，显示 ${shown.length} 项，最近 ${near.item.title}，${displayText(near)}；点击打开详情`;
 
   return (
-    <CardRoot ariaLabel={ariaLabel} onActivate={openDetail} className={rootClass}>
+    <CardRoot ariaLabel={listAria} onActivate={openDetail} className={styles.root}>
       <CardIdentity
-        icon={<CalendarLtr16Regular />}
+        icon={<CalendarLtr20Regular />}
         label="倒数日"
-        accent="pink"
         className={styles.identityRow}
-        trailing={
-          <div className={styles.countLine}>
-            <span className={mergeClasses(styles.countValue, wide && styles.countValueWide)}>
-              {allEntries.length}
-            </span>
-            <Text size={wide ? 400 : 300} className={styles.countLabel}>
-              个事件
-            </Text>
-            {hiddenCount > 0 ? (
-              <Text size={200} className={styles.listFooter}>
-                还有 {hiddenCount} 项
-              </Text>
-            ) : null}
-          </div>
-        }
+        disclosure
+        trailing={<TrailingCount total={visible.length} shown={shown.length} />}
       />
-      <div className={styles.list}>
-        {visibleRows.map((entry) => (
+      <div className={styles.featured}>
+        <Text size={400} weight="semibold" truncate className={styles.featuredTitle}>
+          {near.item.title}
+        </Text>
+        <FeaturedDays entry={near} />
+      </div>
+      <ListStack>
+        {rows.map((entry) => (
           <ListRow
             key={entry.item.id}
             title={entry.item.title}
-            titleSize={wide ? 400 : 300}
-            trailing={<CardDays entry={entry} large={wide} />}
+            titleSize={400}
+            trailing={
+              <span className={styles.rowTrailing}>
+                {wide ? (
+                  <Text size={200} className={styles.rowDate}>
+                    {entry.dateLabel} · {entry.weekdayLabel}
+                  </Text>
+                ) : null}
+                <CardDays entry={entry} />
+              </span>
+            }
           />
         ))}
-      </div>
+      </ListStack>
     </CardRoot>
   );
 }

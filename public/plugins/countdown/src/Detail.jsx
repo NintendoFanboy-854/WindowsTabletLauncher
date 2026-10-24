@@ -3,7 +3,7 @@
  *
  * L1：header 56（事件总数 + 设置… / 添加倒数日）、即将到来 / 已过去两组；
  *     行 48、标题 16、天数 20、日期 12、行尾 ⋯ 编辑/删除（删除走行内确认）。
- * L2：Subpage push，表单标题/日期/颜色/每年重复；保存 = 提交并 pop，
+ * L2：Subpage push，表单标题/日期/每年重复；保存 = 提交并 pop，
  *     取消 / ← 返回 = 放弃并 pop，X / Esc / 遮罩由宿主关闭整个浮层。
  * 设置只由 manifest.settings 声明；这里的「设置…」只发 requestHostSettings()。
  */
@@ -25,13 +25,11 @@ import {
   Switch,
   Text,
   makeStyles,
-  mergeClasses,
   tokens,
 } from '@fluentui/react-components';
 import {
   Add20Regular,
   CalendarLtr24Regular,
-  Checkmark16Regular,
   ChevronDown20Regular,
   ChevronUp20Regular,
   Delete20Regular,
@@ -49,11 +47,11 @@ import {
   EmptyState,
   ListRow,
   Subpage,
+  TOUCH_TARGET,
   useNow,
 } from '../../_shared/ui.jsx';
 import { usePluginConfig } from './data/config.js';
 import {
-  COLOR_OPTIONS,
   DEFAULT_SETTINGS,
   ITEMS_KEY,
   SETTINGS_KEY,
@@ -86,13 +84,13 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    minHeight: '40px',
+    minHeight: `${TOUCH_TARGET}px`,
   },
   pastToggleButton: {
-    width: '40px',
-    height: '40px',
-    minWidth: '40px',
-    minHeight: '40px',
+    width: `${TOUCH_TARGET}px`,
+    height: `${TOUCH_TARGET}px`,
+    minWidth: `${TOUCH_TARGET}px`,
+    minHeight: `${TOUCH_TARGET}px`,
     padding: 0,
   },
   rows: {
@@ -106,12 +104,6 @@ const useStyles = makeStyles({
   },
   muted: {
     color: tokens.colorNeutralForeground3,
-  },
-  dot: {
-    width: '10px',
-    height: '10px',
-    flexShrink: 0,
-    borderRadius: tokens.borderRadiusCircular,
   },
   trailing: {
     display: 'inline-flex',
@@ -142,10 +134,10 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   menuButton: {
-    width: '40px',
-    height: '40px',
-    minWidth: '40px',
-    minHeight: '40px',
+    width: `${TOUCH_TARGET}px`,
+    height: `${TOUCH_TARGET}px`,
+    minWidth: `${TOUCH_TARGET}px`,
+    minHeight: `${TOUCH_TARGET}px`,
     padding: 0,
   },
   confirmRow: {
@@ -153,7 +145,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalS,
-    minHeight: '48px',
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
     minWidth: 0,
   },
   confirmText: {
@@ -180,33 +172,12 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalXL,
     minWidth: 0,
   },
-  colorPicker: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: tokens.spacingHorizontalS,
-  },
-  swatch: {
-    width: '40px',
-    height: '40px',
-    minWidth: '40px',
-    minHeight: '40px',
-    padding: 0,
-    borderRadius: tokens.borderRadiusCircular,
-    borderStyle: 'solid',
-    borderWidth: tokens.strokeWidthThick,
-    borderColor: tokens.colorTransparentStroke,
-    boxSizing: 'border-box',
-  },
-  swatchSelected: {
-    borderColor: tokens.colorNeutralStroke1,
-  },
   repeatRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalL,
-    minHeight: '48px',
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
   },
   repeatText: {
     display: 'flex',
@@ -340,14 +311,7 @@ function CountdownRow({
 
   return (
     <ListRow
-      style={{ minHeight: '48px' }}
-      leading={
-        <span
-          className={styles.dot}
-          style={{ backgroundColor: tokens[entry.colorToken] }}
-          aria-hidden="true"
-        />
-      }
+      style={{ minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})` }}
       title={entry.item.title}
       subtitle={entry.subtitle}
       titleSize={400}
@@ -381,7 +345,6 @@ function CountdownEditor({ item, items, writeItems, onClosed }) {
     item?.targetDate ?? toDateString(new Date()),
   );
   const [repeatYearly, setRepeatYearly] = useState(Boolean(item?.repeatYearly));
-  const [color, setColor] = useState(item?.color ?? COLOR_OPTIONS[0].id);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -399,13 +362,11 @@ function CountdownEditor({ item, items, writeItems, onClosed }) {
             title: validation.title,
             targetDate,
             repeatYearly,
-            color,
           })
         : addItem(items, {
             title: validation.title,
             targetDate,
             repeatYearly,
-            color,
           });
       writeItems(result.items);
       close();
@@ -424,18 +385,6 @@ function CountdownEditor({ item, items, writeItems, onClosed }) {
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : String(removeError));
     }
-  };
-
-  const moveColor = (event) => {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
-    const index = COLOR_OPTIONS.findIndex((option) => option.id === color);
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const next = COLOR_OPTIONS[(index + delta + COLOR_OPTIONS.length) % COLOR_OPTIONS.length];
-    setColor(next.id);
-    if (error) setError('');
-    const nextElement = document.getElementById(`countdown-color-${next.id}`);
-    nextElement?.focus();
   };
 
   return (
@@ -485,7 +434,7 @@ function CountdownEditor({ item, items, writeItems, onClosed }) {
               <ActionButton appearance="secondary" onClick={close}>
                 取消
               </ActionButton>
-              <ActionButton appearance="primary" onClick={() => save(close)}>
+              <ActionButton appearance="secondary" onClick={() => save(close)}>
                 保存
               </ActionButton>
             </div>
@@ -530,38 +479,6 @@ function CountdownEditor({ item, items, writeItems, onClosed }) {
                 if (error) setError('');
               }}
             />
-          </Field>
-
-          <Field label="颜色" hint="只用于事件行和列表上的状态圆点">
-            <div className={styles.colorPicker} role="radiogroup" aria-label="颜色">
-              {COLOR_OPTIONS.map((option) => {
-                const selected = color === option.id;
-                return (
-                  <Button
-                    key={option.id}
-                    id={`countdown-color-${option.id}`}
-                    type="button"
-                    appearance="transparent"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={option.label}
-                    title={option.label}
-                    tabIndex={selected ? 0 : -1}
-                    className={mergeClasses(styles.swatch, selected && styles.swatchSelected)}
-                    style={{ backgroundColor: tokens[option.token] }}
-                    onClick={() => {
-                      setColor(option.id);
-                      if (error) setError('');
-                    }}
-                    onKeyDown={moveColor}
-                  >
-                    {selected ? (
-                      <Checkmark16Regular style={{ color: tokens.colorNeutralBackground1 }} />
-                    ) : null}
-                  </Button>
-                );
-              })}
-            </div>
           </Field>
 
           <div className={styles.repeatRow}>
@@ -616,8 +533,8 @@ export default function CountdownDetail() {
 
   const entries = useMemo(() => listEntries(items, today), [items, today]);
   const upcoming = entries.filter((entry) => entry.days >= 0);
-  const past = entries.filter((entry) => entry.days < 0);
-  const visiblePast = settings.showPast ? past : [];
+  // 卡片上的 showPast 只决定卡内列表；详情始终保留「已过去」组，供空态「查看已过去」落地。
+  const visiblePast = entries.filter((entry) => entry.days < 0);
   const count = upcoming.length + visiblePast.length;
 
   const finishRemove = (id) => (_event, data) => {
@@ -673,7 +590,7 @@ export default function CountdownDetail() {
           <>
             <ActionButton onClick={requestHostSettings}>设置…</ActionButton>
             <ActionButton
-              appearance="primary"
+              appearance="secondary"
               icon={<Add20Regular />}
               onClick={() => setEditor({ id: null })}
             >
@@ -694,11 +611,11 @@ export default function CountdownDetail() {
             title="还没有倒数日"
             action={
               <ActionButton
-                appearance="primary"
+                appearance="secondary"
                 icon={<Add20Regular />}
                 onClick={() => setEditor({ id: null })}
               >
-                添加倒数日
+                添加事件
               </ActionButton>
             }
           />

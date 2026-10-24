@@ -1,11 +1,19 @@
 /** 少量通用小工具（尺寸档位、演示开关、缓存时效）。 */
 
+/**
+ * 卡片尺寸档（与 manifest.json 的 sizes 一致）。
+ *
+ * 逐档字段集合见 `wtsl-density-clock-weather.md` §3.6：换尺寸换字段，不换字号
+ * （hero 恒 fontSizeHero900 / lineHeightHero900）。`4x2` 已删除：它的全部字段
+ * （AQI 环 / 未来 7 天）已由 `3x3` 承担，再保留一档只会让同一字段集在两个宽高比里各排一遍。
+ */
 export const SUPPORTED_SIZES = {
   '1x1': [1, 1],
   '2x1': [2, 1],
+  '1x2': [1, 2],
   '2x2': [2, 2],
   '3x2': [3, 2],
-  '4x2': [4, 2],
+  '3x3': [3, 3],
 };
 
 export const DEFAULT_SIZE_KEY = '3x2';

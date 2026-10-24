@@ -2,6 +2,7 @@
   "id": "weather",
   "name": "天气",
   "version": "0.2.0",
+  "identityHue": "teal",
   "background": false,
   "widgets": [
     {
@@ -10,11 +11,12 @@
       "sizes": [
         [1, 1],
         [2, 1],
+        [1, 2],
         [2, 2],
         [3, 2],
-        [4, 2]
+        [3, 3]
       ],
-      "defaultSize": [4, 2],
+      "defaultSize": [3, 2],
       "cell": [0, 0]
     }
   ],

@@ -8,6 +8,19 @@
  *
  * 不再在各个插件里复制一份 base.css；本轮 E3.1 起逐个换上来。
  */
+:root {
+  /*
+   * 这里不定义任何尺寸/字号/间距变量：卡片 padding、gap、hero 字号全部由
+   * `src/shared/ui.jsx` 直接引用 Fluent `tokens.*`（spacingHorizontalL / spacingVerticalS /
+   * fontSizeHero900 / lineHeightHero900）。
+   *
+   * 唯一的项目变量是身份色的转发别名：值是宿主用 Fluent shared palette
+   * `colorPalette<Hue>Foreground2` 解析出来的具体颜色，不是手写色值。
+   * 未注入时跟随中性前景，不猜 hue（不写 currentColor，避免模板把「吃文字色」固化）。
+   */
+  --wtsl-identity: var(--colorNeutralForeground3);
+}
+
 html,
 body,
 #root {
@@ -31,14 +44,25 @@ body {
   scrollbar-width: thin;
 }
 
-/* 平板触控：Fluent 内建表单控件的命中区统一 >=40（DESIGN 1.2 / AUDIT N-03） */
-.fui-Input,
-.fui-Switch,
-.fui-Checkbox,
-.fui-Radio,
-.fui-Slider,
-.fui-Dropdown {
-  min-height: 40px;
+/*
+ * 平板触控：所有可点控件命中区 >=44（Fluent layout.md 44×44 / HIG §6 同值）。
+ * 44 = spacingVerticalXXXL(32) + spacingVerticalM(12)，用两个 token 相加表达契约值。
+ */
+body .fui-Input,
+body .fui-Switch,
+body .fui-Checkbox,
+body .fui-Radio,
+body .fui-Slider,
+body .fui-Dropdown,
+body .fui-Button,
+body .fui-Tab,
+body .fui-MenuItem {
+  min-height: calc(var(--spacingVerticalXXXL) + var(--spacingVerticalM));
+}
+
+body .fui-Button,
+body .fui-Tab {
+  min-width: calc(var(--spacingHorizontalXXXL) + var(--spacingHorizontalM));
 }
 
 /*
@@ -47,7 +71,17 @@ body {
  * 避免出现双焦点环。颜色只用 Fluent CSS 变量。
  */
 :focus-visible:not([data-fui-focus-visible]) {
-  outline: 2px solid var(--colorStrokeFocus2, currentColor);
+  outline: var(--strokeWidthThick) solid var(--colorStrokeFocus2, currentColor);
   /* 插件根节点占满 iframe；向内画焦点环，避免被视口裁掉 */
-  outline-offset: -2px;
+  outline-offset: calc(var(--strokeWidthThick) * -1);
+}
+
+/* 动效兜底：共享 presence 组件已有 reducedMotion 变体，这里兜住内联过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: var(--durationUltraFast, 50ms) !important;
+    scroll-behavior: auto !important;
+  }
 }

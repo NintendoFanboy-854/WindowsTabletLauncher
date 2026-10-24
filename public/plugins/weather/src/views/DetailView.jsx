@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
-  Button,
   MessageBar,
   MessageBarActions,
   MessageBarBody,
@@ -25,9 +24,10 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import {
+  Add20Regular,
   ArrowClockwise20Regular,
-  Key20Regular,
-  Location20Regular,
+  Key24Regular,
+  Location24Regular,
   Settings20Regular,
 } from '@fluentui/react-icons';
 import { requestHostSettings, useHostTheme } from '../../../_shared/host.js';
@@ -38,13 +38,15 @@ import {
   DetailScroll,
   DetailTabs,
   EmptyState,
+  LIST_ROW_HEIGHT,
   Metric,
   Subpage,
+  TouchButton,
   useNow,
 } from '../../../_shared/ui.jsx';
 import { CrossFade } from '../../../_shared/motion.js';
 import { CityMenu } from '../components/CityMenu.jsx';
-import { HiLo, StatusLine, WeatherIcon } from '../components/atoms.jsx';
+import { HiLo, StatusLine, WeatherIcon, statusToneColor } from '../components/atoms.jsx';
 import { isNight } from '../components/forecast.jsx';
 import { AirPanel, DailyPanel, HourlyPanel, IndicesPanel, WarningPanel } from './panels.jsx';
 import { ManageCities } from './ManageCities.jsx';
@@ -100,8 +102,8 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
   },
   aqiDot: {
-    width: '8px',
-    height: '8px',
+    width: tokens.spacingHorizontalS,
+    height: tokens.spacingHorizontalS,
     borderRadius: tokens.borderRadiusCircular,
     flexShrink: 0,
   },
@@ -111,7 +113,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
     gap: tokens.spacingHorizontalL,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     alignItems: 'center',
     paddingInline: tokens.spacingHorizontalXXL,
     boxSizing: 'border-box',
@@ -171,7 +173,7 @@ function AirBadge({ air }) {
     <div className={styles.aqiBadge}>
       <Badge appearance="tint" color="informative" size="large">
         <span className={styles.aqiContent}>
-          <span className={styles.aqiDot} style={{ backgroundColor: air.color }} />
+          <span className={styles.aqiDot} style={{ backgroundColor: statusToneColor(air.tone) }} />
           <Text size={400} weight="semibold">
             {air.aqiDisplay || air.aqi}
           </Text>
@@ -282,7 +284,7 @@ export default function DetailView() {
       trailing={
         <div className={styles.actions}>
           <Tooltip content="刷新天气" relationship="label">
-            <Button
+            <TouchButton
               appearance="subtle"
               size="large"
               aria-label="刷新天气"
@@ -339,11 +341,14 @@ export default function DetailView() {
         {header}
         <DetailScroll>
           <EmptyState
-            icon={<Key20Regular />}
-            title="还没有配置和风天气 API Key"
-            description="在宿主设置页的天气分区填写 API Key 与 API Host，卡片与详情就会显示实时天气"
+            icon={<Key24Regular />}
+            title="未配置 Key"
             action={
-              <ActionButton appearance="primary" onClick={openSettings}>
+              <ActionButton
+                appearance="secondary"
+                icon={<Settings20Regular />}
+                onClick={openSettings}
+              >
                 打开设置
               </ActionButton>
             }
@@ -366,11 +371,14 @@ export default function DetailView() {
             </div>
           ) : (
             <EmptyState
-              icon={<Location20Regular />}
+              icon={<Location24Regular />}
               title="还没有城市"
-              description="搜索并添加一个城市，卡片就会显示当前天气；打开自动定位会把当前位置作为候选"
               action={
-                <ActionButton appearance="primary" onClick={() => setManaging(true)}>
+                <ActionButton
+                  appearance="secondary"
+                  icon={<Add20Regular />}
+                  onClick={() => setManaging(true)}
+                >
                   管理城市
                 </ActionButton>
               }
@@ -395,7 +403,7 @@ export default function DetailView() {
             size={56}
             title={current.text}
           />
-          <Metric value={fmtTemp(current.temp, settings.unit)} size={48} />
+          <Metric value={fmtTemp(current.temp, settings.unit)} />
           <div className={styles.summaryMeta}>
             <Text size={400}>{current.text}</Text>
             <HiLo max={today?.tempMax} min={today?.tempMin} unit={settings.unit} size={300} />

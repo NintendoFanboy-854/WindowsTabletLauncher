@@ -5,6 +5,10 @@
  * 不内置城市表：能搜到什么完全取决于 API；搜过的关键词缓存在 `clock.searchCache`，
  * 之后同一关键词直接读缓存。
  *
+ * Agent 侧（`clock.world.search` / `clock.world.add`）的城市与时区必须来自真实搜索
+ * 结果：先查缓存，缓存没有就现场联网抓，抓不到直接报错，绝不接受调用方自带的
+ * name ↔ tz 组合——那是模型编造时区的入口。
+ *
  * 存储键按 docs/components/clock.md：`clock.places`。旧版本键
  * `plugin.clock.places` / `clock.worldClocks` / `clock.world` 只在主键不存在时导入，
  * 不覆盖已有数据；数据统一 normalize 后最多保留 8 条。
@@ -125,6 +129,89 @@ export async function searchCitiesOnline(query, { signal, limit = ONLINE_LIMIT }
   const results = resolved.filter(Boolean);
   if (results.length > 0) writeSearchCache(cacheKey, results);
   return results;
+}
+
+/* ------------------------------------------------------------------ */
+/* Agent 侧检索：clock.world.search                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 城市名归一化：去括注（`比什凯克（吉尔吉斯斯坦）` → `比什凯克`）、去空格与
+ * 分隔符、转小写。只用于在搜索缓存里判断「是不是同一个地方」，不写进存档。
+ */
+function normalizePlaceName(value) {
+  return String(value ?? '')
+    .replace(/[（(][^）)]*[）)]/g, ' ')
+    .toLowerCase()
+    .replace(/[\s·・,，、/]+/g, '')
+    .trim();
+}
+
+/** 搜索缓存里这个关键词的候选（已 normalize）；未命中返回 null。 */
+function readCachedCitySearch(query) {
+  const text = String(query ?? '').trim().toLowerCase();
+  if (text.length < 2) return null;
+  const cache = readSearchCache();
+  if (!Array.isArray(cache[text])) return null;
+  return cache[text].map((entry) => resolveWorldPlace(entry)).filter(Boolean);
+}
+
+/**
+ * `clock.world.search` 的数据层：命中缓存直接返回，未命中联网抓（写缓存由
+ * `searchCitiesOnline` 完成）。
+ *
+ * 返回 `{ ok:true, source:'cache'|'network', places }`，或
+ * `{ ok:false, code:'invalid'|'offline', error }`。联网失败不向外抛异常，避免
+ * 模型只看到一行不可读的 `TypeError: fetch failed`。
+ */
+export async function searchCitiesForAgent(query, { signal, limit } = {}) {
+  const text = String(query ?? '').trim();
+  if (text.length < 2) {
+    return { ok: false, code: 'invalid', error: '搜索词至少 2 个字符，例如 大阪 / Osaka' };
+  }
+  const cached = readCachedCitySearch(text);
+  if (cached) return { ok: true, source: 'cache', places: cached };
+
+  try {
+    const places = await searchCitiesOnline(text, { signal, limit });
+    return { ok: true, source: 'network', places };
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    return { ok: false, code: 'offline', error: '联网搜索失败，请检查网络后重试' };
+  }
+}
+
+/**
+ * 在搜索缓存里找与入参同 id / 同名的候选。
+ *
+ * **绝不按 tz 匹配**：按 tz 匹配等于承认「任意城市名 + 任何同偏移时区」，
+ * 正是「乌鲁木齐 → 比什凯克」这类编造能落库的原因。
+ */
+function findCachedCity({ id, name, country }) {
+  const wantedId = String(id ?? '').trim().toLowerCase();
+  const wantedName = normalizePlaceName(name);
+  if (!wantedId && !wantedName) return null;
+
+  const wantedCountry = normalizePlaceName(country);
+  const cache = readSearchCache();
+  let nameHit = null;
+  let firstMatch = null;
+
+  for (const key of Object.keys(cache)) {
+    const entries = Array.isArray(cache[key]) ? cache[key] : [];
+    for (const entry of entries) {
+      const place = resolveWorldPlace(entry);
+      if (!place) continue;
+      if (wantedId && place.id.toLowerCase() === wantedId) return place;
+      if (wantedName && normalizePlaceName(place.name) === wantedName) {
+        if (!firstMatch) firstMatch = place;
+        if (!nameHit && wantedCountry && normalizePlaceName(place.country) === wantedCountry) {
+          nameHit = place;
+        }
+      }
+    }
+  }
+  return nameHit || firstMatch;
 }
 
 /** 强制刷新的请求间隔：Nominatim 上限 1 次/秒。 */
@@ -355,7 +442,7 @@ export function addWorldPlace(input) {
     return {
       ok: false,
       code: 'limit',
-      error: `世界时钟最多 ${WORLD_LIMIT} 个城市，请先删除一个`,
+      error: `世界时钟已达 ${WORLD_LIMIT} 个城市上限`,
       places: current,
     };
   }
@@ -364,6 +451,139 @@ export function addWorldPlace(input) {
     return { ok: false, error: '无法保存世界时钟数据（本机存储不可写）' };
   }
   return { ok: true, place, places: next };
+}
+
+/**
+ * Agent 落库：按 **tz** 去重（UI 的 `addWorldPlace` 仍按 id 去重，行为不变）。
+ * 同一时区只能有一条：否则模型换个 id 就能塞进同一时区的重复城市。
+ * 上限文案与 `addWorldPlace` 保持一致。
+ */
+function insertWorldPlaceByTimeZone(place, extra) {
+  const current = readWorldClocks();
+  const sameZone = current.find((entry) => entry.tz.toLowerCase() === place.tz.toLowerCase());
+  if (sameZone) {
+    return {
+      ok: false,
+      code: 'duplicate',
+      error: `${sameZone.name} 已经在世界时钟里（时区 ${sameZone.tz}）`,
+      place: sameZone,
+      places: current,
+    };
+  }
+  if (current.some((entry) => entry.id === place.id)) {
+    return { ok: false, code: 'duplicate', error: `${place.name} 已在世界时钟里`, places: current };
+  }
+  if (current.length >= WORLD_LIMIT) {
+    return {
+      ok: false,
+      code: 'limit',
+      error: `世界时钟已达 ${WORLD_LIMIT} 个城市上限`,
+      places: current,
+    };
+  }
+  const next = [...current, place];
+  if (!writeWorldClocks(next)) {
+    return { ok: false, error: '无法保存世界时钟数据（本机存储不可写）' };
+  }
+  return { ok: true, place, places: next, ...extra };
+}
+
+/**
+ * `clock.world.add` 的完整校验。城市名与时区必须来自真实搜索结果：
+ * 1. 只给合法 IANA 时区、没给城市名 → 「手工时区」通道，直接添加（刻意保留）；
+ * 2. 命中 `clock.searchCache` → 用缓存里的 name/country/tz 落库，忽略调用方给的 tz；
+ * 3. 缓存没有 → 用城市名现场联网抓；按「候选里同名 tz 优先，否则第一条」选，
+ *    落库用解析出来的 name/country/tz/id；
+ * 4. 联网失败 / 搜不到 → 返回 `code:'offline'|'not_found'` 的结构化错误，不写库。
+ *
+ * 给了 name 就等于要求校验：模型给的 tz 一律不直接落库，这正是防住
+ * 「乌鲁木齐 → 比什凯克（Asia/Bishkek）」的关口。
+ *
+ * 返回 `{ ok:true, place, places, source, note, requestedTz?, tzAdjusted? }` 或
+ * `{ ok:false, code, error, places? }`。
+ */
+export async function addWorldPlaceFromAgent(input, { signal } = {}) {
+  const record = isRecord(input) ? input : {};
+  const rawId = firstString(record.id);
+  const rawName = firstString(record.name, record.city);
+  const rawCountry = firstString(record.country, record.region);
+  const rawTz = firstString(record.tz, record.timezone, record.timeZone, record.zone);
+
+  const zoneFromId =
+    rawId.toLowerCase().startsWith('tz:') && hasTimeZoneApi(rawId.slice(3)) ? rawId.slice(3) : '';
+  const zoneFromName = rawName && hasTimeZoneApi(rawName) ? rawName : '';
+  const zoneForManual = hasTimeZoneApi(rawTz) ? rawTz : zoneFromId;
+
+  // 手工时区通道：没有城市名（或名字本身就是时区名）时，只认合法 IANA 时区。
+  if (zoneFromName) {
+    return insertWorldPlaceByTimeZone(timeZoneCandidate(zoneFromName), { source: 'manual' });
+  }
+  if (!rawName && zoneForManual) {
+    return insertWorldPlaceByTimeZone(timeZoneCandidate(zoneForManual), { source: 'manual' });
+  }
+
+  const queryText = rawName || rawTz;
+  if (!queryText) {
+    // 只给了缓存里的 id（如 osm:node:123）也能落库，同样以缓存为准。
+    const cachedById = findCachedCity({ id: rawId, country: rawCountry });
+    if (cachedById) {
+      return insertWorldPlaceByTimeZone(cachedById, { source: 'cache', note: '已采用搜索结果' });
+    }
+    return {
+      ok: false,
+      code: 'not_found',
+      error:
+        '无法识别的城市：请给出城市名，或只给合法 IANA 时区（如 Asia/Shanghai）；' +
+        '加城市前先调用 clock.world.search',
+    };
+  }
+
+  // 1. 搜索缓存命中：城市名、国家、时区全部取缓存那条。
+  const cached = findCachedCity({ id: rawId, name: queryText, country: rawCountry });
+  if (cached) {
+    return insertWorldPlaceByTimeZone(cached, {
+      source: 'cache',
+      note: '已采用搜索结果',
+      requestedTz: rawTz || undefined,
+      tzAdjusted: Boolean(rawTz) && rawTz.toLowerCase() !== cached.tz.toLowerCase(),
+    });
+  }
+
+  // 2. 缓存没有 → 现场联网抓。抓不到就报错，不拿模型给的 name/tz 组合兜底。
+  let places;
+  try {
+    places = await searchCitiesOnline(queryText, { signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    return {
+      ok: false,
+      code: 'offline',
+      error: `联网搜索失败，无法确认「${queryText}」的时区；请先调用 clock.world.search 或检查网络`,
+    };
+  }
+  if (!Array.isArray(places) || places.length === 0) {
+    return {
+      ok: false,
+      code: 'not_found',
+      error: `没有搜到「${queryText}」，无法确认它的时区；请先调用 clock.world.search 换个关键词，或只传 IANA 时区（如 Asia/Shanghai）`,
+    };
+  }
+
+  // 3. 选候选：调用方给的 tz 与某条候选一致就选它，否则第一条。
+  const requestedTz = rawTz.toLowerCase();
+  const picked =
+    (requestedTz && places.find((place) => place.tz.toLowerCase() === requestedTz)) || places[0];
+  const tzAdjusted = Boolean(rawTz) && rawTz.toLowerCase() !== picked.tz.toLowerCase();
+  // timeapi.io 对中国城市一律返回 Asia/Shanghai（例如乌鲁木齐坐标 → Asia/Shanghai），
+  // 这是数据源事实：联网解析值与调用方给的时区不一致时，如实说明以解析值为准。
+  const note = tzAdjusted
+    ? `已联网解析并采用搜索结果的名称与时区（数据源给出 ${picked.tz}，与调用方给的 ${rawTz} 不同）`
+    : '已联网解析并采用搜索结果的名称与时区';
+
+  return insertWorldPlaceByTimeZone(
+    { id: picked.id, name: picked.name, country: picked.country, tz: picked.tz },
+    { source: 'network', note, requestedTz: rawTz || undefined, tzAdjusted },
+  );
 }
 
 function matchesSelector(place, selector) {
@@ -594,11 +814,21 @@ export function useWorldClocks() {
     return result;
   }, []);
 
+  /**
+   * Agent 的加城市入口：先搜索/缓存校验城市与时区是否一致再落库。
+   * 与 `add` 共用同一份 localStorage 数据与同步事件。
+   */
+  const addVerified = useCallback(async (input) => {
+    const result = await addWorldPlaceFromAgent(input);
+    if (result.ok) setPlaces(result.places);
+    return result;
+  }, []);
+
   const remove = useCallback((selector) => {
     const result = removeWorldPlace(selector);
     if (result.ok) setPlaces(result.places);
     return result;
   }, []);
 
-  return { places, add, remove };
+  return { places, add, addVerified, remove };
 }

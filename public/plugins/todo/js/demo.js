@@ -30,12 +30,8 @@ export function shouldSeedDemo() {
 
 export function seedDemo() {
   const random = mulberry32(20261018);
-  const lists = [
-    { name: '工作', color: 'colorPaletteBlueForeground2' },
-    { name: '生活', color: 'colorPaletteGreenForeground2' },
-    { name: '学习', color: 'colorPaletteBerryForeground2' },
-  ];
-  const created = lists.map((item) => store.addList(item.name, item.color));
+  const lists = [{ name: '工作' }, { name: '生活' }, { name: '学习' }];
+  const created = lists.map((item) => store.addList(item.name));
   const [work, life, study] = created;
   const byName = { 工作: work.id, 生活: life.id, 学习: study.id };
 

@@ -9,11 +9,13 @@
 import { useState } from 'react';
 import { Button, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
 import {
+  Add20Regular,
   CalendarLtr20Regular,
+  CalendarLtr24Regular,
   ChevronLeft20Regular,
   ChevronRight20Regular,
 } from '@fluentui/react-icons';
-import { ActionButton, EmptyState } from '../../_shared/ui.jsx';
+import { ActionButton, EmptyState, LIST_ROW_HEIGHT } from '../../_shared/ui.jsx';
 import {
   addDays,
   dayKey,
@@ -68,15 +70,18 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     padding: 0,
     borderRadius: tokens.borderRadiusMedium,
   },
   daySelected: {
     backgroundColor: tokens.colorNeutralBackground1Selected,
   },
+  /** 今日格不占 accent：中性描边 + 半粗文字（时间性语义降级） */
   dayToday: {
-    boxShadow: `inset 0 0 0 ${tokens.strokeWidthThin} ${tokens.colorBrandStroke1}`,
+    boxShadow: `inset 0 0 0 ${tokens.strokeWidthThin} ${tokens.colorNeutralStroke1}`,
+    color: tokens.colorNeutralForeground1,
+    fontWeight: tokens.fontWeightSemibold,
   },
   dayOther: { color: tokens.colorNeutralForeground3 },
   dayCount: {
@@ -86,18 +91,16 @@ const useStyles = makeStyles({
   dots: {
     display: 'flex',
     alignItems: 'center',
-    gap: '2px',
-    height: '6px',
+    gap: tokens.spacingHorizontalXXS,
+    height: tokens.spacingHorizontalSNudge,
   },
   dot: {
-    width: '6px',
-    height: '6px',
+    width: tokens.spacingHorizontalSNudge,
+    height: tokens.spacingHorizontalSNudge,
     borderRadius: tokens.borderRadiusCircular,
     backgroundColor: tokens.colorNeutralForeground3,
   },
-  dotHigh: { backgroundColor: tokens.colorPaletteRedForeground1 },
-  dotMedium: { backgroundColor: tokens.colorPaletteMarigoldForeground1 },
-  dotLow: { backgroundColor: tokens.colorPaletteBlueForeground2 },
+
   dayHead: {
     display: 'flex',
     alignItems: 'center',
@@ -121,7 +124,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
   },
   weekHead: {
     display: 'flex',
@@ -139,7 +142,7 @@ const useStyles = makeStyles({
   monthGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-    gridTemplateRows: 'repeat(6, minmax(44px, auto))',
+    gridTemplateRows: `repeat(6, minmax(${LIST_ROW_HEIGHT}px, auto))`,
     gap: tokens.spacingHorizontalXXS,
   },
   heatStats: {
@@ -157,21 +160,25 @@ const useStyles = makeStyles({
   heatGrid: {
     display: 'grid',
     gridAutoFlow: 'column',
-    gridTemplateRows: 'repeat(7, 32px)',
-    gridAutoColumns: '32px',
+    gridTemplateRows: `repeat(7, ${tokens.spacingHorizontalXXXL})`,
+    gridAutoColumns: tokens.spacingHorizontalXXXL,
     justifyContent: 'center',
-    gap: '2px',
+    gap: tokens.spacingHorizontalXXS,
   },
   heatCell: {
-    width: '32px',
-    height: '32px',
+    width: tokens.spacingHorizontalXXXL,
+    height: tokens.spacingHorizontalXXXL,
     borderRadius: tokens.borderRadiusSmall,
   },
-  heat0: { backgroundColor: tokens.colorNeutralBackground4 },
-  heat1: { backgroundColor: tokens.colorPaletteGreenBackground1 },
-  heat2: { backgroundColor: tokens.colorPaletteGreenBackground2 },
-  heat3: { backgroundColor: tokens.colorPaletteGreenBackground3 },
-  heat4: { backgroundColor: tokens.colorPaletteGreenForeground1 },
+  /**
+   * 热力强度用中性阶梯（DENSITY §2 层级手段：不拿 semantic 色做装饰）。
+   * 0 档贴近卡面，4 档最重；亮暗主题都由 Fluent neutral 档自动适配。
+   */
+  heat0: { backgroundColor: tokens.colorNeutralBackground2 },
+  heat1: { backgroundColor: tokens.colorNeutralBackground4 },
+  heat2: { backgroundColor: tokens.colorNeutralForeground4 },
+  heat3: { backgroundColor: tokens.colorNeutralForeground3 },
+  heat4: { backgroundColor: tokens.colorNeutralForeground2 },
   legend: {
     display: 'flex',
     alignItems: 'center',
@@ -204,13 +211,6 @@ function monthDays(cursor, weekStart) {
   return Array.from({ length: 42 }, (_, index) => addDays(start, index));
 }
 
-function dotClass(styles, priority) {
-  if (priority >= 3) return styles.dotHigh;
-  if (priority === 2) return styles.dotMedium;
-  if (priority === 1) return styles.dotLow;
-  return styles.dot;
-}
-
 function dayTasks(tasks, key) {
   return tasks.filter((task) => task.dueAt && dayKey(task.dueAt) === key);
 }
@@ -220,9 +220,13 @@ function DayPanel({ tasks, now, settings, onOpenTask, onToggleTask, onAddDay }) 
   const sorted = store.sortTasks(tasks, 'due');
   return sorted.length === 0 ? (
     <EmptyState
-      title="这天还没有任务"
-      description="把要做的事安排到这一天"
-      action={<ActionButton onClick={onAddDay}>添加任务</ActionButton>}
+      icon={<CalendarLtr24Regular />}
+      title="这天没有任务"
+      action={
+        <ActionButton icon={<Add20Regular />} onClick={onAddDay}>
+          添加任务
+        </ActionButton>
+      }
     />
   ) : (
     <div className={styles.rows}>
@@ -502,7 +506,7 @@ export function MonthView({ tasks, now, settings, onOpenTask, onToggleTask, onAd
               {items.length > 0 ? (
                 <span className={styles.dots} aria-hidden="true">
                   {items.map((task) => (
-                    <span key={task.id} className={mergeClasses(styles.dot, dotClass(styles, task.priority))} />
+                    <span key={task.id} className={styles.dot} />
                   ))}
                 </span>
               ) : null}

@@ -33,6 +33,7 @@ import {
   DetailScroll,
   DetailTabs,
   DetailToolbar,
+  TOUCH_TARGET,
 } from '../../_shared/ui.jsx';
 import {
   DEFAULT_SETTINGS,
@@ -60,6 +61,7 @@ const useStyles = makeStyles({
   listDropdown: {
     minWidth: '140px',
     maxWidth: '180px',
+    minHeight: `${TOUCH_TARGET}px`,
     flexShrink: 0,
   },
   search: {
@@ -122,7 +124,7 @@ export default function TodoDetail() {
       <DetailHeader
         trailing={
           <ActionButton
-            appearance="primary"
+            appearance="secondary"
             icon={<Add20Regular />}
             onClick={() => openNewTask(null)}
           >
@@ -133,6 +135,7 @@ export default function TodoDetail() {
         <Dropdown
           size="large"
           className={styles.listDropdown}
+          style={{ minHeight: `${TOUCH_TARGET}px` }}
           value={filterLabel}
           selectedOptions={[listFilter]}
           aria-label="筛选清单"
@@ -157,6 +160,7 @@ export default function TodoDetail() {
         <Input
           size="large"
           className={styles.search}
+          style={{ minHeight: `${TOUCH_TARGET}px` }}
           appearance="outline"
           contentBefore={<Search20Regular />}
           contentAfter={

@@ -455,6 +455,7 @@ export function describeState(settings, now = new Date()) {
   const status = statusOf(settings, runtime, now);
   const posture = settings.enabled ? runtime.posture : null;
   const stateMinutes = posture ? currentPostureMinutes(runtime, now.getTime()) : 0;
+  const streak = currentStreakMin(runtime, now.getTime());
   const lastBreak = safeDate(runtime.lastBreakAt);
   return {
     runtime,
@@ -465,6 +466,14 @@ export function describeState(settings, now = new Date()) {
     statusLabel: statusLabelOf(status),
     currentMin: Math.floor(stateMinutes),
     stateMinutes,
+    /**
+     * 下一次提醒还剩多少分钟（只在「坐着 + 已开启」时有值）。
+     * 卡片把它渲染成「点 + 计时图标 + N 分钟」的数据块，不拼「距提醒还有…」的句子。
+     */
+    nextReminderMin:
+      settings.enabled && posture === 'sitting'
+        ? Math.max(0, settings.thresholdMin - Math.round(streak))
+        : null,
     hint: hintOf(settings, runtime, now),
     lastBreakText: lastBreak ? formatClock(lastBreak) : '—',
     snoozable: canSnooze(settings, runtime, now),

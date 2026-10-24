@@ -27,8 +27,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { Add20Regular, Delete20Regular, Dismiss16Regular } from '@fluentui/react-icons';
-import { ActionButton, Subpage } from '../../_shared/ui.jsx';
-import { useMotionTransition } from '../../_shared/motion.js';
+import { ActionButton, LIST_ROW_HEIGHT, Subpage, TOUCH_TARGET } from '../../_shared/ui.jsx';
 import {
   RECURRENCES,
   combineDateTime,
@@ -36,7 +35,6 @@ import {
   priorityMeta,
 } from '../js/date.js';
 import { store } from '../js/store.js';
-import { textSizeFor } from '../js/config.js';
 import { EllipsisText } from './parts.jsx';
 
 const PRIORITY_OPTIONS = [0, 1, 2, 3].map((value) => ({ value, label: priorityMeta(value).label }));
@@ -57,7 +55,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
-    minHeight: '40px',
+    minHeight: `${TOUCH_TARGET}px`,
   },
   dateInput: { flex: 1, minWidth: '160px' },
   timeInput: { width: '120px' },
@@ -72,15 +70,14 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
   },
   subtaskTitle: { flex: 1, minWidth: 0, color: tokens.colorNeutralForeground2 },
   subtaskDone: {
     color: tokens.colorNeutralForeground3,
-    textDecorationLine: 'line-through',
   },
-  iconButton: { minWidth: '40px', minHeight: '40px' },
+  iconButton: { minWidth: `${TOUCH_TARGET}px`, minHeight: `${TOUCH_TARGET}px` },
   muted: { color: tokens.colorNeutralForeground3 },
   footer: {
     display: 'flex',
@@ -97,7 +94,7 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     minWidth: 0,
   },
-  danger: { color: tokens.colorPaletteRedForeground1 },
+  danger: { color: tokens.colorStatusDangerForeground1 },
   confirmText: { color: tokens.colorNeutralForeground3 },
   progress: { marginBottom: tokens.spacingVerticalXS },
 });
@@ -158,12 +155,10 @@ export function TaskEditor({ mode, taskId, initialListId, initialDueDate, settin
   const [subInput, setSubInput] = useState('');
   const [error, setError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const doneOpacity = useMotionTransition('normal');
 
   const list = store.listById(listId) || store.lists[0];
   const doneCount = subtasks.filter((sub) => sub.done).length;
   const progress = subtasks.length ? doneCount / subtasks.length : 0;
-  const titleSize = textSizeFor(settings, 400);
 
   const addTag = () => {
     const value = tagInput.trim();
@@ -245,7 +240,7 @@ export function TaskEditor({ mode, taskId, initialListId, initialDueDate, settin
             <Text size={200} className={styles.confirmText}>
               删除后不可恢复
             </Text>
-            <ActionButton appearance="primary" onClick={() => removeTask(close)}>
+            <ActionButton appearance="secondary" onClick={() => removeTask(close)}>
               确认删除
             </ActionButton>
             <ActionButton onClick={() => setConfirmDelete(false)}>取消</ActionButton>
@@ -255,7 +250,7 @@ export function TaskEditor({ mode, taskId, initialListId, initialDueDate, settin
       {confirmDelete ? null : (
         <div className={styles.footerGroup}>
           <ActionButton onClick={close}>取消</ActionButton>
-          <ActionButton appearance="primary" onClick={() => save(close)}>
+          <ActionButton appearance="secondary" onClick={() => save(close)}>
             保存
           </ActionButton>
         </div>
@@ -349,7 +344,7 @@ export function TaskEditor({ mode, taskId, initialListId, initialDueDate, settin
           </div>
         </Field>
 
-        <Field label="提醒" hint="到点后在桌面提示；只改其他字段不会重复弹出已触发的提醒">
+        <Field label="提醒" hint="到点后在桌面提示">
           <div className={styles.row}>
             <Input
               type="date"
@@ -448,11 +443,10 @@ export function TaskEditor({ mode, taskId, initialListId, initialDueDate, settin
                 }
               />
               <Text
-                size={titleSize}
+                size={400}
                 className={
                   sub.done ? `${styles.subtaskTitle} ${styles.subtaskDone}` : styles.subtaskTitle
                 }
-                style={{ opacity: sub.done ? 0.55 : 1, transitionProperty: 'opacity', ...doneOpacity }}
               >
                 <EllipsisText>{sub.title}</EllipsisText>
               </Text>

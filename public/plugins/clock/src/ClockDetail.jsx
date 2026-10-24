@@ -35,6 +35,7 @@ import {
   Globe24Regular,
   MoreHorizontal20Regular,
   Search20Regular,
+  Search24Regular,
 } from '@fluentui/react-icons';
 
 import { requestHostSettings, useStoredConfig } from '../../_shared/host.js';
@@ -50,7 +51,7 @@ import {
   useNow,
   useSubpageClose,
 } from '../../_shared/ui.jsx';
-import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from '../../_shared/typography.js';
+import { DISPLAY_WEIGHT, HERO_TEXT, TABULAR_NUMS } from '../../_shared/typography.js';
 import {
   DEFAULT_SETTINGS,
   SETTINGS_KEY,
@@ -109,7 +110,7 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
   },
   headerTime: {
-    ...displayXl(48),
+    ...HERO_TEXT,
     fontWeight: DISPLAY_WEIGHT,
     color: tokens.colorNeutralForeground1,
   },
@@ -132,7 +133,7 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
   worldRow: {
-    minHeight: '48px',
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
   },
   worldTrailing: {
     display: 'flex',
@@ -373,7 +374,7 @@ export default function ClockDetail() {
       <DetailHeader
         trailing={
           <>
-            <ActionButton appearance="primary" icon={<Add20Regular />} onClick={openAdd}>
+            <ActionButton appearance="secondary" icon={<Add20Regular />} onClick={openAdd}>
               添加城市
             </ActionButton>
             <ActionButton onClick={requestHostSettings}>设置…</ActionButton>
@@ -424,10 +425,9 @@ export default function ClockDetail() {
             {rows.length === 0 ? (
               <EmptyState
                 icon={<Globe24Regular />}
-                title="还没有添加城市"
-                description="添加城市后可以同时查看当地时间与时差"
+                title="还没有城市"
                 action={
-                  <ActionButton appearance="primary" icon={<Add20Regular />} onClick={openAdd}>
+                  <ActionButton appearance="secondary" icon={<Add20Regular />} onClick={openAdd}>
                     添加城市
                   </ActionButton>
                 }
@@ -577,9 +577,8 @@ function AddCityContent({ existing, onAdd }) {
       {results.length === 0 ? (
         searching ? null : (
           <EmptyState
-            icon={<Search20Regular />}
+            icon={<Search24Regular />}
             title="没有找到城市"
-            description="试试中文名、英文名或时区，例如“大阪”“Tokyo”“Asia/Tokyo”"
           />
         )
       ) : (

@@ -13,8 +13,8 @@ import {
   dateOnly,
   windDirZh,
   aqiCategoryZh,
-  aqiFallbackColor,
-  rgbaToCss,
+  aqiTone,
+  warningTone,
   SEVERITY_ZH,
   POLLUTANT_LABELS,
 } from './format.js';
@@ -64,31 +64,35 @@ function authHeaders(settings) {
   return { 'X-QW-Api-Key': key };
 }
 
+/**
+ * 错误文案口径（PLUGIN-CONTRACT §4.4.3）：只写「发生了什么」，不写「你应该怎么做」。
+ * 下一步动作由所在空态/详情页的按钮承担，不在句子里教学。
+ */
 const LEGACY_CODE_MESSAGE = {
   204: '该地区没有天气数据',
-  400: '请求有误，请稍后再试',
-  401: '天气服务认证失败，请检查 API Key',
-  402: '今日请求次数已用完，请稍后再试',
-  403: '天气服务暂时不可用，请检查帐号状态',
+  400: '请求有误',
+  401: '天气服务认证失败',
+  402: '今日请求次数已用完',
+  403: '天气服务暂时不可用',
   404: '没有找到天气数据',
-  429: '请求过于频繁，请稍后再试',
-  500: '天气服务暂时不可用，请稍后再试',
+  429: '请求过于频繁',
+  500: '天气服务暂时不可用',
 };
 
 function messageForStatus(status, detail) {
   switch (status) {
     case 400:
-      return detail ? `请求有误：${detail}` : '请求有误，请稍后再试';
+      return detail ? `请求有误：${detail}` : '请求有误';
     case 401:
-      return '天气服务认证失败，请检查 API Key';
+      return '天气服务认证失败';
     case 403:
-      return '天气服务暂时不可用，请检查数据地址与帐号状态';
+      return '天气数据地址或帐号不可用';
     case 404:
-      return '没有找到天气数据，请确认数据地址';
+      return '没有找到天气数据';
     case 429:
       return '请求过于频繁，暂时显示已缓存的数据';
     default:
-      return status >= 500 ? '天气服务暂时不可用，请稍后再试' : `请求失败（${status}），请稍后再试`;
+      return status >= 500 ? '天气服务暂时不可用' : `请求失败（${status}）`;
   }
 }
 
@@ -104,7 +108,7 @@ function buildUrl(base, path, query) {
 async function request(settings, base, path, query) {
   const headers = authHeaders(settings);
   if (!resolveHost(settings).configured) {
-    throw new WeatherApiError('还没有设置天气数据地址：请在天气设置里填写和风天气控制台提供的 API Host', {
+    throw new WeatherApiError('天气数据地址未设置', {
       status: 401,
       code: 'NO_HOST',
     });
@@ -139,11 +143,11 @@ async function request(settings, base, path, query) {
     const detail = body?.error?.detail || body?.error?.title || '';
     let message = messageForStatus(response.status, detail);
     if (type.includes('invalid-host')) {
-      message = '天气数据地址无效：请在天气设置里检查 API Host';
+      message = '天气数据地址无效';
     } else if (type.includes('unauthorized')) {
-      message = '天气服务认证失败，请检查 API Key';
+      message = '天气服务认证失败';
     } else if (type.includes('no-credit') || type.includes('overdue')) {
-      message = '天气帐号额度不足，请在和风天气控制台检查';
+      message = '天气帐号额度不足';
     }
     throw new WeatherApiError(message, { status: response.status, code: type || String(response.status) });
   }
@@ -324,7 +328,8 @@ function normalizeIndexEntry(item) {
     aqiDisplay: item?.aqiDisplay ?? (item?.aqi != null ? String(item.aqi) : '—'),
     level: item?.level || '',
     category: aqiCategoryZh(item?.category, item?.level),
-    color: rgbaToCss(item?.color) || aqiFallbackColor(item?.aqi),
+    // 只给语义档，不给色值：颜色由视图层从 Fluent colorStatus token 取
+    tone: aqiTone(item?.aqi),
     primary: item?.primaryPollutant?.name || '',
   };
 }
@@ -352,7 +357,7 @@ export function normalizeAirV1(raw) {
     aqiDisplay: primary.aqiDisplay,
     level: primary.level,
     category: primary.category,
-    color: primary.color,
+    tone: primary.tone,
     primary: primary.primary,
     pollutants: pollutantMap,
     pm2p5: pollutantMap.pm2p5?.value ?? null,
@@ -381,13 +386,12 @@ function primaryHealth(raw, indexes, primary) {
 export function normalizeAirV7(raw) {
   const now = raw?.now || {};
   const aqi = now.aqi != null ? Number(now.aqi) : null;
-  const color = aqiFallbackColor(aqi);
   return {
     aqi,
     aqiDisplay: aqi == null ? '—' : String(aqi),
     level: now.level || '',
     category: now.category || '',
-    color,
+    tone: aqiTone(aqi),
     primary: now.primary || '',
     pollutants: {
       pm2p5: { value: now.pm2p5 != null ? Number(now.pm2p5) : null, unit: 'μg/m³', name: 'PM2.5' },
@@ -412,19 +416,6 @@ export function normalizeAirV7(raw) {
 
 // ---------- 预警 ----------
 
-const WARNING_COLOR_RGB = {
-  white: 'rgb(240, 240, 240)',
-  gray: 'rgb(120, 120, 120)',
-  green: 'rgb(0, 150, 90)',
-  blue: 'rgb(30, 80, 200)',
-  yellow: 'rgb(230, 180, 0)',
-  amber: 'rgb(230, 150, 0)',
-  orange: 'rgb(230, 100, 20)',
-  red: 'rgb(200, 40, 40)',
-  purple: 'rgb(140, 60, 160)',
-  black: 'rgb(30, 30, 30)',
-};
-
 export function normalizeWarningsV1(raw) {
   return (raw?.alerts || []).map((item) => ({
     id: item.id || `${item.issuedTime}:${item.headline}`,
@@ -433,7 +424,8 @@ export function normalizeWarningsV1(raw) {
     severity: item.severity || 'unknown',
     severityText: SEVERITY_ZH[item.severity] || item.severity || '未知',
     colorCode: item.color?.code || '',
-    color: rgbaToCss(item.color) || WARNING_COLOR_RGB[item.color?.code] || 'rgb(200, 140, 0)',
+    // 只给语义档；色值由视图层从 Fluent colorStatus token 取
+    tone: warningTone(item.color?.code),
     startTime: item.effectiveTime || item.onsetTime || item.issuedTime || null,
     endTime: item.expireTime || null,
     issuedTime: item.issuedTime || null,
@@ -443,15 +435,6 @@ export function normalizeWarningsV1(raw) {
   }));
 }
 
-const LEVEL_COLOR_RGB = {
-  白色: 'rgb(240, 240, 240)',
-  蓝色: 'rgb(30, 80, 200)',
-  黄色: 'rgb(230, 180, 0)',
-  橙色: 'rgb(230, 100, 20)',
-  红色: 'rgb(200, 40, 40)',
-  黑色: 'rgb(30, 30, 30)',
-};
-
 export function normalizeWarningsV7(raw) {
   return (raw?.warning || []).map((item) => ({
     id: item.id || `${item.pubTime}:${item.title}`,
@@ -460,7 +443,7 @@ export function normalizeWarningsV7(raw) {
     severity: String(item.severity || '').toLowerCase(),
     severityText: item.level || SEVERITY_ZH[String(item.severity || '').toLowerCase()] || '未知',
     colorCode: item.severityColor || '',
-    color: LEVEL_COLOR_RGB[item.level] || 'rgb(200, 140, 0)',
+    tone: warningTone(item.level || item.severityColor),
     startTime: item.startTime || null,
     endTime: item.endTime || null,
     issuedTime: item.pubTime || null,

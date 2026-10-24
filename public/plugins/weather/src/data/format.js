@@ -232,24 +232,56 @@ export const WARNING_COLOR_ZH = {
   black: '黑色',
 };
 
-/** rgba 对象转 CSS 颜色 */
-export function rgbaToCss(color) {
-  if (!color) return null;
-  if (typeof color === 'string') return color;
-  const { red = 0, green = 0, blue = 0, alpha = 1 } = color;
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+/**
+ * AQI 数值 → 语义档（Fluent colorStatus 三档），不产出任何 rgb 色值。
+ * 具体颜色由视图层取 `colorStatus{Success,Warning,Danger}Foreground1`，
+ * 所以换了主题/暗色都不用改这里（FLUENT2 §2：颜色只表达状态）。
+ *
+ * @returns {'success' | 'warning' | 'danger' | 'neutral'}
+ */
+export function aqiTone(aqi) {
+  const value = Number(aqi);
+  if (!Number.isFinite(value)) return 'neutral';
+  if (value <= 50) return 'success';
+  if (value <= 100) return 'warning';
+  return 'danger';
 }
 
-/** 根据 AQI 数值给一个 API 没返回颜色时的兜底色 */
-export function aqiFallbackColor(aqi) {
-  const value = Number(aqi);
-  if (!Number.isFinite(value)) return null;
-  if (value <= 50) return 'rgb(0, 228, 0)';
-  if (value <= 100) return 'rgb(255, 255, 0)';
-  if (value <= 150) return 'rgb(255, 126, 0)';
-  if (value <= 200) return 'rgb(255, 0, 0)';
-  if (value <= 300) return 'rgb(143, 63, 151)';
-  return 'rgb(126, 0, 35)';
+/** 预警颜色代码（V1 `color.code`）→ 语义档；不产出色值 */
+const WARNING_TONE_BY_CODE = {
+  white: 'neutral',
+  gray: 'neutral',
+  green: 'success',
+  blue: 'info',
+  yellow: 'warning',
+  amber: 'warning',
+  orange: 'danger',
+  red: 'danger',
+  purple: 'danger',
+  black: 'danger',
+};
+
+/** 预警级别（V7 `level`，中文色名）→ 语义档；不产出色值 */
+const WARNING_TONE_BY_LEVEL = {
+  白色: 'neutral',
+  蓝色: 'info',
+  黄色: 'warning',
+  橙色: 'danger',
+  红色: 'danger',
+  黑色: 'danger',
+};
+
+/**
+ * 预警 → 语义档。视图层再用 `statusToneColor()` 换成 Fluent 状态色，
+ * 数据层不再出现任何 rgb()/hex（B-4：数据色一律走 token + 文字/形状区分）。
+ *
+ * @returns {'success' | 'warning' | 'danger' | 'info' | 'neutral'}
+ */
+export function warningTone(codeOrLevel) {
+  if (!codeOrLevel) return 'warning';
+  return (
+    WARNING_TONE_BY_LEVEL[codeOrLevel] || WARNING_TONE_BY_CODE[String(codeOrLevel).toLowerCase()] || 'warning'
+  );
 }
 
 export const POLLUTANT_LABELS = {

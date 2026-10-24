@@ -236,10 +236,10 @@ export function nextOccurrence(base, recurrence) {
 }
 
 export const PRIORITIES = [
-  { value: 0, label: '无', short: '无', color: 'var(--colorNeutralForeground3)' },
-  { value: 1, label: '低', short: '低', color: 'var(--colorPaletteBlueForeground2)' },
-  { value: 2, label: '中', short: '中', color: 'var(--colorPaletteMarigoldForeground2)' },
-  { value: 3, label: '高', short: '高', color: 'var(--colorPaletteRedForeground2)' },
+  { value: 0, label: '无', short: '无' },
+  { value: 1, label: '低', short: '低' },
+  { value: 2, label: '中', short: '中' },
+  { value: 3, label: '高', short: '高' },
 ];
 
 export function priorityMeta(value) {

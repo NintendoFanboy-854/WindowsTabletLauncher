@@ -238,7 +238,7 @@ function currentResult(place, data) {
 function requireConfigured(settings) {
   if (!hasKeyOrMock(settings)) {
     throw new WeatherApiError(
-      '天气插件还没配置和风天气 API Key：请打开桌面「设置 → 插件 → 天气」填写 API Key 与 API Host。',
+      '天气插件未配置和风天气 API Key',
       { status: 401, code: 'NO_KEY' },
     );
   }
@@ -492,7 +492,7 @@ export function createToolHandlers(context) {
       const state = await loadState(context);
       requireConfigured(state.settings);
       if (!state.settings.autoLocate) {
-        throw new WeatherApiError('自动定位已关闭：请先在设置里打开「自动定位」', { code: 'LOCATE_OFF' });
+        throw new WeatherApiError('自动定位已关闭', { code: 'LOCATE_OFF' });
       }
       const result = await locatePlace(state.settings);
       if (!result?.place) {

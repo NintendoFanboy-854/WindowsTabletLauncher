@@ -7,11 +7,27 @@
  * 常用入口：
  *   <CardRoot onActivate={...} ariaLabel="...">卡片内容</CardRoot>
  *   <CardHeader title="今日 · 3" trailing={<Badge .../>} />
- *   <Metric value="42" unit="分钟" label="连续久坐" size={68} />
- *   <ListRow leading={<Checkbox ... />} title="任务标题" subtitle="今天 18:00" />
- *   <EmptyState title="还没有内容" description="从详情里添加" action={<ActionButton>添加</ActionButton>} />
+ *   <CardIdentity icon={<Clock20Regular />} label="时钟" />
+ *   <CardIdentity placeholder />                       // 本档不放 identity：只保留 24 高行
+ *   <HeroText>14:05</HeroText>
+ *   <Metric value="42" unit="分钟" label="连续久坐" />
+ *   <DataRow label="体感" value="24°" />               // 只读数据行：label 左 / 值右
+ *   <ListStack><ListRow leading={<Checkbox ... />} title="任务标题" subtitle="今天 18:00" /></ListStack>
+ *   <StatusLine tone="warning">距提醒还有 12 分钟</StatusLine>
+ *   <TrailingCount total={12} shown={5} />
+ *   <MiniBars values={[...]} labels={[...]} ariaLabel="最近 7 天久坐" />
+ *   <HeroProgress value={0.42} active={running} label="本轮进度" />
+ *   <EmptyState align="start" icon={<CalendarLtr24Regular />} title="还没有倒数日" action={<ActionButton appearance="secondary" icon={<Add20Regular />}>添加事件</ActionButton>} />
+ *   <EmptyState compact icon={<Key24Regular />} title="未配置 Key" action={<ActionButton icon={<Settings20Regular />}>打开设置</ActionButton>} />
  *   <DetailPage><DetailHeader trailing={...}>...</DetailHeader><DetailScroll>...</DetailScroll></DetailPage>
  *   <Subpage title="编辑任务" onClosed={...}>...</Subpage>
+ *
+ * 图标尺寸只取 `ICON_SIZE`（16/20/24/32/48）；identity 用 `IDENTITY_ICON_SIZE`(20)，
+ * 空态用 `EMPTY_STATE_ICON_SIZE`(24)，不要在调用点写字面量。空态在 3×3 档会自动升到
+ * 40 档位（`EMPTY_STATE_ICON_SIZE_LARGE`，DENSITY §1.2 结构性例外），插件无需传参。
+ *
+ * 空态不接收说明文字（PLUGIN-CONTRACT §4.4.3）：可做的事由图标 + 一个次操作按钮承担，
+ * 卡片的「可展开」由 `CardIdentity disclosure` 的行尾 chevron 承担。
  *
  * 注意：不要用本文件的组件再画设置表单；设置统一走 manifest.settings + 宿主设置页。
  */
@@ -35,20 +51,105 @@ import {
   makeStyles,
   mergeClasses,
   tokens,
+  webLightTheme,
 } from '@fluentui/react-components';
-import { ArrowLeft24Regular } from '@fluentui/react-icons';
-import { useHostCardGesture } from './host.js';
-import { SlidePage } from './motion.js';
-import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from './typography.js';
+import { ArrowLeft24Regular, ChevronRight16Regular } from '@fluentui/react-icons';
+import { useHostCardGesture, useHostSize } from './host.js';
+import { sizeKeyOf } from './sizes.js';
+import { SlidePage, useReducedMotion } from './motion.js';
+import { DISPLAY_WEIGHT, HERO_TEXT, TABULAR_NUMS } from './typography.js';
 
-/** 平板触控目标（DESIGN §1.2 / AUDIT V-06）：所有可点击元素不小于 40×40 */
-const TOUCH_TARGET = 40;
-/** 列表行高（DENSITY §2.1：≥44，同时满足触控 40） */
-const LIST_ROW_HEIGHT = 44;
+/** 尺寸档位字段表（纯数据、无 React 依赖）与 UI 原语同一入口导出，插件只记一个 import。 */
+export { SIZE_KEYS, sizeKeyOf, defineSizeFields } from './sizes.js';
+
+/**
+ * 平板触控目标（Fluent `layout.md:57`：iOS & Web 最小 44×44；同时满足 HIG §6 的 44）。
+ *
+ * Fluent spacing/typography 档位里没有 44 这一档（spacing 最大 32），这是无障碍
+ * 下限而非设计 token，因此只在这里定义一次，插件引用这个常量，不写裸 44。
+ */
+export const TOUCH_TARGET = 44;
+/** 列表行高（DENSITY §2.1：≥44，与触控目标同值） */
+export const LIST_ROW_HEIGHT = 44;
+/** 列表行间距（DENSITY §2.1 第 7 条） */
+export const LIST_ROW_GAP = 4;
+/** 列表 pitch：行高 + 行距（插件反推行数时用这个唯一常量） */
+export const LIST_ROW_PITCH = LIST_ROW_HEIGHT + LIST_ROW_GAP;
+
+/**
+ * 数值镜像：插件在 JS 里按 iframe 高度反推行数时需要数字（CSS 变量读不到）。
+ *
+ * `tokens.*` 在运行时是 `var(--spacingVerticalL)` 这种 CSS 变量引用，parseFloat 会得到 NaN；
+ * Fluent 的 theme 对象里才是 token 的原始值（`'16px'`）。间距/字阶与亮暗主题无关，
+ * 所以固定取 webLightTheme 的原始值，插件里不写死像素。
+ */
+const tokenPx = (value) => Number.parseFloat(value);
+export const CARD_PADDING_PX = tokenPx(webLightTheme.spacingVerticalL);
+export const CARD_GAP_PX = tokenPx(webLightTheme.spacingVerticalS);
+export const HERO_LINE_HEIGHT_PX = tokenPx(webLightTheme.lineHeightHero900);
+/** identity 行高（24 = spacingVerticalXXL），插件跑行预算公式时直接用这个，不再各解析一次 */
+export const CARD_IDENTITY_HEIGHT_PX = tokenPx(webLightTheme.spacingVerticalXXL);
+
+/**
+ * 卡片内容轴（卡片外框 → 内容盒四边）= 22 = 宿主 6 + 共享层 16。
+ *
+ * 两段分别在两个盒模型里真实生效，**不能合并写到一处**：
+ * - 宿主 6：`src/host/desktop/desktop.styles.ts` 的 `gestureArea.padding`
+ *   （`spacingHorizontalSNudge`），给 hover 1.015 缩放留内衬；
+ * - 共享层 16：本文件 `CardRoot` 的四边 padding（`spacingHorizontalL` / `spacingVerticalL`）。
+ *
+ * 因此这里导出的 22 只用于验收、自检标记与宿主侧引用
+ * （`data-card-content-inset-total`）；插件不得把 22 再写进 padding，
+ * 否则会变成 6 + 22 = 28。六张卡片（weather / clock / todo / pomodoro /
+ * countdown / sedentary）全部通过 `CardRoot` 继承同一条轴，插件源码里
+ * 没有任何一处横向 padding（PLUGIN-CONTRACT §4.2）。
+ */
+export const CARD_CONTENT_INSET = `calc(${tokens.spacingHorizontalSNudge} + ${tokens.spacingHorizontalL})`;
+export const CARD_CONTENT_INSET_PX =
+  tokenPx(webLightTheme.spacingHorizontalSNudge) + tokenPx(webLightTheme.spacingHorizontalL);
+
+/**
+ * Fluent System Icon 尺寸阶梯（16 / 20 / 24 / 32 / 48）。
+ *
+ * 图标不缩放：需要多大就取哪一档，插件里不得再出现 `size={28}` 这类中间值，
+ * 也不得把 32 的图标塞进 20 的槽位再由 CSS 缩放。语义档位：
+ * - `S`(20) = identity 行图标；
+ * - `M`(24) = 卡片空态 / 1×1 空态槽位；
+ * - `L`(32) = 详情页空态、内容图形；
+ * - `XL`(48) = 天气等唯一允许的内容图形档（FLUENT2 §9）。
+ */
+export const ICON_SIZE = Object.freeze({
+  XS: 16,
+  S: 20,
+  M: 24,
+  L: 32,
+  XL: 48,
+});
+
+/** identity 图标档位（DENSITY §1-4：20px 单色、唯一允许出现身份色的落点） */
+export const IDENTITY_ICON_SIZE = ICON_SIZE.S;
+/** 空态图标档位（24；详情空态可用 ICON_SIZE.L） */
+export const EMPTY_STATE_ICON_SIZE = ICON_SIZE.M;
+/**
+ * 空态主图标大档 40（voice 空态圆内图标）。
+ *
+ * 它不在 16/20/24/32/48 图标阶梯内，是「空态主图标」单独一档：32 在 96 圆内偏小、
+ * 48 会撑破内环。常量出口只在这里定义一次，调用点不得再写裸 40。
+ */
+export const EMPTY_STATE_ICON_SIZE_LARGE = 40;
+
+/**
+ * HeroProgress 的厚度：4 = `strokeWidthThickest`。
+ *
+ * `strokeWidthThicker` 在 @fluentui/tokens 的 Web 档是 **3px**（Fluent shapes.md：
+ * Thicker 在 Web 为 3、在 Mobile 为 4），用它会把规格要求的 4px 进度带做成 3px；
+ * 这里取同族最大的 `strokeWidthThickest`（4px），仍是 stroke token、不写裸像素。
+ */
+export const HERO_PROGRESS_THICKNESS_PX = tokenPx(webLightTheme.strokeWidthThickest);
 /** L1 固定骨架高度（PLUGIN-CONTRACT §4.1） */
 const DETAIL_HEADER_HEIGHT = 56;
 const DETAIL_TOOLBAR_HEIGHT = 48;
-const DETAIL_TABS_HEIGHT = 40;
+const DETAIL_TABS_HEIGHT = 44;
 /** L2 header 高度（PLUGIN-CONTRACT §4.1：56） */
 const SUBPAGE_HEADER_HEIGHT = 56;
 
@@ -91,6 +192,12 @@ const useCardRootStyles = makeStyles({
     minHeight: 0,
     overflow: 'hidden',
     boxSizing: 'border-box',
+    // 唯一卡片内容栅格：所有尺寸档同 padding / 同 gap，值全部来自 Fluent spacing ramp
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    gap: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground1,
     fontFamily: tokens.fontFamilyBase,
   },
@@ -107,7 +214,8 @@ const useCardRootStyles = makeStyles({
  * - `ref` 由 `useHostCardGesture()` 提供，不要再自己建一个根 ref；
  * - 内部 `button/input/[role=button]` 等控件点击不会触发 `onActivate`，控件自己处理；
  * - 卡片主体点击 / 根节点聚焦后 Enter、Space 触发 `onActivate`；
- * - className/style 用于插件自己的 padding/gap 布局。
+ * - className/style 只用于非系统属性（如对齐、子布局）；padding/gap 由系统强制为
+ *   16 / 8，插件传 style 也会被这里的系统值覆盖。
  *
  * @param {object} props
  * @param {(event: Event) => void} [props.onActivate] 卡片主体主操作
@@ -119,6 +227,21 @@ const useCardRootStyles = makeStyles({
 export function CardRoot({ onActivate, ariaLabel, className, style, children, ...rest }) {
   const styles = useCardRootStyles();
   const gesture = useHostCardGesture();
+
+  /**
+   * 系统内衬是宿主 6 + 本组件 16 = 22（`CARD_CONTENT_INSET`）。这里只声明本组件
+   * 负责的那一段 16；宿主那 6 由 `desktop.styles.ts` 的 `gestureArea` 提供，
+   * 不能把 22 整个写进 padding（会变成 28）。inline style 放在最后，
+   * 任何插件 className/style 里的 padding/gap 都无法改掉内容轴。
+   */
+  const systemInset = {
+    ...style,
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    gap: tokens.spacingVerticalS,
+  };
 
   const handleClick = useCallback(
     (event) => {
@@ -147,8 +270,10 @@ export function CardRoot({ onActivate, ariaLabel, className, style, children, ..
       tabIndex={0}
       aria-label={ariaLabel}
       className={mergeClasses(styles.root, className)}
-      style={style}
+      style={systemInset}
       data-card-root="true"
+      data-card-content-inset={String(CARD_PADDING_PX)}
+      data-card-content-inset-total={String(CARD_CONTENT_INSET_PX)}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
     >
@@ -168,6 +293,7 @@ const useCardHeaderStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalS,
+    // 行高对齐 12px 标签的 Fluent 行高（Base200），不再写死像素
     minHeight: tokens.lineHeightBase200,
     color: tokens.colorNeutralForeground3,
   },
@@ -211,36 +337,33 @@ export function CardHeader({ title, trailing, className, style }) {
 /* CardIdentity                                                        */
 /* ------------------------------------------------------------------ */
 
-/**
- * 组件 identity 色（DECISIONS D-32，2026-10-23 用户拍板）：
- * 只允许用 Fluent shared palette 的 6 个 hue，且只出现在 identity 图标（≤10% 卡片面积），
- * 不承担状态语义、不做数据色、不做装饰背景。
- */
-export const CARD_ACCENTS = {
-  blue: { foreground: 'colorPaletteBlueForeground2', background: 'colorPaletteBlueBackground2' },
-  pink: { foreground: 'colorPalettePinkForeground2', background: 'colorPalettePinkBackground2' },
-  orange: { foreground: 'colorPaletteOrangeForeground2', background: 'colorPaletteOrangeBackground2' },
-  green: { foreground: 'colorPaletteGreenForeground2', background: 'colorPaletteGreenBackground2' },
-  purple: { foreground: 'colorPalettePurpleForeground2', background: 'colorPalettePurpleBackground2' },
-  teal: { foreground: 'colorPaletteTealForeground2', background: 'colorPaletteTealBackground2' },
-};
-
 const useCardIdentityStyles = makeStyles({
   root: {
     display: 'flex',
     flexShrink: 0,
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
+    gap: tokens.spacingHorizontalS,
     minWidth: 0,
+    minHeight: tokens.spacingVerticalXXL,
   },
-  chip: {
+  icon: {
     display: 'inline-flex',
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '24px',
-    height: '24px',
-    borderRadius: tokens.borderRadiusSmall,
+    // 尺寸由传入的 20px Fluent System Icon 决定，这里不再写死像素
+    // 身份色唯一落点：20px 单色图标；没有色块、没有背景 tint
+    color: 'var(--wtsl-identity, currentColor)',
+  },
+  /**
+   * 无图标占位：宽度 = identity 图标档位（20 = spacingHorizontalXL），
+   * 只占位、不渲染图标；缺少图标的卡片标题因此不会左移 28（20 + 8 组距）。
+   */
+  iconPlaceholder: {
+    display: 'inline-block',
+    flexShrink: 0,
+    width: tokens.spacingHorizontalXL,
+    height: tokens.spacingVerticalXL,
   },
   label: {
     minWidth: 0,
@@ -250,55 +373,166 @@ const useCardIdentityStyles = makeStyles({
     display: 'inline-flex',
     flexShrink: 0,
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
+    gap: tokens.spacingHorizontalS,
     marginInlineStart: 'auto',
+    maxHeight: tokens.spacingVerticalXXL,
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground3,
+  },
+  /**
+   * 无 trailing 时 chevron 自己吃掉剩余空间（`marginInlineStart: auto`）；
+   * 有 trailing 时不能再给 auto，否则两颗 auto 会平分空档、把 trailing 顶到行中。
+   */
+  disclosure: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
     color: tokens.colorNeutralForeground3,
   },
 });
 
 /**
- * 卡片静态 identity 行（DENSITY §2 例外 D-34）：24px 高，24×24 accent chip + 12px 半粗标签。
+ * 行尾 chevron：卡片「点开有更多内容」的唯一视觉信号（不写「详情」二字）。
  *
- * 它**不是** chrome：没有可交互控件、不常驻操作、不占点击热区，只是卡片身份的锚点。
- * 1×1 卡用 `compact`（只留 chip）；2×1 起用 chip + 标签 + 可选 trailing。
+ * 它是纯装饰：语义由 `CardRoot` 的 `aria-label`（「…，点击打开详情」）承担，
+ * 因此 `aria-hidden="true"`，不进 Tab 序列、不抢命中区（点它等于点卡片）。
+ * 16（`ICON_SIZE.XS`）比 identity 图标小一档：它是方向提示，不是身份。
  *
- * 用法：
- *   <CardIdentity icon={<Clock16Regular />} label="时钟" accent="blue" />
- *   <CardIdentity icon={<WeatherSunny16Regular />} label="天气" accent="teal" trailing={<Text size={200}>澳门</Text>} />
+ * 用法（直接放进自定义行，或交给 `CardIdentity disclosure`）：
+ *   <CardDisclosure />
  *
  * @param {object} props
- * @param {React.ReactNode} props.icon 16px Fluent System Icon
- * @param {string} [props.label] 组件名（≤4 字）
- * @param {'blue'|'pink'|'orange'|'green'|'purple'|'teal'} [props.accent='blue']
- * @param {React.ReactNode} [props.trailing] 行尾辅助（城市、计数……）
- * @param {boolean} [props.compact] 只显示 chip（1×1 卡）
+ * @param {string} [props.className]
+ * @param {object} [props.style] 只用于定位（例如无 trailing 时的 `marginInlineStart: 'auto'`）
  */
-export function CardIdentity({ icon, label, accent = 'blue', trailing, compact = false, className, style }) {
+export function CardDisclosure({ className, style }) {
   const styles = useCardIdentityStyles();
-  const palette = CARD_ACCENTS[accent] ?? CARD_ACCENTS.blue;
+  return (
+    <span
+      className={mergeClasses(styles.disclosure, className)}
+      style={style}
+      aria-hidden="true"
+      data-card-disclosure="true"
+    >
+      <ChevronRight16Regular />
+    </span>
+  );
+}
+
+/**
+ * 卡片静态 identity 行：24px 高，20px 身份色图标 + 12px 半粗标签 + 可选 trailing。
+ *
+ * 它**不是** chrome：没有可交互控件、不常驻操作、不占点击热区。
+ * 色相只出现在 20px 图标上；hue 由 manifest.identityHue 决定，插件不再传 accent。
+ * 1×1 卡用 `compact`（只留图标）；2×1 起用图标 + 标签 + 可选 trailing。
+ *
+ * 三种图标状态：
+ * - `icon` 给了 → 正常渲染；
+ * - `icon` 缺省但仍有 label → 渲染 20px **空占位**，标题不会因为缺图标而左移；
+ * - `placeholder` → 整行只保留 24 高与 20px 空图标位，不渲染图标/标签
+ *   （天气 1×1 这类「本档不放 identity」的卡用它，避免插件自建空行）。
+ *
+ * 用法：
+ *   <CardIdentity icon={<Clock20Regular />} label="时钟" disclosure />
+ *   <CardIdentity icon={<WeatherSunny20Regular />} label="天气" trailing={<Text size={200}>澳门</Text>} disclosure />
+ *   <CardIdentity placeholder />
+ *
+ * @param {object} props
+ * @param {React.ReactNode} [props.icon] 20px Fluent System Icon
+ * @param {string} [props.label] 组件名（≤4 字）
+ * @param {React.ReactNode} [props.trailing] 行尾辅助（城市、计数……）
+ * @param {boolean} [props.compact] 只显示图标（1×1 卡）
+ * @param {boolean} [props.placeholder] 只占 24 高行 + 20px 图标位，不渲染图标与标签
+ * @param {boolean} [props.disclosure=false] 行尾加 `CardDisclosure`（整卡可点开详情）
+ */
+export function CardIdentity({
+  icon,
+  label,
+  trailing,
+  compact = false,
+  placeholder = false,
+  disclosure = false,
+  className,
+  style,
+  ...rest
+}) {
+  const styles = useCardIdentityStyles();
+  const showIcon = !placeholder && Boolean(icon);
   return (
     <div
+      {...rest}
       className={mergeClasses(styles.root, className)}
       style={style}
-      data-card-identity={accent}
+      data-card-identity="true"
+      data-card-identity-empty={showIcon ? undefined : 'true'}
     >
-      <span
-        className={styles.chip}
-        style={{
-          color: `var(--${palette.foreground})`,
-          backgroundColor: `var(--${palette.background})`,
-        }}
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
-      {!compact && label ? (
+      {showIcon ? (
+        <span className={styles.icon} aria-hidden="true">
+          {icon}
+        </span>
+      ) : (
+        <span className={styles.iconPlaceholder} aria-hidden="true" />
+      )}
+      {!placeholder && !compact && label ? (
         <Text size={200} weight="semibold" truncate wrap={false} className={styles.label}>
           {label}
         </Text>
       ) : null}
       {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
+      {disclosure ? (
+        <CardDisclosure style={trailing ? undefined : { marginInlineStart: 'auto' }} />
+      ) : null}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* HeroText                                                            */
+/* ------------------------------------------------------------------ */
+
+const useHeroTextStyles = makeStyles({
+  /**
+   * 全站唯一主数字样式。插件不得再自己写 fontSize/lineHeight；
+   * 需要主数字时只渲染这个组件，尺寸/行高/字重/等宽全部来自 Fluent token。
+   *
+   * 例外 E4（保留）：数字 ink 比盒左缘再内缩 1.5–4 px（"1"/"7" 左侧留白 + tabular 等宽），
+   * 这是字形 bearing，不是容器错位；禁止用负 margin 抵消。
+   */
+  hero: {
+    ...TABULAR_NUMS,
+    ...HERO_TEXT,
+    fontWeight: DISPLAY_WEIGHT,
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+});
+
+/**
+ * 主数字（hero）文本：唯一入口。
+ *
+ * 它固定使用 Fluent v9 的 `fontSizeHero900` / `lineHeightHero900`（40/52），
+ * 不接收 size 参数，也不按卡片尺寸放大。时钟、番茄钟、久坐、天气、倒数日
+ * 的主数值都必须经过这里（或经过同样使用它的 `Metric`）。
+ *
+ * 用法：
+ *   <HeroText data-clock-time>{time.main}</HeroText>
+ *   <Metric value="25:00" unit="分钟" />
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.children 主数值文本
+ * @param {string} [props.className]
+ */
+export function HeroText({ children, className, ...rest }) {
+  const styles = useHeroTextStyles();
+  return (
+    <span
+      {...rest}
+      className={mergeClasses(styles.hero, className)}
+      data-wtsl-hero="true"
+    >
+      {children}
+    </span>
   );
 }
 
@@ -320,21 +554,6 @@ const useMetricStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
     minWidth: 0,
   },
-  value: {
-    ...TABULAR_NUMS,
-    fontWeight: DISPLAY_WEIGHT,
-    color: tokens.colorNeutralForeground1,
-    whiteSpace: 'nowrap',
-  },
-  size48: displayXl(48),
-  // 68px 是 Fluent 官方 Display（Hero1000）；项目 Display XL 只有 48/80/96/112（D-07）
-  size68: {
-    fontSize: tokens.fontSizeHero1000,
-    lineHeight: tokens.lineHeightHero1000,
-  },
-  size80: displayXl(80),
-  size96: displayXl(96),
-  size112: displayXl(112),
   unit: {
     color: tokens.colorNeutralForeground2,
   },
@@ -344,6 +563,15 @@ const useMetricStyles = makeStyles({
     gap: tokens.spacingVerticalXXS,
     minWidth: 0,
   },
+  /**
+   * label 行 + caption 行的固定两行高度（20 + 2 + 16 = 38）。
+   * 不给 minHeight 时，caption 从有到无会抽掉 18（2 + 16），下方按钮整体上移；
+   * 姿态/状态切换的卡（久坐的「休息中」）会看到 18px 跳动。系统在这里兜住，
+   * 插件不再各写一份 calc。
+   */
+  metaReserved: {
+    minHeight: `calc(${tokens.lineHeightBase300} + ${tokens.spacingVerticalXXS} + ${tokens.lineHeightBase200})`,
+  },
   label: {
     color: tokens.colorNeutralForeground2,
   },
@@ -352,47 +580,59 @@ const useMetricStyles = makeStyles({
   },
 });
 
-const METRIC_SIZE_CLASS = {
-  48: 'size48',
-  68: 'size68',
-  80: 'size80',
-  96: 'size96',
-  112: 'size112',
-};
-
 /**
  * 数字主信息：值 + 可选单位/标签/说明。
  *
- * 字号只允许 48 / 68 / 80 / 96 / 112：
- * - 48/80/96/112 来自项目 Display XL（`_shared/typography.js`，D-07，只给数字主信息）；
- * - 68 来自 Fluent 官方 Display（fontSizeHero1000 = 68/92）。
- * 文本/标签不得用这些字号，标签用 Fluent Text Base200/300。
+ * 字号不再由调用方选择：统一取 `HERO_TEXT`（`tokens.fontSizeHero900` / `lineHeightHero900`）。
+ * 次级标签走 Text 200/300（caption 1 / body 1），单位走 body 1。
+ * `size` 参数保留只为兼容旧插件调用，已不参与渲染。
+ *
+ * caption 为空时的高度：只要给了 label，meta 固定占 label + caption 两行（38），
+ * 因此「有 caption / 无 caption」两态总高都是 92（52 + 2 + 38），不再塌陷 18px。
+ * 确实需要紧凑的调用方传 `reserveCaption={false}`（恢复旧行为：74）。
  *
  * 用法：
- *   <Metric value="25:00" unit="分钟" label="专注剩余" caption="第 2 轮" size={68} />
+ *   <Metric value="25:00" unit="分钟" label="专注剩余" caption="第 2 轮" />
  *
  * @param {object} props
  * @param {string|number} props.value
  * @param {string} [props.unit]
  * @param {string} [props.label]
  * @param {string} [props.caption]
- * @param {48|68|80|96|112} [props.size=48]
+ * @param {boolean} [props.reserveCaption=true] label 存在时是否保留 caption 行高
+ * @param {number} [props.size] 已废弃：hero 字号由 HERO_TEXT（fontSizeHero900）唯一决定
  */
-export function Metric({ value, unit, label, caption, size = 48, className, style }) {
+export function Metric({
+  value,
+  unit,
+  label,
+  caption,
+  reserveCaption = true,
+  className,
+  style,
+  ...rest
+}) {
   const styles = useMetricStyles();
-  const sizeClass = styles[METRIC_SIZE_CLASS[size] ?? 'size48'];
+  const hasMeta = Boolean(label || caption);
+  const reserveMetaLine = reserveCaption && Boolean(label);
   return (
-    <div className={mergeClasses(styles.root, className)} style={style}>
+    <div
+      {...rest}
+      className={mergeClasses(styles.root, className)}
+      style={style}
+      data-metric="true"
+      data-metric-reserve-caption={reserveMetaLine ? 'true' : undefined}
+    >
       <div className={styles.valueRow}>
-        <span className={mergeClasses(styles.value, sizeClass)}>{value}</span>
+        <HeroText>{value}</HeroText>
         {unit ? (
           <Text size={300} className={styles.unit}>
             {unit}
           </Text>
         ) : null}
       </div>
-      {label || caption ? (
-        <div className={styles.meta}>
+      {hasMeta ? (
+        <div className={mergeClasses(styles.meta, reserveMetaLine && styles.metaReserved)}>
           {label ? (
             <Text size={300} className={styles.label}>
               {label}
@@ -410,6 +650,142 @@ export function Metric({ value, unit, label, caption, size = 48, className, styl
 }
 
 /* ------------------------------------------------------------------ */
+/* DataRow（只读数据行）                                                */
+/* ------------------------------------------------------------------ */
+
+const useDataRowStyles = makeStyles({
+  row: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+    width: '100%',
+    minWidth: 0,
+  },
+  label: {
+    minWidth: 0,
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  /** 值组贴行尾：同一容器里的每一行右缘对齐，形成唯一的值轴 */
+  valueGroup: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalXXS,
+    flexShrink: 0,
+    marginInlineStart: 'auto',
+    textAlign: 'end',
+  },
+  value: {
+    ...TABULAR_NUMS,
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+  },
+  unit: {
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+  },
+});
+
+/**
+ * 只读数据行：label（12/16 fg3，左）+ 值（20/28 fg1，右）+ 可选单位（12/16 fg3）。
+ *
+ * 它是「定义列表」的系统实现：值列靠 `margin-inline-start:auto` 贴到容器右缘，
+ * 同一个容器里多行天然共用一条值轴，不需要每个插件自己写 space-between。
+ * DENSITY §2.1-9 的「定义列表例外」就指这个结构：行内留白不算横向空洞，
+ * 但整块必须占满可用宽度（本组件 `width:100%`）。
+ *
+ * 行高不写死：由 `lineHeightBase500`（28）决定；需要 36 行节奏的块
+ * （weather 今日指标）由外层容器给 `rowGap` + `minHeight`，不在这里改行高。
+ *
+ * 用法：
+ *   <DataRow label="体感" value="24°" />
+ *   <DataRow label="专注" value="25" unit="分钟" />
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.label
+ * @param {React.ReactNode} props.value
+ * @param {React.ReactNode} [props.unit]
+ */
+export function DataRow({ label, value, unit, className, style, ...rest }) {
+  const styles = useDataRowStyles();
+  return (
+    <div
+      {...rest}
+      className={mergeClasses(styles.row, className)}
+      style={style}
+      data-data-row="true"
+      data-data-row-label={typeof label === 'string' ? label : undefined}
+    >
+      <Text size={200} className={styles.label} title={typeof label === 'string' ? label : undefined}>
+        {label}
+      </Text>
+      <span className={styles.valueGroup}>
+        <Text size={500} className={styles.value}>
+          {value}
+        </Text>
+        {unit ? (
+          <Text size={200} className={styles.unit}>
+            {unit}
+          </Text>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* ListStack                                                           */
+/* ------------------------------------------------------------------ */
+
+const useListStackStyles = makeStyles({
+  root: {
+    display: 'grid',
+    gap: tokens.spacingVerticalXS,
+    minHeight: 0,
+    alignContent: 'start',
+  },
+  /**
+   * 无 CardRoot 的 L1/L2 页面用 inset 补首末行留白（16）；
+   * 卡片内默认 false —— 首末行留白已由 CardRoot 的 16 提供，不重复叠加。
+   */
+  inset: {
+    paddingBlock: tokens.spacingVerticalL,
+  },
+});
+
+/**
+ * 列表容器：固定行距 4、零行内 padding，首末行留白由调用方决定。
+ *
+ * 用法（卡片内）：
+ *   <ListStack>{items.map(...<ListRow/>)}</ListStack>
+ * 用法（详情页）：
+ *   <ListStack inset>{...}</ListStack>
+ *
+ * 行高由 ListRow 固定为 LIST_ROW_HEIGHT(44)；两者共同构成 48 pitch，
+ * 插件不要再用 space-between / 自定义行距拉伸出第二套节奏。
+ *
+ * @param {object} props
+ * @param {boolean} [props.inset=false] 是否加首末行 16 留白（卡片内保持 false）
+ */
+export function ListStack({ inset = false, className, style, children, ...rest }) {
+  const styles = useListStackStyles();
+  return (
+    <div
+      {...rest}
+      className={mergeClasses(styles.root, inset && styles.inset, className)}
+      style={style}
+      data-list-stack="true"
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* ListRow                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -419,7 +795,8 @@ const useListRowStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     width: '100%',
-    minHeight: `${LIST_ROW_HEIGHT}px`,
+    /** 44 = 触控 40 + 上下各 2 的按压余量；用 token 表达，避免裸像素 */
+    minHeight: `calc(${tokens.spacingVerticalXL} * 2 + ${tokens.spacingVerticalXS})`,
     boxSizing: 'border-box',
     paddingInline: 0,
     border: 'none',
@@ -553,75 +930,180 @@ export function ListRow({
 /* EmptyState                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 空态图标盒尺寸表：**盒宽 = 图标档位**（16 / 20 / 24 / 32 / 40 / 48）。
+ *
+ * 审计 M1/M3 的根因就在槽宽与图标宽不匹配：32 槽放 24 图标，盒被
+ * `justify-content:center` 推到内容轴 +4；32 槽放 20 图标推到 +6。
+ * 盒与图标同宽后，盒左边缘天然落在内容轴上，字形 ink 再内缩 2–5 是
+ * Fluent 图标自带安全边（R4：不修、不用负 margin 抵消）。
+ *
+ * 值全部来自 spacing ramp：16=L / 20=XL / 24=XXL / 32=XXXL；
+ * 40 不在 ramp 内，用 `XXXL + S` 表达（与 `EMPTY_STATE_ICON_SIZE_LARGE` 同源），
+ * 48 用 `XXXL + L`（= XL 图标档）。
+ */
+const EMPTY_STATE_ICON_BOX = Object.freeze({
+  [ICON_SIZE.XS]: { width: tokens.spacingHorizontalL, height: tokens.spacingVerticalL },
+  [ICON_SIZE.S]: { width: tokens.spacingHorizontalXL, height: tokens.spacingVerticalXL },
+  [EMPTY_STATE_ICON_SIZE]: {
+    width: tokens.spacingHorizontalXXL,
+    height: tokens.spacingVerticalXXL,
+  },
+  [ICON_SIZE.L]: { width: tokens.spacingHorizontalXXXL, height: tokens.spacingVerticalXXXL },
+  [EMPTY_STATE_ICON_SIZE_LARGE]: {
+    width: `calc(${tokens.spacingHorizontalXXXL} + ${tokens.spacingHorizontalS})`,
+    height: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalS})`,
+  },
+  [ICON_SIZE.XL]: {
+    width: `calc(${tokens.spacingHorizontalXXXL} + ${tokens.spacingHorizontalL})`,
+    height: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
+  },
+});
+
 const useEmptyStateStyles = makeStyles({
+  /**
+   * 空态唯一结构：图标盒 24 + 标题 + 一个次操作，组距 24（`spacingVerticalXXL`）。
+   *
+   * 组距从 8 抬到 24 不是审美，是几何：三件套 24 + 22 + 44 = 90 高，
+   * 加两段 24 组距后块高 138；3×2 卡（iframe 328，identity 行外剩余 264）居中后
+   * 单块空带 = (264 − 138)/2 + 8 = 71 → 21.6%，仍在 DENSITY §1.1-2 的 22% 门禁内
+   * （+8 是 identity 行与空态块之间的系统组距）。六张卡共用这一个值，插件不得覆盖 gap。
+   */
   root: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalXXL,
+    gap: tokens.spacingVerticalXXL,
+    padding: 0,
     textAlign: 'center',
   },
+  /** 卡片空态：水平左对齐到内容轴，垂直仍居中；详情页可再配合顶部对齐容器 */
+  start: {
+    alignItems: 'flex-start',
+    textAlign: 'left',
+  },
+  /**
+   * 1×1 / 2×1 短卡档：只收紧组距到 4。
+   * 图标盒不再单独缩档——盒宽恒等于图标档位（见 `EMPTY_STATE_ICON_BOX`），
+   * 120 高内容框里 24 盒 + 4 组距 + 44 按钮放得下。
+   */
+  compact: {
+    gap: tokens.spacingVerticalXS,
+  },
+  /**
+   * 图标盒：宽高由 `EMPTY_STATE_ICON_BOX` 按档位注入（盒 = 图标档位，R4）。
+   * 盒内居中；`align="start"` 时盒左边缘 = 内容盒左边缘，不再有 32 槽的 +4/+6 缩进。
+   */
   icon: {
     display: 'inline-flex',
-    color: tokens.colorNeutralForeground3,
-  },
-  iconChip: {
-    display: 'inline-flex',
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '48px',
-    height: '48px',
-    borderRadius: tokens.borderRadiusLarge,
+    color: tokens.colorNeutralForeground3,
+  },
+  /**
+   * 3×3 空态：盒与字形都抬到 40 档位（`EMPTY_STATE_ICON_SIZE_LARGE`）。
+   * 这是「空带超标但不加文字」的结构性例外里唯一的视觉杠杆（DENSITY §1.2）：
+   * 3×3 档靠**更大的中性图标 + 垂直居中**撑住观感，而不是补一行说明文字，
+   * 也不把身份色扩散到图标上。
+   *
+   * 插件传进来的是 24 变体的 Fluent 图标（显式 width/height=24，不吃 font-size），
+   * 所以这里用后代选择器把它撑到 40 档位。盒宽由尺寸表注入为 40，盒左边缘仍在内容轴；
+   * 40 档图标内建边 5 px 是字形 bearing（E3），**不加负 margin 做光学补偿**：
+   * 那会让盒越出内容轴，几何对齐优先（R4 的可选项，本项目不采用）。
+   */
+  iconLarge: {
+    '& svg': {
+      width: `${EMPTY_STATE_ICON_SIZE_LARGE}px`,
+      height: `${EMPTY_STATE_ICON_SIZE_LARGE}px`,
+    },
   },
   title: {
     color: tokens.colorNeutralForeground1,
   },
-  description: {
-    maxWidth: '42ch',
-    color: tokens.colorNeutralForeground3,
-  },
   action: {
-    marginTop: tokens.spacingVerticalS,
+    marginTop: 0,
   },
 });
 
 /**
- * 空态：图标 + 标题 + 说明 + 一个主操作（DENSITY / FLUENT2 §13）。
- * 说明控制在两行内，主操作只给一个。
+ * 空态：中性单色图标 + 一句标题（≤6 汉字）+ 一个次操作按钮。**不接收说明文字。**
+ *
+ * 文案规则见 PLUGIN-CONTRACT §4.4.3：空态不写「在……里」「卡片会……」「你可以……」这类
+ * 说明书句式——可做的事由 affordance 表达：动作按钮带 `AddRegular` 图标、
+ * 整卡可展开由 `CardIdentity disclosure` 的行尾 chevron 表达。
+ *
+ * Equal Except Hue：空态不占身份色，不做彩色色块，不让“空的东西最亮”。
+ * 图标固定 24（`EMPTY_STATE_ICON_SIZE`），且图标盒**同宽 24**（`EMPTY_STATE_ICON_BOX`）；
+ * 动作按钮由调用方给 `secondary`（空态不得用实心 accent）。
+ *
+ * 1×1 用 `compact`：图标盒 24、组距 4。120 宽的卡里大图标 + 两行文字 + 44 按钮必然溢出，
+ * 所以紧凑档只收紧垂直节奏，不缩小图标盒（盒一变小，图标盒就不在内容轴上了）。
+ *
+ * `...rest` 透传给根节点（`data-*` / `aria-*`），验收脚本与插件都靠它定位空态；
+ * 注意 `data-empty-state` / `data-align` / `data-compact` 由组件自身写入。
  *
  * 用法：
  *   <EmptyState
+ *     align="start"
  *     icon={<CalendarLtr24Regular />}
  *     title="还没有倒数日"
- *     description="添加一个重要的日子，卡片会显示剩余天数"
- *     action={<ActionButton appearance="primary">添加倒数日</ActionButton>}
+ *     action={<ActionButton appearance="secondary" icon={<Add20Regular />}>添加事件</ActionButton>}
  *   />
+ *   <EmptyState compact icon={<Key24Regular />} title="未配置 Key" action={<ActionButton icon={<Settings20Regular />}>打开设置</ActionButton>} />
  *
  * @param {object} props
- * @param {React.ReactNode} [props.icon] 32–48px Fluent 图标（空态要成为视觉锚点）
- * @param {'blue'|'pink'|'orange'|'green'|'purple'|'teal'} [props.iconAccent] 给图标加 identity 色底（D-32）
- * @param {React.ReactNode} [props.title]
- * @param {React.ReactNode} [props.description]
- * @param {React.ReactNode} [props.action]
+ * @param {React.ReactNode} [props.icon] 空态图标（默认 24，即 `EMPTY_STATE_ICON_SIZE`；3×3 档自动用 40 档位）
+ * @param {React.ReactNode} [props.title] 标题（≤6 汉字）
+ * @param {React.ReactNode} [props.action] 唯一的次操作
+ * @param {'center'|'start'} [props.align='center'] 卡片空态用 start，1×1 方块可用 center
+ * @param {boolean} [props.compact=false] 1×1 紧凑档：组距 4（图标盒仍 = 图标档位）
+ * @param {number} [props.iconSize=EMPTY_STATE_ICON_SIZE] 传入图标的档位（16/20/24/32/48）；
+ *   图标盒宽高恒等于它，**不要**让槽比图标大（那会把盒推离内容轴）。3×3 档忽略此值、固定 40
  */
-export function EmptyState({ icon, iconAccent, title, description, action, className, style }) {
+export function EmptyState({
+  icon,
+  title,
+  action,
+  align = 'center',
+  compact = false,
+  iconSize = EMPTY_STATE_ICON_SIZE,
+  className,
+  style,
+  ...rest
+}) {
   const styles = useEmptyStateStyles();
-  const palette = iconAccent ? CARD_ACCENTS[iconAccent] ?? CARD_ACCENTS.blue : null;
+  /**
+   * 3×3 档的图标档位由共享层自己判断，插件调用点不再多传参数：
+   * `useHostSize` 读宿主下发的 `[列, 行]`，非卡片场景（详情/浮层）拿不到合法档位，
+   * `sizeKeyOf` 会回落到默认档，因此不会误放大。
+   */
+  const sizeKey = useHostSize(sizeKeyOf, '2x1');
+  const emphasized = !compact && sizeKey === '3x3';
+  const slotSize = emphasized ? EMPTY_STATE_ICON_SIZE_LARGE : iconSize;
+  const iconBox = EMPTY_STATE_ICON_BOX[slotSize] || EMPTY_STATE_ICON_BOX[EMPTY_STATE_ICON_SIZE];
   return (
-    <div className={mergeClasses(styles.root, className)} style={style} data-empty-state="true">
+    <div
+      {...rest}
+      className={mergeClasses(
+        styles.root,
+        align === 'start' && styles.start,
+        compact && styles.compact,
+        className,
+      )}
+      style={style}
+      data-empty-state="true"
+      data-align={align}
+      data-compact={compact ? 'true' : undefined}
+      data-emphasized={emphasized ? 'true' : undefined}
+    >
       {icon ? (
         <div
-          className={palette ? styles.iconChip : styles.icon}
-          style={
-            palette
-              ? {
-                  color: `var(--${palette.foreground})`,
-                  backgroundColor: `var(--${palette.background})`,
-                }
-              : undefined
-          }
+          className={mergeClasses(styles.icon, emphasized && styles.iconLarge)}
+          style={iconBox}
+          data-empty-state-icon-slot={slotSize}
+          aria-hidden="true"
         >
           {icon}
         </div>
@@ -631,12 +1113,345 @@ export function EmptyState({ icon, iconAccent, title, description, action, class
           {title}
         </Text>
       ) : null}
-      {description ? (
-        <Text size={300} className={styles.description}>
-          {description}
-        </Text>
-      ) : null}
       {action ? <div className={styles.action}>{action}</div> : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 状态点 / 状态线 / trailing 计数                                      */
+/* ------------------------------------------------------------------ */
+
+const useStatusStyles = makeStyles({
+  dot: {
+    display: 'inline-block',
+    flexShrink: 0,
+    width: tokens.spacingHorizontalS,
+    height: tokens.spacingHorizontalS,
+    borderRadius: tokens.borderRadiusCircular,
+  },
+  success: { backgroundColor: tokens.colorStatusSuccessForeground1 },
+  warning: { backgroundColor: tokens.colorStatusWarningForeground1 },
+  danger: { backgroundColor: tokens.colorStatusDangerForeground1 },
+  info: { backgroundColor: tokens.colorStatusInfoForeground1 },
+  neutral: { backgroundColor: tokens.colorNeutralForeground3 },
+  line: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: 0,
+    color: tokens.colorNeutralForeground3,
+  },
+});
+
+/**
+ * 状态点：8×8 圆形，只有 semantic 三态 + info / neutral。
+ * 取代旧实现里的 2×16 竖条；success 不常亮、只在有状态时由插件决定是否渲染。
+ *
+ * 用法：
+ *   <StatusDot tone="warning" />
+ *   <StatusLine tone="danger">该起身了</StatusLine>
+ *
+ * @param {object} props
+ * @param {'success'|'warning'|'danger'|'info'|'neutral'} [props.tone='neutral']
+ * @param {string} [props.label] 需要读屏时给；纯装饰可省略
+ */
+export function StatusDot({ tone = 'neutral', label, className, style, ...rest }) {
+  const styles = useStatusStyles();
+  const toneStyle =
+    tone === 'success'
+      ? styles.success
+      : tone === 'warning'
+        ? styles.warning
+        : tone === 'danger'
+          ? styles.danger
+          : tone === 'info'
+            ? styles.info
+            : styles.neutral;
+  return (
+    <span
+      {...rest}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : 'true'}
+      className={mergeClasses(styles.dot, toneStyle, className)}
+      style={style}
+      data-status-dot={tone}
+    />
+  );
+}
+
+/**
+ * 状态行：8×8 点 + 12px caption 文案，点与文字 cap 中轴对齐。
+ * 只用于就地状态（warning / danger / info），不用于装饰性分类。
+ *
+ * @param {object} props
+ * @param {'success'|'warning'|'danger'|'info'|'neutral'} [props.tone='neutral']
+ * @param {React.ReactNode} props.children 状态文案（一句，≤2 行）
+ */
+export function StatusLine({ tone = 'neutral', children, className, style, ...rest }) {
+  const styles = useStatusStyles();
+  return (
+    <span {...rest} className={mergeClasses(styles.line, className)} style={style} data-status-line={tone}>
+      <StatusDot tone={tone} />
+      <Text size={200} truncate wrap={false}>
+        {children}
+      </Text>
+    </span>
+  );
+}
+
+const useTrailingCountStyles = makeStyles({
+  count: {
+    ...TABULAR_NUMS,
+    color: tokens.colorNeutralForeground3,
+    whiteSpace: 'nowrap',
+  },
+});
+
+/**
+ * trailing 计数：固定「共 X · 显示 Y」口径，12px fg3、tabular-nums。
+ * 总数不超过首屏时只写「共 X」；用于 identity 行尾或空态说明，不占独立行。
+ *
+ * 用法：
+ *   <CardIdentity ... trailing={<TrailingCount total={all.length} shown={visible.length} />} />
+ *
+ * @param {object} props
+ * @param {number} props.total 全部条目数
+ * @param {number} [props.shown] 当前可见条目数；小于 total 时显示「显示 Y」
+ */
+export function TrailingCount({ total, shown, className, style, ...rest }) {
+  const styles = useTrailingCountStyles();
+  const hasHidden = typeof shown === 'number' && shown < total;
+  const text = hasHidden ? `共 ${total} · 显示 ${shown}` : `共 ${total}`;
+  return (
+    <Text
+      {...rest}
+      size={200}
+      className={mergeClasses(styles.count, className)}
+      style={style}
+      aria-label={hasHidden ? `共 ${total} 项，显示 ${shown} 项` : `共 ${total} 项`}
+      data-trailing-count="true"
+    >
+      {text}
+    </Text>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* MiniBars（迷你条带）                                                 */
+/* ------------------------------------------------------------------ */
+
+/** 数据可视化的最小可见百分比：0 值不画，非 0 至少露出 10%（不是设计尺寸） */
+const MINI_BAR_VISIBLE_PERCENT = 10;
+
+const useMiniBarsStyles = makeStyles({
+  root: {
+    display: 'grid',
+    columnGap: tokens.spacingHorizontalXS,
+    alignItems: 'end',
+    width: '100%',
+    minWidth: 0,
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalXXS,
+    minWidth: 0,
+  },
+  /** 轨道：默认 24 高（spacingVerticalXXL），tall 为 32 高（XXXL）；条宽上限 32 */
+  track: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    width: '100%',
+    maxWidth: tokens.spacingHorizontalXXXL,
+    height: tokens.spacingVerticalXXL,
+    marginInline: 'auto',
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderRadius: tokens.borderRadiusSmall,
+    overflow: 'hidden',
+  },
+  trackTall: {
+    height: tokens.spacingVerticalXXXL,
+  },
+  /** 条色只有中性两档：今天 fg1，其余 fg3；高度按数据百分比（数据驱动，不是设计值） */
+  fill: {
+    display: 'block',
+    width: '100%',
+    backgroundColor: tokens.colorNeutralForeground3,
+    borderRadius: tokens.borderRadiusSmall,
+  },
+  fillToday: {
+    backgroundColor: tokens.colorNeutralForeground1,
+  },
+  label: {
+    ...TABULAR_NUMS,
+    color: tokens.colorNeutralForeground3,
+  },
+});
+
+/**
+ * 迷你条带：N 列（默认数据长度，久坐 7 天 / 天气 7 天都用 7），每列一根竖条。
+ *
+ * 条宽由列宽与上限（32）决定，列间距 4，轨道 24 或 32 高；颜色只有中性两档，
+ * 今天（`todayIndex`，默认最后一列）用 fg1，其余 fg3。组件自带 `role="img"` 与
+ * `aria-label`，不给 ariaLabel 时用「最近 N 项数据，最高 X」兜底。
+ *
+ * 高度百分比是**数据**归一化结果（value / max），不是设计值；0 值不画条。
+ *
+ * 用法：
+ *   <MiniBars values={[12, 40, 30, 0, 55, 48, 61]} labels={['18','19','20','21','22','23','今天']} ariaLabel="最近 7 天久坐" />
+ *
+ * @param {object} props
+ * @param {number[]} props.values 每列数值（长度 = 列数）
+ * @param {React.ReactNode[]} [props.labels] 每列底部标签（给就渲染，Base200 fg3）
+ * @param {number} [props.max] 归一化上限；缺省取 values 最大值（至少 1）
+ * @param {number|null} [props.todayIndex] 高亮列（默认最后一列；传 null 不高亮）
+ * @param {'default'|'tall'} [props.size='default'] 轨道 24 / 32
+ * @param {string} [props.ariaLabel]
+ */
+export function MiniBars({
+  values = [],
+  labels,
+  max,
+  todayIndex,
+  size = 'default',
+  ariaLabel,
+  className,
+  style,
+  ...rest
+}) {
+  const styles = useMiniBarsStyles();
+  const items = Array.isArray(values) ? values.map((value) => Number(value) || 0) : [];
+  if (items.length === 0) return null;
+
+  const declaredMax = Number(max);
+  const peak = Math.max(1, declaredMax > 0 ? declaredMax : Math.max(...items));
+  const lastIndex = items.length - 1;
+  const highlightIndex = todayIndex === undefined ? lastIndex : todayIndex;
+  const tall = size === 'tall';
+
+  return (
+    <div
+      {...rest}
+      role="img"
+      aria-label={ariaLabel || `最近 ${items.length} 项数据，最高 ${Math.round(peak)}`}
+      className={mergeClasses(styles.root, className)}
+      style={{ ...style, gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+      data-mini-bars={items.length}
+    >
+      {items.map((value, index) => {
+        const isToday = index === highlightIndex;
+        const percent =
+          value > 0 ? Math.max(MINI_BAR_VISIBLE_PERCENT, Math.round((value / peak) * 100)) : 0;
+        const label = Array.isArray(labels) ? labels[index] : undefined;
+        return (
+          <div
+            key={index}
+            className={styles.column}
+            data-mini-bar={index}
+            data-mini-bar-today={isToday ? 'true' : undefined}
+          >
+            <div className={mergeClasses(styles.track, tall && styles.trackTall)}>
+              <span
+                className={mergeClasses(styles.fill, isToday && styles.fillToday)}
+                style={{ height: `${percent}%` }}
+                aria-hidden="true"
+              />
+            </div>
+            {label !== undefined && label !== null ? (
+              <Text size={200} className={styles.label}>
+                {label}
+              </Text>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* HeroProgress（4px 进度带）                                           */
+/* ------------------------------------------------------------------ */
+
+const useHeroProgressStyles = makeStyles({
+  root: {
+    position: 'relative',
+    flexShrink: 0,
+    width: '100%',
+    // 4 = strokeWidthThickest（见 HERO_PROGRESS_THICKNESS_PX 的说明）
+    height: tokens.strokeWidthThickest,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorNeutralBackground3,
+    overflow: 'hidden',
+  },
+  fill: {
+    display: 'block',
+    height: '100%',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorBrandBackground,
+  },
+});
+
+/**
+ * 卡片内的 4px 进度带：只有 `active`（计时器 running）时出画。
+ *
+ * 非 active 时整个组件保留原来的盒子（`visibility:hidden`），因此暂停/继续
+ * 不产生高度重排，也不产生任何 brand 像素。绘制颜色固定 `colorBrandBackground`，
+ * 不接收颜色参数——accent 的判定输入只有「是否运行中」。
+ *
+ * 值域按 0–1 归一化（与 pomodoro 的 `snapshot.progress` 一致），宽度用百分比。
+ * 宽度过渡 100ms（durationFaster）+ curveEasyEase；reduced-motion 下不做过场。
+ *
+ * 用法：
+ *   <HeroProgress value={snapshot.progress} active={snapshot.running} label="本轮进度" />
+ *
+ * @param {object} props
+ * @param {number} [props.value=0] 0–1 的进度
+ * @param {boolean} [props.active=true] false = 保占位不出画（visibility:hidden）
+ * @param {string} [props.label='进度'] 读屏文案
+ */
+export function HeroProgress({
+  value = 0,
+  active = true,
+  label = '进度',
+  className,
+  style,
+  ...rest
+}) {
+  const styles = useHeroProgressStyles();
+  const reduced = useReducedMotion();
+  const numeric = Number(value);
+  const ratio = Number.isFinite(numeric) ? Math.min(1, Math.max(0, numeric)) : 0;
+  const percent = Math.round(ratio * 100);
+  const fillMotion = reduced
+    ? null
+    : {
+        transitionProperty: 'width',
+        transitionDuration: tokens.durationFaster,
+        transitionTimingFunction: tokens.curveEasyEase,
+      };
+
+  return (
+    <div
+      {...rest}
+      role={active ? 'progressbar' : undefined}
+      aria-label={active ? label : undefined}
+      aria-valuemin={active ? 0 : undefined}
+      aria-valuemax={active ? 100 : undefined}
+      aria-valuenow={active ? percent : undefined}
+      aria-hidden={active ? undefined : 'true'}
+      className={mergeClasses(styles.root, className)}
+      style={{ ...style, ...(active ? null : { visibility: 'hidden' }) }}
+      data-hero-progress={active ? 'active' : 'idle'}
+    >
+      <span
+        className={styles.fill}
+        style={{ width: `${percent}%`, ...fillMotion }}
+        data-hero-progress-fill="true"
+      />
     </div>
   );
 }
@@ -653,11 +1468,11 @@ const useTouchButtonStyles = makeStyles({
 });
 
 /**
- * 统一 40px 触控目标的 Fluent Button。高频快捷操作（开始/暂停、我起来了、添加…）用它。
+ * 统一 44px 触控目标的 Fluent Button。高频快捷操作（开始/暂停、我起来了、添加…）用它。
  * 其他 Fluent Button 属性原样透传；仍由 Fluent 处理 hover/pressed/focus/disabled。
  *
  * 用法：
- *   <TouchButton appearance="primary" icon={<Play20Regular />} onClick={start}>开始</TouchButton>
+ *   <TouchButton appearance="secondary" icon={<Play20Regular />} onClick={start}>开始</TouchButton>
  *
  * @param {object} props Fluent Button props
  */
@@ -734,7 +1549,8 @@ const useDetailHeaderStyles = makeStyles({
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalM,
     minHeight: `${DETAIL_HEADER_HEIGHT}px`,
-    paddingInline: tokens.spacingHorizontalXXL,
+    // 宿主 DialogContent 已给 16，插件骨架横向归零，避免叠出第二条内容轴
+    paddingInline: 0,
     boxSizing: 'border-box',
   },
   leading: {
@@ -781,7 +1597,7 @@ const useDetailToolbarStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     minHeight: `${DETAIL_TOOLBAR_HEIGHT}px`,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
   },
 });
@@ -806,7 +1622,7 @@ const useDetailTabsStyles = makeStyles({
     flexShrink: 0,
     height: `${DETAIL_TABS_HEIGHT}px`,
     minHeight: `${DETAIL_TABS_HEIGHT}px`,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
     overflowX: 'auto',
   },
@@ -883,7 +1699,7 @@ const useDetailScrollStyles = makeStyles({
     overflowY: 'auto',
     overflowX: 'hidden',
     paddingBlock: tokens.spacingVerticalXXL,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
     overscrollBehavior: 'contain',
     scrollbarWidth: 'thin',
@@ -1029,7 +1845,7 @@ const useSubpageStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     minHeight: `${SUBPAGE_HEADER_HEIGHT}px`,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
   },
   title: {
@@ -1056,7 +1872,7 @@ const useSubpageStyles = makeStyles({
     overflowY: 'auto',
     overflowX: 'hidden',
     paddingBlock: tokens.spacingVerticalXXL,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
     overscrollBehavior: 'contain',
     scrollbarWidth: 'thin',
@@ -1081,7 +1897,7 @@ const useSubpageStyles = makeStyles({
     justifyContent: 'flex-end',
     gap: tokens.spacingHorizontalS,
     paddingBlock: tokens.spacingVerticalM,
-    paddingInline: tokens.spacingHorizontalXXL,
+    paddingInline: 0,
     boxSizing: 'border-box',
   },
 });
@@ -1101,7 +1917,7 @@ const useSubpageStyles = makeStyles({
  *   footer={(close) => (
  *     <>
  *       <ActionButton onClick={close}>取消</ActionButton>
- *       <ActionButton appearance="primary" onClick={() => { save(); close(); }}>保存</ActionButton>
+ *       <ActionButton appearance="secondary" onClick={() => { save(); close(); }}>保存</ActionButton>
  *     </>
  *   )}
  *

@@ -20,9 +20,10 @@ import {
   mergeClasses,
   tokens,
 } from '@fluentui/react-components';
-import { Water20Regular, WeatherSunny24Regular } from '@fluentui/react-icons';
-import { ActionButton, EmptyState } from '../../../_shared/ui.jsx';
-import { WeatherIcon } from '../components/atoms.jsx';
+import { ArrowClockwise20Regular, Settings20Regular, Water20Regular, WeatherSunny24Regular } from '@fluentui/react-icons';
+import { ActionButton, EmptyState, LIST_ROW_HEIGHT } from '../../../_shared/ui.jsx';
+import { requestHostSettings } from '../../../_shared/host.js';
+import { WeatherIcon, statusToneColor } from '../components/atoms.jsx';
 import { AirRing, isNight } from '../components/forecast.jsx';
 import {
   fmtPop,
@@ -47,7 +48,7 @@ const useStyles = makeStyles({
     gridTemplateColumns: '56px 24px 56px minmax(0, 1fr) 104px 80px',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
   },
   dailyRow: {
@@ -55,7 +56,7 @@ const useStyles = makeStyles({
     gridTemplateColumns: '104px 24px minmax(0, 1fr) 112px 96px',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
   },
   dayCell: {
@@ -111,14 +112,14 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'flex-end',
     gap: tokens.spacingHorizontalXXS,
-    height: '48px',
+    height: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
     minWidth: 0,
   },
   minutelyBar: {
     flex: 1,
-    minWidth: '2px',
+    minWidth: tokens.spacingHorizontalXXS,
     borderRadius: tokens.borderRadiusSmall,
-    backgroundColor: tokens.colorBrandBackground,
+    backgroundColor: tokens.colorNeutralForeground3,
   },
 
   airTop: {
@@ -139,7 +140,7 @@ const useStyles = makeStyles({
     gridTemplateColumns: 'minmax(0, 1fr) auto 72px',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
     minWidth: 0,
   },
   airValue: { justifySelf: 'end', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
@@ -149,7 +150,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalXXS,
-    minHeight: '48px',
+    minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalL})`,
     paddingBlock: tokens.spacingVerticalS,
     minWidth: 0,
   },
@@ -167,11 +168,11 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     width: '100%',
     minWidth: 0,
-    minHeight: '44px',
+    minHeight: `${LIST_ROW_HEIGHT}px`,
   },
   warningDot: {
-    width: '10px',
-    height: '10px',
+    width: tokens.spacingHorizontalMNudge,
+    height: tokens.spacingHorizontalMNudge,
     borderRadius: tokens.borderRadiusCircular,
     flexShrink: 0,
   },
@@ -345,8 +346,12 @@ export function AirPanel({ data, state, onRetry, showAir = true }) {
     return (
       <EmptyState
         icon={<WeatherSunny24Regular />}
-        title="已在设置里关闭空气质量"
-        description="打开「显示空气质量」后，这里会显示 AQI 与污染物浓度"
+        title="空气质量已关闭"
+        action={
+          <ActionButton icon={<Settings20Regular />} onClick={requestHostSettings}>
+            去设置
+          </ActionButton>
+        }
       />
     );
   }
@@ -357,8 +362,11 @@ export function AirPanel({ data, state, onRetry, showAir = true }) {
       <EmptyState
         icon={<WeatherSunny24Regular />}
         title="暂无空气质量数据"
-        description="该城市当前没有返回空气质量数据"
-        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+        action={
+          <ActionButton icon={<ArrowClockwise20Regular />} onClick={onRetry}>
+            重新获取
+          </ActionButton>
+        }
       />
     );
   }
@@ -407,8 +415,11 @@ export function IndicesPanel({ data, state, onRetry }) {
       <EmptyState
         icon={<WeatherSunny24Regular />}
         title="暂无生活指数"
-        description="该城市当前没有返回生活指数数据"
-        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+        action={
+          <ActionButton icon={<ArrowClockwise20Regular />} onClick={onRetry}>
+            重新获取
+          </ActionButton>
+        }
       />
     );
   }
@@ -457,9 +468,12 @@ export function WarningPanel({ data, state, onRetry }) {
     return (
       <EmptyState
         icon={<WeatherSunny24Regular />}
-        title="当前没有生效的天气预警"
-        description="有新的预警时，详情会默认打开这个 Tab"
-        action={<ActionButton onClick={onRetry}>重新获取</ActionButton>}
+        title="暂无天气预警"
+        action={
+          <ActionButton icon={<ArrowClockwise20Regular />} onClick={onRetry}>
+            重新获取
+          </ActionButton>
+        }
       />
     );
   }
@@ -470,7 +484,7 @@ export function WarningPanel({ data, state, onRetry }) {
         <AccordionItem value={item.id} key={item.id}>
           <AccordionHeader expandIconPosition="end">
             <span className={styles.warningHeader} data-warning-head>
-              <span className={styles.warningDot} style={{ backgroundColor: item.color }} />
+              <span className={styles.warningDot} style={{ backgroundColor: statusToneColor(item.tone) }} />
               <Text size={300} weight="semibold" className={styles.warningTitle}>
                 {item.title}
               </Text>

@@ -2,11 +2,12 @@
   "id": "countdown",
   "name": "倒数日",
   "version": "0.2.0",
+  "identityHue": "pink",
   "widgets": [
     {
       "id": "countdown",
       "title": "倒数日",
-      "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
+      "sizes": [[1, 1], [2, 1], [2, 2], [3, 2], [3, 3]],
       "defaultSize": [2, 2],
       "cell": [6, 2]
     }

@@ -2,6 +2,7 @@
   "id": "sedentary",
   "name": "久坐提醒",
   "version": "0.2.0",
+  "identityHue": "green",
   "background": true,
   "widgets": [
     {
@@ -9,7 +10,7 @@
       "title": "久坐提醒",
       "sizes": [[1, 1], [2, 1], [2, 2], [3, 2]],
       "defaultSize": [2, 1],
-      "cell": [6, 4]
+      "cell": [5, 4]
     }
   ],
   "settings": {

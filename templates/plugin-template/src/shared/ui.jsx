@@ -7,7 +7,7 @@
  * 常用入口：
  *   <CardRoot onActivate={...} ariaLabel="...">卡片内容</CardRoot>
  *   <CardHeader title="今日 · 3" trailing={<Badge .../>} />
- *   <Metric value="42" unit="分钟" label="连续久坐" size={68} />
+ *   <Metric value="42" unit="分钟" label="连续久坐" />
  *   <ListRow leading={<Checkbox ... />} title="任务标题" subtitle="今天 18:00" />
  *   <EmptyState title="还没有内容" description="从详情里添加" action={<ActionButton>添加</ActionButton>} />
  *   <DetailPage><DetailHeader trailing={...}>...</DetailHeader><DetailScroll>...</DetailScroll></DetailPage>
@@ -39,16 +39,16 @@ import {
 import { ArrowLeft24Regular } from '@fluentui/react-icons';
 import { useHostCardGesture } from './host.js';
 import { SlidePage } from './motion.js';
-import { DISPLAY_WEIGHT, TABULAR_NUMS, displayXl } from './typography.js';
+import { DISPLAY_WEIGHT, HERO_TEXT, TABULAR_NUMS } from './typography.js';
 
-/** 平板触控目标（DESIGN §1.2 / AUDIT V-06）：所有可点击元素不小于 40×40 */
-const TOUCH_TARGET = 40;
-/** 列表行高（DENSITY §2.1：≥44，同时满足触控 40） */
+/** 平板触控目标（Fluent `layout.md:57` 44×44；同时满足 HIG §6）：所有可点元素不小于 44×44 */
+const TOUCH_TARGET = 44;
+/** 列表行高（DENSITY §2.1：≥44，与触控目标同值） */
 const LIST_ROW_HEIGHT = 44;
 /** L1 固定骨架高度（PLUGIN-CONTRACT §4.1） */
 const DETAIL_HEADER_HEIGHT = 56;
 const DETAIL_TOOLBAR_HEIGHT = 48;
-const DETAIL_TABS_HEIGHT = 40;
+const DETAIL_TABS_HEIGHT = 44;
 /** L2 header 高度（PLUGIN-CONTRACT §4.1：56） */
 const SUBPAGE_HEADER_HEIGHT = 56;
 
@@ -91,6 +91,12 @@ const useCardRootStyles = makeStyles({
     minHeight: 0,
     overflow: 'hidden',
     boxSizing: 'border-box',
+    // 唯一卡片内容栅格：padding / gap 全部来自 Fluent spacing ramp
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    gap: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground1,
     fontFamily: tokens.fontFamilyBase,
   },
@@ -208,6 +214,75 @@ export function CardHeader({ title, trailing, className, style }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* CardIdentity                                                        */
+/* ------------------------------------------------------------------ */
+
+const useCardIdentityStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+    minHeight: tokens.spacingVerticalXXL,
+  },
+  icon: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // 身份色唯一落点：20px 单色图标（尺寸由图标本身决定）；没有色块、没有背景 tint
+    color: 'var(--wtsl-identity, currentColor)',
+  },
+  label: {
+    minWidth: 0,
+    color: tokens.colorNeutralForeground3,
+  },
+  trailing: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    marginInlineStart: 'auto',
+    color: tokens.colorNeutralForeground3,
+  },
+});
+
+/**
+ * 卡片静态 identity 行：24px 高，20px 身份色图标 + 12px 半粗标签 + 可选 trailing。
+ *
+ * 它**不是** chrome：没有可交互控件、不常驻操作、不占点击热区、不计入信息预算。
+ * 色相来自 manifest `identityHue` → 宿主下发 `--wtsl-identity`，插件不传色值。
+ * 新卡片照抄这一行即可满足 Equal Except Hue（20px 图标是身份色唯一落点）。
+ *
+ * 用法：
+ *   <CardIdentity icon={<Apps20Regular />} label="模板" />
+ *   <CardIdentity icon={<Apps20Regular />} compact trailing={<Text size={200}>3×2</Text>} />
+ *
+ * @param {object} props
+ * @param {React.ReactNode} props.icon 20px Fluent System Icon
+ * @param {string} [props.label] 组件名（≤4 字）
+ * @param {React.ReactNode} [props.trailing] 行尾辅助（状态、计数）
+ * @param {boolean} [props.compact] 只显示图标（1×1 卡）
+ */
+export function CardIdentity({ icon, label, trailing, compact = false, className, style }) {
+  const styles = useCardIdentityStyles();
+  return (
+    <div className={mergeClasses(styles.root, className)} style={style} data-card-identity="true">
+      <span className={styles.icon} aria-hidden="true">
+        {icon}
+      </span>
+      {!compact && label ? (
+        <Text size={200} weight="semibold" truncate className={styles.label}>
+          {label}
+        </Text>
+      ) : null}
+      {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Metric                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -226,20 +301,13 @@ const useMetricStyles = makeStyles({
     minWidth: 0,
   },
   value: {
+    // 唯一 hero 字号：Fluent Large Title（fontSizeHero900 / lineHeightHero900）
+    ...HERO_TEXT,
     ...TABULAR_NUMS,
     fontWeight: DISPLAY_WEIGHT,
     color: tokens.colorNeutralForeground1,
     whiteSpace: 'nowrap',
   },
-  size48: displayXl(48),
-  // 68px 是 Fluent 官方 Display（Hero1000）；项目 Display XL 只有 48/80/96/112（D-07）
-  size68: {
-    fontSize: tokens.fontSizeHero1000,
-    lineHeight: tokens.lineHeightHero1000,
-  },
-  size80: displayXl(80),
-  size96: displayXl(96),
-  size112: displayXl(112),
   unit: {
     color: tokens.colorNeutralForeground2,
   },
@@ -257,39 +325,29 @@ const useMetricStyles = makeStyles({
   },
 });
 
-const METRIC_SIZE_CLASS = {
-  48: 'size48',
-  68: 'size68',
-  80: 'size80',
-  96: 'size96',
-  112: 'size112',
-};
-
 /**
  * 数字主信息：值 + 可选单位/标签/说明。
  *
- * 字号只允许 48 / 68 / 80 / 96 / 112：
- * - 48/80/96/112 来自项目 Display XL（`_shared/typography.js`，D-07，只给数字主信息）；
- * - 68 来自 Fluent 官方 Display（fontSizeHero1000 = 68/92）。
- * 文本/标签不得用这些字号，标签用 Fluent Text Base200/300。
+ * 字号不再由调用方选择：统一取 `HERO_TEXT`（`tokens.fontSizeHero900` / `lineHeightHero900`）。
+ * 次级标签走 Text 200/300（caption 1 / body 1），单位走 body 1。
+ * `size` 参数保留只为兼容旧插件调用，已不参与渲染。
  *
  * 用法：
- *   <Metric value="25:00" unit="分钟" label="专注剩余" caption="第 2 轮" size={68} />
+ *   <Metric value="25:00" unit="分钟" label="专注剩余" caption="第 2 轮" />
  *
  * @param {object} props
  * @param {string|number} props.value
  * @param {string} [props.unit]
  * @param {string} [props.label]
  * @param {string} [props.caption]
- * @param {48|68|80|96|112} [props.size=48]
+ * @param {number} [props.size] 已废弃：hero 字号由 HERO_TEXT（fontSizeHero900）唯一决定
  */
-export function Metric({ value, unit, label, caption, size = 48, className, style }) {
+export function Metric({ value, unit, label, caption, className, style }) {
   const styles = useMetricStyles();
-  const sizeClass = styles[METRIC_SIZE_CLASS[size] ?? 'size48'];
   return (
     <div className={mergeClasses(styles.root, className)} style={style}>
       <div className={styles.valueRow}>
-        <span className={mergeClasses(styles.value, sizeClass)}>{value}</span>
+        <span className={styles.value}>{value}</span>
         {unit ? (
           <Text size={300} className={styles.unit}>
             {unit}
@@ -465,11 +523,16 @@ const useEmptyStateStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     gap: tokens.spacingVerticalS,
-    padding: tokens.spacingVerticalXXL,
+    padding: 0,
     textAlign: 'center',
   },
   icon: {
     display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    // 32px 容器对齐 Fluent spacing XXXL；空态保持中性，不加彩色色块
+    width: tokens.spacingHorizontalXXXL,
+    height: tokens.spacingVerticalXXXL,
     color: tokens.colorNeutralForeground3,
   },
   title: {
@@ -480,7 +543,7 @@ const useEmptyStateStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   action: {
-    marginTop: tokens.spacingVerticalS,
+    marginTop: 0,
   },
 });
 
@@ -493,7 +556,7 @@ const useEmptyStateStyles = makeStyles({
  *     icon={<CalendarLtr24Regular />}
  *     title="还没有倒数日"
  *     description="添加一个重要的日子，卡片会显示剩余天数"
- *     action={<ActionButton appearance="primary">添加倒数日</ActionButton>}
+ *     action={<ActionButton appearance="secondary">添加倒数日</ActionButton>}
  *   />
  *
  * @param {object} props
@@ -513,7 +576,7 @@ export function EmptyState({ icon, title, description, action, className, style 
         </Text>
       ) : null}
       {description ? (
-        <Text size={300} className={styles.description}>
+        <Text size={200} className={styles.description}>
           {description}
         </Text>
       ) : null}
@@ -534,11 +597,11 @@ const useTouchButtonStyles = makeStyles({
 });
 
 /**
- * 统一 40px 触控目标的 Fluent Button。高频快捷操作（开始/暂停、我起来了、添加…）用它。
+ * 统一 44px 触控目标的 Fluent Button。高频快捷操作（开始/暂停、我起来了、添加…）用它。
  * 其他 Fluent Button 属性原样透传；仍由 Fluent 处理 hover/pressed/focus/disabled。
  *
  * 用法：
- *   <TouchButton appearance="primary" icon={<Play20Regular />} onClick={start}>开始</TouchButton>
+ *   <TouchButton appearance="secondary" icon={<Play20Regular />} onClick={start}>开始</TouchButton>
  *
  * @param {object} props Fluent Button props
  */
@@ -878,7 +941,7 @@ const useSubpageStyles = makeStyles({
  *   footer={(close) => (
  *     <>
  *       <ActionButton onClick={close}>取消</ActionButton>
- *       <ActionButton appearance="primary" onClick={() => { save(); close(); }}>保存</ActionButton>
+ *       <ActionButton appearance="secondary" onClick={() => { save(); close(); }}>保存</ActionButton>
  *     </>
  *   )}
  *

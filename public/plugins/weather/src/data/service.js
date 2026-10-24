@@ -65,7 +65,7 @@ export async function loadWeather(settings, place, previous) {
     return { data, offline: false, failures: [], fetchedAt: data.fetchedAt };
   }
   if (!hasApiKey(settings)) {
-    throw new WeatherApiError('未配置和风天气 API Key：请在宿主「设置 → 插件 → 天气」填写 API Key 与 API Host', {
+    throw new WeatherApiError('未配置和风天气 API Key', {
       status: 401,
       code: 'NO_KEY',
     });

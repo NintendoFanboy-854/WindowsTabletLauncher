@@ -26,12 +26,13 @@ import {
   Settings16Regular,
 } from '@fluentui/react-icons';
 import { placeMenuLabel } from '../data/store.js';
+import { TOUCH_TARGET } from '../../../_shared/ui.jsx';
 
 const useStyles = makeStyles({
   trigger: {
     minWidth: 0,
     maxWidth: '100%',
-    minHeight: '40px',
+    minHeight: `${TOUCH_TARGET}px`,
     justifyContent: 'flex-start',
     paddingInline: tokens.spacingHorizontalXS,
     gap: tokens.spacingHorizontalXS,

@@ -2,6 +2,7 @@
   "id": "todo",
   "name": "待办",
   "version": "2.0.0",
+  "identityHue": "purple",
   "background": true,
   "widgets": [
     {
@@ -46,17 +47,6 @@
               { "value": "due", "label": "截止时间" },
               { "value": "priority", "label": "优先级" },
               { "value": "created", "label": "创建时间" }
-            ]
-          },
-          {
-            "key": "fontSize",
-            "type": "enum",
-            "label": "字号",
-            "description": "任务标题的字号档位",
-            "default": "default",
-            "options": [
-              { "value": "default", "label": "默认" },
-              { "value": "large", "label": "大" }
             ]
           },
           {

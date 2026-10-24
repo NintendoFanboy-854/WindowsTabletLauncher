@@ -128,6 +128,29 @@ export function useHostTheme(fallbackScheme = 'dark') {
     if (document.body) document.body.style.colorScheme = result.scheme;
   }, [result.scheme]);
 
+  /**
+   * 身份色：宿主把 manifest.identityHue 映射成 shared palette 同档三档，
+   * 随主题下发。插件只消费 `--wtsl-identity`（20px 图标）；border/surface 仅作为
+   * 契约保留的纯别名，默认不用于任何装饰，也不得用于卡背景/大数字/按钮填充。
+   */
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    const values = {
+      '--wtsl-identity': resolvedPayload.wtslIdentity,
+      '--wtsl-identity-border': resolvedPayload.wtslIdentityBorder,
+      '--wtsl-identity-surface': resolvedPayload.wtslIdentitySurface,
+    };
+    for (const [name, value] of Object.entries(values)) {
+      if (typeof value === 'string' && value) root.style.setProperty(name, value);
+      else root.style.removeProperty(name);
+    }
+  }, [
+    resolvedPayload.wtslIdentity,
+    resolvedPayload.wtslIdentityBorder,
+    resolvedPayload.wtslIdentitySurface,
+  ]);
+
   return result;
 }
 

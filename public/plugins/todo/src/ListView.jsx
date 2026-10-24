@@ -9,6 +9,12 @@
 
 import { useState } from 'react';
 import { Text, makeStyles, tokens } from '@fluentui/react-components';
+import {
+  Add20Regular,
+  Dismiss20Regular,
+  Search24Regular,
+  TaskListSquareLtr24Regular,
+} from '@fluentui/react-icons';
 import { Collapse, FadeSlide } from '../../_shared/motion.js';
 import { EmptyState, ActionButton } from '../../_shared/ui.jsx';
 import { addDays, isSameDay, startOfDay, toDate } from '../js/date.js';
@@ -156,9 +162,13 @@ export function ListView({
         <GroupHead label={`搜索结果 · ${searchHits.length}`} />
         {searchHits.length === 0 ? (
           <EmptyState
+            icon={<Search24Regular />}
             title="没有匹配的任务"
-            description="换个关键词，或清除搜索回到全部任务"
-            action={<ActionButton onClick={onClearSearch}>清除搜索</ActionButton>}
+            action={
+              <ActionButton icon={<Dismiss20Regular />} onClick={onClearSearch}>
+                清除搜索
+              </ActionButton>
+            }
           />
         ) : (
           <div className={styles.rows}>
@@ -182,10 +192,14 @@ export function ListView({
   if (undone.length === 0 && doneSorted.length === 0) {
     return (
       <EmptyState
+        icon={<TaskListSquareLtr24Regular />}
         title="还没有任务"
-        description="先加一条今天要做的事，完成后会自动收进已完成"
         action={
-          <ActionButton appearance="primary" onClick={onAddTask}>
+          <ActionButton
+            appearance="secondary"
+            icon={<Add20Regular />}
+            onClick={onAddTask}
+          >
             添加任务
           </ActionButton>
         }
@@ -243,7 +257,7 @@ export function ListView({
                   <ActionButton appearance="secondary" onClick={() => setClearConfirm(false)}>
                     取消
                   </ActionButton>
-                  <ActionButton appearance="primary" onClick={clearCompleted}>
+                  <ActionButton appearance="secondary" onClick={clearCompleted}>
                     清空
                   </ActionButton>
                 </span>

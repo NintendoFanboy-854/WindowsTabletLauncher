@@ -118,7 +118,7 @@ export function ManageCities({
         .catch((searchError) => {
           if (!alive) return;
           setResults([]);
-          setError(searchError?.message || '搜索失败，请稍后再试');
+          setError(searchError?.message || '搜索失败');
         })
         .finally(() => {
           if (alive) setSearching(false);
@@ -192,7 +192,7 @@ export function ManageCities({
         <Input
           size="large"
           value={query}
-          placeholder={configured ? '输入城市名，例如 杭州' : '配置 API Key 后才能搜索城市'}
+          placeholder="输入城市名，例如 杭州"
           aria-label="搜索城市"
           disabled={!configured}
           contentBefore={<Search20Regular />}
@@ -200,13 +200,9 @@ export function ManageCities({
         />
         {!configured ? (
           <Text size={200} className={styles.hint}>
-            当前没有和风天气 API Key：仍可切换或删除已保存的城市
+            未配置和风天气 API Key
           </Text>
-        ) : (
-          <Text size={200} className={styles.hint}>
-            搜索使用和风 GeoAPI；添加后自动设为当前城市
-          </Text>
-        )}
+        ) : null}
         {error ? (
           <Text size={200} className={styles.error}>
             {error}
@@ -214,7 +210,7 @@ export function ManageCities({
         ) : null}
         {query.trim() && !searching && !error && results.length === 0 ? (
           <Text size={300} className={styles.empty}>
-            没有找到城市，换个写法试试
+            没有找到城市
           </Text>
         ) : null}
         {results.map((place) => {
@@ -231,7 +227,7 @@ export function ManageCities({
                     已添加
                   </Text>
                 ) : (
-                  <ActionButton appearance="primary" onClick={() => addAndClose(place)}>
+                  <ActionButton appearance="secondary" onClick={() => addAndClose(place)}>
                     添加
                   </ActionButton>
                 )
@@ -252,7 +248,7 @@ export function ManageCities({
         </div>
         {places.length === 0 ? (
           <Text size={300} className={styles.empty}>
-            还没有城市。搜索并添加一个，或使用上方「当前位置」
+            还没有城市
           </Text>
         ) : null}
         {places.map((place) => {

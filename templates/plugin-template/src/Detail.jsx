@@ -116,7 +116,7 @@ export default function Detail() {
       </DetailHeader>
 
       <DetailToolbar>
-        <ActionButton appearance="primary" onClick={openEditor}>
+        <ActionButton appearance="secondary" onClick={openEditor}>
           编辑示例
         </ActionButton>
         <ActionButton onClick={openHostSettings}>设置…</ActionButton>
@@ -183,7 +183,7 @@ export default function Detail() {
           footer={(close) => (
             <div className={styles.footer}>
               <ActionButton onClick={close}>取消</ActionButton>
-              <ActionButton appearance="primary" onClick={() => saveEditor(close)}>
+              <ActionButton appearance="secondary" onClick={() => saveEditor(close)}>
                 保存
               </ActionButton>
             </div>

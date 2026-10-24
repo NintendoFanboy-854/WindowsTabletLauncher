@@ -21,32 +21,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   highlightSoon: true,
 });
 
-/** 颜色只存 Fluent token 名；渲染时用 tokens[tokenName] 取实际颜色 */
-export const COLOR_OPTIONS = Object.freeze([
-  { id: 'accent', label: '主题色', token: 'colorBrandForeground1' },
-  { id: 'blue', label: '蓝色', token: 'colorPaletteBlueForeground2' },
-  { id: 'green', label: '绿色', token: 'colorPaletteGreenForeground1' },
-  { id: 'orange', label: '橙色', token: 'colorPaletteDarkOrangeForeground2' },
-  { id: 'red', label: '红色', token: 'colorPaletteRedForeground1' },
-  { id: 'purple', label: '紫色', token: 'colorPalettePurpleForeground2' },
-  { id: 'teal', label: '青色', token: 'colorPaletteTealForeground2' },
-]);
-
-const COLOR_BY_ID = new Map(COLOR_OPTIONS.map((color) => [color.id, color]));
-const DEFAULT_COLOR = COLOR_OPTIONS[0];
-
-export function normalizeColor(color) {
-  return COLOR_BY_ID.has(color) ? color : DEFAULT_COLOR.id;
-}
-
-export function colorTokenOf(colorId) {
-  return (COLOR_BY_ID.get(colorId) ?? DEFAULT_COLOR).token;
-}
-
-export function colorLabelOf(colorId) {
-  return (COLOR_BY_ID.get(colorId) ?? DEFAULT_COLOR).label;
-}
-
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /* ------------------------------------------------------------------ */
@@ -66,7 +40,7 @@ export function normalizeSettings(raw) {
 }
 
 /**
- * 读取侧迁移：未知颜色回落到主题色，缺失的布尔/创建时间补默认值。
+ * 读取侧迁移：缺失的布尔/创建时间补默认值，旧数据里的 color 字段被丢弃。
  * 合法事件的 title / targetDate 不改写；加载时不回写宿主配置。
  */
 export function normalizeItems(raw) {
@@ -84,7 +58,6 @@ export function normalizeItems(raw) {
       title: item.title,
       targetDate: item.targetDate,
       repeatYearly: Boolean(item.repeatYearly),
-      color: normalizeColor(item.color),
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
     }));
 }
@@ -170,7 +143,6 @@ export function decorate(item, today = new Date()) {
   if (days === 0) status = 'today';
   else if (days < 0) status = 'past';
 
-  const color = COLOR_BY_ID.get(item.color) ?? DEFAULT_COLOR;
   const dateLabel = formatMonthDay(target);
   const weekdayLabel = formatWeekday(target);
   const subtitle = item.repeatYearly
@@ -183,8 +155,6 @@ export function decorate(item, today = new Date()) {
     targetDate: toDateString(target),
     days,
     status,
-    color,
-    colorToken: color.token,
     dateLabel,
     weekdayLabel,
     subtitle,
@@ -242,8 +212,8 @@ export function nextId() {
 
 export function validateDraft(draft) {
   const title = typeof draft?.title === 'string' ? draft.title.trim() : '';
-  if (!title) return { ok: false, error: '请填写标题' };
-  if (!parseDateString(draft?.targetDate)) return { ok: false, error: '请选择合法日期' };
+  if (!title) return { ok: false, error: '标题为空' };
+  if (!parseDateString(draft?.targetDate)) return { ok: false, error: '日期无效' };
   return { ok: true, title };
 }
 
@@ -261,7 +231,6 @@ export function addItem(items, draft) {
     title: validation.title,
     targetDate: draft.targetDate,
     repeatYearly: Boolean(draft.repeatYearly),
-    color: normalizeColor(draft.color),
     createdAt: new Date().toISOString(),
   };
   return { items: [...items, item], item };
@@ -280,10 +249,10 @@ export function updateItem(items, patch) {
       : typeof patch.title === 'string'
         ? patch.title.trim()
         : '';
-  if (!title) throw new Error('请填写标题');
+  if (!title) throw new Error('标题为空');
 
   const targetDate = patch.targetDate === undefined ? current.targetDate : patch.targetDate;
-  if (!parseDateString(targetDate)) throw new Error('请选择合法日期');
+  if (!parseDateString(targetDate)) throw new Error('日期无效');
 
   const nextItem = {
     ...current,
@@ -291,7 +260,6 @@ export function updateItem(items, patch) {
     targetDate,
     repeatYearly:
       patch.repeatYearly === undefined ? current.repeatYearly : Boolean(patch.repeatYearly),
-    color: patch.color === undefined ? current.color : normalizeColor(patch.color),
   };
   return {
     items: items.map((item) => (item.id === id ? nextItem : item)),
@@ -337,7 +305,6 @@ function itemPayload(item, today = new Date()) {
     title: item.title,
     targetDate: entry ? entry.targetDate : item.targetDate,
     repeatYearly: item.repeatYearly,
-    color: item.color,
     days: entry ? entry.days : null,
     status: entry ? entry.status : 'future',
     display: entry ? displayText(entry) : '',
@@ -407,7 +374,6 @@ export async function seedDemoData() {
       title: '产品发布',
       targetDate: offset(0),
       repeatYearly: false,
-      color: 'teal',
       createdAt: nowIso,
     },
     {
@@ -415,7 +381,6 @@ export async function seedDemoData() {
       title: '项目截止',
       targetDate: offset(3),
       repeatYearly: false,
-      color: 'orange',
       createdAt: nowIso,
     },
     {
@@ -423,7 +388,6 @@ export async function seedDemoData() {
       title: '体检',
       targetDate: offset(10),
       repeatYearly: false,
-      color: 'blue',
       createdAt: nowIso,
     },
     {
@@ -431,7 +395,6 @@ export async function seedDemoData() {
       title: '期末考试',
       targetDate: offset(45),
       repeatYearly: false,
-      color: 'purple',
       createdAt: nowIso,
     },
     {
@@ -439,7 +402,6 @@ export async function seedDemoData() {
       title: '结婚纪念日',
       targetDate: `${year - 4}-10-19`,
       repeatYearly: true,
-      color: 'red',
       createdAt: nowIso,
     },
     {
@@ -447,7 +409,6 @@ export async function seedDemoData() {
       title: '妈妈生日',
       targetDate: '1968-04-12',
       repeatYearly: true,
-      color: 'green',
       createdAt: nowIso,
     },
     {
@@ -455,7 +416,6 @@ export async function seedDemoData() {
       title: '搬家',
       targetDate: offset(-20),
       repeatYearly: false,
-      color: 'blue',
       createdAt: nowIso,
     },
   ];

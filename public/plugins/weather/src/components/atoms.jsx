@@ -2,7 +2,7 @@
  * 卡片与详情共用的小展示件。
  *
  * 字号/行高只走 Fluent 字阶：文本用 `<Text size weight>`，温度主值由调用方用
- * 共享 `Metric`（Display XL / Fluent Display）渲染；这里不写任何字号。
+ * 共享 `Metric`（唯一 hero 字号）渲染；这里不写任何字号。
  */
 
 import { Badge, Text, makeStyles, mergeClasses, tokens } from '@fluentui/react-components';
@@ -23,6 +23,9 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    // 单行省略：作为 flex 子项必须允许收缩（1×2 的 120 宽里要和「高低温」同排）
+    minWidth: 0,
+    flexShrink: 1,
   },
   hilo: {
     color: tokens.colorNeutralForeground3,
@@ -44,7 +47,35 @@ const useStyles = makeStyles({
 });
 
 /**
+ * 语义档 → Fluent 状态色。
+ *
+ * 数据层只给 `tone`（success / warning / danger / info / neutral），不产出任何
+ * rgb()/hex：颜色在这里一次映射到 `colorStatus*` / `colorBrand*` token，
+ * 因此亮暗主题、高对比度都由 Fluent 负责（B-4 / FLUENT2 §2）。
+ *
+ * @param {'success'|'warning'|'danger'|'info'|'neutral'|undefined} tone
+ * @returns {string} Fluent token 解析出的颜色
+ */
+export function statusToneColor(tone) {
+  switch (tone) {
+    case 'success':
+      return tokens.colorStatusSuccessForeground1;
+    case 'danger':
+      return tokens.colorStatusDangerForeground1;
+    case 'info':
+      // brand 只表「正在发生 / 可操作 / 已激活」，不能当状态色用（§3.9 W-6）
+      return tokens.colorStatusInfoForeground1;
+    case 'warning':
+      return tokens.colorStatusWarningForeground1;
+    default:
+      return tokens.colorNeutralForeground3;
+  }
+}
+
+/**
  * 和风天气图标（内容图形，尺寸由调用方按档位给固定 px）。
+ * 尺寸只取 Fluent 图标阶梯 16 / 20 / 24 / 32 / 48（iconography.md:19-23「按档位用尺寸，不缩放」）：
+ * 1×1 24、1×2 24、2×1 32、2×2 32、3×2 / 3×3 48、逐时 20 / 24、7 天 20。
  * `scheme` 决定用 icons/dark 还是 icons/light；night 只对晴/多云做夜间映射。
  */
 export function WeatherIcon({ code, night = false, scheme = 'dark', size = 48, title }) {
@@ -61,7 +92,7 @@ export function WeatherIcon({ code, night = false, scheme = 'dark', size = 48, t
   );
 }
 
-/** 天气现象文字；size 默认 16（400），卡片 3×2/4×2 用 14（300） */
+/** 天气现象文字；size 默认 16（400），卡片 3×2 用 14（300） */
 export function Condition({ code, text, size = 400, className }) {
   const styles = useStyles();
   return (
@@ -97,7 +128,7 @@ export function StatusLine({ offline, fetchedAt, refreshMin, className, now = Da
   );
 }
 
-/** 卡片 3×2 / 4×2 城市行的紧凑预警徽标（12 号字，完整内容在详情预警 Tab） */
+/** 卡片 3×2 / 3×3 城市行的紧凑预警徽标（12 号字，完整内容在详情预警 Tab） */
 export function WarningBadge({ count, className }) {
   const styles = useStyles();
   if (!count) return null;
