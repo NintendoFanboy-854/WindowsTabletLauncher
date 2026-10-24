@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.4.0"
+version = "0.5.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -29,13 +29,18 @@ tauri-plugin-global-shortcut = "2"
 flate2 = "1.1"            # zip 解压（deflate）
 percent-encoding = "2.3"  # 自定义协议里的路径解码
 winreg = "0.56"           # 开机自启（HKCU Run）
+# 站点权限自愈：ICoreWebView2Profile4::SetPermissionState
+# （麦克风被 WebView2 持久化成 Block 之后，只有这条 API 能覆盖它；版本与 wry 传递的那份一致，不多编一份）
+webview2-com = "0.39"
 windows = { version = "0.62", features = [
   "Devices_Geolocation",              # Windows Geolocator
   "Foundation",
   "Win32_System_Power",               # SetThreadExecutionState
   "Win32_System_SystemInformation",   # GetTickCount
+  "Win32_System_Threading",           # OpenProcess / QueryFullProcessImageNameW（按进程名认设置窗口）
   "Win32_System_WinRT",               # RoInitialize（WinRT 线程初始化）
   "Win32_UI_Input_KeyboardAndMouse",  # GetLastInputInfo
+  "Win32_UI_WindowsAndMessaging",     # EnumWindows / SetForegroundWindow（设置页切前台）
 ] }
 
 # E2b 网络定位（ip.cn，D-16）：async，在 async command 里直接 await。

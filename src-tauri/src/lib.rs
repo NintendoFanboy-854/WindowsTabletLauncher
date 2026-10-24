@@ -13,13 +13,16 @@
 mod autostart;
 mod iplocate;
 mod location;
+mod micsite;
 mod plugins;
 mod power;
 mod protocol;
+mod settings_win;
 mod window;
 mod zip;
 
 use tauri::Manager;
+use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 type CmdResult<T> = Result<T, String>;
@@ -113,6 +116,43 @@ async fn ip_locate() -> CmdResult<Option<iplocate::IpLocation>> {
     Ok(iplocate::locate().await)
 }
 
+// ---------- 麦克风权限 ----------
+
+/// 把 WebView2「站点权限」里的本站麦克风写成 Allow。
+///
+/// 0.4.4 起这条权限被 WebView2 自己按 origin 持久化成了 Block（宿主没应答 `PermissionRequested`
+/// 时 WebView2 按拒绝落盘），落盘之后 `on_permission_request` 根本不会被问到：
+/// `permissions.query` 直接 denied、`getUserMedia` 直接 `NotAllowedError`。
+/// 前端在启动时与每次探测前都会调用一次（幂等），用户升级后不需要手动清 profile。
+#[tauri::command]
+async fn ensure_mic_permission(window: tauri::WebviewWindow) -> CmdResult<()> {
+    micsite::allow_microphone(&window).await
+}
+
+/// 打开 Windows「隐私和安全性 → 麦克风」设置页，并把它切到前台。
+///
+/// 系统层的麦克风开关被关掉后，应用内**无法**再唤起系统提示（WebView2 也不会二次弹窗），
+/// 只能把用户导过去。`ms-settings:` 是 Windows 设置协议的固定入口，未打包的 Win32 应用同样有效；
+/// 用 `cmd /C start` 是因为它走 shell 关联，不需要额外引入 `tauri-plugin-opener`。
+///
+/// 光把进程拉起来不够：设置页的窗口会被全屏的启动器压在下面（0.4.6 实测），
+/// 所以 `settings_win::open` 还负责前台交接与复核。
+#[tauri::command]
+async fn open_mic_privacy_settings() -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(target_os = "windows")]
+        {
+            settings_win::open("ms-settings:privacy-microphone")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Err("只有 Windows 才有系统级麦克风开关".to_string())
+        }
+    })
+    .await
+    .map_err(|err| format!("打开 Windows 设置任务失败: {err}"))?
+}
+
 // ---------- 插件目录 ----------
 
 #[tauri::command]
@@ -168,6 +208,23 @@ async fn plugin_install_zip(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // WebView2 没有内建授权 UI：媒体权限请求落到 `COREWEBVIEW2_PERMISSION_STATE_DEFAULT`
+        // 就等同于「无人应答 → 拒绝」，0.4.4 的 `Permission denied` 就是这么来的。
+        // 这里只放行麦克风：应用内同意由 `MicPermissionCard` 负责（先解释再开麦），
+        // 其余权限（相机/定位/通知/剪贴板…）保持平台默认，不替用户做决定。
+        //
+        // 注意：这个回调**只在没有持久化决定时**才会被问到。0.4.4 已经把一次拒绝写进了
+        // profile（`media_stream_mic` = Block），所以真正的修复在 `ensure_mic_permission`
+        // 命令里（用 SetPermissionState 覆盖那份旧记录）；这一层保留为「全新 profile」的兜底。
+        .on_permission_request(|_webview, kind| {
+            let response = match kind {
+                PermissionKind::Microphone => PermissionResponse::Allow,
+                _ => PermissionResponse::Default,
+            };
+            // 排障入口：站点权限层每次真的问过来都会留一行（0.4.4 就是在这里静默变成 Deny 的）
+            log::info!("WebView2 权限请求 {kind} -> {response}");
+            response
+        })
         .register_uri_scheme_protocol(protocol::SCHEME, |ctx, request| {
             protocol::handle(ctx.app_handle(), &request).map(std::borrow::Cow::Owned)
         })
@@ -214,6 +271,8 @@ pub fn run() {
             set_keep_awake,
             get_location,
             ip_locate,
+            ensure_mic_permission,
+            open_mic_privacy_settings,
             plugin_env,
             plugin_list,
             plugin_read_manifest,
