@@ -3,9 +3,9 @@
 给 Windows 平板用的全屏小组件桌面，外加一个内置的语音优先 Agent。  
 没有应用图标、没有搜索框、没有开始菜单——开机就是整屏小组件，所有交互通过小组件和 Agent 直接完成。
 
-![桌面](docs/images/v050/desktop-1440-dark.png)
+![桌面](docs/images/v060/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.5.0 · 1440×960 · 深色主题 · 必应每日壁纸（4K，填充）+ 磨砂卡片 · 20px identity 图标行 · 6 卡满屏构图与说明条 / chat 入口下缘共线（截图为 2026-10-24 验证轮）</sub></p>
+<p align="center"><sub>v0.6.0 · 1440×960 · 深色主题 · 必应每日壁纸（4K，填充）+ 磨砂卡片 · 20px identity 图标行 · 6 卡满屏构图与说明条 / chat 入口下缘共线（2026-10-25 真实安装版截图）</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -14,7 +14,7 @@
 
 ## 特性
 
-- **壁纸（v0.6.0：三模式 + 欣赏壁纸）**：数据层固定必应**官方归档**（`HPImageArchive`，4K 由 `urlbase + _UHD.jpg` 拼出，最多 15 天历史；归档接口缺 CORS 头，改由 Rust `reqwest` 代取 JSON）。三种互斥模式：**自动**（按本地日期选「不晚于今天」的最新一张，可关自动更新）、**固定**（钉住某张，跨天不跟）、**本机图片**（二进制存 IndexedDB、按内容哈希寻址，不联网）。比例不符按“填充”（`object-fit: cover`）不拉伸；左下角说明条同时是**欣赏壁纸**入口（全屏观图 + 一次性纯文本释义，会话内状态、不持久化）。取不到时保留当前图或退回 Fluent 中性底色。
+- **壁纸（v0.6.0：三模式 + 欣赏壁纸）**：数据层固定必应**官方归档**（`HPImageArchive`，4K 由 `urlbase + _UHD.jpg` 拼出，最多 15 天历史；归档接口缺 CORS 头，改由 Rust `reqwest` 代取 JSON）。三种互斥模式：**自动**（按本地日期选「不晚于今天」的最新一张，可关自动更新）、**固定**（钉住某张，跨天不跟）、**本机图片**（二进制存 IndexedDB、按内容哈希寻址，不联网）。比例不符按“填充”（`object-fit: cover`）不拉伸；左下角说明条同时是**欣赏壁纸**入口（全屏观图 + 一次性纯文本释义，会话内状态、不持久化）。释义由 **MiMo V2.6 Pro 看图 + 深度思考 + 强制联网搜索**生成：简体中文、禁任何语言来源旁白，提示词建议 ≤200 字（客户端不截断、不按长度判失败）；支持手动「重新生成说明」，失败保留旧释义。取不到时保留当前图或退回 Fluent 中性底色。
 - **小组件桌面**：单一布局算法「网格 + 底部条（说明条 / chat 入口）」——说明条实测高度 `H_p` 是布局输入，整块在视口内垂直居中；自适应网格、多页滑动、长按进入编辑模式（拖拽换位/改尺寸/删除/添加组件）、编辑删除持久化；布局、主题偏好都保存在本机。全屏页用磨砂底与层级契约，触控命中区统一 44px。
 - **六个内置小组件**：时钟、倒数日、番茄钟、久坐提醒、待办、天气。同权视觉契约（D-36）：唯一 hero 字号 `Hero900`（40/52）、统一卡片栅格与材质、identity 色只允许出现在 20px 图标；每张卡有静态 identity 行（20px 图标 + 12px 组件名），空态为中性单色图标 + 主操作；默认布局按 8×5 满屏构图。
 - **天气 3×2 为「当前天气 + 今日指标 + 逐时 6 列」三带式布局**，4×2 显示 AQI + 未来 7 天。
@@ -25,14 +25,36 @@
 
 ## 截图
 
-> 截图取自 **2026-10-24 验证轮**（v0.4.5–v0.5.0 界面：D-36 同权视觉、居中布局、44px 命中区、Agent 轮次时间线）；**v0.6.0 的壁纸三模式 / 欣赏壁纸 / 说明条参与布局属于设置项与交互增量，暂无截图**，补图时新增 `docs/images/v060/`。历史版本截图（v030 / v037 / v040）仍保留在 `docs/images/` 作视觉存档。
+> 截图取自 **2026-10-25 v0.6.0 验证轮**（真实安装版 1440×960 / 200% DPI：说明条按下形变、卡片 hover/press 本体缩放、欣赏壁纸中文释义）；v0.6.0 的壁纸三模式 / 欣赏壁纸 / 说明条参与布局已补图到 `docs/images/v060/`。历史版本截图（v030 / v037 / v040 / v050）仍保留在 `docs/images/` 作视觉存档。
 
-### 桌面（v0.5.0：必应壁纸 + 磨砂卡片 + 说明条参与布局 + 满屏默认构图）
+### 桌面（v0.6.0：必应壁纸 + 磨砂卡片 + 说明条参与布局 + 满屏默认构图）
 
-| 深色 · 1440×960 | 亮色 · 1024×768 |
+| 深色 · 1440×960（v0.6.0 真实安装版） | 亮色 · 1024×768（v0.5.0 留存） |
 |---|---|
-| <img src="docs/images/v050/desktop-1440-dark.png" width="440" /> | <img src="docs/images/v050/desktop-1024-light.png" width="340" /> |
-| <sub>4K 壁纸按“填充”铺满；卡片浮在壁纸上；左下角说明条与右下 chat 入口下缘共线</sub> | <sub>同一套 Fluent token，亮色下卡片为白色磨砂面；1024 宽下默认构图回退，部分卡片在后续页</sub> |
+| <img src="docs/images/v060/desktop-1440-dark.png" width="440" /> | <img src="docs/images/v050/desktop-1024-light.png" width="340" /> |
+| <sub>4K 壁纸按“填充”铺满；卡片浮在壁纸上；左下角说明条（欣赏壁纸入口）与右下 chat 入口下缘共线</sub> | <sub>同一套 Fluent token，亮色下卡片为白色磨砂面；1024 宽下默认构图回退，部分卡片在后续页</sub> |
+
+### 欣赏壁纸（v0.6.0：说明条入口 + 中文释义）
+
+| 欣赏壁纸 · 深色 1440×960 |
+|---|
+| <img src="docs/images/v060/gallery-1440-dark.png" width="640" /> |
+| <sub>桌面与卡片退场，只留壁纸 + 左下角说明条；释义由 MiMo V2.6 Pro 看图 + 深度思考生成（简体中文、禁来源旁白，提示词建议 ≤200 字），右侧为手动「重新生成说明」按钮</sub> |
+
+<details>
+<summary>交互态截图（真实鼠标：卡片 hover/press 本体缩放、说明条按下形变）</summary>
+
+| 卡片 rest / hover / press（卡片本体缩放） |
+|---|
+| <img src="docs/images/v060/card-states.png" width="740" /> |
+| <sub>hover 1.015（100ms 减速）、press 0.985（50ms 加速）；缩放只作用卡片本体，iframe 内容不参与，阴影/描边按 MOTION §2 升降</sub> |
+
+| 说明条 rest / press（scale 0.985） |
+|---|
+| <img src="docs/images/v060/credit-press.png" width="600" /> |
+| <sub>按下 0.985 形变（50ms 加速 / 回弹 100ms）；transform 不改 border-box，H_p 仍 26，44×44 命中区不变</sub> |
+
+</details>
 
 ### Agent：右下角浮空三段界面（语音优先）
 
@@ -103,7 +125,7 @@
 
 ### 直接安装
 
-从构建产物安装 `Windows Tablet Launcher`（NSIS 中文安装包或 MSI zh-CN）。本机 `release/` 中最新已构建产物为 **v0.4.0**；代码已到 v0.6.0，但 v0.4.5 / v0.5.0 / v0.6.0 尚未重新打包安装包。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
+从构建产物安装 `Windows Tablet Launcher`（NSIS 中文安装包或 MSI zh-CN）。v0.6.0 已在本机完成 `npx tauri build` 与 NSIS 静默**全新安装**（产物在 `src-tauri/target/release/bundle/{nsis,msi}/`；`release/` 里是 v0.4.0 及更早的历史归档）。升级会通过插件目录的 `.seed-version` 自动重种内置插件，用户布局/会话/插件配置保留。
 
 首次启动后：
 
@@ -185,10 +207,13 @@ release/                # 本机安装包产物（本地不入库）
 ## 验证状态（v0.6.0）
 
 > 代码版本 **v0.6.0**（`package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` 一致）。
-> v0.4.0 及以前有独立验证报告与截图；**v0.4.5 / v0.5.0 / v0.6.0 未保留独立验证报告与截图**，
-> 结论以 git 提交记录、[docs/DECISIONS.md](docs/DECISIONS.md)（D-36 / D-37）与已同步的规范文档为准。
+> **v0.6.0 已完成验证（2026-10-25）**：`npx tsc --noEmit` / `npm run build` / `npx tauri build` 全部通过；
+> NSIS 静默全新安装 + 清空 WebView2 配置后，在 1440×960 逻辑 / DPI192 下用真实鼠标截图确认
+> 卡片本体 hover/press 缩放、说明条按下形变、说明文字为中文且不含来源旁白；CDP 断言 **47/47 PASS**。
+> 证据是本地 `shots/acceptance-v060/`（`REPORT.md` / `checks.json` / 原始截图，按约定不入库）。
+> v0.4.0 及以前有独立验证报告与截图；v0.4.5 / v0.5.0 未保留独立报告。
 
-- v0.6.0（2026-10-25，壁纸三模式 + 说明条参与布局，D-37）：壁纸改为必应**官方归档**（`HPImageArchive`，15 天历史、4K；归档接口缺 CORS 头，改由 Rust `reqwest` 代取 JSON，`src-tauri/src/bingarchive.rs` 注册到 `lib.rs`）；自动 / 固定 / 本机图片三模式互斥（本机图存 IndexedDB、按内容哈希寻址）；说明条改为按钮，同时是**欣赏壁纸**唯一入口（全屏观图，Esc/再点退出，会话内不持久化），并新增一次性纯文本释义（独立调用、强制 `web_search`、≤120 字、按内容地址缓存、失败 24h 冷静期）；说明条实测高度 `H_p` 成为布局输入（`H_p=0` 时网格单独居中），chat 入口与说明条下缘共线。文档落点：DESIGN §6 / TOKEN-MAP §1·§6 / AGENT-SURFACE-CONTRACT §1·§14.1·§20 / MOTION §5.2 / DENSITY §1.1-5 / FLUENT2 §5·§7·§14 / PLUGIN-CONTRACT §栅格。
+- v0.6.0（2026-10-25，壁纸三模式 + 欣赏壁纸 + 说明文字收口，D-37 / D-38）：壁纸改为必应**官方归档**（`HPImageArchive`，15 天历史、4K；归档接口缺 CORS 头，改由 Rust `reqwest` 代取 JSON，`src-tauri/src/bingarchive.rs` 注册到 `lib.rs`）；自动 / 固定 / 本机图片三模式互斥（本机图存 IndexedDB、按内容哈希寻址）；说明条改为按钮，同时是**欣赏壁纸**唯一入口（全屏观图，Esc/再点退出，会话内不持久化），并新增一次性释义（独立调用、强制 `web_search`、按内容地址缓存、失败 24h 冷静期）。**说明文字 v3（D-38）**：固定 `mimo-v2.6-pro`、开启深度思考，并把今日壁纸 4K 图片以 `image_url` 多模态消息随请求发送；SYSTEM_PROMPT 要求简体中文、禁任何语言来源旁白、建议 2–4 句 ≤200 字（长度只由提示词约束，客户端不截断）；客户端新增语言/旁白硬校验，命中即失败不落库；欣赏壁纸模式可手动「重新生成说明」（失败保留旧释义）。**动效收口**：说明条按下 `scale(0.985)` 形变（`H_p` 改 `offsetHeight` 测量，44×44 命中区不变）；hover/press/长按/编辑缩放全部回到 **Card 本体**，iframe 内容不参与（reduced-motion 无 transform）。**磨砂诊断**：真实 DPR2 截图实测 `backdrop-filter` 正常对壁纸合成（卡片区域 / 锐利壁纸 Laplacian 方差比 1.9e-05），`will-change`/`isolation` 移除前后像素 diff 0.0，非合成层截断；材质 72% + blur 24 维持 D-31 登记值。证据：本地 `shots/acceptance-v060/REPORT.md`。文档落点：DESIGN §6 / TOKEN-MAP §1·§6 / AGENT-SURFACE-CONTRACT §1·§14.1·§20 / MOTION §5.2 / FLUENT2 §5·§7·§14 / DECISIONS D-37·D-38。
 - v0.5.0（2026-10-24，布局 / Agent / 插件 / 宿主收敛轮）：桌面布局收敛为「网格 + 底部条（说明条 / chat 入口）」单一算法；Agent 增加轮次时间线、「触控 + 语音」混合手势、空闲自动收回、麦克风权限自愈；宿主全屏页磨砂底与层级契约、44px 命中区垂直居中；插件卡片内对齐收敛到内容轴、时钟 Agent 工具收紧（先搜后加）；构建升级 Tauri 2.12.4 并修复 WebView2 权限，版本号统一 0.5.0。
 - v0.4.5（2026-10-24，Equal Except Hue 视觉契约 + 布局居中，D-36）：唯一 hero 字号 `Hero900`（40/52，不定义项目级字号 token）、统一卡片栅格（padding 16 / gap 8 / 行高 44）、identity 色白名单且只出现在 20px 图标、按钮层级规则、统一卡框材质；`gridOrigin` 取消 4px 吸附改为严格居中（22/22/46/46）。验证：`npm run typecheck` exit 0；`npm run build` 通过（2227 modules）。
 
