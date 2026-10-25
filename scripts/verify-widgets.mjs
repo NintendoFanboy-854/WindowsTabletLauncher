@@ -5,7 +5,7 @@
  *   node scripts/verify-widgets.mjs                 # 全部插件 × 全部尺寸（1440×960）
  *   node scripts/verify-widgets.mjs --plugin clock  # 只测一个插件
  *   node scripts/verify-widgets.mjs --scheme light  # 亮色主题抽查（默认 dark）
- *   node scripts/verify-widgets.mjs --screenshots   # 同时把每例截图写到 shots/e7/cards/
+ *   node scripts/verify-widgets.mjs --screenshots   # 同时把每例截图写到 shots/milestones/e7/cards/
  *
  * 实现：复用 `scripts/lib/cdp.mjs`（串行单 Edge、唯一 `%TEMP%\wtsl-verify-*` profile、
  * 结束按本次 profile 清理，不用 `taskkill /F /IM msedge.exe`）。
@@ -138,7 +138,7 @@ function thresholds(sizeKind, key) {
 /**
  * 纯列表卡（E7 追加）：docs/components/todo.md 明确「2×2 头部『今日 · N』12 fg3 + 4 行」，
  * 头部不是计数主层，因此 DENSITY §2.1 的「列表头主层 ≥28px + 主次比 ≥1.5」不适用
- * （文档冲突已记入 shots/e7/REPORT.md，建议 Lead 统一口径）。
+ * （文档冲突已记入 shots/milestones/e7/REPORT.md，建议 Lead 统一口径）。
  * 这里改用更贴合物料的断言：行数在 D-04 预算内、行高 ≥44、行标题 16px、头部文案存在。
  */
 const ROW_CARDS = {
@@ -148,7 +148,7 @@ const ROW_CARDS = {
 /**
  * 已知且已接受为 P2 的偏差账本（必须写理由与出处）：
  * 断言仍然执行；只有在此账本登记、且未超出放宽后的护栏时才 PASS*（不隐藏偏差）。
- * - weather 2×2：E5-P2-01（`shots/e5/REPORT.md` §4.1）实测约 29% 空带，是当前内容预算的
+ * - weather 2×2：E5-P2-01（`shots/milestones/e5/REPORT.md` §4.1）实测约 29% 空带，是当前内容预算的
  *   结果，Lead 未要求改产品；E7 只把上限放宽到 30% / 内容带 ≥40% 作为回归护栏。
  */
 const ACCEPTED_P2 = {
@@ -525,9 +525,9 @@ async function verifyCase(cdp, plugin, size, options) {
   await sleep(400);
   const measure = await cdp.evaluate(MEASURE_SCRIPT);
   if (options.screenshots) {
-    // E7：卡片证据归档到 shots/e7/cards（E5 的 shots/rewrite/verify 是旧路径）
+    // E7：卡片证据归档到 shots/milestones/e7/cards（E5 时期的旧路径已废弃）
     await cdp.screenshot(
-      join('shots', 'e7', 'cards', `${plugin.id}-${size.key}-${options.scheme}.png`),
+      join('shots', 'milestones', 'e7', 'cards', `${plugin.id}-${size.key}-${options.scheme}.png`),
     );
   }
 

@@ -7,15 +7,15 @@
   .\scripts\shot.ps1 -Serve
 
 .EXAMPLE
-  .\scripts\shot.ps1 -Url http://localhost:4173/ -Out shots/desktop-1440x960.png
+  .\scripts\shot.ps1 -Url http://localhost:4173/ -Out shots/archive/desktop-1440x960.png
 
 .EXAMPLE
   # 竖屏
-  .\scripts\shot.ps1 -Width 960 -Height 1440 -Out shots/desktop-portrait.png
+  .\scripts\shot.ps1 -Width 960 -Height 1440 -Out shots/archive/desktop-portrait.png
 #>
 param(
   [string]$Url = 'http://localhost:4173/',
-  [string]$Out = 'shots/shot.png',
+  [string]$Out = 'shots/archive/shot.png',
   [int]$Width = 1440,
   [int]$Height = 960,
   [int]$BudgetMs = 12000,

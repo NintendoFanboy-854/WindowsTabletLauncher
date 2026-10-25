@@ -66,7 +66,7 @@ docs/
 │
 ├── audits/                        # 审计报告与证据索引（见 audits/README.md）
 │   ├── README.md
-│   ├── round1-fluid-visual/       # 2026-10-18/19 基线 UI 审计：AUDIT.md + 原始扫描 txt/log
+│   ├── round1-fluid-visual/       # 2026-10-18/19 基线 UI 审计：AUDIT.md + 原始扫描 txt（运行日志在 shots/audits/round1-fluid-visual/logs/）
 │   └── round2-type-visual/        # 第二轮：字号/间距审计 + 视觉审计 + 重写验收 + 量测数据
 │
 └── images/                        # README/发布说明引用的精选截图，按版本归档（v030 / v037 / v040；旧版本图保留作视觉存档）
@@ -95,7 +95,7 @@ pomodoro 等其余文档只被文档间引用。`VISION` / `MOTION` / `TOKEN-MAP
 | 目录 | 内容 | 版本库 |
 |---|---|---|
 | `shots/` | 验证/审计截图与日志，按 `releases/`、`milestones/`、`audits/`、`archive/` 归档 | 忽略 |
-| `.tmp/` | 临时调试输出：`logs/`、`scripts/`、`screenshots/`、`media/`、`data/`、`backups/`、`experiments/`、`archive/`；`reorg/` 为本次整理的一次性脚本与 `moves.log` | 忽略 |
+| `.tmp/` | 临时调试输出：`logs/`、`scripts/`、`screenshots/`、`media/`、`data/`、`backups/`、`experiments/`、`archive/`；`archive/reorg-2026-10-25/` 为本次整理的一次性脚本与 `moves.log` | 忽略 |
 | `release/` | 各版本安装包（NSIS/MSI/app.exe + README/SHA256SUMS） | 忽略 |
 | `dist/` | Vite 构建产物 | 忽略 |
 
@@ -150,14 +150,24 @@ pomodoro 等其余文档只被文档间引用。`VISION` / `MOTION` / `TOKEN-MAP
 | `.tmp/` 下的试验目录 | `.tmp/experiments/`；LevelDB/localStorage 副本 → `.tmp/data/`；安装备份 → `.tmp/backups/` |
 | `.tmp/v040-spec.md` | `docs/history/V040-VISUAL-REWORK-SPEC.md` |
 
+### 2026-10-25 第二轮：遗留收口
+
+| 内容 | 变化 |
+|---|---|
+| `docs/audits/round1-fluid-visual/*.log`（15 个运行日志） | 移到 `shots/audits/round1-fluid-visual/logs/`（本地证据，不入库；报告内路径已同步） |
+| `scripts/*.mjs`、`scripts/shot.ps1`、`docs/audits/round2-type-visual/_type-data/harness.mjs` | 证据输出目录按上表切到新 `shots/` 结构（仅路径常量/注释，不涉及逻辑） |
+| `docs/releases/RELEASE.md` / `RELEASE-REPORT.md` | 标题改为实际覆盖范围（v0.3.0 基线 + v0.3.1–v0.3.7 增量 / v0.2.1–v0.3.7） |
+| `.tmp/reorg/` | 归档到 `.tmp/archive/reorg-2026-10-25/` |
+| `docs/images/` | 新增 README，说明版本归档、被引用与未引用截图 |
+| `.gitignore` | 移除已删除目录的 `references/` 残留规则 |
+
 ## 已知陈旧点（整理时发现，未擅自改写）
 
-- 根 `README.md` 的"验证状态"与版本号停在 **v0.4.0**，而 `package.json` / `src-tauri/Cargo.toml` /
-  `tauri.conf.json` 已是 **0.6.0**；v0.5.0、v0.6.0 的验证结论目前只在 git 提交信息里，未回填 README/RELEASE-REPORT。
-- `docs/releases/RELEASE-REPORT.md` 覆盖到 **v0.3.7 §20**；v0.4.0 之后的验证结论散见 README 与提交信息。
-- 历史文档（`history/`、`releases/`、`audits/`）中的路径是按当时仓库状态写的；遇到旧路径请对照上面的迁移表。
-- **验证脚本仍写旧证据路径**：按"代码不动"原则，本次未修改 `scripts/*.mjs`。其中 7 个验证脚本 + `shot.ps1`
-  + 1 个历史审计 harness 的注释与默认输出目录仍指向旧结构（如 `shots/e7/`、`shots/v030-dev/`、
-  `shots/v022-final/`、`shots/pnp/`、`shots/e3/`），
-  运行这些脚本会在 `shots/` 根下重新生成旧目录名。需要与上面的新结构对齐时，请按迁移表同步脚本内的
-  路径常量（属代码改动，未包含在本次整理中）。
+- 根 `README.md` 的验证状态已同步到 **v0.6.0**（2026-10-25 补记 v0.4.5 / v0.5.0 / v0.6.0 摘要）；但
+  v0.4.5 之后未保留独立验证报告与截图，结论以 git 提交记录、`docs/DECISIONS.md`（D-36 / D-37）与
+  已同步的规范文档为准。
+- `docs/releases/RELEASE-REPORT.md` 覆盖 **v0.2.1 §10 → v0.3.7 §20**；v0.4.0 之后的版本验证未回填本报告。
+- 历史文档（`history/`、`releases/`、`audits/`）中的时间/命令/行号按当时仓库状态保留；路径已按迁移表
+  同步（含相对链接），遇到表外旧路径以本文件为准。
+- **验证脚本输出路径已在第二轮同步**：`scripts/*.mjs`、`scripts/shot.ps1` 与审计 harness 的证据输出目录
+  已切到 `shots/releases|milestones|audits/...`（仅路径常量与注释改动，不涉及逻辑）。

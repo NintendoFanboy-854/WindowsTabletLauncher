@@ -7,8 +7,8 @@
 > **G2b 增量复验**：收口提交 `2b79fb9`（2026-10-19 02:58:06），复验时间 03:0x–03:4x；结果见 §0（历史）、§8、§9.8。
 > **G2c 最终确认（本次更新）**：收口提交 `85c3962`（2026-10-19 03:30:44，工作区除 1 个未跟踪 `docs/releases/RELEASE-REPORT.md` 外干净），复验时间 2026-10-19 03:3x–03:5x；最终判定见 §0、§8、§9.9。
 > **审计工具**：PowerShell 7 + Edge 155.0.4283.62 headless（CDP 截图/DOM 测量）+ ripgrep 静态扫描
-> **截图目录**：`shots/audits/round1-fluid-visual/`（本报告引用的截图均在此目录）
-> **扫描原始输出**：`docs/audits/round1-fluid-visual/_scan-*.txt`、`docs/audits/round1-fluid-visual/_shots-*.log`、`docs/audits/round1-fluid-visual/_baseline-manifest.txt`
+> **截图与运行日志目录**：`shots/audits/round1-fluid-visual/`（截图在根目录，运行日志在 `logs/`；均不入库，本报告引用的截图均在此目录）
+> **扫描原始输出**：`docs/audits/round1-fluid-visual/_scan-*.txt`、`shots/audits/round1-fluid-visual/logs/_shots-*.log`、`docs/audits/round1-fluid-visual/_baseline-manifest.txt`
 > **审计者立场**：只对照规范与产物；不接受"整体良好"结论；每条违规均带截图或 `文件:行` 证据。
 
 ## 0. 结论摘要（G2c 最终确认，2026-10-19）
@@ -71,7 +71,7 @@
 | 强提醒 | `/src/host/shell/demo.html?reminder=1` | 1440×960 / 1024×768 |
 | 插件独立页 | `/plugins/<id>/index.html?size=<WxH>&demo=1`（天气 `&mock=1`，另加 `&detail=...&settings=1&theme=light`） | 1×1 180×180、2×1 360×180、2×2 360×360、3×2 540×360、3×3 540×540、4×2 720×360 |
 
-截图统一由 headless Edge + CDP `Page.captureScreenshot` 生成（不占桌面、不抢焦点），日志见 `docs/audits/round1-fluid-visual/_shots-plugins2.log`、`docs/audits/round1-fluid-visual/_shots-host-final.log`。插件独立页采用 180px 基准卡片尺寸（3×2=540×360 等），与宿主真实卡片（1440×960 下约 166px 单元格）视觉近似，密度结论以宿主截图为主、独立页用于观察各档位裁剪。
+截图统一由 headless Edge + CDP `Page.captureScreenshot` 生成（不占桌面、不抢焦点），日志见 `shots/audits/round1-fluid-visual/logs/_shots-plugins2.log`、`shots/audits/round1-fluid-visual/logs/_shots-host-final.log`。插件独立页采用 180px 基准卡片尺寸（3×2=540×360 等），与宿主真实卡片（1440×960 下约 166px 单元格）视觉近似，密度结论以宿主截图为主、独立页用于观察各档位裁剪。
 
 ### 1.4 判定口径
 
@@ -171,7 +171,7 @@
 | **V-04** | FLUENT2 §3「组件内字号只取 type ramp（10/12/14/16/20/24/28/32/40/68）；Primary 允许 clamp 缩放但基准参照 ramp」 | 扫描 `docs/audits/round1-fluid-visual/_scan-fontsize.txt`：非 token 113/153（74%）。逐文件：clock 11/17、countdown 17/28、pomodoro 15/27、sedentary 15/26、todo 52/52、`src/styles.css` 3/3。典型：`clock/styles.css:229-288`（`clamp(11px,2.9vmin,20px)` 等非 ramp 端点）；`pomodoro/styles.css:365`（`clamp(12px,3.2vmin,16px)`）；`todo/app.css:24`（`font-size: var(--fs,13px)`）+ `todo/js/app.js:214` 按卡片尺寸把根字号连续缩放到 10.5–16.5px，全部 rem 字号随之连续变化（`todo/app.css:146-2153` 52 处 rem/em） | 插件字号不落在 type ramp 上；todo 甚至用连续缩放字号，等同放弃字阶体系 | 把字号改为 `var(--fontSizeBase*)`，Primary 的 clamp 端点取 ramp 值；todo 放弃 rem 全量缩放，按尺寸档位切 ramp 字号 |
 | **V-05** | FLUENT2 §4「只用 spacing token（2/4/6/8/10/12/16/20/24/32/40/48）」；DENSITY §2「分组用 spacing token 留白」 | 扫描 `docs/audits/round1-fluid-visual/_scan-gap.txt` / `_scan-padding.txt` / `_scan-margin.txt`：gap 非 token 113/152、padding 101/124、margin 42/53。典型：`todo/app.css:75`（`padding: 0.75rem 0.95rem`）、`:347/:370`（`min-height: 2.5rem/2.25rem`）、`:665-680`；`sedentary/styles.css` gap 21/32；`countdown/styles.css` gap 14/26；`src/styles.css:49-59`（26px 标题栏高度、12px padding 等手写值） | 间距使用 rem/px 任意值（如 0.3rem=4.8px、0.4rem=6.4px、0.95rem=15.2px），不在 4px ramp 上，跨尺寸无法保持节奏 | 改用 `var(--spacingHorizontal*)`/`var(--spacingVertical*)`；需要缩放时用 ramp 端点 clamp |
 | **V-06** | FLUENT2 §9「交互目标 ≥40×40」；DESIGN §1.2「触控目标不小于 40×40 CSS px」 | ① 桌面 dock：`src/host/App.tsx:149-159` 四个 `size="small"` 按钮（Fluent small 高 24px），截图 `host-desktop-1440x960.png` 右下角；② 编辑模式：`WidgetCard.tsx:211/225/249` 三个 `size="small"` 图标按钮，截图 `host-desktop-edit-1440x960.png` 卡片右上；③ Agent 头部：`ConversationPane.tsx:135-239` 五个默认 medium 图标按钮（Fluent medium 32px），截图 `agent-demo-overlay-1440x960.png`；④ Agent 设置对话框：`SettingsDialog.tsx:146-325` 的输入框/开关/下拉均为 Fluent 默认 32px 高（截图 `agent-demo-settings-1440x960.png`）；⑤ 设置页纵向 Tab：截图像素测量行高约 33px（`host-settings-1024x768.png` 导航项 y=116/149/181/215/248/282）；⑥ todo 任务行：`todo/app.css:347/370`（2.5rem/2.25rem，按 `--fs` 10.5–16.5px 换算约 26–36px），截图 `p-todo-2x2.png` 8 行/360px 高；⑦ todo 周/月视图日历格约 33px 高、内文 8–9px（`p-todo-week-3x3.png`、`p-todo-month-3x3.png`） | 平板触控场景下大量主操作目标低于 40×40，误触率高 | 宿主 chrome 统一 `size="large"`（40px）或加 `minHeight:40/minWidth:40`；Tab 用 `size="large"`；表单控件统一 40px 高；todo 行高与日历格改为 ≥40px（或降低单屏条数） |
-| **V-07** | DESIGN §7「页面切换用 Fluent 减速曲线…不允许自定义」；FLUENT2 §8「Enter/Exit 用 createPresenceComponent」 | `src/host/shell/PageTransition.tsx:8-16` 用 `createMotionComponent` 直接包页面；`App.tsx:133` `<PageTransition key={page}>{content}</PageTransition>`。运行日志 `docs/audits/round1-fluid-visual/_shots-host-final.log` 每次页面加载均报：`@fluentui/react-motion: Invalid child element. Motion factories require a single child element...`；另有 `Keyborg instance ... disposed incorrectly`（切页焦点管理库告警） | 页面切换动效实际不生效（退化/报错），motion 用法错误；焦点管理库在页面卸载时异常 | 用 `createPresenceComponent`/`createMotionComponent` 的 motion slot 规范包裹单个元素（或对 div 套用 className），并修正 Keyborg 卸载顺序；验收以控制台零报错为准 |
+| **V-07** | DESIGN §7「页面切换用 Fluent 减速曲线…不允许自定义」；FLUENT2 §8「Enter/Exit 用 createPresenceComponent」 | `src/host/shell/PageTransition.tsx:8-16` 用 `createMotionComponent` 直接包页面；`App.tsx:133` `<PageTransition key={page}>{content}</PageTransition>`。运行日志 `shots/audits/round1-fluid-visual/logs/_shots-host-final.log` 每次页面加载均报：`@fluentui/react-motion: Invalid child element. Motion factories require a single child element...`；另有 `Keyborg instance ... disposed incorrectly`（切页焦点管理库告警） | 页面切换动效实际不生效（退化/报错），motion 用法错误；焦点管理库在页面卸载时异常 | 用 `createPresenceComponent`/`createMotionComponent` 的 motion slot 规范包裹单个元素（或对 div 套用 className），并修正 Keyborg 卸载顺序；验收以控制台零报错为准 |
 | **V-08** | DENSITY 硬规则 1「每个尺寸有信息预算，超预算必须降级」；DENSITY §2 预算表（2×2 允许 2–4 项、3×2 允许 4–6 项） | 截图 `p-todo-2x2.png`：2×2 内渲染 **8 条**任务；`p-todo-3x2.png`：3×2 内渲染 **8 条**任务；`host-desktop-1440x960.png` 3×3 空态另行；`p-todo-4x2.png` 已完成列在第 10 行处被裁切（无滚动提示） | todo 2×2/3×2 任务条数超预算 2–4 倍，列表行高被压到 26–30px（同时触发 V-06） | 2×2 限 4 条、3×2 限 6 条，其余进"查看全部"；4×2 已完成列加内部滚动与计数 |
 
 ### 3.3 P2（可优化 / 风险项）
@@ -192,7 +192,7 @@
 | **V-20** | FLUENT2 §2/§4 | `src/styles.css:14-18`（桌面壁纸 radial-gradient + `#0e0f13` + `#f3f3f3`）、`:115-128`（`.desktop-dock` 使用 `18px/16px/4px/6px/12px` 字面量与 rgba fallback） | 宿主根样式未走 token（壁纸为设计决定的例外，但值是手写的；dock 间距/圆角为字面量） | 壁纸如需保留，声明为项目材质 token（如 `--wtsl-desktop-backdrop`）并注明例外；dock 改 spacing/radius token |
 | **V-21** | DENSITY §4 页面「一屏一个主任务」；FLUENT2 §13 空状态 | `host-review-1440x960.png`：页头"刷新"与空状态"重新读取"两个等效操作并存；空态描述在 1440 宽下仍被压成两行（"…会自动汇/总。"）；`host-plugins-1440x960.png` 操作列仅有一个禁用"删除"，无重载/禁用等动作 | 复盘空态双刷新入口、文案换行生硬；插件管理操作列信息价值低 | 空态只留一个"重新读取"，页头刷新在空态时隐藏；空态描述限宽改为一句话；插件管理补"重新扫描/禁用"行内操作或移除空列 |
 | **V-22** | FLUENT2 §10「支持 320px 宽回流」；DESIGN §1.1 | `src/host/layout/breakpoints.ts:26-30`（<900 一律 4 列）、`:56`（cell 夹取 ≥96px）：320px 宽时 4×96+3×12=420px > 可用宽 280px，网格必然横向溢出（页内不滚动 + overflow hidden）。另 `host-agent-overlay-960x1440.png`：960px 宽时 Agent 浮层固定 min(420px,92vw) 占宽 44%，遮住右下卡片 | 320px 极小宽度无降列策略（未实机截图，几何推导确定溢出）；窄屏浮层占比过高 | 增加 <480 断点降为 2–3 列或允许横向滚动；窄屏（<1100）Agent 浮层改全屏形态 |
-| **V-23** | FLUENT2 §8「统一走 motionTokens」 | `docs/audits/round1-fluid-visual/_shots-host-final.log` 每次页面加载出现 `Keyborg instance ... is being disposed incorrectly`（Fluent 焦点管理库） | 切页时焦点管理实例异常，可能造成焦点丢失/焦点顺序错乱 | 检查 PageTransition 包裹方式与 FocusTrap 生命周期，确保页面卸载顺序正确 |
+| **V-23** | FLUENT2 §8「统一走 motionTokens」 | `shots/audits/round1-fluid-visual/logs/_shots-host-final.log` 每次页面加载出现 `Keyborg instance ... is being disposed incorrectly`（Fluent 焦点管理库） | 切页时焦点管理实例异常，可能造成焦点丢失/焦点顺序错乱 | 检查 PageTransition 包裹方式与 FocusTrap 生命周期，确保页面卸载顺序正确 |
 
 ### 3.4 P3（备注，不计入违规）
 
@@ -607,8 +607,8 @@ G2b 复验开始时（02:58）lead 声称工作区 clean（`2b79fb9`）；复验
 | `docs/audits/round1-fluid-visual/_scan-radius.txt` / `_scan-shadow.txt` | 圆角/阴影命中 |
 | `docs/audits/round1-fluid-visual/_scan-fontsize.txt` / `_scan-gap.txt` / `_scan-padding.txt` / `_scan-margin.txt` | 字号/间距命中 |
 | `docs/audits/round1-fluid-visual/_scan-ts-visual.txt` | 宿主 TS 非 token 视觉属性（8 处） |
-| `docs/audits/round1-fluid-visual/_shots-plugins2.log` / `_shots-host-final.log` | 最终截图批次日志（含控制台报错原文） |
-| `docs/audits/round1-fluid-visual/_shots-host2.log` / `_shots-log.txt` | 过程截图日志（基线期间，供追溯） |
+| `shots/audits/round1-fluid-visual/logs/_shots-plugins2.log` / `_shots-host-final.log` | 最终截图批次日志（含控制台报错原文） |
+| `shots/audits/round1-fluid-visual/logs/_shots-host2.log` / `_shots-log.txt` | 过程截图日志（基线期间，供追溯） |
 
 ---
 
@@ -645,13 +645,13 @@ G2b 复验开始时（02:58）lead 声称工作区 clean（`2b79fb9`）；复验
 | 文件 | 内容 |
 |---|---|
 | `docs/audits/round1-fluid-visual/_g2-scan-hex.txt`、`_g2-scan-fontsize.txt`、`_g2-scan-radius.txt`、`_g2-scan-shadow.txt`、`_g2-scan-gap.txt`、`_g2-scan-padding.txt`、`_g2-scan-margin.txt`、`_g2-scan-transition.txt` | G2 静态扫描明细 |
-| `docs/audits/round1-fluid-visual/_g2-measure-host.log` | 宿主 DOM 实测（dock/编辑按钮/页面按钮/Tab/320 溢出/Agent 头部） |
-| `docs/audits/round1-fluid-visual/_g2-measure-plugins2.log` | 插件 DOM 实测（todo 行高/行数、weather AQI、pomodoro 1×1、countdown 3×2 按钮） |
-| `docs/audits/round1-fluid-visual/_g2-shots-plain.log`、`_g2-shots-remaining.log` | G2 截图批次日志（含控制台报错原文：0 条 react-motion；Keyborg 仅演示页） |
-| `docs/audits/round1-fluid-visual/_g2-overlays.log`、`_g2-overlay-todo-retry.log` | 插件全窗口浮层截图日志（Dialog 尺寸/关闭按钮 40×40） |
+| `shots/audits/round1-fluid-visual/logs/_g2-measure-host.log` | 宿主 DOM 实测（dock/编辑按钮/页面按钮/Tab/320 溢出/Agent 头部） |
+| `shots/audits/round1-fluid-visual/logs/_g2-measure-plugins2.log` | 插件 DOM 实测（todo 行高/行数、weather AQI、pomodoro 1×1、countdown 3×2 按钮） |
+| `shots/audits/round1-fluid-visual/logs/_g2-shots-plain.log`、`_g2-shots-remaining.log` | G2 截图批次日志（含控制台报错原文：0 条 react-motion；Keyborg 仅演示页） |
+| `shots/audits/round1-fluid-visual/logs/_g2-overlays.log`、`_g2-overlay-todo-retry.log` | 插件全窗口浮层截图日志（Dialog 尺寸/关闭按钮 40×40） |
 | `docs/audits/round1-fluid-visual/_g2b-scan-*.txt` | **G2b 复扫**（hex/字号/圆角/阴影/gap/padding/margin） |
-| `docs/audits/round1-fluid-visual/_g2b-scenarios.log`、`_g2b2-scenarios.log`、`_g2b3-scenarios.log` | **G2b DOM 实测/截图日志**（V-06 高度、N-01/N-02 验证、N-03/N-04 高度、N-05 产物核对） |
+| `shots/audits/round1-fluid-visual/logs/_g2b-scenarios.log`、`_g2b2-scenarios.log`、`_g2b3-scenarios.log` | **G2b DOM 实测/截图日志**（V-06 高度、N-01/N-02 验证、N-03/N-04 高度、N-05 产物核对） |
 | `docs/audits/round1-fluid-visual/_g2c-scan-*.txt` | **G2c 复扫**（与 G2b 一致） |
-| `docs/audits/round1-fluid-visual/_g2c-scenarios.log`、`_g2c2-scenarios.log` | **G2c DOM 实测/截图日志**（控件根元素 40、CTA 40、产物文案核对、progressbar） |
+| `shots/audits/round1-fluid-visual/logs/_g2c-scenarios.log`、`_g2c2-scenarios.log` | **G2c DOM 实测/截图日志**（控件根元素 40、CTA 40、产物文案核对、progressbar） |
 
 > 说明：`_g2b*-scenarios.log` / `_g2c*-scenarios.log` 命中仓库 `.gitignore` 的 `*.log` 规则，仅本地留存；其关键数值已定量写入 §9.8/§9.9，扫描结果（`_g2b-scan-*`、`_g2c-scan-*`）与截图目录另行保存。复现命令与场景 JSON 脚本位于本机 `%TEMP%\wtsl-g2.mjs`、`g2b*-scenarios.json`、`g2c*-scenarios.json`（临时文件，如需归档可在发布前复制进 `docs/audits/round1-fluid-visual/`）。

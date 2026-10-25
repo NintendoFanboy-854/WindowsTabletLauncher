@@ -9,8 +9,8 @@
  *   node scripts/verify-overlays.mjs                     # 六插件 detail（默认暗色）
  *   node scripts/verify-overlays.mjs --scheme light      # 亮色同一套断言
  *   node scripts/verify-overlays.mjs --plugin weather    # 只测一个插件
- *   node scripts/verify-overlays.mjs --screenshots       # 截图到 shots/e7/overlays/
- *   node scripts/verify-overlays.mjs --json shots/e7/logs/overlays.json
+ *   node scripts/verify-overlays.mjs --screenshots       # 截图到 shots/milestones/e7/overlays/
+ *   node scripts/verify-overlays.mjs --json shots/milestones/e7/logs/overlays.json
  *
  * 视口：宿主浮层 iframe 实测 834×582（1440×960 下 Dialog 880×680 − 标题/边距）。
  * 断言（不随主题放宽）：
@@ -259,7 +259,7 @@ async function verifyCase(cdp, entry, options) {
   }
 
   if (options.screenshots) {
-    const dir = join('shots', 'e7', 'overlays');
+    const dir = join('shots', 'milestones', 'e7', 'overlays');
     mkdirSync(dir, { recursive: true });
     const suffix = options.scheme === 'light' ? '-light' : '-dark';
     await cdp.screenshot(join(dir, `${entry.plugin}-detail${suffix}.png`));

@@ -21,7 +21,6 @@ shots/
 *.log
 
 # ---- 第三方参考资料本地副本（来源与重新获取方式见 docs/reference/README.md） ----
-references/
 docs/reference/fluent-design/
 docs/reference/fluent-ui-docs/
 

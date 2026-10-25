@@ -12,8 +12,7 @@ docs/audits/
 │   ├── AUDIT.md              # 审计报告（P1/P2 清单、复验记录、处置口径）
 │   ├── _scan-*.txt           # 静态扫描原始命中（hex/字号/间距/圆角/阴影/动效）
 │   ├── _g2*-scan-*.txt       # G2/G2b/G2c 复扫命中
-│   ├── _baseline*.txt        # 审计基线（时间 / git 状态 / 137 个源文件的 SHA256 前 16 位快照）
-│   └── _shots-*.log          # 截图批次日志（*.log 被 .gitignore 忽略：本地有、不入库）
+│   └── _baseline*.txt        # 审计基线（时间 / git 状态 / 137 个源文件的 SHA256 前 16 位快照）
 └── round2-type-visual/       # 第二轮：字号/间距系统审计 + 视觉审计 + 重写验收（2026-10-19）
     ├── REPORT-TYPE.md        # 字号与间距系统审计
     ├── REPORT-VISUAL.md      # 信息密度 / 可扫读性 / 层级审计
@@ -23,12 +22,14 @@ docs/audits/
     └── _type-data/           # 字阶矩阵与 harness 脚本/输出
 ```
 
-对应证据：`shots/audits/round1-fluid-visual/`（151 个文件）、`shots/audits/round2-type-visual/`（87 个文件）。
-本目录中 round1 现有 57 个文件，其中 15 个 `*.log` 被 `.gitignore` 忽略（仅本机存在）；round2 的
-`_data/`、`_type-data/` 是可复现的量测数据与 harness，随报告入库。
+对应证据：`shots/audits/round1-fluid-visual/`（166 个文件 = 151 + 15 个运行日志）、
+`shots/audits/round2-type-visual/`（87 个文件）。本目录中 round1 有 42 个可入库文件（报告 + 扫描 txt），
+15 个运行日志（`_g2-*.log`、`_g2b*.log`、`_g2c*.log`、`_shots-*.log`）在 `shots/audits/round1-fluid-visual/logs/`
+（`*.log` 不入库）；round2 的 `_data/`、`_type-data/` 是可复现的量测数据与 harness，随报告入库。
 
-> 两份审计报告写于 v0.2 前后，是**历史文档**：其中的文件路径/行号按当时仓库状态保留，不随
-> `docs/` 重排而改写。当前规范请以 `docs/` 根目录与 `docs/components/` 为准。
+> 两份审计报告写于 v0.2 前后，是**历史文档**：正文的时间/命令/行号按当时仓库状态保留，路径与相对链接
+> 已按 2026-10-25 迁移同步（含运行日志移到 `shots/audits/round1-fluid-visual/logs/`）。当前规范请以
+> `docs/` 根目录与 `docs/components/` 为准。
 
 ## 里程碑验证报告（本地证据）
 
@@ -69,7 +70,6 @@ shots/
 
 增删证据时保持"一个验证任务一个目录、报告与截图同目录"的规则；体积较大的原始证据不进版本库。
 
-> **注意（2026-10-25 整理后的已知遗留）**：`scripts/*.mjs` 里验证脚本默认的输出目录仍是旧结构
-> （如 `shots/e7/`、`shots/v030-dev/`、`shots/v022-final/`、`shots/pnp/`、`shots/e3/`、`shots/v031-dev/`）。
-> 按"代码不动"原则本次未改脚本；重新运行这些脚本会在 `shots/` 根下生成旧目录名。若要和新结构对齐，
-> 见 `docs/README.md`「已知陈旧点」一节（按迁移表同步脚本内路径常量，属代码改动）。
+> **脚本输出目录（2026-10-25 已对齐）**：`scripts/*.mjs`、`scripts/shot.ps1` 与 `_type-data/harness.mjs`
+> 的证据输出目录已按新结构切换（`shots/releases/…`、`shots/milestones/…`、`shots/audits/…`、
+> `shots/archive/…`）；重跑验证会直接落到对应目录，不再在 `shots/` 根生成旧目录名。

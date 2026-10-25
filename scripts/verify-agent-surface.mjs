@@ -8,7 +8,7 @@
  * 契约：docs/AGENT-SURFACE-CONTRACT.md（v0.3.7 修订）+ 共享任务 task-1 contract
  * 用法（仓库根目录，dev server 在 http://localhost:5173）：
  *   node scripts/verify-agent-surface.mjs
- *   node scripts/verify-agent-surface.mjs --screenshots   # 默认就截图到 shots/v030-dev/
+ *   node scripts/verify-agent-surface.mjs --screenshots   # 默认就截图到 shots/releases/v0.3.x/v030-dev/
  *
  * 覆盖（Phase 1）：
  * - 入口形态：无 dock / 无机器人头像 / 56×56 / aria-label「开始语音提问」；
@@ -27,7 +27,7 @@ import { join } from 'node:path';
 import { launch, sleep } from './lib/cdp.mjs';
 
 const REPO_ROOT = process.cwd();
-const OUT = join(REPO_ROOT, 'shots', 'v030-dev');
+const OUT = join(REPO_ROOT, 'shots', 'releases', 'v0.3.x', 'v030-dev');
 const BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 mkdirSync(OUT, { recursive: true });
 

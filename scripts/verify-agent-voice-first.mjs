@@ -22,7 +22,7 @@
  *   WTSL_BASE_URL=http://127.0.0.1:5173 node scripts/verify-agent-voice-first.mjs
  *
  * 约束：只通过 scripts/lib/cdp.mjs 启动 headless Edge；一次一个实例；结束即清理自己的进程树。
- * 证据：截图 + JSON 写 shots/v037-dev/（gitignored）。
+ * 证据：截图 + JSON 写 shots/releases/v0.3.x/v037-dev/（gitignored）。
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { launch, sleep } from './lib/cdp.mjs';
 
 const REPO_ROOT = process.cwd();
-const OUT = join(REPO_ROOT, 'shots', 'v037-dev');
+const OUT = join(REPO_ROOT, 'shots', 'releases', 'v0.3.x', 'v037-dev');
 const BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 mkdirSync(OUT, { recursive: true });
 

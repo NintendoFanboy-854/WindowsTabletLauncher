@@ -9,7 +9,7 @@
  *   node scripts/smoke-v031-ui.mjs
  *
  * 约束：只启动一个 headless Edge（假麦克风 flags 由 scripts/lib/cdp.mjs 默认带上），
- * 全程串行；失败继续后续项；证据（截图/JSON）写 shots/v031-dev/。
+ * 全程串行；失败继续后续项；证据（截图/JSON）写 shots/releases/v0.3.x/v031-dev/。
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { launch, sleep } from './lib/cdp.mjs';
 
 const REPO_ROOT = process.cwd();
-const OUT = join(REPO_ROOT, 'shots', 'v031-dev');
+const OUT = join(REPO_ROOT, 'shots', 'releases', 'v0.3.x', 'v031-dev');
 // 注意：Vite dev server 可能只监听 IPv6 loopback（::1），127.0.0.1 会 ERR_CONNECTION_REFUSED；
 // 统一用 localhost（与 scripts/lib/cdp.mjs 的 DEFAULT_BASE_URL 一致）。
 const BASE_URL = process.env.WTSL_BASE_URL || 'http://localhost:5173';
@@ -584,7 +584,7 @@ try {
     check('D', 'voice 顶部朗读开关存在且默认「关闭自动朗读」', idle.stage === 'voice' && topBar.toggleLabel === '关闭自动朗读', JSON.stringify({ stage: idle.stage, toggleLabel: topBar.toggleLabel }));
     check('D', 'voice idle 时有「点击说话」按钮 [data-wtsl-agent-talk]', await evalJS(`Boolean(document.querySelector('[data-wtsl-agent-pane="voice"] [data-wtsl-agent-talk]'))`));
     // 无横向溢出：文档无溢出 + surface overflowX=hidden（内容被裁剪、不出滚动条）；
-    // surface scrollWidth-clientWidth 允许 1px 边框亚像素舍入（探针 shots/v031-dev/overflow-probe.log 证：无子元素越界）。
+    // surface scrollWidth-clientWidth 允许 1px 边框亚像素舍入（探针 shots/releases/v0.3.x/v031-dev/overflow-probe.log 证：无子元素越界）。
     const overflow = await evalJS(`(() => {
       const el = document.querySelector('[data-wtsl-agent-surface]');
       const cs = getComputedStyle(el);

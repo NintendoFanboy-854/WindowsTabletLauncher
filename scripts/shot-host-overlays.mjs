@@ -12,7 +12,7 @@
  *
  * 与 verify-overlays.mjs 的分工：那个只测插件页 standalone 的 detail 布局与字号/控件；
  * 这个测宿主集成（点卡开浮层、Dialog 尺寸、iframe 内容、Esc 收回、焦点归还），
- * 截图归档 `shots/e7/host/`。
+ * 截图归档 `shots/milestones/e7/host/`。
  *
  * 实现：复用 `scripts/lib/cdp.mjs`（串行单 Edge、唯一 `%TEMP%\wtsl-verify-*` profile、自动清理）。
  */
@@ -160,7 +160,7 @@ async function main() {
   if (scheme !== 'dark' && scheme !== 'light') throw new Error(`非法 scheme：${scheme}`);
   if (!Number.isFinite(dsf) || dsf <= 0) throw new Error(`非法 dsf：${args[dsfIndex + 1]}`);
 
-  const dir = join('shots', 'e7', 'host');
+  const dir = join('shots', 'milestones', 'e7', 'host');
   const suffix = scheme === 'light' ? '-light' : '-dark';
   const cdp = await launch({ width: WIDTH, height: HEIGHT, scheme });
   const problems = [];
@@ -255,9 +255,9 @@ async function main() {
   }
 
   const { writeFileSync, mkdirSync } = await import('node:fs');
-  mkdirSync(join('shots', 'e7', 'logs'), { recursive: true });
+  mkdirSync(join('shots', 'milestones', 'e7', 'logs'), { recursive: true });
   writeFileSync(
-    join('shots', 'e7', 'logs', `host-overlays-${scheme}.json`),
+    join('shots', 'milestones', 'e7', 'logs', `host-overlays-${scheme}.json`),
     `${JSON.stringify(
       {
         scheme,

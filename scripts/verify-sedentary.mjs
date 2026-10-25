@@ -14,7 +14,7 @@ import { launch, sleep } from './lib/cdp.mjs';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const OUT = join(process.cwd(), 'shots', 'sedentary-verify');
+const OUT = join(process.cwd(), 'shots', 'milestones', 'sedentary-verify');
 const BASE = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 const url = `${BASE}/plugins/sedentary/index.html?plugin=sedentary&demo=1`;
 const result = { url, checks: [], consoleErrors: [] };

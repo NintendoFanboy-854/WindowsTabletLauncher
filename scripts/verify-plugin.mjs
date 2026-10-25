@@ -11,7 +11,7 @@
  *   1. 静态：manifest 结构与源码禁用样式（非 Fluent 字阶 / clamp / lineHeight:1 /
  *      10-11px / 自定义 hex 颜色）；
  *   2. 独立尺寸：按 manifest 的 sizes 逐个打开插件卡片页，断言有文字、最小字号 ≥12、
- *      无 console error，并截图到 shots/e3/<id>/；
+ *      无 console error，并截图到 shots/milestones/e3/<id>/；
  *   3. 宿主冒烟：打开 /?page=desktop，触控轻点该插件卡片；若插件发
  *      plugin:request-overlay，则等宿主 Dialog、截图、X 关闭；再用 Esc 关一次。
  *      未请求浮层的卡片只检查渲染。
@@ -26,7 +26,7 @@ import { DEFAULT_BASE_URL, assert, launch, sleep } from './lib/cdp.mjs';
 
 const REPO_ROOT = process.cwd();
 const PLUGINS_ROOT = join(REPO_ROOT, 'public', 'plugins');
-const SHOTS_ROOT = join(REPO_ROOT, 'shots', 'e3');
+const SHOTS_ROOT = join(REPO_ROOT, 'shots', 'milestones', 'e3');
 
 const args = process.argv.slice(2);
 const id = args.find((arg) => !arg.startsWith('--'));

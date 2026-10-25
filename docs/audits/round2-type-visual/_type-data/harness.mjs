@@ -4,7 +4,7 @@ import { BASE, SEED, gridFor, launch, sleep } from './lib.mjs';
 
 const OUT = path.join(BASE, 'raw');
 fs.mkdirSync(OUT, { recursive: true });
-const SHOTS = path.resolve('shots/audit2');
+const SHOTS = path.resolve('shots/audits/round2-type-visual');
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const PLUGINS = [

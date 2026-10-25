@@ -20,7 +20,7 @@
  *
  * 用法（仓库根目录，dev server 需在 http://localhost:5173 运行）：
  *   node scripts/verify-plug-and-play.mjs
- *   node scripts/verify-plug-and-play.mjs --screenshots   # 截图到 shots/pnp/
+ *   node scripts/verify-plug-and-play.mjs --screenshots   # 截图到 shots/milestones/pnp/
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -36,7 +36,7 @@ const probeDir = join(pluginsRoot, probeId);
 const indexPath = join(pluginsRoot, 'index.json');
 const baseUrl = process.env.WTSL_BASE_URL || 'http://localhost:5173';
 const wantScreenshots = process.argv.includes('--screenshots');
-const shotDir = join(repoRoot, 'shots', 'pnp');
+const shotDir = join(repoRoot, 'shots', 'milestones', 'pnp');
 
 let failures = 0;
 const results = [];
@@ -55,7 +55,7 @@ function restoreIndex(original) {
 async function waitCards(cdp, expected, message) {
   return cdp.waitFor(
     `document.querySelectorAll('[data-widget-card]').length === ${expected}`,
-    // v0.2.2 回归：弱机 + Vite 冷加载时宿主首屏可达 60–100s（见 shots/v022-final/pnp-investigation.json），
+    // v0.2.2 回归：弱机 + Vite 冷加载时宿主首屏可达 60–100s（见 shots/releases/v0.2.x/v022-final/pnp-investigation.json），
     // 30s 会把环境慢误判成产品回归；放宽到 120s，断言本身不变。
     { timeout: 120000, interval: 200, message },
   );
