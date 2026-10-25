@@ -41,6 +41,17 @@ export const useStyles = makeStyles({
     inset: '0',
     overflow: 'hidden',
   },
+  /**
+   * 翻页轨道。
+   *
+   * `will-change: transform` 保留：它是翻页位移的合成层提示，**不是** backdrop-filter
+   * 的失效原因。Filter Effects 2 §3 明确「transform 与 will-change: transform 不形成
+   * backdrop root」；本机 2880×1920 / DPR2 真实窗口截图实测：把卡片自身与全部祖先的
+   * will-change 内联改成 auto、以及把 isolation 改成 auto，卡片区域像素 diff 均为 0.0，
+   * 卡片磨砂始终对着壁纸合成（证据：.tmp/blur-diag/diag2.json 的
+   * dark/light-material-blur-vs-wc-auto 全为 0）。磨砂强弱只由材质配比
+   * （D-31 登记的 72% + blur 24）与壁纸内容决定，不要为了“让模糊出现”去动这里。
+   */
   track: {
     display: 'flex',
     height: '100%',
@@ -77,6 +88,14 @@ export const useStyles = makeStyles({
     flex: '0 0 auto',
     height: '100%',
   },
+  /**
+   * 卡片本体（surface）：定位 translate、MOTION §2 状态机 scale、材质、阴影都在这一层。
+   *
+   * scale 以 `transform-origin: center center` 生效；`will-change: transform` 只是
+   * 卡片缩放/拖拽的合成层提示。它同样不形成 backdrop root（Filter Effects 2 §3），
+   * 本机真实截图实测移除前后像素 diff = 0；backdrop-filter 在 DPR2 真实窗口里
+   * 确实采样到壁纸（见 track 注释里的证据路径）。
+   */
   card: {
     willChange: 'transform',
     transformOrigin: 'center center',
@@ -97,7 +116,11 @@ export const useStyles = makeStyles({
   },
   /**
    * 卡片内容区：承载 iframe，并接住宿主边缘（6px 内衬）的 hover。
-   * 缩放放在内部的 contentLayer 上，让 hover 的 1.015 倍只长进内衬，不裁到 Card 外。
+   *
+   * 缩放不在这里：MOTION §2 的 hover/press/longpress 缩放只作用在 **Card 本体**
+   * （`WidgetCard.tsx` 的 cardTransform），内容层永远 `transform: none`——
+   * 这是 MOTION §10「不做跨 iframe 内容缩放动画，卡片层动画在宿主外层完成」的落地。
+   * 6px 内衬只是内容与卡框之间的间隔，不承担任何缩放吸收。
    *
    * 唯一内容轴：宿主 6（SNudge）+ 共享 CardRoot 16（L）= 22。
    * 16 由系统共享层强制，插件传 className/style 也不能改 padding/gap；
@@ -108,12 +131,11 @@ export const useStyles = makeStyles({
     inset: '0',
     padding: tokens.spacingHorizontalSNudge,
   },
+  /** 内容层不参与任何缩放/transform（缩放只在 Card 本体）；不再需要合成层提示 */
   contentLayer: {
     position: 'relative',
     width: '100%',
     height: '100%',
-    transformOrigin: 'center center',
-    willChange: 'transform',
   },
   /** 1px 描边 overlay：hover 用中性色、长按用品牌色，绘制在 iframe 之上且不拦点击 */
   interactionStroke: {

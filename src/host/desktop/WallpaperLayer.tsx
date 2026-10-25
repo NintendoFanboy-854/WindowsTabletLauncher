@@ -7,18 +7,22 @@
  *
  * 说明条是「欣赏壁纸」模式的唯一入口：按钮自身保持 26 高的视觉尺寸（这个高度会
  * 通过 `reportFooterPillHeight` 反向驱动桌面网格，不能改），44×44 的命中区由
- * `::after` 绝对定位外扩，不占布局、不改 padding。
+ * `::after` 绝对定位外扩，不占布局、不改 padding。按下反馈只加
+ * `transform: scale(0.985)`（transform 不改变 border-box，H_p 仍为 26），高度测量
+ * 因此改用 `offsetHeight`，不量会受 transform 影响的 `getBoundingClientRect()`。
  *
- * 解释文本只在欣赏壁纸模式下出现，位置在说明条上方；它不参与布局测量，
- * 因此不会改变说明条高度或网格几何。文本走 Agent 现有 Markdown 渲染器。
+ * 解释文本只在欣赏壁纸模式下出现，位置在说明条上方；文本右侧的「重新生成说明」
+ * 按钮也挂在这条绝对定位的说明行里，两者都不参与布局测量，因此不会改变说明条
+ * 高度或网格几何。文本走 Agent 现有 Markdown 渲染器。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { makeStyles, mergeClasses, motionTokens, tokens } from '@fluentui/react-components';
+import { ArrowClockwise20Regular } from '@fluentui/react-icons';
 
 import { useWallpaperNote } from '../agent/oneshot/describeWallpaper';
 import { MessageContent } from '../agent/ui/MessageContent';
 import { useReducedMotion } from '../agent/ui/useReducedMotion';
-import { TOUCH_TARGET } from '../design/metrics';
+import { TOUCH_TARGET, TOUCH_TARGET_CSS } from '../design/metrics';
 import {
   FOOTER_PILL_ESTIMATE,
   computeGridMetrics,
@@ -38,6 +42,16 @@ import type { ColorScheme } from '../shell/themeMode';
  * 不写死 `-10px`。
  */
 const CREDIT_HIT_INSET = `calc(-${(TOUCH_TARGET - FOOTER_PILL_ESTIMATE) / 2}px - ${tokens.strokeWidthThin})`;
+
+/**
+ * 说明行里解释文本的宽度上限：12×XXXL=384，窄屏再用网格两侧留白夹住，
+ * 并给右侧 44×44「重新生成说明」按钮与一个间距留位。
+ * 1440 宽下先命中 384 上限，解释文本视觉宽度与旧实现一致（按钮不吃文本宽度）。
+ */
+const NOTE_MAX_WIDTH = `min(calc(${tokens.spacingHorizontalXXXL} * 12), calc(100vw - ${tokens.spacingHorizontalXL} * 2 - ${TOUCH_TARGET_CSS} - ${tokens.spacingHorizontalS}))`;
+
+/** 手动重新生成说明的入口：图标按钮没有可见文字，名称只从 aria-label 来 */
+const REGENERATE_NOTE_LABEL = '重新生成说明';
 
 const useWallpaperStyles = makeStyles({
   root: {
@@ -91,7 +105,7 @@ const useWallpaperStyles = makeStyles({
     justifyContent: 'flex-start',
     pointerEvents: 'none',
   },
-  /** 说明条与其上方解释文本的定位上下文；自身高度只由按钮决定 */
+  /** 说明条与其上方解释文本 / 重新生成按钮的定位上下文；自身高度只由按钮决定 */
   creditStack: {
     position: 'relative',
     display: 'flex',
@@ -101,7 +115,17 @@ const useWallpaperStyles = makeStyles({
   },
   /**
    * 说明条按钮。视觉尺寸（padding / border / 行高）与旧 div 完全一致；
-   * 只额外加 `::after` 命中区、hover/active 底色和键盘焦点环。
+   * 只额外加 `::after` 命中区、hover/active 底色、按下形变和键盘焦点环。
+   *
+   * 按下反馈用 `transform: scale(0.985)`（TOKEN-MAP §11 的 C 值，与卡片 pressed 同档）：
+   * transform 只走合成层，**不改变 border-box**，所以 H_p（26）与依赖它的
+   * `reportFooterPillHeight` 布局输入完全不变；44×44 命中区仍由 `::after` 外扩，
+   * 不靠改 padding / border / 高度换反馈。
+   *
+   * 时长与曲线只用 motionTokens（MOTION §1）：base = 离开 / 回弹 100ms
+   * `curveAccelerateMin`；`:hover` 进入 100ms `curveDecelerateMin`（松手后若仍
+   * hover，回弹也落在这一档）；按下 50ms `curveAccelerateMin` 在 `creditPressable`。
+   * reduced-motion 不合并 `creditPressable`，只保留 100ms 颜色变化（MOTION §7 / §160）。
    */
   credit: {
     appearance: 'none',
@@ -126,8 +150,17 @@ const useWallpaperStyles = makeStyles({
     fontFamily: tokens.fontFamilyBase,
     fontSize: tokens.fontSizeBase200,
     lineHeight: tokens.lineHeightBase200,
+    transformOrigin: 'center center',
+    // transform 不参与布局：过渡它不触发重排，H_p 不会在按下/松手时抖动
+    transitionProperty: 'transform, background-color, border-color',
+    // base 档 = hover 离开 / 松手回弹：100ms 加速（MOTION §1「悬停离开」）
+    transitionDuration: `${motionTokens.durationFaster}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMin,
     ':hover': {
       backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 88%, transparent)`,
+      // hover 进入 100ms 减速（MOTION §1「悬停进入」）
+      transitionDuration: `${motionTokens.durationFaster}ms`,
+      transitionTimingFunction: motionTokens.curveDecelerateMin,
     },
     ':active': {
       backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
@@ -147,6 +180,23 @@ const useWallpaperStyles = makeStyles({
       borderRadius: tokens.borderRadiusCircular,
       pointerEvents: 'auto',
     },
+  },
+  /**
+   * 按下形变单独成类：reduced-motion 下不合并这个类，transform 就完全不存在。
+   * 这样不需要用「后定义的 :active 覆盖前一条」的顺序技巧——那依赖 Griffel 的规则
+   * 插入次序，重构样式时容易失效。
+   */
+  creditPressable: {
+    ':active': {
+      transform: 'scale(0.985)',
+      // 按下 50ms 加速（MOTION §1「按下」）；松手后由 base / :hover 档回弹
+      transitionDuration: `${motionTokens.durationUltraFast}ms`,
+      transitionTimingFunction: motionTokens.curveAccelerateMin,
+    },
+  },
+  /** reduced-motion：不做任何 transform，只保留 100ms 颜色变化（MOTION §7 / §160） */
+  creditReduced: {
+    transitionProperty: 'background-color, border-color',
   },
   /** 文本裁切放在内层：按钮本身必须 overflow:visible，伪元素命中区才不会被裁掉 */
   creditContent: {
@@ -177,20 +227,17 @@ const useWallpaperStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   /**
-   * 解释文本：浮在说明条上方，绝对定位，不参与 pill 高度测量。
+   * 解释文本：由 noteRow 绝对定位在说明条上方，自身不参与 pill 高度测量。
    *
    * 材质与说明条同一套（半透明中性面 + 单一 blur token + 大圆角），否则 14px 文字
    * 直接压在必应照片上，亮天/雪景下的对比度会低于 FLUENT2 §10 的 4.5:1。
    * 动效按 MOTION §1「常规进出」：`durationNormal`(200) + `curveDecelerateMid`，
    * **不设延迟**（§8「禁止为动画延迟内容渲染」，120ms 曾是自造时长）。
+   * 宽度仍按内容收缩（max-content），上限见 NOTE_MAX_WIDTH（已给右侧按钮留位）。
    */
   note: {
-    position: 'absolute',
-    left: 0,
-    bottom: `calc(100% + ${tokens.spacingVerticalS})`,
     width: 'max-content',
-    // 12×XXXL(32)=384；窄屏再用网格两侧留白 token 夹住，避免文字伸出视口
-    maxWidth: `min(calc(${tokens.spacingHorizontalXXXL} * 12), calc(100vw - ${tokens.spacingHorizontalXL} * 2))`,
+    maxWidth: NOTE_MAX_WIDTH,
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalL}`,
     borderRadius: tokens.borderRadiusXLarge,
     backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
@@ -204,6 +251,21 @@ const useWallpaperStyles = makeStyles({
     transitionDuration: `${motionTokens.durationNormal}ms`,
     transitionTimingFunction: motionTokens.curveDecelerateMid,
   },
+  /**
+   * 说明行：解释文本 + 手动「重新生成说明」按钮的定位壳。
+   *
+   * 绝对定位在说明条上方（left/bottom 与旧 note 相同），宽度 = 文本宽度：
+   * 不占 creditStack 的布局，因此不进 H_p 测量、也不改 pill 几何。
+   * 按钮在本壳内再绝对定位到文本右侧，所以按钮存在与否都不改变文本宽度。
+   */
+  noteRow: {
+    position: 'absolute',
+    left: 0,
+    bottom: `calc(100% + ${tokens.spacingVerticalS})`,
+    width: 'max-content',
+    maxWidth: NOTE_MAX_WIDTH,
+    pointerEvents: 'none',
+  },
   noteVisible: {
     opacity: 1,
     transform: 'none',
@@ -213,6 +275,70 @@ const useWallpaperStyles = makeStyles({
     transform: 'none',
     transitionProperty: 'opacity',
     transitionDuration: `${motionTokens.durationFaster}ms`,
+  },
+  /**
+   * 手动「重新生成说明」按钮（仅欣赏壁纸模式、有说明文本 / 加载中时出现）。
+   *
+   * 绝对定位在说明文本右侧（**自身** position:absolute），不参与 H_p 测量、
+   * 不改 pill 几何；命中区 44×44 直接取 `TOUCH_TARGET_CSS`，不写裸 44。
+   * 材质复用 note 的同一条表达式（78% 中性面 + 单一 blur token + shadow4），
+   * 圆角/描边/前景色全部来自 tokens。按压只做颜色反馈（与说明条同一档 hover/active
+   * 混合比例），不引入第二套缩放；时长用 motionTokens(durationFaster)。
+   */
+  regenerate: {
+    position: 'absolute',
+    // 贴在文本右缘外一个间距处，底边与文本行底边对齐
+    left: `calc(100% + ${tokens.spacingHorizontalS})`,
+    bottom: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: TOUCH_TARGET_CSS,
+    height: TOUCH_TARGET_CSS,
+    margin: 0,
+    padding: 0,
+    boxSizing: 'border-box',
+    appearance: 'none',
+    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    boxShadow: tokens.shadow4,
+    color: tokens.colorNeutralForeground2,
+    cursor: 'pointer',
+    pointerEvents: 'auto',
+    transitionProperty: 'background-color, border-color',
+    transitionDuration: `${motionTokens.durationFaster}ms`,
+    transitionTimingFunction: motionTokens.curveAccelerateMin,
+    ':hover': {
+      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 88%, transparent)`,
+      transitionTimingFunction: motionTokens.curveDecelerateMin,
+    },
+    ':active': {
+      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
+    },
+    ':focus-visible': {
+      outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
+      outlineOffset: tokens.strokeWidthThin,
+    },
+    ':disabled': {
+      color: tokens.colorNeutralForegroundDisabled,
+      cursor: 'default',
+    },
+  },
+  /**
+   * 加载中图标旋转：时长取 motionTokens 里最长的一档 `durationUltraSlow`(500) +
+   * `curveLinear`，不新增裸毫秒数。reduced-motion 下不合并这个类——静态图标 + 禁用
+   * 态颜色已是可见反馈，MOTION §7 不再加装饰动画。
+   */
+  regenerateSpin: {
+    animationName: {
+      from: { transform: 'rotate(0deg)' },
+      to: { transform: 'rotate(360deg)' },
+    },
+    animationDuration: `${motionTokens.durationUltraSlow}ms`,
+    animationTimingFunction: motionTokens.curveLinear,
+    animationIterationCount: 'infinite',
   },
 });
 
@@ -351,6 +477,15 @@ export function WallpaperCredit({
   const reducedMotion = useReducedMotion();
   const pillRef = useRef<HTMLButtonElement | null>(null);
   const [noteVisible, setNoteVisible] = useState(false);
+  /**
+   * 最近一次成功取到的说明 + 它所属的图片 key。
+   *
+   * 手动刷新时 `useWallpaperNote` 会先把 `text` 置空并进入 loading；若此时按空文本渲染，
+   * 说明行宽度会先塌成左右 padding、再随新文本恢复，右侧「重新生成」按钮会左右各跳一次。
+   * 因此加载 / 失败期间继续显示**同一张图**的上一份说明：宽度和按钮位置都不动，也不涉及
+   * H_p。用 key 同步判断，换图时旧文本不会串到新图上（不依赖 effect 的下一帧）。
+   */
+  const [lastNote, setLastNote] = useState<{ key: string; text: string } | null>(null);
 
   /**
    * 一次性说明只在欣赏壁纸模式、且当前是必应图时请求；本机图片没有模型可搜的元数据。
@@ -366,19 +501,39 @@ export function WallpaperCredit({
       title: entry.title,
       copyright: entry.copyright,
       date: entry.date,
+      // 把今日壁纸本身一起发给模型（pro 多模态看图）
+      imageUrl: entry.imageUrl,
     };
   }, [captionHidden, credit, gallery, wallpaper.current, wallpaper.mode]);
 
-  const { text: noteText } = useWallpaperNote(noteInput);
+  const { text: noteText, status: noteStatus, refresh: refreshNote } = useWallpaperNote(noteInput);
   const noteKey = noteInput?.key ?? '';
   const hasCredit = Boolean(credit);
+  /** 手动重新生成进行中：按钮禁用 + 图标旋转，给出可见但不新增长时的反馈 */
+  const noteLoading = noteStatus === 'loading';
+  /** 实际渲染的文本：新文本优先；加载/失败时回落到同一张图的上一份（避免按钮横向跳动） */
+  const shownNoteText = noteText ?? (lastNote?.key === noteKey ? lastNote.text : null);
+  /**
+   * 手动入口只在欣赏壁纸模式、且已有说明文本或正在加载时显示。
+   * 首轮就失败（没有任何可显示的文本）时不显示：入口只服务「重新生成」而不是「首次失败重试」。
+   */
+  const showRegenerate = gallery && (Boolean(shownNoteText) || noteLoading);
 
-  // 换图（或退出再进入）时先回到隐藏态，等新文本回来再淡入。
+  // 换图（或退出再进入）时先回到隐藏态：同一张图会复用 lastNote 再淡入，换图则等新文本。
   useEffect(() => {
     setNoteVisible(false);
   }, [noteKey]);
 
-  // 只观测 pill 自身：量的是 border-box（padding + 描边 + 行高），与布局无关。
+  // 记录成功返回的文本，供加载 / 失败期间回退显示（key 一起存，换图后旧文本自动失效）。
+  useEffect(() => {
+    if (!noteText) return;
+    setLastNote({ key: noteKey, text: noteText });
+  }, [noteKey, noteText]);
+
+  // 只观测 pill 自身：offsetHeight 是**布局 border-box**（padding + 描边 + 行高），
+  // 不受按下时 `transform: scale(0.985)` 影响；不用 getBoundingClientRect().height——
+  // 那量到的是缩放后的视觉高度（26×0.985≈25.6），经 reportFooterPillHeight 会把整个
+  // 网格在按下/松手时抖动一次。H_p 的语义仍是 border-box=26。
   // 没有说明条时上报 0（= 无底部条，见组件文档），这样隐藏前后网格都对称。
   // hasCredit 入依赖：首帧壁纸还没到时组件返回 null，图片就绪后要重新挂观察器。
   useEffect(() => {
@@ -388,7 +543,7 @@ export function WallpaperCredit({
     }
     const element = pillRef.current;
     if (!element) return undefined;
-    const measure = () => reportFooterPillHeight(element.getBoundingClientRect().height);
+    const measure = () => reportFooterPillHeight(element.offsetHeight);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -400,14 +555,14 @@ export function WallpaperCredit({
    * 下一帧加类名才会触发过渡（不做骨架屏 / spinner）。
    */
   useEffect(() => {
-    if (!gallery || !noteText) {
+    if (!gallery || !shownNoteText) {
       setNoteVisible(false);
       return undefined;
     }
     if (noteVisible) return undefined;
     const frame = window.requestAnimationFrame(() => setNoteVisible(true));
     return () => window.cancelAnimationFrame(frame);
-  }, [gallery, noteText, noteVisible]);
+  }, [gallery, shownNoteText, noteVisible]);
 
   const frame = useMemo(
     () =>
@@ -429,6 +584,12 @@ export function WallpaperCredit({
     noteVisible && styles.noteVisible,
     reducedMotion && styles.noteReduced,
   );
+  // 按下形变类只在允许动效时合并：reduced-motion 下按钮完全没有 transform（MOTION §7）
+  const creditClassName = mergeClasses(
+    styles.credit,
+    !reducedMotion && styles.creditPressable,
+    reducedMotion && styles.creditReduced,
+  );
 
   return (
     <div
@@ -437,18 +598,39 @@ export function WallpaperCredit({
     >
       <div className={styles.creditStack}>
         {gallery ? (
-          <div
-            className={noteClassName}
-            data-wallpaper-note="true"
-            aria-live="polite"
-          >
-            {noteText ? <MessageContent text={noteText} /> : null}
+          <div className={styles.noteRow} data-wallpaper-note-row="true">
+            <div
+              className={noteClassName}
+              data-wallpaper-note="true"
+              aria-live="polite"
+            >
+              {shownNoteText ? <MessageContent text={shownNoteText} /> : null}
+            </div>
+            {showRegenerate ? (
+              <button
+                type="button"
+                className={styles.regenerate}
+                data-wallpaper-regen="true"
+                data-wallpaper-regen-state={noteLoading ? 'loading' : 'ready'}
+                aria-label={REGENERATE_NOTE_LABEL}
+                aria-busy={noteLoading ? true : undefined}
+                disabled={noteLoading}
+                onClick={() => refreshNote()}
+              >
+                <ArrowClockwise20Regular
+                  aria-hidden="true"
+                  className={
+                    noteLoading && !reducedMotion ? styles.regenerateSpin : undefined
+                  }
+                />
+              </button>
+            ) : null}
           </div>
         ) : null}
         <button
           ref={pillRef}
           type="button"
-          className={styles.credit}
+          className={creditClassName}
           data-wallpaper-credit="true"
           data-gallery={gallery ? 'true' : undefined}
           aria-pressed={gallery}

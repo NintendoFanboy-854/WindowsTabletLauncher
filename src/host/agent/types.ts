@@ -596,11 +596,20 @@ export interface ChatTextPart {
   text: string;
 }
 
-export type ChatContentPart = ChatInputAudioPart | ChatTextPart;
+/**
+ * 图片输入（MiMo 多模态：`image_url` 形式，支持公网 URL 或 data URL）。
+ * 目前只用于「欣赏壁纸」一次性说明卡（pro 模型看图）。
+ */
+export interface ChatImagePart {
+  type: 'image_url';
+  image_url: { url: string };
+}
+
+export type ChatContentPart = ChatInputAudioPart | ChatImagePart | ChatTextPart;
 
 /**
- * 模型消息。只有“本轮语音”的那一条 user 消息允许 content 为 content parts 数组；
- * 历史消息（含 retry / 切会话 / 重启）一律 string，绝不重传音频。
+ * 模型消息。只有“本轮语音”/一次性看图的那条 user 消息允许 content 为 content parts 数组；
+ * 历史消息（含 retry / 切会话 / 重启）一律 string，绝不重传音频/图片。
  */
 export type ChatRequestMessage =
   | { role: 'system'; content: string }

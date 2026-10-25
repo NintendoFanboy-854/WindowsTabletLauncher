@@ -126,6 +126,9 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 | 退出欣赏壁纸（卡片回场） | 「常规进出」 | 同上的属性集合，方向不变；回场不叠错峰 |
 | 说明条上方的解释文本淡入 | 「常规进出」 | 只 opacity（可叠同一量级 `translateY`），**延迟为 0**——§8 禁止「为动画延迟内容渲染」；等文本回来前元素保持不可见（`opacity: 0` 先挂一帧），不做骨架屏 / spinner / 打字机（§6） |
 
+- **说明条按下形变**（v0.6.0 收口，DECISIONS D-38）：`scale(0.985)`（TOKEN-MAP §11 登记值，与 §2 卡片 pressed 同档）——按下 `durationUltraFast` + `curveAccelerateMin`、hover 进入 `durationFaster` + `curveDecelerateMin`、hover 离开与松手回弹 `durationFaster` + `curveAccelerateMin`（松手后仍停在 hover 上时走 hover 进入档 `curveDecelerateMin`；档位见 §1，不在此重复毫秒）；`transform` 不改变 border-box，`H_p` 仍为 26（D 类，见 TOKEN-MAP §1），说明条高度因此改按 `offsetHeight` 实测。reduced-motion 下不合并按下形变类，按钮没有任何 transform，只保留 100ms 颜色/描边变化（§7）。
+- **手动「重新生成说明」**：解释文本右侧的 44×44 图标按钮（`aria-label`「重新生成说明」），仅在欣赏壁纸模式、且有文本或加载中时出现；加载中按 `durationUltraSlow`（§1「长按进度」档的时长）+ `curveLinear` 旋转，reduced-motion 下静止；`refresh` 走 `force`（跳过缓存成功命中与失败冷静期），失败静默并保留旧说明行；不做自动刷新 / 自动重试 / 轮询。
+
 - **不新增错峰**：§6「明确不做 stagger 逐项入场」仍然有效。若将来确实要给桌面卡片分批退场，必须先在本文登记这条例外、再把新数值登记进 `TOKEN-MAP §11`，不得在组件里用「token × 系数」派生出一档未登记时长。
 - **reduced-motion**：按 §7「只保留 ≤100ms 纯 opacity 淡入淡出」——位移置 0、错峰置 0、无尺寸/阴影过渡。
 - 本文不复制实现里的毫秒数值：具体档位以 §1 表为准（v0.6.0 实现已按 §1 收敛：卡片退场走 `durationFast` + `curveAccelerateMid`、回场走 `durationNormal` + `curveDecelerateMid`、解释文本 `durationNormal` + `curveDecelerateMid` 且延迟 0、无错峰；本文不另立第二套数字）。
@@ -158,6 +161,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 | 原效果 | 减弱后 |
 |---|---|
 | hover 放大、按下缩放 | 不做 transform，只保留 100ms 颜色/描边变化 |
+| 说明条按下形变（§5.2） | 不做 transform，只保留 100ms 颜色/描边变化 |
 | 长按下沉 | 不做缩放，按下后显示静态描边 |
 | 编辑模式卡片缩放 | 不缩放，直接切换 chrome |
 | 浮层 container transform | 只保留 100ms 淡入淡出，不位移/不缩放 |
@@ -175,6 +179,8 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
     SDK 转发 pointer 事件时过滤交互控件，到点发 `plugin:request-edit-mode`，并负责吞掉后续 click；
   - `prefers-reduced-motion: reduce`：hover/press 不做 transform，只保留 100ms 颜色/描边变化；
     编辑模式卡片也不缩放，直接切换 chrome；
+  - **卡片状态 scale 只在 Card 本体**：hover / press / 长按 / 编辑四种缩放全部叠在 Fluent `Card` 的 `transform` 上（`WidgetCard.tsx` 的 `cardTransform`）；内容层（承载 iframe 的 `contentLayer`）永久 `transform: none` 且不再声明 `will-change`——缩放不进入 iframe 内容（§10 的落地）；
+  - **说明条（§5.2）**：按下形变放在单独的 `creditPressable` 类里，reduced-motion 不合并该类；`H_p` 由 `offsetHeight` 上报（`transform` 不改 border-box）；44×44 命中区仍由 `::after` 外扩；解释文本与「重新生成说明」按钮挂在绝对定位的 `noteRow` 上，不参与 `H_p` 测量；
   - container transform 由浮层组件计算 start/end rect、用 CSS transition 驱动 surface（位置/宽高/透明度），内容交叉淡入；锚点无效时走兜底。
     （E4 落地时的微调：surface 固定在自己的最终 rect 上，位置/尺寸的变化用 `translate + scale` 表达，
     等价于“位置/宽高过渡”但只走合成层；圆角/阴影仍随同一段 transition 一起变化。）
@@ -212,12 +218,13 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 ## 9. 验收
 
 1. `grep` 检查：宿主与插件 `src` 中无非 token 的 duration/easing/ms 字面量（`_shared` 除外）。
-2. 卡片：hover 1.015、press 0.985、长按 500ms 过程中 scale 从 0.985 线性到 0.97、到点进编辑；松手回弹。
+2. 卡片：hover 1.015、press 0.985、长按 500ms 过程中 scale 从 0.985 线性到 0.97、到点进编辑；松手回弹；**缩放只作用 Card 本体，iframe 内容与 contentLayer 不发生 transform**。
 3. 浮层：打开第一帧 surface rect ≈ 来源卡片 rect（CDP 采样 ±2px），结束时为目标 rect；关闭回到同一卡片；点遮罩关闭。
 4. 页面切换、编辑模式、翻页无布局跳动；动画期间可交互。
 5. 插件：Tab 内容切换、列表增删、内联展开、勾选、进度更新按第 6 节；控制台 0 error。
 6. `prefers-reduced-motion` 模拟下：无 transform 动画，浮层只淡入淡出。
 7. 视觉验收：1440×960 连续截图/录屏；亮暗两套各一遍。
+8. 说明条（§5.2）：按下 scale 0.985（50ms）、松手回弹；reduced-motion 模拟下无 transform；按下前后 `H_p` 不变（`offsetHeight`）。
 
 ## 10. 明确不做
 

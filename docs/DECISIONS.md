@@ -506,3 +506,24 @@
 - 文档落点：几何口径 `TOKEN-MAP §1/§6`、`AGENT-SURFACE-CONTRACT §1/§14.1/§20`、`components/agent.md`、`DENSITY §1.1-5`、`DESIGN §1.1/§6`、`FLUENT2 §5/§7/§14`、`PLUGIN-CONTRACT §栅格`；动效 `MOTION §5.2`；数据层与模式在 `DESIGN §6`。
 - 实现状态：`H_p`=0 通道已落地——`layout/footer.ts` 只拒绝负数/NaN（0 合法），`layout/breakpoints.ts` 的 `normalizeFooterPillHeight` 把 0 当有效值、`frameInset` 不再为 pill 行预留 gutter，`desktop/WallpaperLayer.tsx` 在说明条不渲染时上报 0；隐藏说明条后网格 (22,46)-(1418,914)、入口 (1362,858)-(1418,914)、对话面板 516×868，与显示态共用同一个 `layoutFrame`。
 
+## D-38 欣赏壁纸收口：说明文本 v2 硬校验 / 手动重新生成 / 说明条按下形变 / 卡片缩放归位 / 磨砂诊断（2026-10-25，v0.6.0）
+
+- 背景：D-37 把说明条变成欣赏壁纸入口、并加了一次性解释文本，但五处仍与规范或用户预期有缝：①提示词只「建议」中文与不写来源，模型偶尔整段英文或写「根据搜索结果…」，客户端只做字数/格式降级、没有语言与来源判定；②说明一旦生成或失败，只能等换图或 24 小时冷静期，用户无法手动重试；③说明条没有任何按压反馈（HIG：自定义按钮必须有按压状态），而任何改变高度的做法都会破坏 `H_p` 这个布局输入；④v0.6.0 之前的卡片 hover/press scale 加在内容层（contentLayer）上，属于跨 iframe 内容缩放；⑤「磨砂不明显」需要定位原因（材质配比/主题 vs 合成层）并给出是否调整 72% 与 blur 24 的结论。本轮一起收口。
+- 决策：
+  1. **说明文本 v2：提示词硬约束 + 客户端硬校验**（`agent/oneshot/**`）：`PROMPT_VERSION='v2'`。`SYSTEM_PROMPT` 输出规则新增——「正文只用简体中文，地名/物种等专有名词可保留原文，禁止英文句子、英文段落或任何用英文写的正文」；「禁止任何语言、任何形式的来源旁白（中文不写『根据搜索结果』『资料显示』『据检索』『我查到』，英文不写 According to / search results 之类），不列来源、不写作者署名」。`sanitize.ts` 新增 `detectNoteViolation`（`non-chinese` / `source-narration`：汉字数下限、拉丁字母占比上限、连续英文词串长度、中英文来源旁白句式），`generate.ts` 在落库前调用，命中即按既有失败路径处理（不落库、不向 UI 抛错、沿用 24 小时冷静期，配置类错误除外）。提示词与客户端判定不一致时以客户端为准。
+  2. **手动「重新生成说明」**（`desktop/WallpaperLayer.tsx`）：欣赏壁纸模式下解释文本右侧出现 44×44（`TOUCH_TARGET`）图标按钮，`aria-label`「重新生成说明」、加载中 `aria-busy` + 禁用；只在有文本或加载中时显示（首轮就失败、没有任何可显示文本时不出现）。`useWallpaperNote` 返回 `{ text, status, refresh }`，`refresh()` 触发 `force`：跳过缓存成功命中与失败冷静期，强制搜索、语言与旁白校验照旧；加载中图标按 `durationUltraSlow` + `curveLinear` 旋转，reduced-motion 下不旋转。**不做**自动刷新、自动重试或轮询。
+  3. **手动刷新失败保留旧说明**：`generate.ts` 的 `recordFailure` 在旧行 `text` 非空时直接返回，不把成功记录覆盖成失败行——说明卡不消失、也不进冷静期；首次失败仍照旧写冷静期。
+  4. **说明条按下形变**：`transform: scale(0.985)`（TOKEN-MAP §11 已登记的 C 值，与 MOTION §2 卡片 pressed 同档），`transform-origin: center center`；按下 50ms `durationUltraFast` + `curveAccelerateMin`、hover 进入 100ms `durationFaster` + `curveDecelerateMin`、hover 离开与松手回弹 100ms `durationFaster` + `curveAccelerateMin`（松手后仍 hover 时走 hover 进入档；MOTION §1 用途表，全部是 `motionTokens`）。`transform` 只走合成层、**不改变 border-box**，`H_p` 仍为 26（`FOOTER_PILL_ESTIMATE` = `lineHeightBase200` 16 + 2×`spacingVerticalXS` 4 + 2×`strokeWidthThin` 1）；高度测量因此改用 `offsetHeight`（布局 border-box），不再用会随缩放变化的 `getBoundingClientRect()`。44×44 命中区仍由 `::after` 外扩，不改 padding / border / 高度。reduced-motion 下不合并按下形变类——按钮完全没有 transform，只保留 100ms 颜色与描边变化（MOTION §7）。
+  5. **卡片缩放归位**（`WidgetCard.tsx` + `desktop.styles.ts`）：hover / press / 长按 / 编辑模式四种 scale 全部叠在 Fluent `Card` 本体的 `transform` 上（宿主外层，`cardTransform`）；内容层（承载 iframe 的 `contentLayer`）永久 `transform: none`，并且不再声明 `will-change`。`Card` 与翻页轨道 `track` 的 `will-change: transform` 保留（它们是缩放/翻页的合成层提示）。MOTION §2 状态机参数不变，reduced-motion 下 Card 也不缩放。
+  6. **磨砂诊断：不改 72% 与 blur 24**：真实 2880×1920 / DPR2 窗口截图实测 `backdrop-filter` 确实在对壁纸合成（卡片区域 Laplacian 方差 0.02，见 `.tmp/blur-diag/diag2-analysis.json`；卡外同一片壁纸 lapVar 约 1994，见 `real-compare.json`；透明卡面 blur 与 no-blur 的方差比 0.00036，见 `diag-analysis.json`）。把卡片自身与全部祖先的 `will-change` 内联改为 `auto`、以及把 `isolation` 改为 `auto`，卡片区域像素 diff 均为 0.0（`diag2.json` 的 dark/light-material-blur-vs-wc-auto、`diag-analysis.json` 的 s3–s6/s9 对比 lapVarRatio 均为 1.0）。**本轮不修改 72% 与 blur 24 这两个 C 值**：它们是 D-31 登记值，磨砂强弱由材质配比与壁纸内容决定；要动必须先按 TOKEN-MAP §11 与本节登记。
+- 否掉的方案：
+  - **只在提示词里写「尽量中文 / 别写来源」**：软约束不可判定，模型照犯仍会落库；改为提示词硬约束 + 客户端 `detectNoteViolation` 命中即失败不落库。
+  - **手动刷新失败时照常写失败行**（原 `recordFailure` 行为）：说明卡立刻消失、还要等 24 小时冷静期；改为旧行是成功记录时保留不覆盖。
+  - **说明条用 0.98 / 只做颜色反馈 / 不做按压反馈**：0.98 是 MOTION §5.1 的 Agent 按钮档，与卡片 pressed（0.985）不同档；26 高的带状说明条只改底色变化太弱（HIG：没有按压反馈用户会怀疑输入未被接收）；用户拍板取 0.985，与卡片 pressed 同档。
+  - **用 `getBoundingClientRect().height` 量 `H_p`**：按下时量到缩放后的高度，经 `reportFooterPillHeight` 会让整张网格在按下/松手时抖动一次；改为 `offsetHeight`，`H_p` 语义（border-box=26）不变。
+  - **把 scale 留在 contentLayer 上**（D-37 实现）：属于 MOTION §10 明确不做的「跨 iframe 内容缩放」；改为只作用 Card 本体。
+  - **改 72% / blur 24、或移除 `will-change` 来「让磨砂更明显」**：实测无效（像素 diff 0.0），且 72%/24 是 D-31 登记值，改它需要新的 C 登记；不动。
+- 证据：磨砂/合成诊断 `.tmp/blur-diag/{diag2.json,diag2-analysis.json,diag-analysis.json,real-compare.json}`（本地证据，不入库）；提示词与硬校验 `src/host/agent/oneshot/{prompt,sanitize,generate,useWallpaperNote}.ts`；说明条按压与手动重新生成 `src/host/desktop/WallpaperLayer.tsx`；卡片缩放归位 `src/host/desktop/{WidgetCard.tsx,desktop.styles.ts}`。
+- 文档落点：动效 `MOTION §5.2/§7/§8/§9`（§2 状态机数值表未改，只在文字里引用其 pressed 档）；材质与说明条视觉 `FLUENT2 §7`；一次性解释文本契约 `AGENT-SURFACE-CONTRACT §20.1/§20.2`；`TOKEN-MAP §11` 无新增 C 值（0.985、44 已在册；50/100/500ms 均为 `motionTokens` 档位），本轮不改。
+- 实现状态：`src/host/agent/oneshot/{prompt,sanitize,generate,useWallpaperNote}.ts`、`src/host/desktop/{WallpaperLayer.tsx,WidgetCard.tsx,desktop.styles.ts}`。
+

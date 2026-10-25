@@ -10,8 +10,9 @@
  * - iframe 内的指针事件由插件 SDK `useHostCardGesture` 转发成 `plugin:card-pointer`；
  * - 长按 500ms 由 SDK 检测并发 `plugin:request-edit-mode`，宿主这里只做视觉与进编辑，
  *   不再跑第二份长按计时器；
- * - hover / press 的缩放加在 iframe 内层 wrapper 上，Card 本身只保留定位 translate
- *   与编辑模式 scale；缩放值、时长、曲线全部来自 MOTION §2 与 motionTokens。
+ * - 卡片状态机（hover / press / 长按 / 编辑模式）的 scale 全部作用在 Fluent Card 本体
+ *   （宿主外层），iframe 及其内层内容不参与缩放（MOTION §2 / §10：卡片层动画在宿主外层完成）；
+ *   缩放值、时长、曲线全部来自 MOTION §2 与 motionTokens。
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
@@ -129,8 +130,18 @@ export function WidgetCard({
 }: WidgetCardProps) {
   const styles = useStyles();
   const frameRef = useRef<WidgetFrameHandle>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  /** Card 本体节点：状态 scale 与 down→holding 的 transitionend 都盯它（缩放已搬到 Card） */
+  const cardRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+
+  /** Card 节点同时交给桌面层登记（焦点用）和本卡状态机（transitionend 用） */
+  const setCardNode = useCallback(
+    (node: HTMLDivElement | null) => {
+      cardRef.current = node;
+      registerNode(widget.uid, node);
+    },
+    [registerNode, widget.uid],
+  );
 
   /**
    * 身份色属于插件实例，不属于全局主题：同一 ThemePayload 按 manifest hue 派生一份，
@@ -214,11 +225,12 @@ export function WidgetCard({
 
   /**
    * down 的 0.985 落位完成后切到 holding（MOTION §2）。
+   * 缩放已搬到 Card 本体，所以改为监听 Card 节点上的 transform 过渡结束；
    * 用原生 transitionend 而不是再起一个 50ms 定时器：低帧率下定时器会在 transition
    * 真正跑完前触发，down 阶段被整段跳过（React DOM 也没有 transitionstart 合成事件）。
    */
   useEffect(() => {
-    const node = contentRef.current;
+    const node = cardRef.current;
     if (!node) return undefined;
     const onTransitionEnd = (event: TransitionEvent) => {
       if (event.target !== node || event.propertyName !== 'transform') return;
@@ -365,50 +377,19 @@ export function WidgetCard({
   const hoverActive = !editMode && !gallery && !dragging && (hostHover || frameHover);
   const visiblePress = editMode || gallery || dragging ? null : pressPhase;
 
-  // ---- 内容层 scale / 过渡（MOTION §2，全部来自 motionTokens） ----
-  let contentDuration: number = motionTokens.durationFaster;
-  let contentCurve: string = motionTokens.curveAccelerateMin;
-  if (visiblePress === 'down') {
-    contentDuration = motionTokens.durationUltraFast;
-    contentCurve = motionTokens.curveAccelerateMin;
-  } else if (visiblePress === 'holding') {
-    contentDuration = motionTokens.durationUltraSlow;
-    contentCurve = motionTokens.curveLinear;
-  } else if (releasing) {
-    contentDuration = motionTokens.durationFast;
-    contentCurve = motionTokens.curveDecelerateMid;
-  } else if (hoverActive) {
-    contentDuration = motionTokens.durationFaster;
-    contentCurve = motionTokens.curveDecelerateMin;
-  }
-  if (reducedMotion) {
-    // 减少动效：不做 scale 位移，只保留描边/颜色（100ms）
-    contentDuration = motionTokens.durationFaster;
-    contentCurve = motionTokens.curveDecelerateMin;
+  // ---- 卡片状态 scale（MOTION §2 状态机；scale 只作用在 Card 本体，iframe 内容不参与） ----
+  // 编辑模式 0.96；hover 1.015；按下 0.985；长按线性下沉到 0.97；松手回弹到 hover/rest。
+  // reduced-motion 一律 1（编辑模式也不缩放，MOTION §7），只保留颜色/描边变化。
+  let cardScale = 1;
+  if (!reducedMotion) {
+    if (editMode) cardScale = EDIT_CARD_SCALE;
+    else if (visiblePress === 'holding') cardScale = LONG_PRESS_SCALE;
+    else if (visiblePress === 'down') cardScale = PRESS_SCALE;
+    // releasing：hoverActive 为真就回弹到 hover 的 1.015，否则回 rest 的 1
+    else if (hoverActive) cardScale = HOVER_SCALE;
   }
 
-  const contentScale = reducedMotion
-    ? 1
-    : visiblePress === 'holding'
-      ? LONG_PRESS_SCALE
-      : visiblePress === 'down'
-        ? PRESS_SCALE
-        : releasing
-          ? hoverActive
-            ? HOVER_SCALE
-            : 1
-          : hoverActive
-            ? HOVER_SCALE
-            : 1;
-
-  const contentStyle: CSSProperties = {
-    transform: reducedMotion ? 'none' : `scale(${contentScale})`,
-    transitionProperty: 'transform',
-    transitionDuration: `${contentDuration}ms`,
-    transitionTimingFunction: contentCurve,
-  };
-
-  // ---- Card 本身的过渡只服务编辑模式 scale / shadow，不参与 hover/press 缩放 ----
+  // ---- Card 过渡参数：状态 scale / 阴影 / 尺寸 / 欣赏壁纸（MOTION §2、§3、§1，全部来自 motionTokens） ----
   let cardDuration: number = motionTokens.durationFaster;
   let cardCurve: string = motionTokens.curveAccelerateMin;
   if (editMode) {
@@ -450,18 +431,19 @@ export function WidgetCard({
   const galleryOffset = gallery && !reducedMotion ? tokens.spacingVerticalSNudge : '0';
   const galleryMotion = gallery || leavingGallery;
   /**
-   * 欣赏壁纸分支里完全不出现 `scale()`：只保留定位 translate 与退出用的
-   * translateY，避免 iframe 因缩放重新栅格化。
+   * 卡片状态机 scale（hover/press/长按/编辑）全部叠在这里的 Card 本体上（宿主外层），
+   * iframe 及其内层内容不参与缩放（MOTION §2 状态机表 / §10「不做跨 iframe 内容缩放」）。
+   * 欣赏壁纸分支保持现状：只保留定位 translate 与退场/回场 translateY，不出现 `scale()`。
    */
   const cardTransform = gallery
     ? `translate(${x}px, ${y}px) translateY(${galleryOffset})`
-    : `translate(${x}px, ${y}px) scale(${editMode && !reducedMotion ? EDIT_CARD_SCALE : 1})`;
+    : `translate(${x}px, ${y}px) scale(${cardScale})`;
 
   const cardStyle: CSSProperties = {
     position: 'absolute',
     top: 0,
     left: 0,
-    // 定位 translate 与编辑模式 scale 留在 Card 上；hover/press 只动内层内容。
+    // 定位 translate 与状态 scale 都在 Card 上（缩放不进入 iframe 内容）；
     // 欣赏壁纸只额外叠 translateY，不碰 width/height，因此不会触发网格重排。
     transform: cardTransform,
     width,
@@ -533,7 +515,7 @@ export function WidgetCard({
 
   return (
     <Card
-      ref={(node: HTMLDivElement | null) => registerNode(widget.uid, node)}
+      ref={setCardNode}
       className={styles.card}
       style={cardStyle}
       tabIndex={focused ? 0 : -1}
@@ -553,12 +535,8 @@ export function WidgetCard({
         onPointerEnter={handleHostPointerEnter}
         onPointerLeave={handleHostPointerLeave}
       >
-        <div
-          ref={contentRef}
-          className={styles.contentLayer}
-          data-widget-scale="true"
-          style={contentStyle}
-        >
+        {/* 内容层不再参与任何缩放/过渡：状态 scale 只在 Card 本体（验收用 data-card-content-layer 定位） */}
+        <div className={styles.contentLayer} data-card-content-layer="true">
           <WidgetFrame
             ref={frameRef}
             bridge={bridge}

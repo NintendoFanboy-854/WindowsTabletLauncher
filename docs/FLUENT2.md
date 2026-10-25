@@ -112,6 +112,7 @@
   `color-mix(in srgb, colorNeutralBackground1 78%, transparent)` + 既有单一模糊 token + `borderRadiusCircular`，
   hover/active 只改同一中性面的 `color-mix` 百分比（88% / 72%），不引入新色值；焦点环用 `colorStrokeFocus2`；44×44 命中区由 `::after` 外扩，
   **不改变 26 的视觉高度**（它仍是桌面网格布局的输入 `H_p`）。说明条同时是「欣赏壁纸」模式的入口（点击 / Esc 退出）。
+  **（v0.6.0 收口，DECISIONS D-38）**按下形变 `transform: scale(0.985)`（TOKEN-MAP §11 登记值，与卡片 pressed 同档；按下 / 回弹档位见 MOTION §1 与 §5.2），reduced-motion 不做 transform；高度仍按 `offsetHeight` 实测、`H_p` 不变。欣赏壁纸模式下解释文本右侧加 44×44「重新生成说明」按钮（手动触发，失败保留旧说明）；说明文字必须简体中文、禁止来源旁白——提示词 v2 + 客户端硬校验，命中即按失败处理、不落库。
 - 弹层/菜单/遮罩一律用 Fluent 组件自带的材质与 scrim，不自己画。
 
 ## 8. 动效（官方原则 + 时长/曲线）

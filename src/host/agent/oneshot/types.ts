@@ -15,6 +15,8 @@ export interface WallpaperNoteInput {
   copyright: string;
   /** YYYY-MM-DD */
   date: string;
+  /** 壁纸图片 URL（UHD）：随请求一起发给模型看（MiMo pro 图片理解） */
+  imageUrl: string;
 }
 
 /** 一张图的说明：`key` 是缓存键（`cacheKeyFor()` 的产物，含市场与提示词版本） */

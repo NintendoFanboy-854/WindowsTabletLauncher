@@ -239,7 +239,7 @@
 | 720 / 834 / 1180 / 1040 | `PLUGIN-CONTRACT` §4 | 内容列宽 |
 | 7 | `layout/pages.ts` | 分页折叠阈值 |
 | 132 / 168 / 120 | D-35 / Agent 契约 | voice 环与 reduced-motion 时长 |
-| 1.015 / 0.985 / 0.97 / 0.98 | `MOTION.md` | 卡片 hover / 按下 / 长按下沉 / 按压缩放 |
+| 1.015 / 0.985 / 0.97 / 0.98 | `MOTION.md` | 卡片 hover / 按下 / 长按下沉 / 按压缩放；0.985 同时用于说明条 pressed（D-38，`wallpaper-credit` 的 `:active`） |
 | 500ms | `DESIGN.md` §2 | 长按进编辑的手势阈值 |
 | 80–320ms（80/120/150/200/220/240/250/280/300/320） | Agent 契约 §12 | 已登记为 `motionTokens` 就近取值（`durationFaster/Fast/Normal/Gentle/Slow`） |
 | 22% / 60% / 70% / 40 | DENSITY §2.1 | 门禁比例与空洞上限 |

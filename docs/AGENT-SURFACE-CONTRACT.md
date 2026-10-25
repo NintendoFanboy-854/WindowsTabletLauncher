@@ -674,7 +674,7 @@ TurnBlock = ThinkingBlock | TextBlock | ToolBlock | NoticeBlock
   D-31 §4「不新增入口」按本轮修订为「不新增**另一个**入口控件」。
 - 视觉高度仍是 26（`lineHeightBase200` 16 + 2×`spacingVerticalXS` 4 + 2×`strokeWidthThin` 1），
   44×44 命中区由 `::after` 绝对定位外扩 `calc(-9px - strokeWidthThin)` 得到，**不改 padding、不占布局高度**——
-  这是它继续充当布局输入 `H_p` 的前提（`layout/footer.ts` 的 `reportFooterPillHeight`）。
+  这是它继续充当布局输入 `H_p` 的前提（`layout/footer.ts` 的 `reportFooterPillHeight`，测量取 `offsetHeight`）；按下时只叠 `transform: scale(0.985)`（MOTION §5.2，transform 不改 border-box，`H_p` 仍 26）。
 - 退出路径：Esc / 再点说明条 / 设置里打开「隐藏说明条」/ 离开桌面页（`App.tsx`：`captionHidden` 与 `page !== 'desktop'`
   两个 effect 强制 `gallery = false`）。进入时若 Agent 浮层开着，先收起（只留壁纸与说明条）。
 - 模式状态**只在本次会话内有效，不持久化**（`useState`，不写 localStorage）。
@@ -684,14 +684,15 @@ TurnBlock = ThinkingBlock | TextBlock | ToolBlock | NoticeBlock
 | 项 | 口径 | 依据 |
 |---|---|---|
 | 独立性 | 不碰 `useAgentSession`，不写 `agent.conversations` / `activeConversation`，不产生消息气泡、不接 TTS、不暴露输入接口 | `oneshot/generate.ts` 文件头 |
-| 触发 | **只在欣赏壁纸模式、且当前是必应图**时请求；`local` 模式不发请求（本机图没有可搜的元数据） | `desktop/WallpaperLayer.tsx` 的 `noteInput` |
+| 触发 | **只在欣赏壁纸模式、且当前是必应图**时请求；`local` 模式不发请求（本机图没有可搜的元数据）。不做自动刷新 / 自动重试 / 轮询（手动入口见下一行） | `desktop/WallpaperLayer.tsx` 的 `noteInput`、`oneshot/useWallpaperNote.ts` |
+| 手动重新生成 | 解释文本右侧的 44×44 图标按钮（`aria-label`「重新生成说明」；加载中 `aria-busy` + 禁用），仅在欣赏壁纸模式、且有文本或加载中时出现；`refresh()` → `force`：跳过缓存成功命中与失败冷静期，搜索 / 语言 / 旁白校验照旧；加载中图标按 `durationUltraSlow` + `curveLinear` 旋转，reduced-motion 下静止 | `desktop/WallpaperLayer.tsx` 的 `showRegenerate` / `refreshNote`、`generate.ts` 的 `DescribeWallpaperOptions.force` |
 | 联网搜索 | 强制：请求前用 `withForcedSearch()` 覆盖 settings 快照（`search.enabled/forceSearch = true`），不受设置页联网搜索开关影响；**模型没调用检索（无 `sources` 且 `web_search_usage.toolUsage = 0`）直接判失败、不落库** | `oneshot/generate.ts` 的 `withForcedSearch` / `searched` |
-| 输出形态 | 纯文本 ≤120 字（2–3 句、无 Markdown、无套话）；以提示词约束 + 客户端 `sanitize.ts` 二次降级，模型不听话时以客户端为准 | `oneshot/prompt.ts` 的 `SYSTEM_PROMPT`、`sanitize.ts` |
-| 缓存键 | `${内容地址}\|${mkt}\|${PROMPT_VERSION}`（内容地址 = 必应 `hsh`，缺失时退化到绝对化 `urlbase`）；改提示词只改 `PROMPT_VERSION`，旧条目自然 miss（不迁移、不删） | `oneshot/cache.ts` 的 `cacheKeyFor`、`prompt.ts` 的 `PROMPT_VERSION`、`shell/wallpaper.ts` 的 `wallpaperEntryKey` |
+| 输出形态 | 纯文本 ≤120 字（2–3 句、无 Markdown、无套话）；**正文只用简体中文**（地名/物种等专有名词可保留原文），**禁止任何语言、任何形式的来源旁白**；以提示词 v2 约束 + 客户端 `sanitize.ts` 二次降级，`detectNoteViolation` 命中 `non-chinese` / `source-narration` 即按失败处理、不落库（提示词与客户端判定不一致时以客户端为准） | `oneshot/prompt.ts` 的 `SYSTEM_PROMPT`（v2）、`sanitize.ts` 的 `detectNoteViolation`、`generate.ts` |
+| 缓存键 | `${内容地址}\|${mkt}\|${PROMPT_VERSION}`（内容地址 = 必应 `hsh`，缺失时退化到绝对化 `urlbase`）；改提示词只改 `PROMPT_VERSION`（当前 `v2`：中文硬约束 + 禁来源旁白），旧条目自然 miss（不迁移、不删） | `oneshot/cache.ts` 的 `cacheKeyFor`、`prompt.ts` 的 `PROMPT_VERSION`、`shell/wallpaper.ts` 的 `wallpaperEntryKey` |
 | 存储 | 独立 IndexedDB 库 `wtsl.wallpaper-note`（不与会话共享键、不读 `storage.ts`）；库不可用一律当 miss | `oneshot/cache.ts` 文件头 |
-| 失败退避 | 失败行 `text` 空 + `lastFailureAt` 非零 → 24h 内不再请求；配置类错误（未开通 web_search）不写冷静期，补上配置即可立刻重试 | `oneshot/cache.ts` 的 `RETRY_AFTER_FAILURE_MS` / `isSuppressed`、`generate.ts` 的 `isConfigError` |
-| 并发 / 超时 | 同键并发只发一次请求（模块级 `inFlight`）；单次请求 45s 兜底；失败静默（不抛给 UI、不打 `console.error`） | `generate.ts` 的 `inFlight` / `REQUEST_TIMEOUT_MS` |
-| 渲染 | 只在 `gallery` 为真时渲染，位于说明条上方、绝对定位、不参与 `H_p` 测量；走既有 `MessageContent` 渲染器 | `desktop/WallpaperLayer.tsx` 的 `note` / `gallery ? … : null` |
+| 失败退避 | 失败行 `text` 空 + `lastFailureAt` 非零 → 24h 内不再请求；配置类错误（未开通 web_search）不写冷静期，补上配置即可立刻重试；**手动 `force` 失败时若旧行是成功记录则保留旧行、不覆盖成失败行**（说明卡不消失、不进冷静期），语言 / 旁白校验命中同样走失败路径 | `oneshot/cache.ts` 的 `RETRY_AFTER_FAILURE_MS` / `isSuppressed`、`generate.ts` 的 `isConfigError` / `recordFailure` |
+| 并发 / 超时 | 同键并发只发一次请求（模块级 `inFlight`，手动 `force` 也复用同键在途请求、不重复计费）；单次请求 45s 兜底；失败静默（不抛给 UI、不打 `console.error`） | `generate.ts` 的 `inFlight` / `REQUEST_TIMEOUT_MS` |
+| 渲染 | 只在 `gallery` 为真时渲染，位于说明条上方、绝对定位、不参与 `H_p` 测量；走既有 `MessageContent` 渲染器；加载 / 失败期间回落到同一张图的上一份成功说明（宽度与按钮位置不跳动），没有任何成功文本时不渲染说明行（也不显示重新生成按钮） | `desktop/WallpaperLayer.tsx` 的 `noteRow` / `shownNoteText` |
 
 ### 20.3 与三态几何的关系
 
