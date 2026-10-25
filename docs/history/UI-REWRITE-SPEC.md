@@ -1,13 +1,13 @@
 # UI 重写规格 v2（2026-10-19）
 
 > **⚠️ 历史文档（2026-10-19 晚已部分被取代；2026-10-24 字号/密度口径再次被取代）**：卡片点击语义、
-> 设置归属、详情 L1/L2 层级、六插件尺寸内容与视觉规格，以 `docs/DESIGN-ROUND-SUMMARY.md`、
+> 设置归属、详情 L1/L2 层级、六插件尺寸内容与视觉规格，以 `docs/history/DESIGN-ROUND-SUMMARY.md`、
 > `docs/PLUGIN-CONTRACT.md` 与 `docs/components/*.md` 为准；本文只保留历史验收记录，不再作为实现依据。
 > **§1.2 的 Display XL（48/80/96/112）与 §2 的分尺寸 padding 表已全部作废**：全档 hero 统一
 > `fontSizeHero900`/`lineHeightHero900`（40/52）、卡片 padding 16 / gap 8、行高 44（DENSITY §1.1、D-36）；
 > 下文的 48/68/96/112 只作历史值阅读，不得再实现。
 
-> 依据：第二版独立审计 `docs/audit2/REPORT-VISUAL.md`、`docs/audit2/REPORT-TYPE.md` +
+> 依据：第二版独立审计 `docs/audits/round2-type-visual/REPORT-VISUAL.md`、`docs/audits/round2-type-visual/REPORT-TYPE.md` +
 > `docs/DENSITY.md §2.1` 量化门禁 + `docs/DECISIONS.md` D-07（Display XL 例外）。
 > 目标：**每个插件在每个尺寸档都有符合"台面电子设备"场景的信息密度与字号层级**，
 > 不是把所有字统一放大，而是：主信息远看可读、次要近看可读、每档信息量随尺寸递增、没有 10px 微字号。

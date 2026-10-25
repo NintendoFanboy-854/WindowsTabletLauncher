@@ -220,8 +220,8 @@ interface AgentSettings {
 - W1 `agent-surface`：`src/host/agent/ui/**`（重写 AgentPanel→新 surface、Composer、MessageBubble、MessageList、删除 VoiceStage/ConversationPane、改造 Waveform、SettingsDialog、agent.css）、`src/host/agent/index.ts`、`src/host/App.tsx`、`src/host/shell/useGlobalShortcuts.ts`、`src/host/desktop/{EditToolbar,Desktop}.tsx`、`src/styles.css`、`src/host/pages/settings/SettingsPage.tsx`。
 - W2 `voice-pipeline`：`src/host/agent/hooks/**`、`transport/**`、`voice/**`、`settings.ts`、`types.ts`、`storage.ts`、删除 `face/**`、`models/**`、`ui/FaceSetup.tsx` 以外的人脸文件（重复项归 W2：`hooks/useFaceState.ts`、`face/`、`models/`）；`scripts/smoke-mimo-audio.mjs`。
 - W3 `weather-fix`：`public/plugins/weather/**`、`docs/components/weather.md`、`docs/DENSITY.md`、`scripts/verify-widgets.mjs`。
-- Lead：`package.json`、`docs/VISION.md`、`docs/DECISIONS.md`、`docs/DESIGN.md`、`docs/components/agent.md`、`docs/PLAN.md`、`docs/RELEASE*`、版本号、release 构建。
-- W4 `verifier`：`scripts/**`（新增 verify-agent-surface / 修改 cdp 假麦克风）、`shots/v030-final/**`。
+- Lead：`package.json`、`docs/VISION.md`、`docs/DECISIONS.md`、`docs/DESIGN.md`、`docs/components/agent.md`、`docs/history/PLAN.md`、`docs/releases/*`、版本号、release 构建。
+- W4 `verifier`：`scripts/**`（新增 verify-agent-surface / 修改 cdp 假麦克风）、`shots/releases/v0.3.x/v030-final/**`。
 
 ## 11. 验收清单（W1/W2 自查，verifier 复核）
 
@@ -271,7 +271,7 @@ interface AgentSettings {
   桌面右键菜单同时提供「打开 Agent」「编辑桌面」，用 Fluent Menu 的虚拟 target 定位（Portal，无 MenuTrigger）。
 - **鼠标路径**：桌面空白处右键 = Windows 桌面惯例；不再要求用户先知道 Ctrl+, 或长按空白。触控长按语义不变。
 - 验收：`scripts/smoke-v031-ui.mjs`（headless Edge + 假麦克风）A–H 全 PASS（24/24，console error 0）；
-  `tsc --noEmit` 通过；截图 `shots/v031-dev/`。
+  `tsc --noEmit` 通过；截图 `shots/releases/v0.3.x/v031-dev/`。
 
 ## 14. v0.3.7 修订（语音优先：半高窗不再自动升级）
 
@@ -342,7 +342,7 @@ interface AgentSettings {
   展开/收起/Esc/点外部/焦点/录音中禁用/取消录音；reduced-motion；console error 0。
 - 既有 `scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 已按新语义更新（stage 名、
   不再自动 upgrade、无输入框的半高窗、单行 composer、焦点断言）。
-- 证据目录：`shots/v037-dev/`（截图 + JSON + REPORT.md）。
+- 证据目录：`shots/releases/v0.3.x/v037-dev/`（截图 + JSON + REPORT.md）。
 
 ## 15. v0.4.0 修订（半高窗 idle 视觉锚点）
 

@@ -131,7 +131,7 @@
 
 13. **进度带厚度 4px（2026-10-24）**：卡片内进度带一律厚 `tokens.strokeWidthThickest`（Web 档 **4px**），
     经共享 `HERO_PROGRESS_THICKNESS_PX` 暴露；**不得写 `tokens.strokeWidthThicker`**——Fluent `shapes.md` 的
-    stroke 表里 Web 档 Thicker 是 **3px**（4px 是 Mobile 档，见 `references/fluentui-design/shapes.md:67-72`），
+    stroke 表里 Web 档 Thicker 是 **3px**（4px 是 Mobile 档，见 `docs/reference/fluent-design/shapes.md:67-72`），
     用它会得到 3px 带，与 4px 规格冲突。颜色固定 `colorBrandBackground`、轨道 `colorNeutralBackground3`；
     `active=false`（未运行）时保留 4px 占位并 `visibility:hidden`，**不重排**、不出画。插件不自绘进度带
     （PLUGIN-CONTRACT §4.4 `HeroProgress`）。

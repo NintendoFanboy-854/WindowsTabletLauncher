@@ -2,10 +2,10 @@
 
 > 审计员：type-spacing-auditor（独立审计，不继承旧审计结论）
 > 审计对象：`public/plugins/{clock,countdown,pomodoro,sedentary,todo,weather}/src/**`、`public/plugins/_shared/**`、`src/host/**`、`src/styles.css`
-> 判定依据：Fluent 2 官方字阶（`references/fluentui-design/typography.md`）+ Fluent v9 token（`node_modules/@fluentui/tokens`）+ 4px spacing ramp + 平板 0.5–2 m 远看场景
+> 判定依据：Fluent 2 官方字阶（`docs/reference/fluent-design/typography.md`）+ Fluent v9 token（`node_modules/@fluentui/tokens`）+ 4px spacing ramp + 平板 0.5–2 m 远看场景
 > 渲染环境：Microsoft Edge 155.0.4283.62 headless + CDP，Node v24.20.0，viewport deviceScaleFactor=1，dev server `http://localhost:5173/`
 > 代码基线：`@fluentui/react-components ^9.74.9`，React 19
-> 截图：`shots/audit2/{1440x960,1024x768,960x1440}-*.png`、`shots/audit2/type-host-*.png`
+> 截图：`shots/audits/round2-type-visual/{1440x960,1024x768,960x1440}-*.png`、`shots/audits/round2-type-visual/type-host-*.png`
 
 ---
 
@@ -71,7 +71,7 @@
 - 时钟 2×1 主时间 `40/52`，同尺寸番茄钟 `68/68`。
 - 6 个插件在 3×2 档的主值有 4 种字号（14/20/32/68）。
 
-旧审计 `docs/audit/AUDIT.md` 只作为线索；本报告的所有 px 值来自本轮 headless Edge 实测与代码逐行核对，不复用旧审计数字。
+旧审计 `docs/audits/round1-fluid-visual/AUDIT.md` 只作为线索；本报告的所有 px 值来自本轮 headless Edge 实测与代码逐行核对，不复用旧审计数字。
 
 ---
 
@@ -101,7 +101,7 @@
 - 原始数据（临时，不纳入交付）：`%TEMP%\audit-typography\raw\harness-{1440x960,1024x768,960x1440}.json`
 - 语义矩阵：`%TEMP%\audit-typography\analysis-rows.json`、`matrix.md`、`matrix-extra.md`
 - 宿主复核：`%TEMP%\audit-typography\host-measure.json`
-- 截图：`shots/audit2/`（24 张分区尺寸图 + 3 张真实桌面图 `type-host-*.png`）
+- 截图：`shots/audits/round2-type-visual/`（24 张分区尺寸图 + 3 张真实桌面图 `type-host-*.png`）
 
 ### 1.4 测量限制（如实记录）
 
@@ -703,11 +703,11 @@ Secondary 在 2×2 已经收敛到 14；2×1 的 12/14/16 是主要不一致点�
 
 | 文件 | 内容 |
 |---|---|
-| `shots/audit2/1440x960-clock-{1x1,2x1,3x2}.png` | 时钟三档（2×1 40px 偏小） |
-| `shots/audit2/1440x960-weather-{1x1,2x1,3x2}.png` | 天气三档（主温度 14px） |
-| `shots/audit2/1440x960-todo-{1x1,3x3}.png` | 待办 1×1/3×3（10px 元信息、3×3 8px padding） |
-| `shots/audit2/1024x768-*`、`960x1440-*` | 同一尺寸在更小 cell 下的对照 |
-| `shots/audit2/type-host-{1440x960,1024x768,960x1440}.png` | 真实宿主桌面（含 dock 12px） |
+| `shots/audits/round2-type-visual/1440x960-clock-{1x1,2x1,3x2}.png` | 时钟三档（2×1 40px 偏小） |
+| `shots/audits/round2-type-visual/1440x960-weather-{1x1,2x1,3x2}.png` | 天气三档（主温度 14px） |
+| `shots/audits/round2-type-visual/1440x960-todo-{1x1,3x3}.png` | 待办 1×1/3×3（10px 元信息、3×3 8px padding） |
+| `shots/audits/round2-type-visual/1024x768-*`、`960x1440-*` | 同一尺寸在更小 cell 下的对照 |
+| `shots/audits/round2-type-visual/type-host-{1440x960,1024x768,960x1440}.png` | 真实宿主桌面（含 dock 12px） |
 
 ### 6.5 复核用原始矩阵文件
 

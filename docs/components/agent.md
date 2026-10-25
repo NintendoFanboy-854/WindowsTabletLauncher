@@ -141,5 +141,5 @@ interface Settings {
 ## 验收
 
 - 交互/动效/颜色/焦点见 [AGENT-SURFACE-CONTRACT.md](../AGENT-SURFACE-CONTRACT.md) §11、§14 与 v0.3.0 回归报告；音频链路、上下文零音频、天气 3×2 由独立 verifier 用 CDP + 真实 release 复核。
-- v0.3.7 语音优先验收：`scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风 + `?mock=1`）覆盖「入口→半高语音窗并录音 / 空格语音回合后不进入 chat / 回答后空格再次录音 / 半高窗无输入框 / 全高输入区单行 / 焦点与 Esc 语义 / 录音中禁用与取消 / reduced-motion / console error 0」；既有 `scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 同步适配新语义；证据 `shots/v037-dev/`。
+- v0.3.7 语音优先验收：`scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风 + `?mock=1`）覆盖「入口→半高语音窗并录音 / 空格语音回合后不进入 chat / 回答后空格再次录音 / 半高窗无输入框 / 全高输入区单行 / 焦点与 Esc 语义 / 录音中禁用与取消 / reduced-motion / console error 0」；既有 `scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 同步适配新语义；证据 `shots/releases/v0.3.x/v037-dev/`。
 - v0.3.1 修订的验收脚本：`scripts/smoke-v031-ui.mjs`（headless Edge + 假麦克风；右键菜单、设置页、half-height 控制条/peek/展开、朗读开关持久化、录音中收起停麦），A–H 24/24 PASS、console error 0。

@@ -167,24 +167,34 @@ src/
 src-tauri/              # 窗口、系统能力、插件种子、协议
 public/plugins/         # 六个内置插件 + 共享底座
 templates/plugin-template/
-docs/                   # 需求/设计/组件契约/发布报告
+docs/                   # 全部项目文档（现行规范 / 历史 / 发布 / 审计 / 第三方参考）：先看 docs/README.md
+shots/                  # 验证证据：截图与日志（本地不入库；索引见 docs/audits/README.md）
+.tmp/                   # 临时调试输出（本地不入库）
+release/                # 本机安装包产物（本地不入库）
 ```
+
+> 文档/证据/临时目录的分工见 **[docs/README.md](docs/README.md)**：`docs/` 根目录是现行规范的稳定入口
+> （路径被源码注释引用），历史计划与规格在 `docs/history/`，发布记录在 `docs/releases/`，
+> 审计报告在 `docs/audits/`，第三方参考资料在 `docs/reference/`。
 
 ## 文档
 
-- [VISION.md](docs/VISION.md) —— 产品定位与边界
-- [DESIGN.md](docs/DESIGN.md) / [FLUENT2.md](docs/FLUENT2.md) / [DENSITY.md](docs/DENSITY.md) —— 工程与设计规范
-- [MOTION.md](docs/MOTION.md) / [AGENT-SURFACE-CONTRACT.md](docs/AGENT-SURFACE-CONTRACT.md) —— 动效与 Agent 浮空界面契约
-- [components/agent.md](docs/components/agent.md) / [components/weather.md](docs/components/weather.md) —— Agent 与天气组件规格
-- [PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) / [DECISIONS.md](docs/DECISIONS.md) —— 插件协议与关键决策
-- [RELEASE-REPORT.md](docs/RELEASE-REPORT.md) —— 各版本验证报告（v0.3.0 §12 / v0.3.1 §13 / v0.3.2 §15 / v0.3.3 §16 / v0.3.4 §17 / v0.3.5 §18 / v0.3.6 §19 / v0.3.7 §20）
+- **[docs/README.md](docs/README.md)** —— 文档总索引：阅读路径 / 目录布局 / 维护约定 / 迁移对照
+- 现行规范：[VISION.md](docs/VISION.md) · [DESIGN.md](docs/DESIGN.md) · [FLUENT2.md](docs/FLUENT2.md) · [DENSITY.md](docs/DENSITY.md) · [MOTION.md](docs/MOTION.md) · [TOKEN-MAP.md](docs/TOKEN-MAP.md)
+- 契约与决策：[PLUGIN-CONTRACT.md](docs/PLUGIN-CONTRACT.md) · [PLUGIN-REACT.md](docs/PLUGIN-REACT.md) · [AGENT-SURFACE-CONTRACT.md](docs/AGENT-SURFACE-CONTRACT.md) · [DECISIONS.md](docs/DECISIONS.md)
+- 组件规格：[components/](docs/components/)（agent / clock / countdown / pomodoro / sedentary / todo / weather）
+- 发布与验证：[RELEASE-REPORT.md](docs/releases/RELEASE-REPORT.md)（§10 v0.2.1 … §20 v0.3.7）· [RELEASE.md](docs/releases/RELEASE.md) 发布检查清单 · [审计与证据索引](docs/audits/README.md)
+- 历史与参考：[history/](docs/history/)（开发计划、UI/浮层重写规格与结果）· [reference/](docs/reference/)（Fluent 2 / Apple HIG / 外部服务链接）
 
 ## 验证状态（v0.4.0）
+
+> 代码版本已到 **v0.6.0**（`package.json` / `src-tauri/Cargo.toml`）；本节验证记录停在 v0.4.0，
+> v0.5.0 / v0.6.0 的改动与验证结论目前只记录在 git 提交信息中（见 [docs/README.md](docs/README.md)「已知陈旧点」）。
 
 - v0.4.0（视觉返工，用户反馈"很素"）：**壁纸/材质层修复**——`FluentProvider` 根背景改透明、壁纸画在 provider 内部（v0.3.x 壁纸被 `colorNeutralBackground1` 实色盖住，`backdrop-filter` 一直在模糊纯色）；壁纸改用**必应每日壁纸 4K**（依次尝试 `api.bimg.cc` / `api-bimg-cc.apifox.cn` / 必应原生 JSON，UHD 3840×2160，`object-fit: cover` 填充不拉伸，`wtsl.wallpaper.v1` 缓存 12h，失败退回 Fluent 中性底色）；桌面左下角加壁纸说明（标题 + 地点短句）。卡片材质改 `colorNeutralBackground1` 72% + 模糊 + `colorNeutralStroke2` 描边；六插件加静态 identity 行与 identity 色（Fluent shared palette，≤10% 面积，D-32/D-33）与空态主操作；默认布局改为 8×5 满屏构图（35/40 格，D-34，另修了 `cell` 坐标被 `asWidgetSize` 误判的解析 bug）；Agent 半高窗 idle 加静态 voice mark（D-35）。
   验证：`npm run typecheck` / `npm run build` exit 0；六插件 `build-plugin.mjs --all` exit 0；`npx tauri build` exit 0；`verify-widgets.mjs` 六插件 dark+light **60/60 尺寸用例 PASS**（A 34、B 26）；`verify-agent-surface.mjs` **127/127 PASS**；`verify-agent-voice-first.mjs` 断言层全 PASS（198/200，2 条 FAIL 为并发环境 Edge teardown 竞态）；截图 `docs/images/v040/`。**不新增设计 token**：identity 色全部取 Fluent `colorPalette*`，brand 保持 Fluent 默认。
 
-- v0.3.7 增量（用户反馈修复）：Agent 改为**语音优先**——半高窗成为纯语音形态（无文字输入框），语音回合结束**不再自动展开全高**（连续语音对话），全高对话只在显式展开后出现；空格默认永远是按住说话（修复“回答后按空格打进输入框”的根因：不再自动聚焦输入框）；全高对话的输入区改为单行 `[语音] [输入] [发送]`。视觉严格回到 Fluent 2 token（自造尺寸/圆角清零：语音主按钮用 `size=large`，间距/圆角/阴影/动效全取 token），交互按 HIG 思想收敛（入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 渐隐渐进披露、半高 detent、reduced-motion）。验证：新增 `scripts/verify-agent-voice-first.mjs` **198/198 PASS**（含“语音回合后观测不到 chat”“回答后空格再录音”“半高窗 textarea=0”“chat composer 单行三控件同轴”“窗口失焦取消任意路径录音”P2 回归）；`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/smoke-v031-ui.mjs` **26/26 PASS**；1440 dark / 1024 light / reduced-motion 三段 console error 0；`npm run typecheck` / `npm run build` exit 0；`npx tauri build` exit 0（cargo release 4m53s，NSIS + MSI 完成），产物在 `release/v0.3.7/`；证据 `shots/v037-dev/REPORT.md`。
+- v0.3.7 增量（用户反馈修复）：Agent 改为**语音优先**——半高窗成为纯语音形态（无文字输入框），语音回合结束**不再自动展开全高**（连续语音对话），全高对话只在显式展开后出现；空格默认永远是按住说话（修复“回答后按空格打进输入框”的根因：不再自动聚焦输入框）；全高对话的输入区改为单行 `[语音] [输入] [发送]`。视觉严格回到 Fluent 2 token（自造尺寸/圆角清零：语音主按钮用 `size=large`，间距/圆角/阴影/动效全取 token），交互按 HIG 思想收敛（入口长出/原路收回、关闭焦点回入口、✕ 关层 vs ⌄/Esc 退一级、peek 渐隐渐进披露、半高 detent、reduced-motion）。验证：新增 `scripts/verify-agent-voice-first.mjs` **198/198 PASS**（含“语音回合后观测不到 chat”“回答后空格再录音”“半高窗 textarea=0”“chat composer 单行三控件同轴”“窗口失焦取消任意路径录音”P2 回归）；`scripts/verify-agent-surface.mjs` **127/127 PASS**；`scripts/smoke-v031-ui.mjs` **26/26 PASS**；1440 dark / 1024 light / reduced-motion 三段 console error 0；`npm run typecheck` / `npm run build` exit 0；`npx tauri build` exit 0（cargo release 4m53s，NSIS + MSI 完成），产物在 `release/v0.3.7/`；证据 `shots/releases/v0.3.x/v037-dev/REPORT.md`。
 - v0.3.6 增量（用户反馈修复）：**桌面小组件配置实时同步**——新增宿主 → 插件 `host:config` 增量推送，天气自动定位/城市/显示项、时钟/倒数日/番茄钟/久坐/待办等所有插件在 Tauri 打包版里改配置即时生效，不再需要重启。根因：宿主页（`tauri.localhost`）与插件 iframe（`wtsl.localhost`）跨 origin，旧的 storage 事件同步在打包版从未生效。验证：跨 origin harness before 复现 / after **PASS**（settings 34ms、places 58ms 同步，iframe `host:config` 6 条、console error 0）；独立审计 + diff 评审 P0/P1=0；六插件产物重建；`npm run typecheck` / `npm run build` exit 0；全量基线回归全绿（verify-plugin ×6 / overlays 6/6 / widgets 25/25 / plug-and-play 12/12 / sedentary 9/9，console 0）；**release 真窗口 CDP 38/38 PASS**（真实 WebView2：升级重种 0.3.5→0.3.6、时钟/天气设置页改动后跨 origin 卡片 2s 内更新、iframe 未 reload、console 0）。
 - v0.3.5 增量：Agent 里说「我站起来了 / 我坐下了」**立即生效**（插件 `phrases` 由宿主直接执行，不再依赖模型调工具；语音先等 ASR 转写再发请求），卡片/详情无需再点按钮；久坐 UI 文案做减法（删除「休息中，坐下后开始新一轮」等状态机说明与每次操作的「已记录…」通知）。验证：短语单测 10/10；真实 MiMo + headless Edge 端到端 **12/12 PASS**；`scripts/verify-agent-surface.mjs` **109/109 PASS**。`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。
 - v0.3.4 增量：久坐改为手动**「坐着 ↔ 站立」循环**——坐着点「我站起来了」、站立点「我坐下了」；久坐只累计坐姿，站立单独统计；提醒只在坐着时出现。Agent 新增 `standUp` / `sitDown` / `stats`（移除 `takeBreak`），复盘页按「起身次数」为主数值、久坐/站立分钟为次要指标。验证：`scripts/verify-sedentary.mjs` 坐→站→坐循环 **10/10 PASS**；复盘页集成检查 PASS（`sedentary.stats` 被发现并渲染）；`node scripts/build-plugin.mjs sedentary`、typecheck、`npx tauri build` 全部 exit 0。

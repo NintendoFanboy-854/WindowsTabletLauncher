@@ -79,7 +79,7 @@ node scripts/verify-plugin.mjs $id
 ```
 
 验证脚本会做静态检查、按 manifest 的每个尺寸独立打开卡片，并在宿主桌面点卡开详情。
-模板的验收截图保存在 `shots/e3-template/`（截图目录被 `.gitignore` 忽略）。
+模板的验收截图保存在 `shots/milestones/e3-template/`（截图目录被 `.gitignore` 忽略）。
 
 ## 模板功能
 

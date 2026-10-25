@@ -2,13 +2,13 @@
 
 > **⚠️ 历史文档（已被取代）**：本规格里的 `?view=settings` 设置浮层、详情/编辑/全部任务视图的
 > 旧交互与骨架已由 `docs/PLUGIN-CONTRACT.md`（设置宿主化 + L1/L2 页栈）、
-> `docs/DESIGN-ROUND-SUMMARY.md` 与六份 `docs/components/*.md` 取代；仅保留历史参考。
+> `docs/history/DESIGN-ROUND-SUMMARY.md` 与六份 `docs/components/*.md` 取代；仅保留历史参考。
 > **浮层几何以 host-impl §3.5 为准**：880×680、圆角 12、`shadow64`、`DialogContent` padding 16
 > （不是本文的 834×582 / 24 内衬）；列表行 44、设置行 48、控件 40。
 
 > 范围：六个插件在宿主全窗口 Fluent Dialog 里加载的 **设置 / 详情 / 编辑 / 全部任务** 视图
 > （`?view=settings|detail|edit|all`）。卡片视图已完成 v0.2 重写，本轮只动浮层视图。
-> 依据：`docs/audit2/REPORT-VISUAL.md`、`docs/audit2/REPORT-TYPE.md`、
+> 依据：`docs/audits/round2-type-visual/REPORT-VISUAL.md`、`docs/audits/round2-type-visual/REPORT-TYPE.md`、
 > `docs/DENSITY.md`（信息层级/留白）、`docs/DECISIONS.md`（D-07 Display XL 与浮层无关）、
 > Fluent 2 表单与页面布局最佳实践。
 
@@ -112,15 +112,15 @@ root（flex column; height 100%; padding: 24 24 0; overflow: hidden）
 ## 6. 验收
 
 > **状态（2026-10-19）：已完成**。12 个视图暗/亮两套断言全部 PASS（每视图实测字号/控件高度见
-> `docs/OVERLAY-REWRITE-RESULT.md` §2.1），宿主内集成 7/7 PASS；结果与残留见
-> `docs/OVERLAY-REWRITE-RESULT.md`。
+> `docs/history/OVERLAY-REWRITE-RESULT.md` §2.1），宿主内集成 7/7 PASS；结果与残留见
+> `docs/history/OVERLAY-REWRITE-RESULT.md`。
 
 1. `node scripts/build-plugin.mjs <ids>` 成功，产物更新。
 2. `node scripts/verify-overlays.mjs [--plugin id]` 通过：每个视图在 834×582 下
    - 内容渲染（非空）、无横向溢出、无 10/11px 文本、最小字号 ≥12；
    - 可点击控件高度 ≥40；
    - 无 console error；
-   - 截图写入 `shots/rewrite/overlays/`。
+   - 截图写入 `shots/milestones/overlay-rewrite/overlays/`。
 3. 每视图至少 1 张截图（暗色），亮色抽查 1–2 张；报告列出实测字号/控件高度与改动。
 4. 保留功能与浮层机制（`requestSettings/requestOverlay`、`?view=`）；不改卡片视图、宿主、`_shared/**`、docs。
 

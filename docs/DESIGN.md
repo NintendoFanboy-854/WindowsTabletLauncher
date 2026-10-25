@@ -168,7 +168,7 @@
   说明条与 Agent 入口**下缘共线 933**。隐藏说明条后的语义是 `H_p`=0 → 网格单独上下居中（22/22/46/46）。动效见 [MOTION.md](MOTION.md) §5.2。
 - **图标**：界面图标用 Fluent System Icons；**天气现象图标是唯一例外**（用和风 SVG，因为 Fluent 天气图标覆盖不全），只作为内容图形，颜色/间距仍按 Fluent 排。
 - **焦点态 / 高对比度**：用 Fluent 默认焦点样式，不覆写。
-- 本地参考：`references/fluentui-docs/`。
+- 本地参考：`docs/reference/fluent-ui-docs/`。
 
 ## 7. 动效：完全按 Fluent 2
 

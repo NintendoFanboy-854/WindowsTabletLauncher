@@ -88,7 +88,7 @@ Apple 的取舍很明确：**退出的路径可以多（按钮、轻扫、Esc、
 2. 表单给了「完成」就必须同时给「取消」，否则"完成任务"成了退出的唯一路径。
 3. 弹出窗口**默认不给关闭按钮**：点外部或选中即关；关闭按钮只在需要说明"退出时保存还是不保存"时才加；自动关闭时必须保存工作。
 
-**对照**：项目现在是**四个退出路径、两种语义**——宿主 Dialog 的关闭按钮、Esc、点遮罩、以及插件视图内的「取消」；而「取消」在 countdown 里是"恢复表单初值但不关浮层"，在 todo detail 里是"请求关闭"（见 [OVERLAY-REWRITE-RESULT.md](../OVERLAY-REWRITE-RESULT.md) §3、[DESIGN.md](../DESIGN.md) §2）。也就是说，「取消」与「关闭」同名不同义、且并存。这不是"按钮太多"的问题，是**两条路径对"未保存改动"的承诺不一致**的问题。开放问题见 §12-2。
+**对照**：项目现在是**四个退出路径、两种语义**——宿主 Dialog 的关闭按钮、Esc、点遮罩、以及插件视图内的「取消」；而「取消」在 countdown 里是"恢复表单初值但不关浮层"，在 todo detail 里是"请求关闭"（见 [OVERLAY-REWRITE-RESULT.md](../history/OVERLAY-REWRITE-RESULT.md) §3、[DESIGN.md](../DESIGN.md) §2）。也就是说，「取消」与「关闭」同名不同义、且并存。这不是"按钮太多"的问题，是**两条路径对"未保存改动"的承诺不一致**的问题。开放问题见 §12-2。
 
 ## 6. 按钮与控件：命中区域、按压反馈、主次
 
@@ -173,7 +173,7 @@ Apple 的取舍很明确：**退出的路径可以多（按钮、轻扫、Esc、
 | # | 议题 | HIG 依据 | 项目现状（证据） | 开放问题 |
 |---|---|---|---|---|
 | 1 | **点按语义不统一** | 小组件：主体点按=进入 + 深链到相关详情；仅按钮/切换就地操作 | 同一外观四种语义：clock 点击=切 12/24h；sedentary 点击=打卡；pomodoro 点击时间区=沉浸模式；weather 点击=详情 Drawer（[clock.md](../components/clock.md)、[sedentary.md](../components/sedentary.md)、[pomodoro.md](../components/pomodoro.md)、[weather.md](../components/weather.md)） | 桌面卡片这一层要不要统一成"点=打开详情/就地主操作"两类明确契约？clock 的"整块点按切换制式"是否属于"无可见 affordance 的隐式状态变更"？ |
-| 2 | **取消 vs 关闭的羡余** | 表单：取消=关闭不保存、完成=保存关闭、返回≠关闭，且三者不同时出现；弹出窗口：关闭按钮只在需要说明保存语义时给 | 宿主 Dialog 关闭按钮 + Esc + 遮罩 + 插件内「取消」四条路径；「取消」在 countdown=恢复初值不关、在 todo=请求关闭（[OVERLAY-REWRITE-RESULT.md](../OVERLAY-REWRITE-RESULT.md) §3、[DESIGN.md](../DESIGN.md) §2） | 同一个浮层里，「取消」到底是"放弃改动"还是"关闭"？未保存改动时，宿主关闭按钮承诺什么？（保留/丢弃/询问） |
+| 2 | **取消 vs 关闭的羡余** | 表单：取消=关闭不保存、完成=保存关闭、返回≠关闭，且三者不同时出现；弹出窗口：关闭按钮只在需要说明保存语义时给 | 宿主 Dialog 关闭按钮 + Esc + 遮罩 + 插件内「取消」四条路径；「取消」在 countdown=恢复初值不关、在 todo=请求关闭（[OVERLAY-REWRITE-RESULT.md](../history/OVERLAY-REWRITE-RESULT.md) §3、[DESIGN.md](../DESIGN.md) §2） | 同一个浮层里，「取消」到底是"放弃改动"还是"关闭"？未保存改动时，宿主关闭按钮承诺什么？（保留/丢弃/询问） |
 | 3 | **展开后的详情层级** | 小组件：一瞥 + 细看两级；小尺寸信息有限、大尺寸扩展层级而不是放大；≥11pt 文本 | 详情用宿主全窗口 Dialog（880×680）；插件文档给 weather 详情记的是"右侧滑出 Drawer"，D-11 又把浮层统一成宿主 Dialog、内容 max-width 720（[weather.md](../components/weather.md)、[DECISIONS.md](../DECISIONS.md) D-11） | 详情首屏该给"更大的数字/图"还是"列表/操作"？近距阅读（0.5–0.8m）时现有 12px 辅助文字与 44px 行高是否已经够密？ |
 | 4 | **信息聚集/分隔与右侧 spacing** | 布局：用留白/背景/颜色分组，内容与控制要区分；小组件：标准外边距 16pt，更紧时 11pt，内容不要挤到边缘 | 卡片内 padding 按尺寸档 8/12/16（[DENSITY.md](../DENSITY.md) §2.1）；组间 ≥ spacingVerticalM、组内 ≤ XS | 1×1 的 8px padding 在 267 PPI 下换算约 1.5mm，与 HIG 的 16pt 标准边距差一倍；"右侧 trailing 值贴边"是分组问题还是边距问题？ |
 | 5 | **是否所有 widget 都能打开详情** | 熟悉感：行为建立后全局一致；菜单：不可用项也要可见以便理解 | 只有 weather 的卡片点击明确指向详情；todo/countdown 的详情在任务行/条目级，不在卡片级 | "卡片可点开详情"要不要成为六个插件的共同契约？若某些插件没有"更多内容"，它的点击应该做什么？ |

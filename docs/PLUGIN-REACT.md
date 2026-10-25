@@ -331,7 +331,7 @@ node scripts/verify-plugin.mjs <id> --skip-host      # 只跑静态 + 独立尺�
 2. **独立尺寸**：按 manifest 的每个 widget × size 打开
    `/plugins/<id>/index.html?plugin=<id>&widget=<wid>&size=<WxH>&demo=1`，
    iframe 尺寸按 1440×960 网格换算；断言有文字、最小字号 ≥12、无 console error，
-   截图到 `shots/e3/<id>/`。
+   截图到 `shots/milestones/e3/<id>/`。
 3. **宿主冒烟**：打开 `/?page=desktop`，触控轻点卡片中心；若插件发
    `plugin:request-overlay` 则等宿主 Dialog、截图、X 关闭，再用 Esc 关一次；
    未请求浮层的卡片只检查渲染。
@@ -376,7 +376,7 @@ E3.0 宿主从 L1 点「设置…」只导航、不自动关闭详情浮层；�
 `requestHostSettings()` 再发 `plugin:request-overlay-close`（不能反序），宿主修复后可收敛。
 
 `verify-plugin.mjs` 的静态检查、独立尺寸与宿主冒烟可直接复用；模板自己的尺寸截图与
-交互验证在 `shots/e3-template/`，这些截图和临时验证脚本不进 git（`shots/` 已忽略）。
+交互验证在 `shots/milestones/e3-template/`，这些截图和临时验证脚本不进 git（`shots/` 已忽略）。
 
 ### 常见反模式
 

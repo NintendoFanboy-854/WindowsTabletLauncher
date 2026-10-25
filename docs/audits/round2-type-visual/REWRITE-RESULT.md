@@ -1,7 +1,7 @@
 # UI 重写验收结果（v0.2，2026-10-19）
 
-> 基线：`bf25a0f`（审计后、重写前）；重写依据：`docs/audit2/REPORT-VISUAL.md`、
-> `docs/audit2/REPORT-TYPE.md`、`docs/UI-REWRITE-SPEC.md`、`DENSITY.md §2.1`、`DECISIONS.md D-07`。
+> 基线：`bf25a0f`（审计后、重写前）；重写依据：`docs/audits/round2-type-visual/REPORT-VISUAL.md`、
+> `docs/audits/round2-type-visual/REPORT-TYPE.md`、`docs/history/UI-REWRITE-SPEC.md`、`DENSITY.md §2.1`、`DECISIONS.md D-07`。
 > 验证命令：`node scripts/verify-widgets.mjs`（串行单 Edge，按真实 iframe 尺寸逐插件测量）。
 > 结果：**25 / 25 个「插件 × 尺寸」全部通过断言**（exit 0）。
 
@@ -49,11 +49,11 @@
 
 | 内容 | 路径 |
 |---|---|
-| 宿主暗色 1440×960 | `shots/rewrite/final/host-dark-1440x960.png` |
-| 宿主亮色 1440×960 | `shots/rewrite/final/host-light-1440x960.png` |
-| 宿主暗色 1024×768 | `shots/rewrite/final/host-dark-1024x768.png` |
-| 每插件每尺寸断言截图 | `shots/rewrite/verify/<plugin>-<size>-dark.png`（`--screenshots` 生成） |
-| 各插件分尺寸截图 | `shots/rewrite/<plugin>-<size>.png` |
+| 宿主暗色 1440×960 | `shots/milestones/overlay-rewrite/final/host-dark-1440x960.png` |
+| 宿主亮色 1440×960 | `shots/milestones/overlay-rewrite/final/host-light-1440x960.png` |
+| 宿主暗色 1024×768 | `shots/milestones/overlay-rewrite/final/host-dark-1024x768.png` |
+| 每插件每尺寸断言截图 | `shots/milestones/overlay-rewrite/verify/<plugin>-<size>-dark.png`（`--screenshots` 生成） |
+| 各插件分尺寸截图 | `shots/milestones/overlay-rewrite/<plugin>-<size>.png` |
 
 > 截图目录在 `.gitignore` 中，不随仓库提交；报告与测量数据可复现。
 

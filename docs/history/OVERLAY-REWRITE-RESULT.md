@@ -1,10 +1,10 @@
 # 插件设置 / 详情浮层重排结果（v1，2026-10-19）
 
 > **⚠️ 历史文档（部分被取代）**：本文记录的是 v1 浮层重排；随后定稿的新模型已把设置迁到宿主设置页、
-> 详情改为 L1/L2 页栈（见 `docs/PLUGIN-CONTRACT.md`、`docs/DESIGN-ROUND-SUMMARY.md`、D-14）。
+> 详情改为 L1/L2 页栈（见 `docs/PLUGIN-CONTRACT.md`、`docs/history/DESIGN-ROUND-SUMMARY.md`、D-14）。
 > 本文保留作为历史验收证据（12 视图断言、截图），不再描述目标状态。
 
-> 对应规格：`docs/OVERLAY-REWRITE-SPEC.md`。范围：宿主全窗口 Fluent Dialog 里加载的
+> 对应规格：`docs/history/OVERLAY-REWRITE-SPEC.md`。范围：宿主全窗口 Fluent Dialog 里加载的
 > `?view=settings|detail|edit|all` 视图（6 个插件、12 个视图）。卡片视图、宿主代码、
 > `_shared/**` 未改；功能与浮层机制（`requestSettings` / `requestOverlay` / `?view=`）保持原样。
 
@@ -51,7 +51,7 @@
 - 暗色 `--screenshots`：12/12 PASS；亮色 `--scheme light --screenshots`：12/12 PASS。
 - 每个视图同时断言：非空渲染、无横向溢出（`scrollWidth ≤ clientWidth`）、无 <12px 文本、
   无高度 <40 的控件、0 console error。
-- 截图（暗色 + 亮色各 12 张）：`shots/rewrite/overlays/<plugin>-<view>[-light].png`。
+- 截图（暗色 + 亮色各 12 张）：`shots/milestones/overlay-rewrite/overlays/<plugin>-<view>[-light].png`。
 
 ### 2.2 宿主内集成（`node scripts/shot-host-overlays.mjs`，1440×960，DSF2）
 
@@ -59,7 +59,7 @@
 断言宿主 Fluent Dialog 内的浮层渲染完成并截图：
 
 - 7/7 PASS：clock / weather / countdown / pomodoro / sedentary / todo 的**设置** + weather **详情**；
-- 截图：`shots/rewrite/overlays/host-<plugin>-<view>.png`（含宿主标题「插件名 · 视图名」与关闭按钮）。
+- 截图：`shots/milestones/overlay-rewrite/overlays/host-<plugin>-<view>.png`（含宿主标题「插件名 · 视图名」与关闭按钮）。
 
 ### 2.3 构建
 
@@ -88,5 +88,5 @@
 - 源码：`public/plugins/{clock,weather,countdown,pomodoro,sedentary,todo}/src/**`（仅浮层视图文件，见规格 §5）
 - 产物：`public/plugins/*/app/app.js`（全部重建）
 - 脚本：`scripts/verify-overlays.mjs`（新增）、`scripts/shot-host-overlays.mjs`（新增）
-- 规格：`docs/OVERLAY-REWRITE-SPEC.md`（新增）
-- 截图：`shots/rewrite/overlays/`（12 视图 × 暗/亮 + 7 张宿主内集成）
+- 规格：`docs/history/OVERLAY-REWRITE-SPEC.md`（新增）
+- 截图：`shots/milestones/overlay-rewrite/overlays/`（12 视图 × 暗/亮 + 7 张宿主内集成）

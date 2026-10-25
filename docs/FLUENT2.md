@@ -1,6 +1,6 @@
 # Fluent 2 设计规范（本项目落地版）
 
-> 来源：Fluent 2 官网（fluent2.microsoft.design）15 个设计语言页面，已抓取到本地 `references/fluentui-design/`（design-principles / color / typography / layout / shapes / elevation / material / motion / iconography / accessibility / content-design / design-tokens / handoffs / onboarding / wait-ux）。
+> 来源：Fluent 2 官网（fluent2.microsoft.design）15 个设计语言页面，已抓取到本地 `docs/reference/fluent-design/`（design-principles / color / typography / layout / shapes / elevation / material / motion / iconography / accessibility / content-design / design-tokens / handoffs / onboarding / wait-ux）。
 >
 > 三份文档的分工：
 > - **本文**：官方设计语言 → 可执行的视觉规则与数值（颜色/字阶/间距/圆角/阴影/材质/动效/图标/无障碍/文案/等待）。

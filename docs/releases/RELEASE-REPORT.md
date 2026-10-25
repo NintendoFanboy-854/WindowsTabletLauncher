@@ -4,7 +4,7 @@
 > 代码提交：v0.3.0 发布提交（见 `git log`）；v0.2.1 热修见 §10；v0.2.2 交互/定位热修见 §11；v0.3.0 语音优先重构见 §12；v0.3.1 半高窗出口/朗读总开关/鼠标设置入口见 §13
 > 分支：`main`；版本：`0.3.1`（`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / 两个 lockfile）
 > 复现环境：Windows 10 LTSC 19044.7807，2880×1920 物理屏 = 1440×960 CSS @200%，Node 24.20.0，Rust 1.99.1，Edge headless（CDP）
-> 证据根：`shots/e7/`、`shots/v022-final/`、`shots/v030-dev/`、`shots/v030-final/`、`shots/v031-dev/`、`shots/v031-final/`；逐项矩阵见各目录 `REPORT.md`
+> 证据根：`shots/milestones/e7/`、`shots/releases/v0.2.x/v022-final/`、`shots/releases/v0.3.x/v030-dev/`、`shots/releases/v0.3.x/v030-final/`、`shots/releases/v0.3.x/v031-dev/`、`shots/releases/v0.3.x/v031-final/`；逐项矩阵见各目录 `REPORT.md`
 
 ## 0. 结论
 
@@ -35,13 +35,13 @@
 
 | 项 | 命令 | 结果 | 证据 |
 |---|---|---|---|
-| 类型检查 | `npm run typecheck` | ✅ 0 错误，exit 0 | `shots/e7/logs/typecheck.log` |
-| 前端构建 | `npm run build` | ✅ exit 0（5.54s；仅 chunk >500KB 已知警告） | `shots/e7/logs/build.log` |
-| 插件产物 | `node scripts/build-plugin.mjs --all` | ✅ 六插件全部「打包完成」；重建后 `git diff -- public/plugins` 为空 | `shots/e7/logs/build-plugin-all.log` |
-| Rust 侧 | `cargo check`（`src-tauri`） | ✅ exit 0（1m40s，版本 0.2.0） | `shots/e7/logs/cargo-check.log` |
+| 类型检查 | `npm run typecheck` | ✅ 0 错误，exit 0 | `shots/milestones/e7/logs/typecheck.log` |
+| 前端构建 | `npm run build` | ✅ exit 0（5.54s；仅 chunk >500KB 已知警告） | `shots/milestones/e7/logs/build.log` |
+| 插件产物 | `node scripts/build-plugin.mjs --all` | ✅ 六插件全部「打包完成」；重建后 `git diff -- public/plugins` 为空 | `shots/milestones/e7/logs/build-plugin-all.log` |
+| Rust 侧 | `cargo check`（`src-tauri`） | ✅ exit 0（1m40s，版本 0.2.0） | `shots/milestones/e7/logs/cargo-check.log` |
 | `dist` 结构 | 构建后静态检查 | ✅ 7 个 HTML = 1 个 host entry（`dist/index.html` → 单脚本 `assets/index-CvN8saV_.js`）+ 6 个插件 standalone；无 `demo.html` / `bridge-check.html` | 见 §2.1 |
 | host bundle 演示文案 | 对 `dist/assets/index-*.js` 原文检索 | ✅ `演示/测试/demo/scenario/bridge-check/源码路径/浏览器演示模式` 均为 0 | 见 §2.1 |
-| Tauri 真窗口 | `tauri build --debug --no-bundle` + 真实启动 | ✅ **2026-10-20 补充重跑**：v0.2.0 debug exe 构建并启动，窗口/六插件渲染见 §2.2 | `shots/e7/tauri/` |
+| Tauri 真窗口 | `tauri build --debug --no-bundle` + 真实启动 | ✅ **2026-10-20 补充重跑**：v0.2.0 debug exe 构建并启动，窗口/六插件渲染见 §2.2 | `shots/milestones/e7/tauri/` |
 | 安装包 | `npx tauri build`（release） | ✅ 2026-10-20 产出 MSI + NSIS（§2.3）；未做安装验证 | `src-tauri/target/release/bundle/` |
 
 ### 2.1 dist 审计明细
@@ -62,7 +62,7 @@
 | 窗口 | 标题 `Windows Tablet Launcher`；`IsWindowVisible=True`；DPI-aware `GetWindowRect` = `(0,0,2880,1920)` 全屏无边框 |
 | 插件加载 | Rust 日志 `插件目录: …\public\plugins`；窗口截图可见六张卡片真实渲染（clock 13:01:36、countdown 空态、sedentary「0 分钟 / 我起来了」+ 久坐 Toast、pomodoro 25:00、todo「今日 · 0」、weather「还没有城市」） |
 | stderr | 仅关闭时 WebView2 teardown 一条 `Failed to unregister class Chrome_WidgetWin_0 (1412)`（已知无害，退出阶段） |
-| 截图 | `shots/e7/tauri/app-window.png`（2880×1920 全窗口）；日志 `shots/e7/tauri/{app-stdout.log,app-stderr.log,verify.json}` |
+| 截图 | `shots/milestones/e7/tauri/app-window.png`（2880×1920 全窗口）；日志 `shots/milestones/e7/tauri/{app-stdout.log,app-stderr.log,verify.json}` |
 | 限制 | 真窗口内的长按/拖拽/浮层/热键等交互未自动化驱动；窗口由人工关闭，未做完整交互回归（交互回归仍以 §3 的 headless 套件为准） |
 
 ### 2.3 发布安装包（2026-10-20 补充）
@@ -79,21 +79,21 @@
 
 ## 2.4 plug-and-play 自动化脚本（2026-10-20 补充）
 
-`scripts/verify-plug-and-play.mjs` 已落地并跑通 **12/12 PASS**：冷复制 `templates/plugin-template` → 只改 manifest id/name → 仅追加 `index.json` 条目 → 正式宿主出现第 7 张卡、点卡开 detail、Esc 关闭、设置页按 schema 渲染 3 字段、console 0 → 删除目录与 index 后恢复 6 卡、无残留。截图 `shots/pnp/`。
+`scripts/verify-plug-and-play.mjs` 已落地并跑通 **12/12 PASS**：冷复制 `templates/plugin-template` → 只改 manifest id/name → 仅追加 `index.json` 条目 → 正式宿主出现第 7 张卡、点卡开 detail、Esc 关闭、设置页按 schema 渲染 3 字段、console 0 → 删除目录与 index 后恢复 6 卡、无残留。截图 `shots/milestones/pnp/`。
 （Agent 工具与复盘统计块仍依赖插件声明 `*.stats`，模板无该工具，故以 E7 人工 ping fixture 证据为准。）
 
 ## 3. 脚本回归（全量）
 
 | 脚本 | 范围 | 结果 | 证据 |
 |---|---|---|---|
-| `verify-plugin.mjs` | 六插件 × 全尺寸 + 宿主点卡冒烟 | ✅ 6/6 PASS（见 §3.1） | `shots/e7/logs/verify-plugin-final.log` |
-| `verify-widgets.mjs` | 六插件 × 25 档尺寸，暗色 | ✅ 25/25 PASS（1 项已接受 P2 记账） | `shots/e7/logs/verify-widgets-final-dark.log` |
-| `verify-widgets.mjs --scheme light` | 同上，亮色 | ✅ 25/25 PASS | `shots/e7/logs/verify-widgets-final-light.log` |
-| `verify-overlays.mjs` | 六插件 `?view=detail`（834×582）暗色 | ✅ 6/6 PASS | `shots/e7/logs/verify-overlays-dark.log`、`overlays-dark.json` |
-| `verify-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/e7/logs/verify-overlays-light.log`、`overlays-light.json` |
-| `shot-host-overlays.mjs` | 宿主内点卡 → detail 浮层（880×680）暗色 | ✅ 6/6 PASS | `shots/e7/logs/shot-host-overlays-dark.log` |
-| `shot-host-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/e7/logs/shot-host-overlays-light.log` |
-| `verify-plug-and-play.mjs` | 冷复制模板 + 仅登记 index → 正式宿主卡片/详情/设置/清理 | ✅ 12/12 PASS（2026-10-20 补充，§2.4） | `shots/pnp/` |
+| `verify-plugin.mjs` | 六插件 × 全尺寸 + 宿主点卡冒烟 | ✅ 6/6 PASS（见 §3.1） | `shots/milestones/e7/logs/verify-plugin-final.log` |
+| `verify-widgets.mjs` | 六插件 × 25 档尺寸，暗色 | ✅ 25/25 PASS（1 项已接受 P2 记账） | `shots/milestones/e7/logs/verify-widgets-final-dark.log` |
+| `verify-widgets.mjs --scheme light` | 同上，亮色 | ✅ 25/25 PASS | `shots/milestones/e7/logs/verify-widgets-final-light.log` |
+| `verify-overlays.mjs` | 六插件 `?view=detail`（834×582）暗色 | ✅ 6/6 PASS | `shots/milestones/e7/logs/verify-overlays-dark.log`、`overlays-dark.json` |
+| `verify-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/milestones/e7/logs/verify-overlays-light.log`、`overlays-light.json` |
+| `shot-host-overlays.mjs` | 宿主内点卡 → detail 浮层（880×680）暗色 | ✅ 6/6 PASS | `shots/milestones/e7/logs/shot-host-overlays-dark.log` |
+| `shot-host-overlays.mjs --scheme light` | 同上，亮色 | ✅ 6/6 PASS | `shots/milestones/e7/logs/shot-host-overlays-light.log` |
+| `verify-plug-and-play.mjs` | 冷复制模板 + 仅登记 index → 正式宿主卡片/详情/设置/清理 | ✅ 12/12 PASS（2026-10-20 补充，§2.4） | `shots/milestones/pnp/` |
 
 ### 3.1 六个插件
 
@@ -124,12 +124,12 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 
 | 视口 × 主题 | 结果 | 证据 |
 |---|---|---|
-| 1440×960 dark | ✅ 53/53 | `shots/e7/logs/desktop-e2e-1440x960-dark.log` |
-| 1440×960 light | ✅ 53/53 | `shots/e7/logs/desktop-e2e-1440x960-light.log` |
-| 1024×768 dark | ✅ 53/53 | `shots/e7/logs/desktop-e2e-1024x768-dark.log` |
-| 1024×768 light | ✅ 53/53 | `shots/e7/logs/desktop-e2e-1024x768-light.log` |
+| 1440×960 dark | ✅ 53/53 | `shots/milestones/e7/logs/desktop-e2e-1440x960-dark.log` |
+| 1440×960 light | ✅ 53/53 | `shots/milestones/e7/logs/desktop-e2e-1440x960-light.log` |
+| 1024×768 dark | ✅ 53/53 | `shots/milestones/e7/logs/desktop-e2e-1024x768-dark.log` |
+| 1024×768 light | ✅ 53/53 | `shots/milestones/e7/logs/desktop-e2e-1024x768-light.log` |
 
-页面专项（临时脚本 `pages-e2e.mjs`）：插件页 / 复盘页 / Agent mock **12/12 PASS**（`shots/e7/logs/pages-e2e.log`）。
+页面专项（临时脚本 `pages-e2e.mjs`）：插件页 / 复盘页 / Agent mock **12/12 PASS**（`shots/milestones/e7/logs/pages-e2e.log`）。
 
 关键实测：
 
@@ -150,7 +150,7 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 
 | # | 断言 | 证据 |
 |---|---|---|
-| 1–2 | 桌面出现 ping 卡并渲染；无横向溢出 | `shots/e7/plug-and-play/1-desktop-with-ping.png` |
+| 1–2 | 桌面出现 ping 卡并渲染；无横向溢出 | `shots/milestones/e7/plug-and-play/1-desktop-with-ping.png` |
 | 3 | 点卡进入 `?view=detail` 浮层（文字就绪） | `2-detail.png` |
 | 4 | 详情「设置…」收起浮层并导航到 ping 分区 | `3-settings-ping.png` |
 | 5–7 | 设置页自动分区、boolean/enum/number 按 schema 渲染、改值即时写 localStorage、「保存」Toast | `3-settings-ping.png` |
@@ -160,7 +160,7 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 | 15 | 复盘页出现「Ping 测试」统计块（`ping.stats` 实际返回 `completed=3`） | `6-review-ping.png` |
 | 16–19 | 删除插件目录与 index 项后桌面恢复六卡、layout 无残留、console 0 | `7-desktop-restored.png` |
 
-证据 JSON：`shots/e7/plug-and-play/evidence.json`；fixture 源码留档：`shots/e7/plug-and-play/fixture-src/`（仅证据目录，`shots/` 被 gitignore）。验收后 `public/plugins/ping/` 与 index 项已删除，`public/plugins/index.json` 内容与 HEAD 一致。
+证据 JSON：`shots/milestones/e7/plug-and-play/evidence.json`；fixture 源码留档：`shots/milestones/e7/plug-and-play/fixture-src/`（仅证据目录，`shots/` 被 gitignore）。验收后 `public/plugins/ping/` 与 index 项已删除，`public/plugins/index.json` 内容与 HEAD 一致。
 
 ## 6. 设计合规与问题清单
 
@@ -175,18 +175,18 @@ weather    1x1/2x1/2x2/3x2/4x2 + 宿主冒烟 PASS
 ### 6.2 P2 / 文档冲突（不阻塞交付）
 
 1. **weather 2×2 空带**：实测 26.8% > DENSITY 22%，E5-P2-01 已记录为“需产品决定加/减内容”；E7 在脚本中登记为已接受 P2（护栏 30% / 内容带 40%），不改产品。
-2. **clock L1 数据少时偏空、pomodoro 3×2 右列、列表卡空底、亮色渐隐弱**：沿用 `shots/e5/REPORT.md` §4 的 P2 清单。
+2. **clock L1 数据少时偏空、pomodoro 3×2 右列、列表卡空底、亮色渐隐弱**：沿用 `shots/milestones/e5/REPORT.md` §4 的 P2 清单。
 3. **DENSITY §2.1 与 `docs/components/todo.md` 冲突（已收口）**：DENSITY 已补「纯列表卡（todo）按组件文档：12 fg3 分组标题 + 16 行标题，不套用列表头主层 ≥28」的口径；`verify-widgets` 对 todo 使用行预算/行高断言，两者一致。
 4. **编辑模式删除卡片是会话级（已定稿）**：reload 后按插件目录重建（`reconcileLayout` 补回）；持久移除路径是插件管理页启用/禁用（E7 P1 修复后真正生效，且不删布局条目）。见 `DECISIONS.md` D-18。
 5. **`docs/DECISIONS.md` D-11（已更新）**：E1 起插件只有 `?view=detail`；D-11 宽度口径（表单 720 / 详情列表满宽 834）仍有效。
-6. **`verify-overlays.mjs` / `shot-host-overlays.mjs` 的旧截图目录**（`shots/rewrite/overlays`）不再写入；新证据在 `shots/e7/overlays`、`shots/e7/host`。
+6. **`verify-overlays.mjs` / `shot-host-overlays.mjs` 的旧截图目录**（`shots/milestones/overlay-rewrite/overlays`）不再写入；新证据在 `shots/milestones/e7/overlays`、`shots/milestones/e7/host`。
 
 ### 6.3 设计合规复核
 
 - 六插件均为 React + Fluent UI React（无自绘控件）；静态检查无 `lineHeight:1`、clamp、10/11px、自定义 hex（`verify-plugin` 静态段）。
 - 触控目标：详情可交互控件根 ≥40（6/6 × 暗/亮）；卡片编辑按钮 40×40；设置行 48、控件 40。
 - 最小字号：六插件 detail 全部 ≥12px（`overlays-*.json`）。
-- 亮/暗两套、1440×960 / 1024×768 均有桌面、浮层、设置、页面截图（`shots/e7/`）。
+- 亮/暗两套、1440×960 / 1024×768 均有桌面、浮层、设置、页面截图（`shots/milestones/e7/`）。
 - 未在本轮重新执行 `design-auditor`；P0/P1 结论来自 E5 收口 + E7 回归，未发现新的 P0/P1（除已修 P1）。
 
 ## 7. 已知限制与未验证项
@@ -250,9 +250,9 @@ npx tauri build                    # release + 安装包
 | 插件 iframe | 全部走 `http://wtsl.localhost/<id>/...`（TauriPluginSource 生效） |
 | `plugin_list` | 6 条记录，`hasManifest=true` |
 | console error / warning | 0 |
-| 窗口截图 | `shots/e7/release-seed/seed-window.png`（2880×1920，六卡真实内容） |
+| 窗口截图 | `shots/milestones/e7/release-seed/seed-window.png`（2880×1920，六卡真实内容） |
 
-诊断原始输出：`shots/e7/release-debug/diag2.json`。修复前同一诊断可见 6 条 `manifest.json 不是合法 JSON`（`diag.json`）。
+诊断原始输出：`shots/milestones/e7/release-debug/diag2.json`。修复前同一诊断可见 6 条 `manifest.json 不是合法 JSON`（`diag.json`）。
 
 ### 10.4 中文安装器与 v0.2.1 产物
 
@@ -307,12 +307,12 @@ npx tauri build                    # release + 安装包
 
 | 阶段 | 结果 | 证据 |
 |---|---|---|
-| A 工程门禁 | 4/4：`typecheck` 0、`build` 0（2234 modules）、`node --check` weather app.js 0、重建前后 SHA-256 一致 `6ACA66D8…` | `shots/v022-final/A-gates.json` |
-| B 既有脚本 | `verify-plugin` 六插件全 PASS；`verify-widgets` 25/25 × 暗/亮；`verify-overlays` 6/6 × 暗/亮；`verify-plug-and-play` 12/12 | `shots/v022-final/B-*.log` |
-| C 四项修复 E2E | **21/21 PASS**：1024×768 light + 1440×960 dark；尺寸菜单负例 toast+rect 不变+勾选回退、成功跟随；删除持久化 + reload 5 卡 + 插件页「未上桌」→「桌面 1/1」；「添加组件」列表/添加/空态；外观→重置布局恢复六卡；六卡基线/无横向溢出/无编辑 chrome/console 0 | `shots/v022-final/C-e2e-results.json`、`*-C1..C5-*.png` |
-| C.6 天气定位注入 | **7/7 PASS**：空列表自动加入上海 + `location.applied=true` + 卡片真实显示「上海 25°」（QWeather 真实网络）；已有北京→切上海且北京保留；`applied=true` 不覆盖手动城市、定位请求 0；无 `applied` 迁移应用、请求 0；console 0 | `shots/v022-final/C6-locate-results.json`、`C6-*.png` |
+| A 工程门禁 | 4/4：`typecheck` 0、`build` 0（2234 modules）、`node --check` weather app.js 0、重建前后 SHA-256 一致 `6ACA66D8…` | `shots/releases/v0.2.x/v022-final/A-gates.json` |
+| B 既有脚本 | `verify-plugin` 六插件全 PASS；`verify-widgets` 25/25 × 暗/亮；`verify-overlays` 6/6 × 暗/亮；`verify-plug-and-play` 12/12 | `shots/releases/v0.2.x/v022-final/B-*.log` |
+| C 四项修复 E2E | **21/21 PASS**：1024×768 light + 1440×960 dark；尺寸菜单负例 toast+rect 不变+勾选回退、成功跟随；删除持久化 + reload 5 卡 + 插件页「未上桌」→「桌面 1/1」；「添加组件」列表/添加/空态；外观→重置布局恢复六卡；六卡基线/无横向溢出/无编辑 chrome/console 0 | `shots/releases/v0.2.x/v022-final/C-e2e-results.json`、`*-C1..C5-*.png` |
+| C.6 天气定位注入 | **7/7 PASS**：空列表自动加入上海 + `location.applied=true` + 卡片真实显示「上海 25°」（QWeather 真实网络）；已有北京→切上海且北京保留；`applied=true` 不覆盖手动城市、定位请求 0；无 `applied` 迁移应用、请求 0；console 0 | `shots/releases/v0.2.x/v022-final/C6-locate-results.json`、`C6-*.png` |
 
-环境说明：回归期间本机 4 核持续 93–100% CPU，Vite 冷加载 60–100s，导致 plug-and-play 首次 30s 超时误报；对照实验（`pnp-investigation.json`：15s 时 0 卡、83.6s 时 6 卡、console 0）确认非产品回归，加固超时后 12/12 PASS。完整报告：`shots/v022-final/REPORT.md`。
+环境说明：回归期间本机 4 核持续 93–100% CPU，Vite 冷加载 60–100s，导致 plug-and-play 首次 30s 超时误报；对照实验（`pnp-investigation.json`：15s 时 0 卡、83.6s 时 6 卡、console 0）确认非产品回归，加固超时后 12/12 PASS。完整报告：`shots/releases/v0.2.x/v022-final/REPORT.md`。
 
 ### 11.4 安装包与升级路径
 
@@ -323,14 +323,14 @@ npx tauri build                    # release + 安装包
 | NSIS（推荐） | `src-tauri/target/release/bundle/nsis/Windows Tablet Launcher_0.2.2_x64-setup.exe` | 8.16 MiB（8,561,260 B） | `29D763199A2279AA` |
 | MSI | `src-tauri/target/release/bundle/msi/Windows Tablet Launcher_0.2.2_x64_zh-CN.msi` | 9.27 MiB（9,715,712 B） | `E8FF653E75AA6AF0` |
 
-`npx tauri build` exit 0（release 编译 7m36s；日志 `shots/v022-final/tauri-build.log`）；release `app.exe` 16,737,280 B（SHA-256 `5A17A9991CE9F3AD…`）。
+`npx tauri build` exit 0（release 编译 7m36s；日志 `shots/releases/v0.2.x/v022-final/tauri-build.log`）；release `app.exe` 16,737,280 B（SHA-256 `5A17A9991CE9F3AD…`）。
 
 - 直接安装 v0.2.2 覆盖 v0.2.1：`.seed-version` 变化会重新种六个内置插件（weather 新产物生效）；`wtsl.layout` v2 存档自动迁移到 v3（`removed: []`）；升级前 30 分钟内的天气定位结果会在首次启动应用一次（`applied` 迁移），之后不再覆盖手动选择。
 - 用户数据（插件配置、城市列表、布局、插件启用偏好）保留；自己放进插件目录的额外插件不受影响。
 
 ### 11.5 release exe + WebView2 CDP 复验（2026-10-20 17:41–17:52）
 
-证据：`shots/v022-final/release/RELEASE-VERIFY.md`、`webview2-cdp.json`、`seed-upgrade.json`、`app-cdp-window.png`。
+证据：`shots/releases/v0.2.x/v022-final/release/RELEASE-VERIFY.md`、`webview2-cdp.json`、`seed-upgrade.json`、`app-cdp-window.png`。
 
 | 项 | 结果 |
 |---|---|
@@ -344,7 +344,7 @@ npx tauri build                    # release + 安装包
 
 ### 11.6 已知风险（v0.2.2）
 
-- **P2 打包内嵌 `secrets.json`**：`public/secrets.json` 会进入 `dist` 与安装包，安装包携带本机和风天气 Key（个人自用可接受；若对外分发需在构建时排除或改为运行时录入）。证据 `shots/v022-final/release/secrets-embed.json`（仅状态，不含 Key 明文）。
+- **P2 打包内嵌 `secrets.json`**：`public/secrets.json` 会进入 `dist` 与安装包，安装包携带本机和风天气 Key（个人自用可接受；若对外分发需在构建时排除或改为运行时录入）。证据 `shots/releases/v0.2.x/v022-final/release/secrets-embed.json`（仅状态，不含 Key 明文）。
 - 真实 Windows Geolocator（系统定位）权限路径未单独验证；本轮真实定位走 ip.cn 成功。QWeather 真实网络链路已在 headless C.6 与真实 release exe 两处验证。
 
 ## 12. v0.3.0 语音优先重构（2026-10-20）
@@ -358,7 +358,7 @@ npx tauri build                    # release + 安装包
 
 ### 12.1 Phase 1：Agent 浮空界面 E2E（dev server，mock + 假麦克风）
 
-证据：`shots/v030-dev/REPORT.md`、`run8.log`、`agent-surface-results.json`、`p1p2-retest.json`、`p1p2-retest.log`、截图 12 张。
+证据：`shots/releases/v0.3.x/v030-dev/REPORT.md`、`run8.log`、`agent-surface-results.json`、`p1p2-retest.json`、`p1p2-retest.log`、截图 12 张。
 
 | 项 | 结果 |
 |---|---|
@@ -382,7 +382,7 @@ npx tauri build                    # release + 安装包
 ### 12.3 Phase 1：真实 MiMo 音频冒烟与既有回归
 
 - `scripts/smoke-mimo-audio.mjs`（真实 api.xiaomimimo.com）**PASS 5/5**：TTS 流式 pcm16 3.84s / 3309ms → chat `input_audio` HTTP 200 / 6 内容块 / `prompt_tokens=73` / `audio_tokens=25`（≈3.84s×6.25，证明音频被摄入）→ ASR 回读与原句字符相似度 100% → 后续纯文字请求 200 且请求体 `input_audio=false`。
-- 既有脚本（`shots/v030-dev/existing-scripts.log`，全部 exit 0，每步后 edgeAfter=0）：
+- 既有脚本（`shots/releases/v0.3.x/v030-dev/existing-scripts.log`，全部 exit 0，每步后 edgeAfter=0）：
   - `verify-plugin.mjs` 六插件全 PASS（clock/countdown/pomodoro/sedentary/todo/weather；各尺寸 + 宿主冒烟 + console 0）
   - `verify-overlays.mjs` 六插件 detail 6/6 × 暗/亮（51/54s）
   - `verify-plug-and-play.mjs` 12/12（176s）
@@ -390,7 +390,7 @@ npx tauri build                    # release + 安装包
 
 ### 12.4 Phase 1：天气 3×2 三带式门禁
 
-证据：`shots/v030-dev/weather/`（3×2 dark/light + 2×2/4×2 对照）、`shots/v030-dev/existing-scripts.log`。
+证据：`shots/releases/v0.3.x/v030-dev/weather/`（3×2 dark/light + 2×2/4×2 对照）、`shots/releases/v0.3.x/v030-dev/existing-scripts.log`。
 
 | 项 | 1440 | 1024 |
 |---|---|---|
@@ -413,7 +413,7 @@ npx tauri build                    # release + 安装包
   | NSIS `Windows Tablet Launcher_0.3.0_x64-setup.exe` | 3,927,851 B | `A786D075B4A7FA571E2D9C33DC66CB9AA7D8AB9E84D2A91E17290E3D4908294B` |
   | MSI `Windows Tablet Launcher_0.3.0_x64_zh-CN.msi` | 5,136,384 B | `9888375AED02A506CE0C1C93D532CB02AE0270E6C115EEEFE86A99E261DD9D53` |
 - 体积相比 v0.2.2 明显下降（NSIS 8.56MB→3.93MB、MSI 9.72MB→5.14MB、exe 16.74MB→12.16MB），主要来自删除 `@vladmandic/face-api` 与 6.7MB 人脸模型。
-- **真实 exe 真窗口**（`shots/v030-final/genuine-window.json/.png`）：标题 4.3s 出现、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.0`。
+- **真实 exe 真窗口**（`shots/releases/v0.3.x/v030-final/genuine-window.json/.png`）：标题 4.3s 出现、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.0`。
 - **升级重种**（`seed-upgrade.json`）：appdata `.seed-version` 0.2.2 → **0.3.0**；`weather/app/app.js` 重写后 SHA-256 `49E47718…` 与仓库新产物一致，含 `data-content-band`×2、`data-secondary-block`×3，保留 v0.2.2 定位语义；6 个 manifest 全部合法、index.json 6 项。
 - **WebView2 CDP**（`webview2-cdp.json`、`launch-cdp.json`、`patch-evidence.json`）：页面 `http://tauri.localhost/` complete、无「正在加载桌面」；**6 卡**（全 page 0）、**8 iframe**=2 background+6 widget（均 `http://wtsl.localhost/…`）；**无 dock**、无机器人/头像/麦克风图标；Agent 入口唯一、collapsed 56×56、圆角 12、aria「开始语音提问」；console.error/exception/log.error **全 0**；localStorage 无音频/base64、layout v3 6 widgets `removed=[]`；截图 `app-cdp-window.png`（2880×1920）。
 - 工具链说明（P2）：release exe 无法用 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 开 CDP（wry 0.57 无条件 set args，同 v0.2.2），本次沿用临时副本方案（仅替换 app.exe 内 62 字节默认 WebView2 参数串；原产物未动、副本已删，证据 `patch-evidence.json`）。
@@ -431,7 +431,7 @@ npx tauri build                    # release + 安装包
 ## 13. v0.3.1 半高窗出口 / 常驻朗读开关 / 鼠标设置入口（2026-10-21）
 
 > 代码：界面与设置修正提交 `2b13729`；本版发布提交（版本号 0.3.1 + 文档）；分支 `main`；tag `v0.3.1`。
-> 证据根：`shots/v031-dev/`（Phase 1，dev server）、`shots/v031-final/`（Phase 2，release exe/安装包）。
+> 证据根：`shots/releases/v0.3.x/v031-dev/`（Phase 1，dev server）、`shots/releases/v0.3.x/v031-final/`（Phase 2，release exe/安装包）。
 
 ### 13.1 背景与改动
 
@@ -473,12 +473,12 @@ npx tauri build                    # release + 安装包
 
 ### 13.4 Phase 2：release exe + 安装包验证 — PASS
 
-- **真实 exe 真窗口**（`shots/v031-final/genuine-window.json/.png`）：标题 2.8s、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.1`。
+- **真实 exe 真窗口**（`shots/releases/v0.3.x/v031-final/genuine-window.json/.png`）：标题 2.8s、Responding=true、全屏 1440×960 CSS @DPR2（物理 2880×1920）、WebView2 `--webview-exe-version=0.3.1`。
 - **升级重种**（`seed-upgrade.json`）：appdata `.seed-version` **0.3.0 → 0.3.1**；6 个 manifest 合法；`weather/app/app.js` 931,293 B / SHA-256 `49E47718…` 与仓库 `public` 产物一致，mtime 已更新；旧布局/会话/插件配置保留。
 - **WebView2 CDP**（patched 副本仅替换 app.exe 内 62 字节 wry 默认 WebView2 参数串开 CDP，offset 9,185,640，原产物未动、哈希不变）：页面 `http://tauri.localhost/` complete；**6 卡**、**8 iframe**（2 background + 6 widget，均 `wtsl.localhost`）；无 dock/机器人/头像/麦克风图标、无加载文案、无横向溢出；Agent 入口唯一、collapsed 56×56、圆角 12；console.error/exception/log.error **全 0**（连接后 reload 一次覆盖首屏）。**16/16 checks PASS**（`checks.json`、`webview2-cdp.json`）。
 - **新交互在真实 WebView2 内复验**：A 真实 CDP 右键三项菜单、无「桌面设置」；B 菜单「设置」→ `data-active=false` + 设置页；C 设置→入口→「打开 Agent」→ chat，header 未播放即有「关闭自动朗读」、无「停止朗读」，点击写 `tts.autoRead=false`、再点回 true；D ⋯ 菜单无宿主设置入口、Esc 关菜单不收起 Agent。
 - 截图：`app-cdp-window.png`（2880×1920）、`context-menu.png`、`settings-page.png`、`agent-chat-header.png`、`genuine-window.png`。
-- **安全**：首次取证 JSON 因脚本只脱敏 settings 顶层 apiKey，曾包含 localStorage 中 mimo/weather 两个本地 key；已立即脱敏并把脚本改为深层脱敏（任意层级 apiKey/token/secret），重新生成证据并对 `shots/v031-final` 18 个文件全量扫描：0 泄漏。证据 JSON 不含对话内容；chat 截图含本机既有对话界面内容，仅本地证据。
+- **安全**：首次取证 JSON 因脚本只脱敏 settings 顶层 apiKey，曾包含 localStorage 中 mimo/weather 两个本地 key；已立即脱敏并把脚本改为深层脱敏（任意层级 apiKey/token/secret），重新生成证据并对 `shots/releases/v0.3.x/v031-final` 18 个文件全量扫描：0 泄漏。证据 JSON 不含对话内容；chat 截图含本机既有对话界面内容，仅本地证据。
 - 未覆盖：NSIS/MSI 实际安装/注册表/升级路径（按任务不安装）；release 内真实麦克风录音链路未自动化（同 v0.3.0，fake mic 仅 dev）。
 
 ### 13.5 已知风险 / 限制（v0.3.1）
@@ -495,7 +495,7 @@ npx tauri build                    # release + 安装包
 ## 15. v0.3.2 久坐计时修复（2026-10-21）
 
 > 代码提交：本次修复提交（版本 0.3.2 + 文档）；分支 `main`；tag `v0.3.2`。
-> 证据：`shots/sedentary-verify/`（聚焦验证）、`scripts/verify-sedentary.mjs`、用户机器 `sedentary.runtime` 存档分析。
+> 证据：`shots/milestones/sedentary-verify/`（聚焦验证）、`scripts/verify-sedentary.mjs`、用户机器 `sedentary.runtime` 存档分析。
 
 ### 15.1 问题
 
@@ -518,7 +518,7 @@ npx tauri build                    # release + 安装包
 ### 15.4 验证
 
 - Node 状态机模拟（替换 plugin stub）：首 tick 建立会话；2 分钟累加；点「起来了」→ breaks+1 且 sittingSince 立即重置；结算后 tick 立即继续；60 分钟空档 → 只顺延不进累计、不记 break。5/5 PASS。
-- `node scripts/verify-sedentary.mjs`（独立预览页 + headless Edge + 真实点击「我起来了」，demo=1 注入演示数据）：7/7 PASS — 首屏开始计时、无「刚起身」旧文案、breaks 3→4、`sittingSince` 立即重置、显示 0 分钟继续、console error 0。截图 `shots/sedentary-verify/sedentary-fix.png`。
+- `node scripts/verify-sedentary.mjs`（独立预览页 + headless Edge + 真实点击「我起来了」，demo=1 注入演示数据）：7/7 PASS — 首屏开始计时、无「刚起身」旧文案、breaks 3→4、`sittingSince` 立即重置、显示 0 分钟继续、console error 0。截图 `shots/milestones/sedentary-verify/sedentary-fix.png`。
 - `npm run typecheck` / `npm run build` / `npx tauri build` 均 exit 0。
 - 说明：按用户要求未跑完整 release CDP 回归；v0.3.2 仅包含 sedentary 插件与版本号变更，宿主代码未改。
 
@@ -540,7 +540,7 @@ npx tauri build                    # release + 安装包
 ## 16. v0.3.3 久坐移除免打扰（2026-10-21）
 
 > 代码提交：本次修复提交（版本 0.3.3 + 文档）；分支 `main`；tag `v0.3.3`。
-> 证据：`shots/sedentary-verify/`、`scripts/verify-sedentary.mjs`。
+> 证据：`shots/milestones/sedentary-verify/`、`scripts/verify-sedentary.mjs`。
 
 ### 16.1 背景
 
@@ -578,7 +578,7 @@ npx tauri build                    # release + 安装包
 ## 17. v0.3.4 久坐「坐 ↔ 站」循环 + 复盘接入（2026-10-21）
 
 > 代码提交：本次功能提交（版本 0.3.4 + 文档）；分支 `main`；tag `v0.3.4`。
-> 证据：`shots/sedentary-verify/`、`scripts/verify-sedentary.mjs`；复盘集成检查（headless Edge）。
+> 证据：`shots/milestones/sedentary-verify/`、`scripts/verify-sedentary.mjs`；复盘集成检查（headless Edge）。
 
 ### 17.1 背景
 
@@ -595,8 +595,8 @@ npx tauri build                    # release + 安装包
 
 ### 17.3 验证
 
-- 独立预览 + headless Edge 真实点击循环：**10/10 PASS** — 首屏坐着计时、按钮「我站起来了」；点按后 breaks 3→4、进入 standing、按钮变「我坐下了」、提示「休息中」；再点回到 sitting、站立分钟 24→24.025 被累计、按钮恢复；无旧文案；console error 0。截图 `shots/sedentary-verify/sedentary-cycle.png`。
-- 复盘集成：headless Edge 打开 `?page=review`，8 个插件 iframe 就绪后，页面出现「久坐提醒 0 次起身 · 久坐 0 分钟 · 站立 0 分钟」，来源包含 `sedentary.stats`；无加载错误。截图 `shots/sedentary-verify/review.png`。
+- 独立预览 + headless Edge 真实点击循环：**10/10 PASS** — 首屏坐着计时、按钮「我站起来了」；点按后 breaks 3→4、进入 standing、按钮变「我坐下了」、提示「休息中」；再点回到 sitting、站立分钟 24→24.025 被累计、按钮恢复；无旧文案；console error 0。截图 `shots/milestones/sedentary-verify/sedentary-cycle.png`。
+- 复盘集成：headless Edge 打开 `?page=review`，8 个插件 iframe 就绪后，页面出现「久坐提醒 0 次起身 · 久坐 0 分钟 · 站立 0 分钟」，来源包含 `sedentary.stats`；无加载错误。截图 `shots/milestones/sedentary-verify/review.png`。
 - `node scripts/build-plugin.mjs sedentary`（554,867 B / `FA7168D9…`）、`npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0。
 - 修复过程中发现并修掉一个过渡期计时 bug：命令处理曾提前改写 `lastTickAt`，导致姿态切换时把上一次 tick 到本次操作的时长丢掉；现在只记 `commandId`，姿态切换按上次 tick 时间戳补记。
 
@@ -619,7 +619,7 @@ npx tauri build                    # release + 安装包
 ## 18. v0.3.5 Agent 状态短句直通 + 久坐文案减法（2026-10-22）
 
 > 代码提交：本次功能提交（版本 0.3.5 + 文档）；分支 `main`；tag `v0.3.5`。
-> 证据：`shots/sedentary-agent-sync/`、`.tmp/test-phrases.mjs`、`scripts/verify-agent-surface.mjs` 复跑日志。
+> 证据：`shots/milestones/sedentary-agent-sync/`、`.tmp/test-phrases.mjs`、`scripts/verify-agent-surface.mjs` 复跑日志。
 
 ### 18.1 背景
 
@@ -638,7 +638,7 @@ npx tauri build                    # release + 安装包
 ### 18.3 验证
 
 - 短语匹配单测（`node --experimental-strip-types`）：**10/10 PASS** — 站/坐、带标点、带空格、长句不误判、无关句不误判。
-- 真实 MiMo + headless Edge 端到端：**12/12 PASS** — 聊天里说「我站起来了」→ `sedentary.runtime.posture=standing`（`commandId=null`，即工具路径而非点按）、卡片按钮切「我坐下了」、breaks +1；说「我坐下了」→ 回 `sitting`、按钮切回；两次都有 `sedentary.standUp` / `sedentary.sitDown` 工具卡；回复短确认不含「点一下 / 新一轮」；卡片与详情不再出现「坐下后开始新一轮」；console error 0。截图 `shots/sedentary-agent-sync/01-stand-synced.png`、`02-sit-synced.png`、`03-detail-standalone.png`，明细 `result.json`。
+- 真实 MiMo + headless Edge 端到端：**12/12 PASS** — 聊天里说「我站起来了」→ `sedentary.runtime.posture=standing`（`commandId=null`，即工具路径而非点按）、卡片按钮切「我坐下了」、breaks +1；说「我坐下了」→ 回 `sitting`、按钮切回；两次都有 `sedentary.standUp` / `sedentary.sitDown` 工具卡；回复短确认不含「点一下 / 新一轮」；卡片与详情不再出现「坐下后开始新一轮」；console error 0。截图 `shots/milestones/sedentary-agent-sync/01-stand-synced.png`、`02-sit-synced.png`、`03-detail-standalone.png`，明细 `result.json`。
 - Agent 浮空界面回归：`node scripts/verify-agent-surface.mjs` **109/109 PASS、0 FAIL**（mock 语音链路：停止→transcribing→chat 仍正常，ASR-first 不破坏状态机）。
 - `node scripts/build-plugin.mjs sedentary`（553,803 B / `5F1902C2…`）、`npm run typecheck`、`npm run build`、`npx tauri build` 均 exit 0（cargo release 8m19s）。
 
@@ -661,7 +661,7 @@ npx tauri build                    # release + 安装包
 ## 19. v0.3.6 插件配置同步修复：宿主主动 `host:config` 推送（2026-10-22）
 
 > 代码提交：本次修复提交（版本 0.3.6）；分支 `main`；tag `v0.3.6`。
-> 证据：`.tmp/config-sync-harness/`（跨 origin 回归 harness：before/after + 可复跑 `run.mjs`）、`.tmp/config-sync-audit/audit.md`（独立审计）、`.tmp/config-sync-review/review.md`（独立 diff 评审）、`shots/v036-dev/`、`shots/v036-final/`。
+> 证据：`.tmp/config-sync-harness/`（跨 origin 回归 harness：before/after + 可复跑 `run.mjs`）、`.tmp/config-sync-audit/audit.md`（独立审计）、`.tmp/config-sync-review/review.md`（独立 diff 评审）、`shots/releases/v0.3.x/v036-dev/`、`shots/releases/v0.3.x/v036-final/`。
 
 ### 19.1 背景
 
@@ -693,10 +693,10 @@ npx tauri build                    # release + 安装包
   - after（本修复，weather app.js SHA-256 `48C8B86E…`）：`host:config` 6 条；settings push **34ms** 生效（23°→73°F）、places push **58ms** 生效（北京→上海）；iframe console error 0。
   - 期间 harness 抓到并修复两处时序回归（同值回推未置 `loaded` 导致天气 mock 空态；注册重放不应作废在途权威读取），最终冻结产物复跑 PASS，记录在 `.tmp/config-sync-harness/README.md`。
 - **独立审计 / 评审**：`sync-auditor` 复核根因同意（LevelDB/代码路径证据）；最终 diff 评审 **PASS，P0/P1 = 0**，门禁 `typecheck` / `build` / 六产物重建一致性 / `verify-plugin weather` 均 PASS。
-- **全量基线回归（dev 同源基线，`shots/v036-dev/` 与 `.tmp/v036-regression/`）**：全部 exit 0 / console error 0 ——
+- **全量基线回归（dev 同源基线，`shots/releases/v0.3.x/v036-dev/` 与 `.tmp/v036-regression/`）**：全部 exit 0 / console error 0 ——
   `npm run typecheck` / `npm run build`；`verify-plugin` × 6（clock 4/4、countdown 5/5、pomodoro 5/5、sedentary 5/5、todo 6/6、weather 6/6，均含宿主冒烟）；`verify-overlays` 6/6 detail；`verify-widgets` 25/25 全尺寸；`verify-plug-and-play` 12/12。
   既有 `verify-sedentary.mjs` 因 v0.3.5 文案减法后选择器过期（仍用长 aria-label）确定性 FAIL；本次顺带更新 3 处选择器（v0.3.6 修复范围内），复跑 **9/9 PASS**（breaks 3→4、sitting↔standing、站立分钟累计、console 0）。
-- **release 真窗口 CDP（`shots/v036-final/`，patched 副本，38 PASS / 0 FAIL / 1 WARN=仅记录项）**：原产物 `app.exe` SHA-256 `1D1BFFC3…` 未改，仅替换副本内 62 字节 wry WebView2 默认参数开 CDP（offset=9,192,344；patched SHA-256 `EFA73285…`）。实测：宿主页 `http://tauri.localhost/`、6 卡 / 8 iframe（均 `http://wtsl.localhost/`）、console.error/exception/log.error = 0；升级重种走真实路径（先用 v0.3.5 exe 重种回旧产物，再自然升级）→ `.seed-version` 0.3.5 → **0.3.6**，六插件 `app.js` SHA-256 与仓库 `public/` 全部一致。**真实跨 origin 配置同步**：设置页时钟 12h→24h 后 host localStorage 写入、clock iframe **71ms** 收到 `host:config`（1 条）、卡片 **360ms** 内切换且 timeOrigin/探针证明**未 reload**（仍 8 iframe）；天气自动定位开关双向切换收到 `host:config`（settings 到达 75ms / 60ms），iframe 未 reload（卡片文案未变属仅记录 WARN：澳门定位结果本就不再变化，同步通道已由 host:config+时钟可见变化证明）。测试后 localStorage 精确恢复、只杀本次 PID 树、证据深层脱敏 0 泄漏。
+- **release 真窗口 CDP（`shots/releases/v0.3.x/v036-final/`，patched 副本，38 PASS / 0 FAIL / 1 WARN=仅记录项）**：原产物 `app.exe` SHA-256 `1D1BFFC3…` 未改，仅替换副本内 62 字节 wry WebView2 默认参数开 CDP（offset=9,192,344；patched SHA-256 `EFA73285…`）。实测：宿主页 `http://tauri.localhost/`、6 卡 / 8 iframe（均 `http://wtsl.localhost/`）、console.error/exception/log.error = 0；升级重种走真实路径（先用 v0.3.5 exe 重种回旧产物，再自然升级）→ `.seed-version` 0.3.5 → **0.3.6**，六插件 `app.js` SHA-256 与仓库 `public/` 全部一致。**真实跨 origin 配置同步**：设置页时钟 12h→24h 后 host localStorage 写入、clock iframe **71ms** 收到 `host:config`（1 条）、卡片 **360ms** 内切换且 timeOrigin/探针证明**未 reload**（仍 8 iframe）；天气自动定位开关双向切换收到 `host:config`（settings 到达 75ms / 60ms），iframe 未 reload（卡片文案未变属仅记录 WARN：澳门定位结果本就不再变化，同步通道已由 host:config+时钟可见变化证明）。测试后 localStorage 精确恢复、只杀本次 PID 树、证据深层脱敏 0 泄漏。
 
 ### 19.5 构建产物
 
@@ -744,7 +744,7 @@ npx tauri build                    # release + 安装包
 - **新增** `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风 + `?mock=1`）：**198/198 PASS，0 FAIL，194s**。关键断言：入口 / 空格 / 点击说话 → `stage=voice` + 立即 recording 且 `data-stage` 观测器全程无 `chat`；语音回合后 3.6s 采样仍 `voice`；回答后空格再次 `recording`（不存在可被写入的 textarea）；半高窗 textarea=0、全文无可见输入框；chat composer 三控件垂直中心差 **1px**、空卡高 **44px**；焦点从不落进 textarea；Esc 链 chat→voice→collapsed 首次命中；录音 / 转写中展开禁用、X 取消后麦克风 0 live；textarea 内空格是打字不是录音；窗口失焦两条录音路径均取消（P2 回归）；reduced-motion 尺寸过渡 0ms + 连续动画 none + 保留 120ms opacity；console error 0。
 - `scripts/verify-agent-surface.mjs`（按新语义适配，覆盖 1440 dark / 1024 light / reduced-motion）：**127/127 PASS，0 FAIL，217s**（旧版 112 checks，未削弱）。
 - `scripts/smoke-v031-ui.mjs`（voice 阶段适配）：**26/26 PASS，0 FAIL，82s**。
-- 证据：`shots/v037-dev/REPORT.md`、`run-06-final.log`、`smoke-final.log`、`verify-agent-surface-final.log`、`verify-voice-first-results.json` + 16 张截图（01–14、20、21）。
+- 证据：`shots/releases/v0.3.x/v037-dev/REPORT.md`、`run-06-final.log`、`smoke-final.log`、`verify-agent-surface-final.log`、`verify-voice-first-results.json` + 16 张截图（01–14、20、21）。
 - `npm run typecheck` / `npm run build` exit 0；`npx tauri build` exit 0（cargo release **4m53s**，NSIS + MSI 完成）。
 
 ### 20.4 构建产物

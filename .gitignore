@@ -1,95 +1,43 @@
-# Sensitive / secrets
-APIs.txt
-*.env
-*.env.*
-appsettings.*.json
+# ============================================================
+# Windows Tablet Launcher — .gitignore
+# 项目结构说明见 README.md 与 docs/README.md。
+# 原则：源码 / 项目文档 / 插件构建产物（public/plugins/**/app/app.js）入库；
+#       依赖、构建产物、验证证据、临时输出、本地密钥、第三方副本不入库。
+# ============================================================
 
-## .NET / Visual Studio
-[Bb]in/
-[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
-.vs/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-artifacts/
-
-# Build logs
-[Ll]og/
-[Ll]ogs/
-*.log
-*.binlog
-
-# Test results
-[Tt]est[Rr]esult*/
-*.trx
-*.coverage
-*.coveragexml
-
-# NuGet
-*.nupkg
-*.snupkg
-*.nuget.props
-*.nuget.targets
-project.lock.json
-
-# MSIX packaging output
-AppPackages/
-BundleArtifacts/
-*.msix
-*.msixupload
-*.appx
-*.appxbundle
-*.appxupload
-
-# Publish output
-publish/
-*.pubxml
-PublishScripts/
-
-# Code analysis and tooling
-_ReSharper*/
-*.DotSettings.user
-*.dotCover
-.idea/
-.vscode/
-*.swp
-*~
-
-# Windows thumbnail cache
-Thumbs.db
-ehthumbs.db
-
-# OS junk
-[Dd]esktop.ini
-$RECYCLE.BIN/
-
-# Third-party cloned repos
-references/
-Assets/pi/
-Assets/BluetoothAudioReceiver
-Assets/windows-dev-docs
-Assets/Design
-screenshot
-# Node / frontend
+# ---- 依赖与构建产物 ----
 node_modules/
 dist/
 .vite/
-
-# Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
 
-# 截图回归输出
+# ---- 本机打包/发布产物（按版本目录，见 README「安装」） ----
+release/
+
+# ---- 验证证据与临时输出（约定「结论入库、证据本地」，见 docs/README.md） ----
 shots/
+.tmp/
+*.log
 
+# ---- 第三方参考资料本地副本（来源与重新获取方式见 docs/reference/README.md） ----
+references/
+docs/reference/fluent-design/
+docs/reference/fluent-ui-docs/
 
-# 本地密钥（不进仓库）
+# ---- 本地密钥（永不入库） ----
 public/secrets.json
 secrets.json
+*.env
+*.env.*
+APIs.txt
 
-
-# 临时抓取/调试输出（不要提交）
-.tmp/
+# ---- 编辑器 / 操作系统垃圾 ----
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/

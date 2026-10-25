@@ -1,9 +1,9 @@
 # 第二版视觉审计：信息密度 / 可扫读性 / 层级
 
 > 审计对象：Windows 平板桌面启动器（Tauri v2 + React 19 + Fluent UI React v9）六个插件卡片 + 宿主桌面
-> 审计员：visual-auditor（首次介入，独立复核；旧审计 `docs/audit/AUDIT.md` 只用于定位文件，结论全部重新实测）
+> 审计员：visual-auditor（首次介入，独立复核；旧审计 `docs/audits/round1-fluid-visual/AUDIT.md` 只用于定位文件，结论全部重新实测）
 > 日期：2026-10-19
-> 交付边界：只写 `docs/audit2/**`、`shots/audit2/**`；未改任何业务代码、未改 `docs/audit/`、未 commit
+> 交付边界：只写 `docs/audits/round2-type-visual/**`、`shots/audits/round2-type-visual/**`；未改任何业务代码、未改 `docs/audits/round1-fluid-visual/`、未 commit
 > 所有字号/尺寸均为浏览器 **CSS px** 实测值（截图若为 2× 设备像素会注明）。
 
 ---
@@ -72,7 +72,7 @@
 
 ### S0 物理口径与换算
 
-- 目标屏由项目文档确定：`docs/RELEASE.md:16` "窗口全屏 2880×1920（1440×960 epx @200%）"；13″ 3:2 2880×1920 面板 = **267 PPI**。因此 **1 CSS px = 2 物理 px = 0.1902 mm**。
+- 目标屏由项目文档确定：`docs/releases/RELEASE.md:16` "窗口全屏 2880×1920（1440×960 epx @200%）"；13″ 3:2 2880×1920 面板 = **267 PPI**。因此 **1 CSS px = 2 物理 px = 0.1902 mm**。
 - 视角换算：`1 CSS px 在距离 D(mm) 处 = 653.9 / D 弧分`（近似，D≫px）。正文数字按 20/20 视力、字母高 ≈ 0.7em 计算帽高（cap）。
 - 视距分档：**主信息目标 1.0–1.5 m（远看）**；**次要 0.5–0.8 m（近看）**；次次要 ≤0.5 m（凑近看）。
 
@@ -148,8 +148,8 @@
 
 ### S7 取证口径与局限（必须先读）
 
-1. **宿主真实截图（3 档）**：`shots/audit2/host/desktop-{1440x960,1024x768,960x1440}.png`，由 headless Edge CDP `Page.captureScreenshot`、`deviceScaleFactor=1` 拍摄；此时卡片材质、主题、字体与产品一致。**注意：DSF=2 时 headless 的 `backdrop-filter` 会合成失败（卡片渲染成白底），所以真实观感图一律 DSF=1。**
-2. **插件逐尺寸截图**：宿主页当前 dev 构建在 reload 后不会恢复 `wtsl.layout`（写入自定义布局 → reload → 回到默认布局，实测见 §8.4），无法用 URL/localStorage 把任意插件切到任意尺寸；因此逐尺寸证据用**插件独立页** `?size=`，视口设为**宿主真实 iframe 尺寸**，并注入从宿主截图取样的卡片材质色 `#212121`。这些图路径在 `shots/audit2/standalone/`，文件名含尺寸与分辨率；报告中不再逐张重复"独立页"字样。
+1. **宿主真实截图（3 档）**：`shots/audits/round2-type-visual/host/desktop-{1440x960,1024x768,960x1440}.png`，由 headless Edge CDP `Page.captureScreenshot`、`deviceScaleFactor=1` 拍摄；此时卡片材质、主题、字体与产品一致。**注意：DSF=2 时 headless 的 `backdrop-filter` 会合成失败（卡片渲染成白底），所以真实观感图一律 DSF=1。**
+2. **插件逐尺寸截图**：宿主页当前 dev 构建在 reload 后不会恢复 `wtsl.layout`（写入自定义布局 → reload → 回到默认布局，实测见 §8.4），无法用 URL/localStorage 把任意插件切到任意尺寸；因此逐尺寸证据用**插件独立页** `?size=`，视口设为**宿主真实 iframe 尺寸**，并注入从宿主截图取样的卡片材质色 `#212121`。这些图路径在 `shots/audits/round2-type-visual/standalone/`，文件名含尺寸与分辨率；报告中不再逐张重复"独立页"字样。
 3. **分辨率/卡片像素实测**（与任务简报的"100–130px"估计不同，以实测为准）：
    - 1440×960：8 列，cell=164px；网格 1396×868，居中偏移 (22,46)。
    - 1024×768：6 列，cell=154px；网格 984×652，偏移 (20,58)。
@@ -232,7 +232,7 @@
 
 **问题（截图+实测+代码）**
 
-- R-04：`shots/audit2/standalone/clock-1x1-1440x960.png`（时间 40px，上下各空 50/48px）、`clock-2x1-1440x960.png`（左右各空 106/104px）、`clock-3x2-1440x960.png`（时间 68px，上下各空 100/98px）。代码 `ClockApp.jsx:207`：`size={large ? 1000 : 900}` → 3×2=68px、其余=40px；根节点 `justifyContent:center` + `gap: XS`（`:37-64`）。
+- R-04：`shots/audits/round2-type-visual/standalone/clock-1x1-1440x960.png`（时间 40px，上下各空 50/48px）、`clock-2x1-1440x960.png`（左右各空 106/104px）、`clock-3x2-1440x960.png`（时间 68px，上下各空 100/98px）。代码 `ClockApp.jsx:207`：`size={large ? 1000 : 900}` → 3×2=68px、其余=40px；根节点 `justifyContent:center` + `gap: XS`（`:37-64`）。
 - D-05：`ClockApp.jsx:210-225` 只在 3×2 把日期和星期拼成一行（`:223`），信息项从 2×1 的 3 个只增加到 4 个（只多了星期）；没有任何第二层（如"上午/下午"、时区、下一闹钟——但产品明确不做闹钟，因此第二层应该用"更大的时间"本身承担）。
 - 实测：`clock-3x2-1440x960.json` 时间元素 y=101、h=92，日期 y=205——时间与日期之间还有 12px；卡高 328，内容带 101→227=126px。
 
@@ -511,10 +511,10 @@
 
 ## 7. 证据清单与复现
 
-### 7.1 截图（`shots/audit2/`）
+### 7.1 截图（`shots/audits/round2-type-visual/`）
 
 - 宿主真实桌面（DSF=1，暗色、真实主题/材质）：`host/desktop-1440x960.png`、`host/desktop-1024x768.png`、`host/desktop-960x1440.png`
-- 逐插件逐尺寸（DSF=2；独立页 + 注入 `#212121` 宿主材质色）：`standalone/<plugin>-<size>-<resolution>.png`，共 56 张（55 场景 + countdown 非今天态对照 1 张）；本审计产出的就是 `host/` 3 张 + `standalone/` 56 张。`shots/audit2/` 根目录另有其它并行审计任务产出的图片，不在本报告引用。重点：
+- 逐插件逐尺寸（DSF=2；独立页 + 注入 `#212121` 宿主材质色）：`standalone/<plugin>-<size>-<resolution>.png`，共 56 张（55 场景 + countdown 非今天态对照 1 张）；本审计产出的就是 `host/` 3 张 + `standalone/` 56 张。`shots/audits/round2-type-visual/` 根目录另有其它并行审计任务产出的图片，不在本报告引用。重点：
   - clock：`standalone/clock-1x1-1440x960.png`、`standalone/clock-2x1-1440x960.png`、`standalone/clock-3x2-1440x960.png`
   - countdown：`standalone/countdown-1x1-1440x960.png`（今天态）、`standalone/countdown-1x1-nontoday-1440x960.png`、`standalone/countdown-2x2-1440x960.png`、`standalone/countdown-3x2-1440x960.png`
   - pomodoro：`standalone/pomodoro-1x1-1440x960.png`、`standalone/pomodoro-2x1-1440x960.png`、`standalone/pomodoro-3x2-1440x960.png`（另有 2×2）
@@ -522,7 +522,7 @@
   - todo：`standalone/todo-1x1-1440x960.png`、`standalone/todo-2x2-1440x960.png`、`standalone/todo-3x2-1440x960.png`、`standalone/todo-3x3-1440x960.png`、`standalone/todo-4x2-1440x960.png`、`standalone/todo-3x3-1024x768.png`
   - weather：`standalone/weather-1x1-1440x960.png`、`standalone/weather-2x1-1440x960.png`、`standalone/weather-2x2-1440x960.png`、`standalone/weather-3x2-1440x960.png`、`standalone/weather-4x2-1440x960.png`
 
-### 7.2 测量数据（`docs/audit2/_data/`）
+### 7.2 测量数据（`docs/audits/round2-type-visual/_data/`）
 
 - `measures/<plugin>-<size>-<resolution>.json`（55 份原始测量：文本叶子 fontSize/fontWeight/color/rect、图形 rect、字号直方图、覆盖率、空白带、溢出、对比度、背景色）
 - `summary-standalone.md`（人读汇总）、`table-compact.tsv`（报告矩阵数据源）
@@ -535,7 +535,7 @@
 2. 种子：用 headless Edge 同 profile 打开 `?demo=1` 的 todo/countdown/pomodoro/sedentary 独立页；weather 写 `plugin.weather.settings = {mock:true,showWarnings:false}`（脚本在 `%TEMP%\audit2\seed.mjs`）。
 3. 测量：CDP `Emulation.setDeviceMetricsOverride` 设视口 = 宿主 iframe 尺寸，`Runtime.evaluate` 取 `getComputedStyle/fontSize` 与 `getBoundingClientRect`；截图用 `Page.captureScreenshot`（脚本 `%TEMP%\audit2\measure-standalone.mjs`；汇总 `summarize.mjs` / `table.mjs`）。
 4. 宿主截图：`host-shots.mjs`，DSF=1（DSF=2 会出现 backdrop-filter 合成白底伪影，不能用）。
-5. 临时脚本全部在 `%TEMP%\audit2\`，未进仓库；仓库里只新增 `docs/audit2/**` 与 `shots/audit2/**`。
+5. 临时脚本全部在 `%TEMP%\audit2\`，未进仓库；仓库里只新增 `docs/audits/round2-type-visual/**` 与 `shots/audits/round2-type-visual/**`。
 
 ### 7.4 局限（与任务简报不同之处，需要 Lead 知悉）
 

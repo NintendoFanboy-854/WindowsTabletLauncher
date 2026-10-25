@@ -1,6 +1,6 @@
 # 设计决策记录（审计相关）
 
-> 日期：2026-10-19。对应 `docs/audit/AUDIT.md` 的 P1/P2 处置口径。
+> 日期：2026-10-19。对应 `docs/audits/round1-fluid-visual/AUDIT.md` 的 P1/P2 处置口径。
 > 由 Lead 决策，作为审计复检（task-25）的判定依据。
 
 ## D-01 卡片圆角（V-01 / V-02）
@@ -81,7 +81,7 @@
 > `DISPLAY_XL` 已从 `public/plugins/_shared/typography.js` 删除；所有插件主数字改用 Fluent 官方
 > `tokens.fontSizeHero900` / `lineHeightHero900`（40/52），不再有项目级字号例外。以下条文仅作历史记录。
 
-- **背景**：Fluent 2 官方字阶（`references/fluentui-design/typography.md`）与 Fluent UI React v9 token
+- **背景**：Fluent 2 官方字阶（`docs/reference/fluent-design/typography.md`）与 Fluent UI React v9 token
   （`node_modules/@fluentui/tokens/lib/global/fonts.js`）的最大角色都是 **Display 68px / 92px**
   （`fontSizeHero1000`）。本项目平板常驻桌面、当作台面电子设备使用（0.5–2m 观看），
   墙钟/计时/温度等**纯数字主信息**在 1–1.5m 外需要更大的字，官方 ramp 不提供。
@@ -109,7 +109,7 @@
 
 ## D-11 设置/详情浮层统一骨架（2026-10-19，已落地）
 
-- 插件浮层视图统一按 `docs/OVERLAY-REWRITE-SPEC.md`：**E1 起插件只保留 `?view=detail`**；
+- 插件浮层视图统一按 `docs/history/OVERLAY-REWRITE-SPEC.md`：**E1 起插件只保留 `?view=detail`**；
   旧的 `?view=settings` 已删除（设置统一由 manifest schema 在宿主设置页渲染），`edit` / `all`
   也已并入详情内的 L2/Tabs。历史写法 `?view=settings|detail|edit|all` 仅见旧文档。
   视图根 padding 24、内容 max-width 720 居中、section 间距 24、设置行 48 / 列表行 44、
@@ -118,9 +118,9 @@
 - 浮层标题与关闭按钮只由宿主 Dialog 提供，插件视图内不再画标题栏/关闭按钮。
 - 回归入口：`node scripts/verify-overlays.mjs`（E7 起重写为**六插件 × detail 的 6 个视图断言**，
   暗/亮各一遍；E1 之前的 12 个 settings/edit/all 用例已失效）+ `node scripts/shot-host-overlays.mjs`
-  （宿主内联调截图，E7 更新为真实路径「点卡 → detail 浮层 → Esc → 焦点归还」）。细节与残留见 `docs/OVERLAY-REWRITE-RESULT.md`。
+  （宿主内联调截图，E7 更新为真实路径「点卡 → detail 浮层 → Esc → 焦点归还」）。细节与残留见 `docs/history/OVERLAY-REWRITE-RESULT.md`。
 - 宽度口径（E5 复核，2026-10-20）：**表单/设置内容 max-width 720 居中；详情里的列表/统计区可用满宽 834**
-  （见 [OVERLAY-REWRITE-SPEC.md](OVERLAY-REWRITE-SPEC.md) §2）。组件文档未要求 720 的详情页不强制收窄，
+  （见 [OVERLAY-REWRITE-SPEC.md](history/OVERLAY-REWRITE-SPEC.md) §2）。组件文档未要求 720 的详情页不强制收窄，
   避免改变列表密度与列对齐。
 - 后续新增任何插件浮层视图都按此骨架执行；不再逐页另立规格。
 
@@ -173,7 +173,7 @@
 - 本轮定稿内容：卡片点击语义、详情 L1/L2、设置宿主化（manifest schema）、六插件卡片/详情规格、
   插件内部动效、颜色政策（严格功能色）、Agent 对等、测试脚手架清理计划。
 - 逐插件规格见 `docs/components/{clock,countdown,sedentary,pomodoro,todo,weather}.md`；
-  总览见 `docs/DESIGN-ROUND-SUMMARY.md`；契约见 `docs/PLUGIN-CONTRACT.md`；动效见 `docs/MOTION.md`。
+  总览见 `docs/history/DESIGN-ROUND-SUMMARY.md`；契约见 `docs/PLUGIN-CONTRACT.md`；动效见 `docs/MOTION.md`。
 - 设置：插件在 manifest 中声明 schema（boolean/number/enum/text/timeRange），宿主设置页通用渲染；
   即时生效 +「保存」羡余 +「恢复默认」；插件不再提供 `?view=settings`。
 - 颜色：本轮只使用 Fluent 功能色（中性文字层级、品牌色交互、语义色状态、数据色图表、内容色小面积），
@@ -185,7 +185,7 @@
   改为紧凑摘要 + 单行环境信息 + Tabs。
 - 测试脚手架清理（E6）：删除三套 demo host 与 bridge-check，生产 `dist` 不得包含 demo 页面/文案；
   Agent「演示模式」移出主设置。
-- 实现按 `docs/PLAN.md` §8 的 E0–E7 执行。
+- 实现按 `docs/history/PLAN.md` §8 的 E0–E7 执行。
 
 ## D-16 自动定位改用 ip.cn 网络归属地（2026-10-19，已实现）
 
@@ -216,7 +216,7 @@
   `plugin-sdk.js` 的 `plugin.ipLocate()`；天气插件在 E3 接入。浏览器 dev 没有 Tauri 后端，
   bridge 与 SDK 都返回 null（插件按“拿不到”降级）。
 - **失败兜底**：ip.cn 改版 / 超时（8s）→ 返回 null；不影响手动搜索城市；日志记录原因，不弹错误。
-- 细节见 [components/weather.md](components/weather.md)「自动定位」一节；任务见 [PLAN.md](PLAN.md) E2b。
+- 细节见 [components/weather.md](components/weather.md)「自动定位」一节；任务见 [PLAN.md](history/PLAN.md) E2b。
 
 ## D-17 插件契约与自包含模板（2026-10-19，E3.0b）
 
@@ -237,7 +237,7 @@
   复制者必须为每个写操作补 Agent 工具，模板 README 明示了这个缺口。
 - 实现与验证：冷复制到 `public/plugins/template/`（不构建）后通过 `verify-plugin.mjs`
   三档尺寸 + 宿主冒烟；14 项交互/设置/工具断言通过，console 0 error；截图在
-  `shots/e3-template/`。
+  `shots/milestones/e3-template/`。
 - 本轮同时修复宿主缺口：浮层内发 `plugin:request-host-settings` 时，宿主先关闭浮层再导航
   （契约 §5），插件只发一条消息；模板与后续六个插件的「设置…」都按这个口径写。
 
@@ -272,7 +272,7 @@
 - **尺寸菜单勾选修复**：改尺寸菜单的勾选改为受控，只反映真实 `widget.size`；选到当前页放不下的
   档位时提示「当前页面没有空间放 W × H，尺寸保持不变」，卡片与勾选都保持原尺寸。
 - 验收：删除 → reload 仍在桌面外；插件页显示未上桌并可一键加回；编辑模式对话框可加回；
-  六卡基线 / 重置恢复 / console 0（v0.2.2 回归报告 `docs/RELEASE-REPORT.md` §11）。
+  六卡基线 / 重置恢复 / console 0（v0.2.2 回归报告 `docs/releases/RELEASE-REPORT.md` §11）。
 
 ## D-20 Agent 浮空三段式界面 + 立即录音（2026-10-20，v0.3.0）
 
@@ -401,7 +401,7 @@
   - after（本修复，最终产物 sha 48c8b86e…）：iframe 收到 `host:config` 6 条；settings push 34ms 生效
     （23°→73°F），places push 58ms 生效（北京→上海），iframe console error 0。
   - `npm run typecheck` / `npm run build` / 六插件产物重建通过（产物已完成，与源码一致）。
-  - release 真窗口（patched CDP 副本，`shots/v036-final/`，38 PASS / 0 FAIL）：升级重种 0.3.5→0.3.6；真实 WebView2 里设置页切时钟 12 小时制/天气自动定位开关后，跨 origin 卡片 360ms 内可见更新、iframe 71ms 收到 `host:config`（天气双向 75/60ms）、timeOrigin/探针证明未 reload、console 0。
+  - release 真窗口（patched CDP 副本，`shots/releases/v0.3.x/v036-final/`，38 PASS / 0 FAIL）：升级重种 0.3.5→0.3.6；真实 WebView2 里设置页切时钟 12 小时制/天气自动定位开关后，跨 origin 卡片 360ms 内可见更新、iframe 71ms 收到 `host:config`（天气双向 75/60ms）、timeOrigin/探针证明未 reload、console 0。
 
 ## D-30 Agent 语音优先：半高窗改为纯语音、取消自动升级、输入区单行（2026-10-23，v0.3.7 反馈）
 
@@ -417,7 +417,7 @@
   - 「半高窗保留一行文字输入」：用户明确“半高就是纯语音”；文字是兜底，需要显式展开。
   - 「靠“输入框为空时允许空格录音”的启发式」：状态不可预测，且解决不了自动聚焦根因。
 - 兼容：`SurfaceStage` 由 `composer` 改为 `voice`（仅 UI 内部类型，不持久化）；`AgentSurface` props 不变（`open` 仍打开 `chat`）；session / 存储 / 音频链路不变；不迁移数据。
-- 验证：新增 `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风，voice 回合后观测不到 chat、回答后空格再录音、半高窗 textarea=0、chat 单行 composer 三控件同轴、焦点/Esc/录音取消、reduced-motion、console 0）；`scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 按新语义更新后全 PASS；`tsc --noEmit` / `npm run build` 通过；证据 `shots/v037-dev/`。
+- 验证：新增 `scripts/verify-agent-voice-first.mjs`（headless Edge + 假麦克风，voice 回合后观测不到 chat、回答后空格再录音、半高窗 textarea=0、chat 单行 composer 三控件同轴、焦点/Esc/录音取消、reduced-motion、console 0）；`scripts/verify-agent-surface.mjs`、`scripts/smoke-v031-ui.mjs` 按新语义更新后全 PASS；`tsc --noEmit` / `npm run build` 通过；证据 `shots/releases/v0.3.x/v037-dev/`。
 
 ## D-31 壁纸层：必应每日壁纸（原生接口）+ 修复 provider 盖住壁纸（2026-10-23，v0.4.0）
 

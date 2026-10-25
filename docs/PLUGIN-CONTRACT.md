@@ -437,19 +437,19 @@ plugin → host: { type: 'plugin:request-host-settings' }
 ## 7. 验收清单（插件进入本项目的硬门槛）
 
 > 本阶段验收记录：2026-10-20（E7，版本 0.2.0）。六个正式插件全部通过；逐条证据见下表与
-> `shots/e7/REPORT.md`。命令：`node scripts/verify-plugin.mjs <id>`、`node scripts/verify-widgets.mjs`、
+> `shots/milestones/e7/REPORT.md`。命令：`node scripts/verify-plugin.mjs <id>`、`node scripts/verify-widgets.mjs`、
 > `node scripts/verify-overlays.mjs --scheme dark|light`。
 
 | # | 门槛 | 结果 | 证据 |
 |---|---|---|---|
-| 1 | 卡片主体点击 = `requestOverlay('detail')`；卡片内控件阻止冒泡 | ✅ | 六插件宿主冒烟（点卡开 detail 浮层、X/Esc 关闭）；`shots/e7/logs/verify-plugin-final.log` |
+| 1 | 卡片主体点击 = `requestOverlay('detail')`；卡片内控件阻止冒泡 | ✅ | 六插件宿主冒烟（点卡开 detail 浮层、X/Esc 关闭）；`shots/milestones/e7/logs/verify-plugin-final.log` |
 | 2 | 设置只通过 manifest `settings` schema 声明，无自带设置界面 | ✅ | 六插件 `?view=settings` 已删除；设置页按 schema 渲染 3/2/9/6/4/8 项（E2E E2） |
 | 3 | 每个用户操作都有对应 Agent 工具（含设置读写） | ✅ | 六插件工具声明与 `plugin:ready` 注册；plug-and-play 复盘页 `ping.stats` 实际调用成功 |
-| 4 | 提供 `?view=detail`，内容为「更多 + 操作」 | ✅ | `verify-overlays` 六插件 detail 6/6 × 暗/亮；`shots/e7/overlays/` |
+| 4 | 提供 `?view=detail`，内容为「更多 + 操作」 | ✅ | `verify-overlays` 六插件 detail 6/6 × 暗/亮；`shots/milestones/e7/overlays/` |
 | 5 | 长按通过 SDK `useHostCardGesture` 上报，插件不自处理长按/右键/hover | ✅ | 宿主 E2E 长按进编辑 53/53 × 4 套；静态扫描无插件自绘长按 |
 | 6 | 详情按 L1/L2 页栈；L1 无返回箭头、L2 有；保存 pop / 取消 pop / X 关闭 | ✅ | 六插件 detail 断言 + E5 L2 截图；`docs/DECISIONS.md` D-14 |
 | 7 | Tabs 只用于平级内容且常显 | ✅ | weather / todo detail Tabs 常显；detail 骨架无「视图菜单」 |
-| 8 | 每个尺寸符合 DENSITY 信息预算，无详情级操作 | ✅ | `verify-widgets` 25/25 × 暗/亮（1 项已接受 P2 记账，见 `shots/e7/REPORT.md` §3.2） |
+| 8 | 每个尺寸符合 DENSITY 信息预算，无详情级操作 | ✅ | `verify-widgets` 25/25 × 暗/亮（1 项已接受 P2 记账，见 `shots/milestones/e7/REPORT.md` §3.2） |
 | 9 | 只使用 `plugin-sdk.js` + `_shared/**`，未 import `src/host/**` | ✅ | `verify-plugin` 静态检查；插件源码 grep 无 `src/host` |
 | 10 | `node scripts/build-plugin.mjs <id>` 产物提交；`verify-widgets --plugin <id>` 通过 | ✅ | `build-plugin --all` 重建后 `git status` 无 diff；六插件 widgets 全 PASS |
 
@@ -473,7 +473,7 @@ plugin → host: { type: 'plugin:request-host-settings' }
 > 打开宿主跑 6 类断言 → 删除 `public/plugins/ping/` 与 index 项。**未改任何 `src/host/**`**，19/19 断言通过
 > （桌面出卡、点卡进详情、编辑改尺寸/拖拽/删除、设置页自动分区并按 schema 渲染/即时保存、详情「设置…」
 > 跳分区、Agent `?mock=1` 工具调用、复盘页 `Ping 测试` 统计块、删除后桌面恢复六卡无残留）。
-> 步骤、用例与证据：`shots/e7/REPORT.md` §2.3（截图与 JSON 在 `shots/e7/plug-and-play/`）。
+> 步骤、用例与证据：`shots/milestones/e7/REPORT.md` §2.3（截图与 JSON 在 `shots/milestones/e7/plug-and-play/`）。
 > 自动化脚本：`node scripts/verify-plug-and-play.mjs`（2026-10-20 落地）。冷复制模板 → 仅登记 index →
 > 正式宿主断言第 7 卡 / 详情 / 设置 schema / 清理，**12/12 PASS**；Agent 工具与复盘统计仍以 E7 人工
 > fixture 证据为准（模板未声明 `*.stats` 工具）。
