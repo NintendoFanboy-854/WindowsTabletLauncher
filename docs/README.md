@@ -69,7 +69,7 @@ docs/
 │   ├── round1-fluid-visual/       # 2026-10-18/19 基线 UI 审计：AUDIT.md + 原始扫描 txt（运行日志在 shots/audits/round1-fluid-visual/logs/）
 │   └── round2-type-visual/        # 第二轮：字号/间距审计 + 视觉审计 + 重写验收 + 量测数据
 │
-└── images/                        # README/发布说明引用的精选截图，按版本归档（v030 / v037 / v040；旧版本图保留作视觉存档）
+└── images/                        # README/发布说明引用的精选截图，按版本归档（v030 / v037 / v040 / v050；旧版本图保留作视觉存档）
 ```
 
 ## 现行规范（根目录文件）为什么不再分子目录

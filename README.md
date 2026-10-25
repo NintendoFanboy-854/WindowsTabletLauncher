@@ -3,9 +3,9 @@
 给 Windows 平板用的全屏小组件桌面，外加一个内置的语音优先 Agent。  
 没有应用图标、没有搜索框、没有开始菜单——开机就是整屏小组件，所有交互通过小组件和 Agent 直接完成。
 
-![桌面](docs/images/v040/desktop-1440-dark.png)
+![桌面](docs/images/v050/desktop-1440-dark.png)
 
-<p align="center"><sub>v0.4.0 · 1440×960 · 深色主题 · 必应每日壁纸（4K，填充）+ 磨砂卡片 · 六张卡片的 identity 行与默认满屏构图</sub></p>
+<p align="center"><sub>v0.5.0 · 1440×960 · 深色主题 · 必应每日壁纸（4K，填充）+ 磨砂卡片 · 20px identity 图标行 · 6 卡满屏构图与说明条 / chat 入口下缘共线（截图为 2026-10-24 验证轮）</sub></p>
 
 - 目标设备：Windows 10/11 平板（Windows 10 LTSC 实测）
 - 设计：Fluent 2（控件/颜色/字阶/间距/动效全部 token 化）；Apple HIG 仅作原则参照
@@ -25,32 +25,26 @@
 
 ## 截图
 
-> 截图取自 **v0.4.0**（本机最后一次系统截图）；v0.4.5 / v0.5.0 / v0.6.0 的壁纸、说明条与全屏页变化未重拍，当前界面以源码与 [docs/](docs/README.md) 规范为准。
+> 截图取自 **2026-10-24 验证轮**（v0.4.5–v0.5.0 界面：D-36 同权视觉、居中布局、44px 命中区、Agent 轮次时间线）；**v0.6.0 的壁纸三模式 / 欣赏壁纸 / 说明条参与布局属于设置项与交互增量，暂无截图**，补图时新增 `docs/images/v060/`。历史版本截图（v030 / v037 / v040）仍保留在 `docs/images/` 作视觉存档。
 
-### 桌面（v0.4.0：必应每日壁纸 + 磨砂卡片 + 满屏默认构图）
+### 桌面（v0.5.0：必应壁纸 + 磨砂卡片 + 说明条参与布局 + 满屏默认构图）
 
-| 深色 · 1440×960 | 亮色 · 1440×960 |
+| 深色 · 1440×960 | 亮色 · 1024×768 |
 |---|---|
-| <img src="docs/images/v040/desktop-1440-dark.png" width="440" /> | <img src="docs/images/v040/desktop-1440-light.png" width="440" /> |
-| <sub>4K 壁纸按“填充”铺满；卡片浮在壁纸上；左下角是壁纸说明</sub> | <sub>同一套 Fluent token，亮色下卡片为白色磨砂面</sub> |
+| <img src="docs/images/v050/desktop-1440-dark.png" width="440" /> | <img src="docs/images/v050/desktop-1024-light.png" width="340" /> |
+| <sub>4K 壁纸按“填充”铺满；卡片浮在壁纸上；左下角说明条与右下 chat 入口下缘共线</sub> | <sub>同一套 Fluent token，亮色下卡片为白色磨砂面；1024 宽下默认构图回退，部分卡片在后续页</sub> |
 
 ### Agent：右下角浮空三段界面（语音优先）
 
-| 入口按钮 | 半高语音窗 · 录音中 |
+| 半高语音窗 · 录音中（1440 深色） | 半高语音窗 · 回答后停留（1024 亮色） |
 |---|---|
-| <img src="docs/images/v030/agent-collapsed-1440-dark.png" width="400" /> | <img src="docs/images/v037/agent-voice-recording-1440-dark.png" width="400" /> |
-| <sub>点按 / 按住空格立即录音</sub> | <sub>纯语音形态：声纹 + 停止 / 取消，没有文字输入框</sub> |
+| <img src="docs/images/v050/agent-voice-recording-1440-dark.png" width="440" /> | <img src="docs/images/v050/agent-voice-reply-1024-light.png" width="340" /> |
+| <sub>纯语音形态：声纹 + 停止 / 取消，没有文字输入框；顶栏 ⌃ / 朗读 / ✕</sub> | <sub>语音回合结束不自动展开，peek 显示问答，可继续说下一轮</sub> |
 
-| 半高语音窗 · 回答后停留 | 全高对话 · 单行输入 |
+| 半高语音窗 · 录音中（1024 亮色） | 全高对话 · 单行输入（1440 深色） |
 |---|---|
-| <img src="docs/images/v037/agent-voice-reply-1440-dark.png" width="400" /> | <img src="docs/images/v037/agent-chat-single-row-1440-dark.png" width="400" /> |
-| <sub>语音回合结束不自动展开，peek 显示问答，可继续说下一轮</sub> | <sub>`[语音] [输入] [发送]` 一行；文字对话是兜底</sub> |
-
-### 亮色 / 1024×768
-
-| 半高语音窗 · 录音中 | 半高语音窗 · 回答后 | 全高对话 |
-|---|---|---|
-| <img src="docs/images/v037/agent-voice-recording-1024-light.png" width="240" /> | <img src="docs/images/v037/agent-voice-reply-1024-light.png" width="240" /> | <img src="docs/images/v037/agent-chat-single-row-1024-light.png" width="240" /> |
+| <img src="docs/images/v050/agent-voice-recording-1024-light.png" width="340" /> | <img src="docs/images/v037/agent-chat-single-row-1440-dark.png" width="400" /> |
+| <sub>点按 / 按住空格立即录音；1024 亮色下的半高窗</sub> | <sub>`[语音] [输入] [发送]` 一行；文字对话是兜底</sub> |
 
 ### 语音消息呈现
 
@@ -79,7 +73,7 @@
 
 | Agent 设置 | 设置页「入口」组 |
 |---|---|
-| <img src="docs/images/v030/agent-settings-1440-dark.png" width="400" /> | <img src="docs/images/v030/settings-entry-1440-dark.png" width="400" /> |
+| <img src="docs/images/v050/agent-settings-1440-dark.png" width="400" /> | <img src="docs/images/v030/settings-entry-1440-dark.png" width="400" /> |
 | <sub>语音（自动朗读总开关 / 文字提问也朗读）/ 模型 / 联网搜索</sub> | <sub>打开 Agent / 复盘 / 插件管理</sub> |
 
 打开宿主设置的三条路径：**鼠标 = 桌面空白处右键 →「设置」**；键盘 = `Ctrl+,`；触控 = 长按桌面空白 → 编辑工具栏「设置」。宿主设置不会放进 Agent 的 `⋯` 菜单（Agent 菜单只放 Agent 自己的设置）。
