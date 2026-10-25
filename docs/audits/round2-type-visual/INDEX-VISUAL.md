@@ -3,8 +3,8 @@
 采集方式：headless Edge + CDP `Page.captureScreenshot`，不使用 shot.ps1（无法注入 CSS/主题）。
 
 - 本审计的报告：同目录 [`REPORT-VISUAL.md`](REPORT-VISUAL.md)、[`REPORT-TYPE.md`](REPORT-TYPE.md)、[`REWRITE-RESULT.md`](REWRITE-RESULT.md)。
-- **截图证据不在版本库内**：`host/` 3 张 + `standalone/` 56 张位于本地证据目录 `shots/audits/round2-type-visual/`（`shots/` 被 `.gitignore` 忽略，见仓库根 `docs/README.md` 的「证据目录」一节）。
-- `shots/audits/round2-type-visual/` 根目录下的其它 PNG 属同期并行审计任务，不在 `REPORT-VISUAL.md` 引用。
+- **截图证据不在版本库内**：`host/` 3 张 + `standalone/` 56 张 + 根目录 `type-host-{1024x768,1440x960,960x1440}.png` 3 张（字号审计引用，见 `REPORT-TYPE.md`），全部位于本地证据目录 `shots/audits/round2-type-visual/`（`shots/` 被 `.gitignore` 忽略，见仓库根 `docs/README.md` 的「证据目录」一节）。
+- `shots/audits/round2-type-visual/` 根目录的其余 PNG（如 `1024x768-*`、`1440x960-*` 等）属同期并行审计任务，不在 `REPORT-VISUAL.md` / `REPORT-TYPE.md` 引用。
 
 ## host/ —— 宿主真实桌面（DSF=1，真实主题/材质/iframe）
 

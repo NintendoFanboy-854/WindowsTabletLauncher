@@ -1,6 +1,6 @@
 # 文档总索引（docs/README.md）
 
-本目录是 Windows Tablet Launcher 的全部项目文档。分两类：
+本目录是 Windows Tablet Launcher 的全部项目文档。分三类：
 
 - **现行规范**（`docs/` 根目录 + `components/`）：描述"现在应该怎么做"，改动要跟代码/契约一起评审。
 - **历史与证据**（`history/`、`releases/`、`audits/`）：描述"当时做了什么、怎么验证的"，**只读不改写**。
@@ -48,7 +48,7 @@ docs/
 ├── reference/                     # 外部参考（来源索引见 reference/README.md）
 │   ├── README.md                  # 来源 / 版本 / 许可 / 本地副本说明
 │   ├── APPLE-HIG.md               # Apple HIG 原则参照（项目内抽取，入库）
-│   ├── external-services.md       # MiMo / 和风天气 等外部服务文档链接
+│   ├── external-services.md       # MiMo / 和风天气文档链接 + Fluent 本地副本检索入口
 │   ├── fluent-design/             # Fluent 2 设计语言 15 页（本地副本，不入库）
 │   └── fluent-ui-docs/            # microsoft/fluentui 文档抽取 722 篇 + INDEX（本地副本，不入库）
 │
@@ -69,14 +69,18 @@ docs/
 │   ├── round1-fluid-visual/       # 2026-10-18/19 基线 UI 审计：AUDIT.md + 原始扫描 txt/log
 │   └── round2-type-visual/        # 第二轮：字号/间距审计 + 视觉审计 + 重写验收 + 量测数据
 │
-└── images/                        # README/发布用的精选截图，按版本归档（v030 / v037 / v040）
+└── images/                        # README/发布说明引用的精选截图，按版本归档（v030 / v037 / v040；旧版本图保留作视觉存档）
 ```
 
 ## 现行规范（根目录文件）为什么不再分子目录
 
-根目录这 10 个文件是**被源码注释直接引用的现行规范**。例如 `src/host/layout/breakpoints.ts` 注释里写
-`docs/DESIGN.md §1.1`，`public/plugins/todo/js/config.js` 注释里写 `PLUGIN-CONTRACT §2.1`，
-`docs/components/*.md` 被六个插件源码逐文件引用。
+根目录这 10 个文件是**现行规范的稳定入口**。其中 7 个被源码注释直接引用（`DESIGN`、`FLUENT2`、
+`DENSITY`、`PLUGIN-CONTRACT`、`PLUGIN-REACT`、`AGENT-SURFACE-CONTRACT`、`DECISIONS`），例如
+`src/host/layout/breakpoints.ts` 注释写 `docs/DESIGN.md §1.1`，`src/host/pages/shared/PageScaffold.tsx`
+注释写 `docs/DENSITY.md`，`public/plugins/todo/js/config.js` 注释写 `PLUGIN-CONTRACT §2.1`；
+`docs/components/` 的 clock / countdown / sedentary / todo / weather 五份规格被对应插件源码引用，
+pomodoro 等其余文档只被文档间引用。`VISION` / `MOTION` / `TOKEN-MAP` 虽未被代码引用，但同属现行规范，
+保持同一层级、不单独下沉。
 
 本仓库的整理原则是**代码不动**，因此这些路径必须保持稳定；历史文档、发布记录、审计与外部参考则按
 语义进入子目录。所以"根目录平铺"是刻意的：**根目录 = 现行规范的稳定入口，子目录 = 归档与参考**。
@@ -91,7 +95,7 @@ docs/
 | 目录 | 内容 | 版本库 |
 |---|---|---|
 | `shots/` | 验证/审计截图与日志，按 `releases/`、`milestones/`、`audits/`、`archive/` 归档 | 忽略 |
-| `.tmp/` | 临时调试输出：`logs/`、`scripts/`、`screenshots/`、`media/`、`data/`、`backups/`、`experiments/`、`archive/` | 忽略 |
+| `.tmp/` | 临时调试输出：`logs/`、`scripts/`、`screenshots/`、`media/`、`data/`、`backups/`、`experiments/`、`archive/`；`reorg/` 为本次整理的一次性脚本与 `moves.log` | 忽略 |
 | `release/` | 各版本安装包（NSIS/MSI/app.exe + README/SHA256SUMS） | 忽略 |
 | `dist/` | Vite 构建产物 | 忽略 |
 
@@ -101,15 +105,18 @@ docs/
 ## 维护约定
 
 1. **现行规范**（根目录 + `components/`）变更时，与代码改动同一次提交；不要只改文档不改实现。
-2. **历史文档只读**：`history/`、`releases/RELEASE-REPORT.md`、`audits/*` 记录的是当时的仓库状态，
-   其中的文件路径/行号按当时版本保留，不追着现在的目录改（若引用已迁移的路径，以本文档的迁移表为准）。
+2. **历史文档正文不改写**：`history/`、`releases/RELEASE-REPORT.md`、`audits/*` 记录的是当时的仓库状态，
+   正文里的时间、命令、行号、当时的路径按原样保留；只同步迁移后的**相对链接**（2026-10-25 整理已做），
+   遇到旧路径以本文档的迁移表为准。
 3. **新文档放哪**：
    - 现行规范/契约 → `docs/` 根目录（会被代码引用）或 `docs/components/`（组件级）；
    - 一次性计划、已完成规格/结果 → `docs/history/`；
    - 发布流程与发布报告 → `docs/releases/`；
-   - 审计报告与量测数据 → `docs/audits/<轮次>/`，原始截图放 `shots/audits/<轮次>/`；
+   - 审计报告 + 可复现的量测数据/harness → `docs/audits/<轮次>/`（历史审计即按此形态入库），
+     原始截图与运行日志 → `shots/audits/<轮次>/`；
    - 外部资料与来源说明 → `docs/reference/`，大体积第三方副本不入库；
-   - 验证脚本留在 `scripts/`，其输出（截图/日志/JSON）进 `shots/`，不要把产物提交进 `docs/`。
+   - 日常验证脚本放 `scripts/`，其运行产物（截图/日志）进 `shots/`；审计专项 harness 与其量测数据
+     作为审计证据包留在 `docs/audits/<轮次>/`，不要另建第三个位置。
 4. **文件名**：现行规范用全大写 + `-`（如 `PLUGIN-CONTRACT.md`）或 `components/<id>.md`；
    索引/说明文件用 `README.md`、小写短横线（如 `external-services.md`）。
 5. **截图引用**：README/发布说明引用 `docs/images/<版本>/`；细节证据引用 `shots/` 路径并说明"本地证据，不入库"。
@@ -117,7 +124,8 @@ docs/
 
 ## 2026-10-25 整理：迁移对照表
 
-本次整理只移动文档/证据/临时文件，**未改动任何源码、配置或构建脚本**。旧路径 → 新路径：
+本次整理**未改应用源码与构建脚本**；改动仅限：文档（含相对链接与路径引用同步）、`.gitignore` 重写、
+`templates/plugin-template/README.md` 中一处截图路径说明。旧路径 → 新路径：
 
 | 旧路径 | 新路径 |
 |---|---|
@@ -148,3 +156,8 @@ docs/
   `tauri.conf.json` 已是 **0.6.0**；v0.5.0、v0.6.0 的验证结论目前只在 git 提交信息里，未回填 README/RELEASE-REPORT。
 - `docs/releases/RELEASE-REPORT.md` 覆盖到 **v0.3.7 §20**；v0.4.0 之后的验证结论散见 README 与提交信息。
 - 历史文档（`history/`、`releases/`、`audits/`）中的路径是按当时仓库状态写的；遇到旧路径请对照上面的迁移表。
+- **验证脚本仍写旧证据路径**：按"代码不动"原则，本次未修改 `scripts/*.mjs`。其中 7 个验证脚本 + `shot.ps1`
+  + 1 个历史审计 harness 的注释与默认输出目录仍指向旧结构（如 `shots/e7/`、`shots/v030-dev/`、
+  `shots/v022-final/`、`shots/pnp/`、`shots/e3/`），
+  运行这些脚本会在 `shots/` 根下重新生成旧目录名。需要与上面的新结构对齐时，请按迁移表同步脚本内的
+  路径常量（属代码改动，未包含在本次整理中）。

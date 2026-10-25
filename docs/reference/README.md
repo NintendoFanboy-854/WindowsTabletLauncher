@@ -9,7 +9,7 @@
 |---|---|---|---|
 | Apple HIG 原则参照 | [APPLE-HIG.md](APPLE-HIG.md) | **入库** | Apple《人机界面指南》中文站，按页面数据接口抓取；抓取日 2026-10-19。项目内摘编，用途见文首 |
 | 外部服务文档链接 | [external-services.md](external-services.md) | **入库** | Xiaomi MiMo、和风天气官方文档链接清单（原仓库根 `Docs.md`） |
-| Fluent 2 设计语言（15 页） | `fluent-design/` | 本地，**不入库** | [fluent2.microsoft.design](https://fluent2.microsoft.design) 页面抓取到本地 |
+| Fluent 2 设计语言（15 页） | `fluent-design/` | 本地，**不入库** | [fluent2.microsoft.design](https://fluent2.microsoft.design) 页面抓取到本地；抓取日 2026-10-18 |
 | Fluent UI React 文档抽取（722 篇） | `fluent-ui-docs/` | 本地，**不入库** | `microsoft/fluentui` @ `f02cfa8f` 抽取的纯 `.md`/`.mdx` 副本；检索方式见 `fluent-ui-docs/INDEX.md` |
 
 > `fluent-design/` 与 `fluent-ui-docs/` 是体量较大的第三方资料副本，按仓库约定**不提交**：

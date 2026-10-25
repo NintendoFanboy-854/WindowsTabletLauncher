@@ -81,7 +81,7 @@
 > `DISPLAY_XL` 已从 `public/plugins/_shared/typography.js` 删除；所有插件主数字改用 Fluent 官方
 > `tokens.fontSizeHero900` / `lineHeightHero900`（40/52），不再有项目级字号例外。以下条文仅作历史记录。
 
-- **背景**：Fluent 2 官方字阶（`docs/reference/fluent-design/typography.md`）与 Fluent UI React v9 token
+- **背景**：Fluent 2 官方字阶（本地副本 `docs/reference/fluent-design/typography.md`，不入库）与 Fluent UI React v9 token
   （`node_modules/@fluentui/tokens/lib/global/fonts.js`）的最大角色都是 **Display 68px / 92px**
   （`fontSizeHero1000`）。本项目平板常驻桌面、当作台面电子设备使用（0.5–2m 观看），
   墙钟/计时/温度等**纯数字主信息**在 1–1.5m 外需要更大的字，官方 ramp 不提供。

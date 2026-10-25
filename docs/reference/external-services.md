@@ -48,8 +48,8 @@
 ## Fluent 2（本地离线文档）
 
 来源：microsoft/fluentui（commit f02cfa8f）抽取的纯文档副本，根目录 `docs/reference/fluent-ui-docs/`，共 722 个 .md/.mdx（另见目录内 `INDEX.md`）。
-该目录为**本地副本、不入库**（`.gitignore` 忽略）；检索方式与目录说明见 [INDEX.md](fluent-ui-docs/INDEX.md)，
-重新获取方式见 [README.md](README.md)。
+该目录为**本地副本、不入库**（`.gitignore` 忽略）；检索方式与目录说明见本地副本
+`fluent-ui-docs/INDEX.md`（clone 后先按 [README.md](README.md) 的「重新获取」补齐，该文件才存在）。
 
 - 概念（`docs/reference/fluent-ui-docs/apps/public-docsite-v9/src/Concepts/`）
   - Introduction: `docs/reference/fluent-ui-docs/apps/public-docsite-v9/src/Concepts/Introduction.mdx`
