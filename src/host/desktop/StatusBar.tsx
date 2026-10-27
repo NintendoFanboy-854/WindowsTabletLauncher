@@ -62,6 +62,7 @@ import {
   btAudioRefresh,
   btAudioResumeAuto,
   btAudioSetAutoConnect,
+  btAudioSetEnabled,
   btAudioSetPreferred,
   btAudioSnapshot,
   type BtAudioSnapshot,
@@ -378,6 +379,7 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
   const [btError, setBtError] = useState(false);
   const [btBusy, setBtBusy] = useState(false);
   const [pendingDeviceId, setPendingDeviceId] = useState<string | null>(null);
+  const [pendingDisconnect, setPendingDisconnect] = useState(false);
 
   const [phase, setPhase] = useState<PanelPhase>('closed');
   const [contentShown, setContentShown] = useState(false);
@@ -534,33 +536,45 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
       );
       return;
     }
+    setPendingDisconnect(true);
     retryRef.current = () => void runBluetoothAction(() => btAudioDisconnect());
-    void runBluetoothAction(() => btAudioDisconnect());
+    void runBluetoothAction(() => btAudioDisconnect()).finally(() =>
+      setPendingDisconnect(false),
+    );
   }, [tauri, runBluetoothAction]);
 
-  const setAutoConnect = useCallback(
+  /**
+   * 面板顶部的「蓝牙音箱」总开关（不是自动连接偏好）：一个动作联动后端
+   * 「开蓝牙 / 开始寻找 / 自动连接」或「断开 / 停止寻找」（命令 bt_audio_set_enabled）。
+   * 关闭过程用 pendingDisconnect 驱动行内「正在断开…」+ 转圈，不假装瞬间完成。
+   */
+  const setBluetoothSpeakerEnabled = useCallback(
     (enabled: boolean) => {
       if (!tauri) {
         setBt((previous) =>
           previous
             ? {
                 ...previous,
+                enabled,
+                bluetoothOn: enabled ? true : previous.bluetoothOn,
                 autoConnectEnabled: enabled,
-                autoConnectState: enabled
-                  ? previous.autoConnectState === 'paused'
-                    ? 'waiting'
-                    : previous.autoConnectState
-                  : 'off',
+                autoConnectState: enabled ? 'waiting' : 'off',
+                activeDeviceId: enabled ? previous.activeDeviceId : null,
+                connected: enabled ? previous.connected : false,
+                streaming: enabled ? previous.streaming : false,
+                connectionState: enabled ? previous.connectionState : 'idle',
               }
             : previous,
         );
         return;
       }
       const finish = async (): Promise<BtAudioSnapshot> => {
-        const next = await btAudioSetAutoConnect(enabled);
-        // 重新打开自动连接时顺带解除「手动断开」造成的 paused（D-44 用户意图）
-        if (enabled && next.autoConnectState === 'paused') return btAudioResumeAuto();
-        return next;
+        if (!enabled) setPendingDisconnect(true);
+        try {
+          return await btAudioSetEnabled(enabled);
+        } finally {
+          setPendingDisconnect(false);
+        }
       };
       retryRef.current = () => {
         void runBluetoothAction(finish);
@@ -569,14 +583,6 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
     },
     [tauri, runBluetoothAction],
   );
-
-  const resumeAuto = useCallback(() => {
-    if (!tauri) {
-      setBt((previous) => (previous ? { ...previous, autoConnectState: 'waiting' } : previous));
-      return;
-    }
-    void runBluetoothAction(() => btAudioResumeAuto());
-  }, [tauri, runBluetoothAction]);
 
   const setPreferred = useCallback(
     (deviceId: string | null) => {
@@ -844,11 +850,11 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
               btError={btError}
               btBusy={btBusy}
               pendingDeviceId={pendingDeviceId}
+              pendingDisconnect={pendingDisconnect}
               onRetry={retry}
               onConnect={connectDevice}
               onDisconnect={disconnectDevice}
-              onSetAutoConnect={setAutoConnect}
-              onResumeAuto={resumeAuto}
+              onSetEnabled={setBluetoothSpeakerEnabled}
               onSetPreferred={setPreferred}
               onSetVolume={setVolume}
               onToggleMute={toggleMute}

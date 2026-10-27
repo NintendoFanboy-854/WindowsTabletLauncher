@@ -303,6 +303,18 @@ async fn bt_audio_set_bluetooth(
         .map_err(|err| format!("切换蓝牙失败: {err}"))
 }
 
+/// 蓝牙音箱总开关：开 = 开蓝牙 + 恢复寻找；关 = 断开 + 停止寻找（一动作联动）。
+#[tauri::command]
+async fn bt_audio_set_enabled(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+    enabled: bool,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.set_enabled(enabled))
+        .await
+        .map_err(|err| format!("切换蓝牙音箱失败: {err}"))
+}
+
 /// 自动连接开关（持久化到 app_data_dir/bt-audio.json）。
 #[tauri::command]
 async fn bt_audio_set_auto_connect(
@@ -466,6 +478,7 @@ pub fn run() {
             bt_audio_connect,
             bt_audio_disconnect,
             bt_audio_set_bluetooth,
+            bt_audio_set_enabled,
             bt_audio_set_auto_connect,
             bt_audio_set_preferred,
             bt_audio_resume_auto,

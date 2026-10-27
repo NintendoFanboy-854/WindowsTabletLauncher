@@ -83,8 +83,8 @@ const DEVICE_REFRESH_INTERVAL_WATCHER: Duration = Duration::from_secs(120);
 const DEVICE_REFRESH_INTERVAL_FALLBACK: Duration = Duration::from_secs(15);
 /// watcher 启动后等 EnumerationCompleted 的宽限；超时就自己做一次慢枚举兜底。
 const ENUMERATION_FALLBACK: Duration = Duration::from_secs(10);
-/// 无线电状态兜底轮询间隔（用户可能在 Windows 设置里开关蓝牙）。
-const RADIO_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+/// 无线电状态轮询间隔（要尽快反映用户在系统里开关蓝牙 → 停止/恢复寻找）。
+const RADIO_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
 /// 命令等待 worker 回传快照的上限（一轮多设备尝试可能跑几十秒）。
 const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(60);
 /// 退出应用时等系统蓝牙链路（ACL）真正断开的上限。
@@ -129,6 +129,8 @@ pub struct BtAudioSnapshot {
     pub connection_state: String,
     /// 最近一次非连接类失败原因（枚举/无线电；成功后清空）
     pub last_error: Option<String>,
+    /// 蓝牙音箱总开关（持久化，默认 true）：关 = 断开并停止寻找，开 = 开蓝牙并恢复寻找
+    pub enabled: bool,
     /// 自动连接是否开启（持久化，默认 true）
     pub auto_connect_enabled: bool,
     /// off | waiting | trying | listening | backoff | paused | unavailable
@@ -156,6 +158,7 @@ impl BtAudioSnapshot {
             streaming: false,
             connection_state: "idle".to_string(),
             last_error: None,
+            enabled: true,
             auto_connect_enabled: true,
             auto_connect_state: "unavailable".to_string(),
             attempt_device_id: None,
@@ -185,6 +188,9 @@ struct PersistedConfig {
     /// 退出清理时为断开 A2DP 链路关闭了蓝牙无线电；下次启动自动恢复打开。
     #[serde(default)]
     radio_off_by_exit: Option<bool>,
+    /// 蓝牙音箱总开关（默认 true）：关 = 断开并停止寻找，开 = 开蓝牙并恢复寻找。
+    #[serde(default)]
+    enabled: Option<bool>,
 }
 
 // ---------- 命令 / 事件 ----------
@@ -193,6 +199,7 @@ enum WorkerCommand {
     Refresh { reply: Sender<BtAudioSnapshot> },
     Connect { device_id: String, reply: Sender<BtAudioSnapshot> },
     Disconnect { reply: Sender<BtAudioSnapshot> },
+    SetEnabled { enabled: bool, reply: Sender<BtAudioSnapshot> },
     SetAutoConnect { enabled: bool, reply: Sender<BtAudioSnapshot> },
     SetPreferred { device_id: Option<String>, reply: Sender<BtAudioSnapshot> },
     ResumeAuto { reply: Sender<BtAudioSnapshot> },
@@ -303,6 +310,8 @@ struct Worker {
     bluetooth_on: Option<bool>,
     connection: Option<LiveConnection>,
     paused: bool,
+    /// 蓝牙音箱总开关（与 auto_enabled 不同：关 = 断开 + 停 watcher + 不寻找）
+    enabled: bool,
     auto_enabled: bool,
     attempt_device_id: Option<String>,
     last_attempt_error: Option<String>,
@@ -331,11 +340,13 @@ impl Worker {
             .unwrap_or_default();
         let now = Instant::now();
         let auto_enabled = config.auto_connect_enabled.unwrap_or(true);
+        let enabled = config.enabled.unwrap_or(true);
         let discovery_order = config.order.clone();
         Self {
             snapshot,
             notifier,
             persist_path,
+            enabled,
             auto_enabled,
             config,
             devices: Vec::new(),
@@ -414,6 +425,7 @@ impl Worker {
                 .unwrap_or(false),
             connection_state: self.connection_state(),
             last_error: self.last_error.clone(),
+            enabled: self.enabled,
             auto_connect_enabled: self.auto_enabled,
             auto_connect_state: self.auto_state().as_str().to_string(),
             attempt_device_id: self.attempt_device_id.clone(),
@@ -440,6 +452,7 @@ impl Worker {
             order: self.discovery_order.clone(),
             last_connected_at: self.config.last_connected_at.clone(),
             radio_off_by_exit: self.config.radio_off_by_exit,
+            enabled: Some(self.enabled),
         };
         let text = match serde_json::to_string_pretty(&persisted) {
             Ok(text) => text,
@@ -727,6 +740,32 @@ impl Worker {
                 self.bluetooth_supported = false;
                 self.bluetooth_on = None;
                 self.last_error = Some(format!("读取蓝牙状态失败: {failure}"));
+            }
+        }
+        // 系统蓝牙被关闭 → 停止寻找并清空设备（总开关开着也一样：没蓝牙就没什么可找）；
+        // 系统蓝牙重新打开且总开关是开的 → 恢复 watcher 与设备列表。一个状态联动全部。
+        if self.bluetooth_on == Some(false) {
+            if self.watcher.is_some() {
+                self.stop_watcher();
+            }
+            if !self.devices.is_empty() {
+                self.devices.clear();
+                self.enumeration_complete = false;
+            }
+            self.close_connection();
+            // 系统蓝牙被关 → 蓝牙音箱总开关跟着关（不寻找）；下次打开总开关会自动把蓝牙开回来。
+            if self.enabled {
+                self.enabled = false;
+                self.auto_enabled = false;
+                self.paused = true;
+                self.retry_at = None;
+                self.pending_priority_device = None;
+                self.persist();
+            }
+        } else if self.enabled && self.bluetooth_on == Some(true) && self.watcher.is_none() {
+            // watcher 的 Added 事件会补齐设备（毫秒级）；不做同步慢枚举，避免阻塞命令通道。
+            if let Err(failure) = self.start_watcher() {
+                self.last_error = Some(failure);
             }
         }
         self.next_radio_refresh_at = Instant::now() + RADIO_REFRESH_INTERVAL;
@@ -1071,6 +1110,10 @@ impl Worker {
                 self.manual_disconnect();
                 let _ = reply.send(self.snapshot());
             }
+            WorkerCommand::SetEnabled { enabled, reply } => {
+                self.set_enabled(enabled);
+                let _ = reply.send(self.snapshot());
+            }
             WorkerCommand::SetAutoConnect { enabled, reply } => {
                 self.auto_enabled = enabled;
                 self.persist();
@@ -1137,6 +1180,53 @@ impl Worker {
         self.publish();
     }
 
+    /// 蓝牙音箱总开关：一个动作联动「蓝牙无线电 / 断开 / watcher / 自动寻找」。
+    ///
+    /// - 关：断开当前连接 + 停 watcher（不再枚举/寻找）+ 关自动连接 + paused；
+    /// - 开：打开系统蓝牙（若关着）+ 重启 watcher + 开自动连接 + 解除 paused。
+    fn set_enabled(&mut self, enabled: bool) {
+        if enabled == self.enabled {
+            self.publish();
+            return;
+        }
+        self.enabled = enabled;
+        if enabled {
+            self.paused = false;
+            self.auto_enabled = true;
+            self.retry_at = None;
+            self.pending_priority_device = None;
+            // 先打开系统蓝牙，再刷新状态：否则 refresh_radio 的「系统蓝牙被关 → 总开关跟关」
+            // 联动会把刚打开的 enabled 又置回 false。
+            if self.bluetooth_on != Some(true) {
+                self.last_error = self.set_radio(true);
+            }
+            self.refresh_radio();
+            if self.watcher.is_none() && self.bluetooth_on != Some(false) {
+                if let Err(failure) = self.start_watcher() {
+                    self.last_error = Some(failure);
+                }
+            }
+            // 设备枚举由 refresh_radio 的联动路径负责（避免重复慢枚举）。
+            log::info!(
+                "蓝牙音箱总开关: 开 (bluetooth_on={:?} devices={})",
+                self.bluetooth_on,
+                self.devices.len()
+            );
+        } else {
+            self.paused = true;
+            self.auto_enabled = false;
+            self.retry_at = None;
+            self.pending_priority_device = None;
+            self.close_connection();
+            self.stop_watcher();
+            self.devices.clear();
+            self.enumeration_complete = false;
+            log::info!("蓝牙音箱总开关: 关（断开并停止寻找）");
+        }
+        self.persist();
+        self.publish();
+    }
+
     // ----- 主循环 -----
 
     fn initialize(&mut self) {
@@ -1150,8 +1240,15 @@ impl Worker {
             self.config.radio_off_by_exit = None;
             self.persist();
         }
-        if let Err(failure) = self.start_watcher() {
-            self.last_error = Some(failure);
+        // 总开关关闭时不做设备监听（「不用再寻找」），只保留无线电轮询。
+        if self.enabled {
+            if let Err(failure) = self.start_watcher() {
+                self.last_error = Some(failure);
+            }
+        } else if let Ok(selector) = AudioPlaybackConnection::GetDeviceSelector() {
+            // 关闭状态不启动 watcher，但仍要报告「本机具备 A2DP Sink 能力」，
+            // 否则面板会显示"没有找到可用的蓝牙适配器"并禁用总开关（用户无法再打开）。
+            self.available = !selector.is_empty();
         }
         // 无线电枚举很快（本机约 50ms），先把它和「能力可用」发布出去，
         // 前端首帧就能看到真实开关状态，而不是 unavailable。
@@ -1159,7 +1256,7 @@ impl Worker {
         self.publish();
         // 设备列表优先靠 watcher 的 Added 事件补（毫秒级）；只有 watcher 起不来时
         // 才立刻做一次慢枚举（本机实测 FindAllAsync 每次 5–8s）兜底。
-        if self.watcher.is_none() {
+        if self.enabled && self.watcher.is_none() {
             self.refresh_devices();
             self.enumeration_complete = true;
         }
@@ -1180,6 +1277,15 @@ impl Worker {
 
     fn tick(&mut self) {
         let now = Instant::now();
+        // 总开关关闭：只保留无线电状态轮询（面板要显示「蓝牙已关闭」），
+        // 不再枚举设备、不再自动连接——「不用再寻找」。
+        if !self.enabled {
+            if now >= self.next_radio_refresh_at {
+                self.refresh_radio();
+                self.publish();
+            }
+            return;
+        }
         if self.connection.is_some() {
             self.poll_connection_state();
         }
@@ -1197,7 +1303,7 @@ impl Worker {
             self.refresh_radio();
             self.publish();
         }
-        if self.connection.is_none() && self.auto_enabled && !self.paused {
+        if self.connection.is_none() && self.enabled && self.auto_enabled && !self.paused {
             self.drive_auto();
         }
     }
@@ -1538,6 +1644,11 @@ impl BtAudioManager {
     /// 手动断开：进入 paused，直到手动连接成功或 resume_auto。
     pub fn disconnect(&self) -> BtAudioSnapshot {
         self.request(|reply| WorkerSignal::Command(WorkerCommand::Disconnect { reply }))
+    }
+
+    /// 蓝牙音箱总开关：开联动开蓝牙 + 寻找；关联动断开 + 停止寻找。
+    pub fn set_enabled(&self, enabled: bool) -> BtAudioSnapshot {
+        self.request(move |reply| WorkerSignal::Command(WorkerCommand::SetEnabled { enabled, reply }))
     }
 
     pub fn set_bluetooth(&self, on: bool) -> BtAudioSnapshot {

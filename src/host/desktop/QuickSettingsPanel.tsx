@@ -16,6 +16,7 @@ import type { CSSProperties, ReactNode, Ref } from 'react';
 import {
   Button,
   Slider,
+  Spinner,
   Switch,
   Text,
   makeStyles,
@@ -232,6 +233,19 @@ const useStyles = makeStyles({
     fontVariantNumeric: 'tabular-nums',
     color: tokens.colorNeutralForeground2,
   },
+  /** 设备行右侧状态（转圈 + 文案）：与数值列同宽口径，保证多行状态右缘对齐 */
+  deviceStatus: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalXS,
+    minWidth: `calc(${tokens.spacingHorizontalXXL} * 2)`,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  mutedStatus: {
+    color: tokens.colorNeutralForeground3,
+  },
   linkRow: {
     display: 'flex',
     alignItems: 'center',
@@ -300,13 +314,15 @@ export interface QuickSettingsPanelProps {
   btError: boolean;
   /** 蓝牙命令进行中：全部蓝牙控件禁用 */
   btBusy: boolean;
-  /** 正在手动连接的设备 id（行内显示「连接中…」） */
+  /** 正在手动连接的设备 id（行内显示「正在连接…」） */
   pendingDeviceId: string | null;
+  /** 手动断开 / 关闭蓝牙音箱进行中（行内显示「正在断开…」+ 转圈） */
+  pendingDisconnect: boolean;
   onRetry: () => void;
   onConnect: (deviceId: string) => void;
   onDisconnect: () => void;
-  onSetAutoConnect: (enabled: boolean) => void;
-  onResumeAuto: () => void;
+  /** 面板顶部的「蓝牙音箱」总开关：开 = 自动接收，关 = 断开并暂停 */
+  onSetEnabled: (enabled: boolean) => void;
   onSetPreferred: (deviceId: string | null) => void;
   onSetVolume: (percent: number) => void;
   onToggleMute: () => void;
@@ -323,11 +339,11 @@ export function QuickSettingsPanel({
   btError,
   btBusy,
   pendingDeviceId,
+  pendingDisconnect,
   onRetry,
   onConnect,
   onDisconnect,
-  onSetAutoConnect,
-  onResumeAuto,
+  onSetEnabled,
   onSetPreferred,
   onSetVolume,
   onToggleMute,
@@ -349,7 +365,14 @@ export function QuickSettingsPanel({
   const bluetoothReady = Boolean(bt && bt.available && bt.bluetoothOn !== false);
   const bluetoothBusy = btBusy || !bluetoothReady;
   const muted = status?.muted === true;
-  const paused = bt?.autoConnectState === 'paused';
+  /**
+   * 顶部开关是「蓝牙音箱」总开关，不是自动连接偏好：
+   * 开 = 开蓝牙 + 寻找 + 自动接收；关 = 断开当前连接并停止寻找（后端 bt_audio_set_enabled 联动）。
+   * 系统蓝牙被关掉时后端会把 enabled 置 false，开关跟着关。
+   */
+  const btEnabled = Boolean(
+    bt && bt.available && bt.bluetoothOn !== false && (bt.enabled ?? (bt.autoConnectEnabled && bt.autoConnectState !== 'paused')),
+  );
   const connected = bt?.connected === true;
   const errorText = btErrorText(bt?.lastAttemptError ?? bt?.lastError ?? null);
 
@@ -374,21 +397,23 @@ export function QuickSettingsPanel({
           <Text size={300} weight="semibold" className={styles.title}>
             蓝牙音箱
           </Text>
+          {btBusy ? <Spinner size="extra-tiny" aria-label="蓝牙操作进行中" /> : null}
           <Switch
-            aria-label="自动连接"
-            checked={bt.autoConnectEnabled === true}
-            disabled={bluetoothBusy}
-            onChange={(_event, data) => onSetAutoConnect(data.checked)}
+            aria-label="蓝牙音箱"
+            checked={btEnabled}
+            /** 蓝牙关闭时仍可点：打开总开关会先打开蓝牙再恢复接收（见 onSetEnabled） */
+            disabled={btBusy || !bt.available}
+            onChange={(_event, data) => onSetEnabled(data.checked)}
           />
         </div>
 
-        {devices.length === 0 ? (
+        {devices.length === 0 || bt.enabled === false ? (
           <div className={styles.row}>
             <Text size={200} className={styles.hint}>
               {!bt.available
                 ? '没有找到可用的蓝牙适配器'
-                : bt.bluetoothOn === false
-                  ? '蓝牙已关闭'
+                : bt.enabled === false || bt.bluetoothOn === false
+                  ? '蓝牙音箱已关闭'
                   : '还没有配对的设备'}
             </Text>
             <Button appearance="transparent" className={styles.textButton} onClick={onOpenWindowsBluetooth}>
@@ -401,16 +426,23 @@ export function QuickSettingsPanel({
             const deviceConnected = active && bt.connected;
             const deviceStreaming = active && bt.streaming;
             const preferred = bt.preferredDeviceId === device.id;
-            const connecting = pendingDeviceId === device.id;
-            const statusText = active
-              ? deviceConnected
-                ? deviceStreaming
-                  ? '接收中'
-                  : '已连接'
-                : '已断开'
+            const connecting =
+              pendingDeviceId === device.id ||
+              (bt.autoConnectState === 'trying' && bt.attemptDeviceId === device.id);
+            const disconnecting = pendingDisconnect && active;
+            // 状态优先级：正在断开 > 正在连接 > 接收中/已连接 > 等待重试 > 未连接
+            const statusText = disconnecting
+              ? '正在断开…'
               : connecting
-                ? '连接中…'
-                : '未连接';
+                ? '正在连接…'
+                : deviceConnected
+                  ? deviceStreaming
+                    ? '接收中'
+                    : '已连接'
+                  : bt.autoConnectState === 'backoff' && bt.attemptDeviceId === device.id
+                    ? '等待重试…'
+                    : '未连接';
+            const statusBusy = disconnecting || connecting;
             return (
               <div className={styles.row} key={device.id}>
                 <button
@@ -423,12 +455,17 @@ export function QuickSettingsPanel({
                   <Text size={200} className={styles.deviceName}>
                     {device.name}
                   </Text>
-                  <Text
-                    size={200}
-                    className={mergeClasses(styles.value, deviceConnected ? styles.success : undefined)}
-                  >
-                    {statusText}
-                  </Text>
+                  <span className={styles.deviceStatus}>
+                    {statusBusy ? <Spinner size="extra-tiny" /> : null}
+                    <Text
+                      size={200}
+                      className={mergeClasses(
+                        deviceConnected && !disconnecting ? styles.success : styles.mutedStatus,
+                      )}
+                    >
+                      {statusText}
+                    </Text>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -448,17 +485,6 @@ export function QuickSettingsPanel({
             );
           })
         )}
-
-        {paused ? (
-          <div className={styles.row}>
-            <Text size={200} className={styles.hint}>
-              自动连接已暂停
-            </Text>
-            <Button appearance="transparent" className={styles.textButton} onClick={onResumeAuto}>
-              恢复
-            </Button>
-          </div>
-        ) : null}
 
         {bt.autoConnectState === 'backoff' ? (
           <div className={styles.row}>
@@ -549,7 +575,7 @@ export function QuickSettingsPanel({
               disabled={btBusy}
               onClick={onDisconnect}
             >
-              断开
+              {pendingDisconnect ? '正在断开…' : '断开'}
             </Button>
           ) : null}
         </div>

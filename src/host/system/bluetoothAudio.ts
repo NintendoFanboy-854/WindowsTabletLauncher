@@ -48,6 +48,11 @@ export interface BtAudioSnapshot {
   connectionState: BtConnectionState;
   /** 最近一次失败原因 */
   lastError: string | null;
+  /**
+   * 蓝牙音箱总开关（v0.8.1）：关 = 断开并停止寻找，开 = 打开蓝牙并恢复寻找。
+   * 旧后端没有该字段时按 `autoConnectEnabled && autoConnectState !== 'paused'` 推断。
+   */
+  enabled?: boolean;
   /** 后台自动连接总开关（D-44） */
   autoConnectEnabled: boolean;
   /** 自动连接状态机（D-44） */
@@ -97,6 +102,10 @@ export const btAudioConnect = (deviceId: string) =>
   invokeCommand<BtAudioSnapshot>('bt_audio_connect', { deviceId });
 
 export const btAudioDisconnect = () => invokeCommand<BtAudioSnapshot>('bt_audio_disconnect');
+
+/** 蓝牙音箱总开关：开 = 开蓝牙 + 恢复寻找；关 = 断开 + 停止寻找。 */
+export const btAudioSetEnabled = (enabled: boolean) =>
+  invokeCommand<BtAudioSnapshot>('bt_audio_set_enabled', { enabled });
 
 export const btAudioSetBluetooth = (on: boolean) =>
   invokeCommand<BtAudioSnapshot>('bt_audio_set_bluetooth', { on });
