@@ -117,6 +117,24 @@ const useStyles = makeStyles({
     flexShrink: 0,
     color: tokens.colorNeutralForeground2,
   },
+  /**
+   * 行首图标槽：44×44（与静音按钮同宽），图标在槽内居中。
+   * 音量行是「可点的静音按钮」、亮度行是「纯图标」——如果两者占位不同（44 vs 20），
+   * 滑杆左缘会差 24px，整块控制区看起来严重没对齐（真机回归）。
+   */
+  /**
+   * 行首图标槽：布局宽 20（图标本身宽），高 44 保持触控行高。
+   * 音量行是「可点的静音按钮」、亮度行是「纯图标」——两行必须共用同样的行首占位，
+   * 否则图标/滑杆左缘会错位（真机回归：图标差 12px、滑杆起点差 24px）。
+   */
+  rowIconSlot: {
+    flexShrink: 0,
+    width: '20px',
+    height: TOUCH_TARGET_CSS,
+    display: 'grid',
+    placeItems: 'center',
+    color: tokens.colorNeutralForeground2,
+  },
   /** 设备行：主按钮（连接）+ 独立 star 按钮；两个 44 命中区不嵌套 */
   deviceMain: {
     appearance: 'none',
@@ -171,9 +189,37 @@ const useStyles = makeStyles({
   },
   starOn: { color: tokens.colorBrandForeground1 },
   iconButton: {
+    appearance: 'none',
+    position: 'relative',
     flexShrink: 0,
-    minWidth: TOUCH_TARGET_CSS,
-    minHeight: TOUCH_TARGET_CSS,
+    // 布局宽 = 图标 20（与 rowIconSlot 一致），44×44 命中区由伪元素外扩，不占布局宽度
+    width: '20px',
+    height: TOUCH_TARGET_CSS,
+    display: 'grid',
+    placeItems: 'center',
+    margin: 0,
+    padding: 0,
+    border: 0,
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: 'transparent',
+    color: tokens.colorNeutralForeground2,
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorSubtleBackgroundHover },
+    ':active': { backgroundColor: tokens.colorSubtleBackgroundPressed },
+    ':focus-visible': {
+      outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
+      outlineOffset: tokens.strokeWidthThin,
+    },
+    ':disabled': { cursor: 'default', backgroundColor: 'transparent', color: tokens.colorNeutralForegroundDisabled },
+    '::after': {
+      content: "''",
+      position: 'absolute',
+      left: `-${tokens.spacingHorizontalM}`,
+      right: `-${tokens.spacingHorizontalM}`,
+      top: '50%',
+      height: TOUCH_TARGET_CSS,
+      transform: 'translateY(-50%)',
+    },
   },
   slider: {
     flex: 1,
@@ -432,14 +478,15 @@ export function QuickSettingsPanel({
 
         {status?.volumePercent != null ? (
           <div className={styles.row}>
-            <Button
-              appearance="transparent"
+            <button
+              type="button"
               className={styles.iconButton}
               aria-label={muted ? '取消静音' : '静音'}
-              icon={muted ? <SpeakerMute20Regular /> : <Speaker220Regular />}
               disabled={bt === null}
               onClick={onToggleMute}
-            />
+            >
+              {muted ? <SpeakerMute20Regular aria-hidden="true" /> : <Speaker220Regular aria-hidden="true" />}
+            </button>
             <Slider
               className={styles.slider}
               min={0}
@@ -456,7 +503,9 @@ export function QuickSettingsPanel({
 
         {status?.brightnessPercent != null ? (
           <div className={styles.row}>
-            <WeatherSunny20Regular aria-hidden="true" className={styles.rowIcon} />
+            <span className={styles.rowIconSlot}>
+              <WeatherSunny20Regular aria-hidden="true" />
+            </span>
             <Slider
               className={styles.slider}
               min={0}
@@ -473,7 +522,9 @@ export function QuickSettingsPanel({
 
         {status?.autoBrightnessSupported === true ? (
           <div className={styles.row}>
-            <WeatherSunny20Regular aria-hidden="true" className={styles.rowIcon} />
+            <span className={styles.rowIconSlot}>
+              <WeatherSunny20Regular aria-hidden="true" />
+            </span>
             <Text size={200} className={styles.hint}>
               自动亮度
             </Text>

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.8.0"
+version = "0.8.1"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -38,6 +38,7 @@ windows-future = "0.3"
 windows = { version = "0.62", features = [
   "Devices_Geolocation",              # Windows Geolocator
   "Devices_Enumeration",              # DeviceInformation / DeviceWatcher（蓝牙音频设备枚举与事件）
+  "Devices_Bluetooth",                # BluetoothDevice.ConnectionStatus（退出时等 A2DP 链路真正断开）
   "Devices_Radios",                   # 蓝牙无线电开关
   "Devices_Sensors",                  # LightSensor.GetDefault（自动亮度能力检测）
   "Media_Audio",                      # AudioPlaybackConnection（A2DP Sink）

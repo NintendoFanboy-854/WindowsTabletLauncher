@@ -26,12 +26,35 @@ mod window;
 mod zip;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::Manager;
 use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 type CmdResult<T> = Result<T, String>;
+
+/// 退出链路专用同步日志（append 到 `%TEMP%\wtsl-exit-trace.log`）。
+///
+/// `tauri-plugin-log` 的写入在进程快速退出时可能来不及落盘（实测退出日志停在
+/// 「应用退出，停止蓝牙音频 worker」），这个函数每次 open/write/flush，用来还原
+/// CloseRequested → shutdown → 进程退出 的时间线。
+pub(crate) fn exit_trace(message: impl AsRef<str>) {
+    use std::io::Write;
+    let path = std::env::temp_dir().join("wtsl-exit-trace.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0);
+        let _ = writeln!(file, "{millis} {}", message.as_ref());
+        let _ = file.flush();
+    }
+}
 
 // ---------- 窗口 ----------
 
@@ -57,15 +80,19 @@ fn app_exit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-/// 隐藏/显示主窗口，返回切换后的可见状态（全局快捷键与外壳共用）
+/// 隐藏/显示主窗口，返回切换后的可见状态（全局快捷键与外壳共用）。
+///
+/// 隐藏 ≠ 退出：只隐藏窗口，蓝牙音频 worker 与 A2DP 连接保持不变（用户要后台继续接收音频）。
 fn toggle_visible(window: &tauri::WebviewWindow) -> CmdResult<bool> {
     let visible = window.is_visible().map_err(|err| err.to_string())?;
     if visible {
         window.hide().map_err(|err| err.to_string())?;
+        log::info!("主窗口已隐藏（应用与蓝牙音频连接保持运行）");
         Ok(false)
     } else {
         window.show().map_err(|err| err.to_string())?;
         window.set_focus().map_err(|err| err.to_string())?;
+        log::info!("主窗口已显示");
         Ok(true)
     }
 }
@@ -383,13 +410,13 @@ pub fn run() {
             protocol::handle(ctx.app_handle(), &request).map(std::borrow::Cow::Owned)
         })
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // 日志：debug/release 都装（release 默认写 OS 日志目录 + stdout）。
+            // 安装版没有控制台，蓝牙退出链路这类偶发问题只能靠日志文件回溯。
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
             let state = plugins::PluginState::resolve(app.handle()).map_err(
                 |err| -> Box<dyn std::error::Error> { Box::new(std::io::Error::other(err)) },
             )?;
@@ -459,14 +486,66 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // 退出时显式收敛蓝牙音频 worker（RunEvent::Exit）：停 watcher、撤销事件回调、
-    // 关闭连接、落盘配置；worker join 完成后进程才真正退出。
-    app.run(|app_handle, event| {
-        if let tauri::RunEvent::Exit = event {
-            if let Some(manager) = app_handle.try_state::<BtAudioManagerHandle>() {
-                log::info!("应用退出，停止蓝牙音频 worker");
-                manager.shutdown();
+    // 退出路径（v0.8.1 真机回归）：
+    // - 直接点窗口关闭时，Tauri 会先销毁 WebView2 / 停事件循环；若在 RunEvent::Exit 里才调
+    //   `AudioPlaybackConnection.Close()`，WinRT 同步调用会卡在正在拆除的 COM 环境里
+    //   （实测：进程 10s 后被系统结束，日志停在「应用退出」前一行，手机仍显示已连接）。
+    // - 因此在 CloseRequested 时先拦住关闭、隐藏窗口，再在后台线程里做蓝牙清理，
+    //   完成后才真正退出；Exit 回调只做兜底（注销/关机等路径）。
+    app.run(|app_handle, event| match event {
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::CloseRequested { api, .. },
+            ..
+        } => {
+            exit_trace("close-requested: prevent_close + hide");
+            api.prevent_close();
+            if let Some(window) = app_handle.get_webview_window(&label) {
+                let _ = window.hide();
             }
+            let handle = app_handle.clone();
+            std::thread::spawn(move || {
+                shutdown_bluetooth_audio(&handle);
+                handle.exit(0);
+            });
+            // 兜底：清理线程若被蓝牙栈卡住，也不能让「隐藏窗口 + 进程残留」挂死。
+            let fallback = app_handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(15));
+                exit_trace("fallback: 15s 强退");
+                fallback.exit(0);
+                std::process::exit(0);
+            });
         }
+        tauri::RunEvent::Exit => {
+            exit_trace("exit-event 兜底清理");
+            shutdown_bluetooth_audio(app_handle);
+        }
+        _ => {}
     });
+}
+
+/// 蓝牙退出清理只执行一次：窗口关闭时后台线程做，Exit 回调兜底。
+static BLUETOOTH_SHUTDOWN_DONE: AtomicBool = AtomicBool::new(false);
+
+/// 收敛蓝牙音频 worker：停 watcher、关连接并等系统蓝牙链路断开、落盘配置。
+/// 重复调用安全（只执行一次）。
+fn shutdown_bluetooth_audio(app: &tauri::AppHandle) {
+    if BLUETOOTH_SHUTDOWN_DONE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let started = std::time::Instant::now();
+    exit_trace("shutdown-start");
+    match app.try_state::<BtAudioManagerHandle>() {
+        Some(manager) => {
+            log::info!("应用退出，停止蓝牙音频 worker");
+            manager.shutdown();
+            log::info!("蓝牙音频 worker 已停止，退出清理耗时 {:?}", started.elapsed());
+            exit_trace(format!("shutdown-done {:?}", started.elapsed()));
+        }
+        None => {
+            log::warn!("应用退出时找不到蓝牙音频 managed state，跳过清理");
+            exit_trace("shutdown-skip: no managed state");
+        }
+    }
 }

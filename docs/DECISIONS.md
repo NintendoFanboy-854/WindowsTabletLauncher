@@ -585,7 +585,7 @@
 - 背景：用户在看完多版 P0 后明确交互：非欣赏态说明条只应整条可按（无展开按钮）；进入欣赏壁纸后默认展开详情，并用「最小变形」把 chevron 拉出来；展开态文字区 = 退出欣赏、chevron = 折叠（语义不得混）；详情不重复说明条已有信息（标题/版权），只留日期/来源 + 说明；文字左轴 = 说明条内容左轴、右轴 = 箭头视觉右缘；日期只左对齐；说明条宽度不出现省略号（min 256，最大随文字动态变化）；刷新说明低频，移到设置页。
 - 决策：
   1. **结构**：非欣赏态一个按钮（无 chevron）；欣赏态渲染 chevron（20 图标 + 8 间距 + 右 8 padding，44×44 命中伪元素外扩）并默认展开；底部 pill 行保留（文字区 = 退出欣赏、chevron = 折叠）；退出欣赏自动收起、chevron 消失。
-  2. **宽度**：非欣赏 `max-content` + `min-width: 256`（8×XXXL）；不设固定上限、不出现 ellipsis；极端超长换行兜底（H_p 实测自适应）。展开宽度只 **+28**（spacing 8 + 20 图标）；详情左右 padding 12，右轴按箭头图标**视觉**右缘（盒右 412 / 图标视觉右 ≈408，与正文右 408 同线）；日期/来源只左对齐；正文 `text-align: justify`（左右都贴内容带，最后一行左对齐）。
+  2. **宽度**：非欣赏 `max-content` + `min-width: 256`（8×XXXL）；不设固定上限、不出现 ellipsis；极端超长换行兜底（H_p 实测自适应）。展开宽度只 **+36**（gap 8 + 20 图标 + 行尾呼吸位 8；v0.8.1 修正为内容驱动，见 D-45）；详情左右 padding 12，右轴按箭头图标**视觉**右缘（盒右 412 / 图标视觉右 ≈408，与正文右 408 同线）；日期/来源只左对齐；正文 `text-align: justify`（左右都贴内容带，最后一行左对齐）。
   3. **展开是浮层**：H_p 恒 26（只测底部 pill 行 `offsetHeight`），网格/入口/状态栏不动；展开 250 / 收起 150、reduced-motion 只淡入；点外部/Esc 收起（不退出欣赏）；与状态栏面板互斥。
   4. **刷新迁移**：移除旧 noteRow /「重新生成说明」按钮；说明刷新移到设置 → 外观 → 壁纸「说明」行（打开设置页只读缓存状态，点刷新才 force 一次；固定模式选图后目标随之切换）。
 - 否掉：非欣赏态保留展开按钮（语义冲突）；展开卡固定 420 / 无 min-width；正文左对齐（右侧参差，用户肉眼判不齐）；桌面放刷新按钮。
@@ -616,3 +616,48 @@
   6. 仍不做配对（延续 D-39）；媒体控制后置。
 - 文档落点：DESIGN §8、README、D-39 修订、Agent 工具字段（btAudio.status/devices 透传新字段）。
 - 实现/验证：`cargo check --lib` 通过；真机连接/自动重连/首选回退场景见发布验证。
+
+## D-45 说明条真机回归修复：宽度累积 / chevron 点击失效 / 行尾呼吸位 / 背景层缩放（2026-10-28，v0.8.1）
+
+- 背景：v0.8.0 真机回归发现四个问题：① 反复进出欣赏后说明条越来越长；② 欣赏态点 chevron 展开时常无效；③ 非欣赏态左右 padding 不对称（右侧多 8）；④ 展开/收起与 hover 的整体缩放不自然。用户另指出展开态 chevron 右侧没有 spacing、紧贴圆角边很难看。
+- 根因（CDP 多轮复现实测，非猜测）：
+  1. 宽度累积：`baseWidth` 在退出欣赏的 layout effect 里量 `shell.offsetWidth`，此时 width 过渡（baseWidth+28 → baseWidth）还没结束，读到的仍是旧宽度 → 每进出一次 +28。
+  2. chevron 失效：`noteShell` 的 `:active { transform: scale(0.98) }` 让按下后的按钮几何收缩，chevron 从指针下移开，release 落在按钮外 → click 派发到共同祖先（creditStack），React `onClick` 收不到；CDP 事件日志显示 pointerdown target=svg、click target=DIV。
+  3. 左右不对称：`noteRow` 的 `paddingRight: 8`（给 chevron 的呼吸位）在非欣赏态也生效。
+  4. 动效：整壳 width/height 做 layout 过渡，文字逐帧重排（拉伸感）；height 在 auto↔px 间无法补间（瞬跳）；缩放把文字一起放大（发虚）。
+- 决策：
+  1. **宽度内容驱动**：删除 baseWidth/detailHeight 测量与显式 width/height；非欣赏 = main（padding 16/16）；欣赏 = main + gap 8 + chevron 20 + `noteRowGallery` paddingRight 8 → 只向右 +36；删除 ResizeObserver。
+  2. **命中稳定且内容跟随缩放**：hover 1.02 作用在**整壳**（文字/图标一起放大，与 widget 卡统一）；pressed 不缩放（`:active` 只加深背景）——按下时几何收缩会让 chevron 从指针下移开、click 被派发到祖先；展开态不做 hover 缩放。
+  3. **展开 morph**：`grid-template-rows: 0fr → 1fr` 补间高度（不再测量 detail 高度），详情内容随 wrap opacity 淡入；不补间 width/height。
+  4. **行尾呼吸位**：仅欣赏态给 `noteRow` 加 8 paddingRight；非欣赏态左右 padding 对称。
+  5. **层级**：材质伪元素 z-index 0，noteRow / noteDetailWrap 抬到 z-index 1（否则 backdrop-filter 的半透明面盖住详情文字——截图表现为「内容在、视觉空白」）。
+  6. **详情宽度锁定**（v0.8.1 二次修正）：`noteDetailWrap` 用 `width: 0; min-width: 100%`，让长正文不参与 shell 的 max-content 计算——否则真机 AI 说明（一段长文本）会把展开卡撑到近全屏、正文不换行。
+- 否掉：继续用测量宽度 + 固定 +28（脆弱且与内容耦合）；整壳 scale 换 `transform-origin` 规避（命中漂移仍在）；用 max-height 补间高度（内容动态时需要魔法数）。
+- 文档落点：MOTION §5.2、DECISIONS D-42 修订、`WallpaperLayer.tsx` 头注释。
+- 实现/验证：`npm run typecheck` 通过；CDP 多轮「进入 → 折叠 → 退出」宽度恒定（263 ↔ 299）；chevron 每轮点击有效；非欣赏左右对称；展开态详情可见（日期 + 说明/Spinner）；真机安装验证见发布记录。
+
+## D-46 蓝牙退出清理：窗口关闭时后台断开、关无线电让 iPhone 真正断开（2026-10-28，v0.8.1）
+
+- 背景：用户反馈「退出应用后手机仍显示已连接」。真机实测（v0.8.1 安装版，自动连接 iPhone 后点窗口关闭）：进程 10.2s 后才消失（系统按无响应结束），日志只写到「应用退出，停止蓝牙音频 worker」。加同步 trace（`%TEMP%\wtsl-exit-trace.log`）后定位到两件事：
+  1. 在 `RunEvent::Exit` 阶段（WebView2 与事件循环已在拆除）调用 `Close()` 会卡死，后续日志全部丢失；改成 `CloseRequested` 时先隐藏窗口、后台线程清理后才退出。
+  2. 修掉时序后，`Close()` 约 0.6–0.9s 返回成功，但 `BluetoothDevice.ConnectionStatus` 在 2/4/…/14s 全部是 `Connected`——**`AudioPlaybackConnection.Close()` 只释放应用侧，iPhone/Windows 的 ACL 链路不会因此自动断开**（手机端因此一直显示已连接）。`State()` 在 Close 后访问也会同步卡死（trace 停在 Close 返回后），已删除该轮询。
+- 决策：
+  1. 拦截 `WindowEvent::CloseRequested`：`api.prevent_close()` + 隐藏主窗口（用户立即看到窗口消失），后台线程清理，完成后 `app.exit(0)`；15s 兜底强退；`RunEvent::Exit` 只兜底（`AtomicBool` 只执行一次）。
+  2. 清理顺序：停 watcher → `Close()`（不轮询 State）→ **若有活动连接则关闭蓝牙无线电**（`Radio.SetStateAsync(Off)`，强制断开 ACL）→ 等 `ConnectionStatus == Disconnected`（≤5s）→ 落盘配置。
+  3. `bt-audio.json` 增加 `radioOffByExit`：退出关无线电前写入；下次启动 `initialize` 恢复打开并清标记（用户不会遇到「蓝牙无缘无故被关」）。只在与手机有活动连接时关无线电，普通退出不动蓝牙。
+  4. release 也启用 `tauri-plugin-log`（默认写 `%LOCALAPPDATA%\com.huanchen.windows-tablet-launcher\logs`），这类退出链路问题只能靠文件日志回溯。
+- 否掉：继续在 Exit 回调里同步 Close（COM 环境已拆除，必卡）；只 Close 等待系统自然断开（实测 14s+ 不断，手机一直显示已连接）；禁用手机 BTHENUM 设备实例（需管理员权限，且会把设备留在禁用状态）；退出不等待直接 `std::process::exit`（音频流关闭但 ACL 仍连接）。
+- 文档落点：D-46、MOTION §5.2 无关、`lib.rs` / `bluetooth_audio.rs` 注释、发布说明。
+- 实现/验证：`cargo check --lib` 通过；trace 确认 Close 不再卡、关闭耗时收敛到 ~1s + ACL 等待；手机端断开与启动自动恢复待本轮安装复测后回填。
+
+## D-47 快速设置面板行首对齐：图标与滑杆共用 20 宽行首（2026-10-28，v0.8.1）
+
+- 背景：真机截图显示面板「声音」行与「亮度」行明显错位——音量行行首是 44×44 静音按钮、亮度行行首是 20 宽裸图标，导致滑杆起点差 24、图标中心差 12；设备行图标（裸 20）又与音量行对不齐。
+- 决策：所有行的行首占位统一为 **20 宽（图标本身宽）× 44 高**：
+  - 音量行的静音按钮改为 20 宽布局盒，44×44 命中区由 `::after` 外扩（不占布局，与说明条 chevron 同口径）；
+  - 亮度 / 自动亮度行的图标槽 `rowIconSlot` 改为 20 宽、`placeItems: center`；
+  - 设备行 Phone 图标本就是裸 20，保持不变。
+  这样行首图标左缘 = 面板内容左缘（与标题同轴），滑杆起点 = 行首 + 20 + gap 8 = +28，所有行一致。
+- 否掉：行首统一 44 槽（图标中心距行首 22，会与标题/链接文字左缘差 12，肉眼仍不齐）。
+- 文档落点：D-47、`QuickSettingsPanel.tsx` 注释。
+- 实现/验证：`npm run typecheck` 通过；真机截图待本轮安装复测。

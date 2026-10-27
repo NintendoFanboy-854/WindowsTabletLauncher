@@ -44,16 +44,17 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use windows::Devices::Bluetooth::{BluetoothConnectionStatus, BluetoothDevice};
 use windows::Devices::Enumeration::{DeviceInformation, DeviceWatcher, DeviceWatcherStatus};
 use windows::Devices::Radios::{Radio, RadioAccessStatus, RadioKind, RadioState};
 use windows::Foundation::TypedEventHandler;
-use windows_future::AsyncStatus;
 use windows::Media::Audio::{
     AudioPlaybackConnection, AudioPlaybackConnectionOpenResultStatus,
     AudioPlaybackConnectionState,
 };
 use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
 use windows::core::{HSTRING, IInspectable};
+use windows_future::AsyncStatus;
 
 // ---------- 行为常量（不是设计 token，是状态机参数） ----------
 
@@ -86,6 +87,17 @@ const ENUMERATION_FALLBACK: Duration = Duration::from_secs(10);
 const RADIO_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 /// 命令等待 worker 回传快照的上限（一轮多设备尝试可能跑几十秒）。
 const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(60);
+/// 退出应用时等系统蓝牙链路（ACL）真正断开的上限。
+///
+/// 真机实测（v0.8.1，iPhone A2DP Sink）：`AudioPlaybackConnection.Close()` 只释放应用侧，
+/// Windows/iPhone 的 ACL 链路不会因此自动断开（trace 实测 14s+ 仍是 Connected）。
+/// 所以退出清理会先关闭蓝牙无线电（见 `shutdown`），再等 `ConnectionStatus` 变为
+/// Disconnected；5s 是关闭无线电后确认链路已断的兜底上限。
+const SHUTDOWN_TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+/// 等链路断开时的轮询间隔。
+const TEARDOWN_POLL: Duration = Duration::from_millis(150);
+/// 设备 id 里解析不出蓝牙地址时的固定等待（给传输层留释放时间）。
+const FALLBACK_CLOSE_SETTLE: Duration = Duration::from_secs(2);
 
 // ---------- 前端快照 ----------
 
@@ -170,6 +182,9 @@ struct PersistedConfig {
     /// 设备 id → 最近一次连接成功的 unix 毫秒。
     #[serde(default)]
     last_connected_at: HashMap<String, u64>,
+    /// 退出清理时为断开 A2DP 链路关闭了蓝牙无线电；下次启动自动恢复打开。
+    #[serde(default)]
+    radio_off_by_exit: Option<bool>,
 }
 
 // ---------- 命令 / 事件 ----------
@@ -424,6 +439,7 @@ impl Worker {
             preferred_device_id: self.config.preferred_device_id.clone(),
             order: self.discovery_order.clone(),
             last_connected_at: self.config.last_connected_at.clone(),
+            radio_off_by_exit: self.config.radio_off_by_exit,
         };
         let text = match serde_json::to_string_pretty(&persisted) {
             Ok(text) => text,
@@ -722,7 +738,11 @@ impl Worker {
         self.publish();
     }
 
-    fn toggle_bluetooth(&mut self, on: bool) {
+    /// 打开/关闭蓝牙无线电；返回错误文案（None = 成功）。
+    ///
+    /// 退出清理与设置页开关共用：退出时为了让 iPhone 真正断开 ACL，会关闭无线电，
+    /// 下次启动 `initialize` 再恢复打开。
+    fn set_radio(&mut self, on: bool) -> Option<String> {
         let mut error: Option<String> = None;
         match Radio::GetRadiosAsync() {
             Ok(operation) => match await_operation(&operation, OPERATION_TIMEOUT) {
@@ -765,7 +785,11 @@ impl Worker {
             },
             Err(failure) => error = Some(format!("读取蓝牙状态失败: {failure}")),
         }
+        error
+    }
 
+    fn toggle_bluetooth(&mut self, on: bool) {
+        let error = self.set_radio(on);
         self.last_error = error;
         self.refresh_radio();
         // 打开蓝牙后立刻重新枚举一次，缩短「打开开关 → 列表出现设备」的等待。
@@ -785,13 +809,31 @@ impl Worker {
             && self.bluetooth_on != Some(false)
     }
 
+    /// 关闭当前连接：`Close()` 后等 WinRT 对象进入 Closed（最多 1s），并记录结果。
+    ///
+    /// 注意：State=Closed 只代表 WinRT 对象侧关闭；系统蓝牙链路（ACL）会再滞后 1–3s
+    /// 才真正断开。退出流程必须再用 [`wait_acl_disconnected`] 等链路掉线后才能结束进程。
     fn close_connection(&mut self) -> Option<String> {
         self.attempt_device_id = None;
         let live = self.connection.take()?;
+        crate::exit_trace(format!("close-connection-start device={}", live.device_id));
         if let Some(token) = live.state_token {
             let _ = live.connection.RemoveStateChanged(token);
         }
-        let _ = live.connection.Close();
+        crate::exit_trace("close-connection: RemoveStateChanged done");
+        let close_result = live.connection.Close();
+        let close_status = match &close_result {
+            Ok(()) => "ok".to_string(),
+            Err(error) => format!("err({error})"),
+        };
+        crate::exit_trace(format!("close-connection: Close() returned {close_status}"));
+        // v0.8.1 真机诊断：`Close()` 之后访问 `State()` 会在退出路径上同步卡死
+        // （trace 显示 Close 返回后既没有 State 结果、也没有后续 shutdown 步骤，
+        //  进程最终被系统结束）。Close 是同步释放，不再轮询 State。
+        log::info!(
+            "蓝牙音频关闭连接: device={} close={close_status}",
+            live.device_id
+        );
         Some(live.device_id)
     }
 
@@ -1098,6 +1140,16 @@ impl Worker {
     // ----- 主循环 -----
 
     fn initialize(&mut self) {
+        // 上次退出时为了断开手机连接关闭了蓝牙无线电：启动时恢复，避免用户以为蓝牙坏了。
+        if self.config.radio_off_by_exit == Some(true) {
+            let error = self.set_radio(true);
+            match error {
+                Some(failure) => log::warn!("恢复蓝牙无线电失败: {failure}"),
+                None => log::info!("已恢复上次退出时关闭的蓝牙无线电"),
+            }
+            self.config.radio_off_by_exit = None;
+            self.persist();
+        }
         if let Err(failure) = self.start_watcher() {
             self.last_error = Some(failure);
         }
@@ -1164,10 +1216,48 @@ impl Worker {
     }
 
     fn shutdown(&mut self) {
+        let active_device = self.connection.as_ref().map(|live| live.device_id.clone());
+        let shutdown_started = Instant::now();
+        crate::exit_trace("worker-shutdown-start");
         self.close_connection();
+        crate::exit_trace(format!("worker-shutdown: close_connection done {:?}", shutdown_started.elapsed()));
         self.stop_watcher();
+        crate::exit_trace(format!("worker-shutdown: stop_watcher done {:?}", shutdown_started.elapsed()));
+        // 关键：Close 只是应用侧释放；Windows 蓝牙栈的 A2DP 传输链路要晚 1–3s 才断。
+        // 进程若在这之前退出，手机会一直显示「已连接」，所以退出路径必须等链路断开。
+        if let Some(device_id) = active_device {
+            // 关闭连接只是应用侧释放：iPhone/Windows 的 ACL 链路不会因此自动断开
+            // （实测 Close 后 14s+ 仍是 Connected）。退出时为了让手机端真正显示断开，
+            // 关闭蓝牙无线电；下次启动 initialize 按 radioOffByExit 标记恢复打开。
+            let radio_error = self.set_radio(false);
+            crate::exit_trace(format!(
+                "worker-shutdown: radio-off error={radio_error:?}"
+            ));
+            if radio_error.is_none() {
+                self.config.radio_off_by_exit = Some(true);
+                self.persist();
+            }
+            let disconnect_started = Instant::now();
+            crate::exit_trace("worker-shutdown: wait-acl-start");
+            let disconnected = wait_acl_disconnected(&device_id, SHUTDOWN_TEARDOWN_TIMEOUT);
+            crate::exit_trace(format!(
+                "worker-shutdown: wait-acl-done disconnected={disconnected} wait={:?}",
+                disconnect_started.elapsed()
+            ));
+            log::info!(
+                "蓝牙音频退出清理: device={device_id} acl_disconnected={disconnected} wait={:?} total_shutdown={:?}",
+                disconnect_started.elapsed(),
+                shutdown_started.elapsed()
+            );
+        } else {
+            log::info!(
+                "蓝牙音频退出清理: 无活动连接 total_shutdown={:?}",
+                shutdown_started.elapsed()
+            );
+        }
         self.persist();
         self.publish();
+        crate::exit_trace(format!("worker-shutdown-done {:?}", shutdown_started.elapsed()));
     }
 }
 
@@ -1211,6 +1301,77 @@ fn await_operation<T: windows::core::RuntimeType + 'static>(
             Ok(_) => return Err("系统蓝牙调用返回未知状态".to_string()),
             Err(failure) => return Err(format!("读取系统蓝牙调用状态失败: {failure}")),
         }
+    }
+}
+
+/// 从 A2DP 设备 id 里解析蓝牙地址。
+///
+/// BTHENUM 设备 id 形如
+/// `\\?\BTHENUM#{0000110a-...}_VID&0001004c_PID&7510#7&105c378a&0&D468AA12EA33_C00000000#{...}\SNK`，
+/// 其中 `D468AA12EA33` 是手机蓝牙地址（12 位十六进制、后面跟 `_`）。
+fn parse_bluetooth_address(device_id: &str) -> Option<u64> {
+    let bytes = device_id.as_bytes();
+    let mut index = 0;
+    while index + 13 <= bytes.len() {
+        if device_id.is_char_boundary(index) && device_id.is_char_boundary(index + 13) {
+            let candidate = &device_id[index..index + 12];
+            let next = bytes[index + 12];
+            if next == b'_'
+                && candidate
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+            {
+                if let Ok(address) = u64::from_str_radix(candidate, 16) {
+                    return Some(address);
+                }
+            }
+        }
+        index += 1;
+    }
+    None
+}
+
+/// 查一次系统侧蓝牙链路状态（WinRT `BluetoothDevice.ConnectionStatus`）。
+fn device_acl_connected(address: u64) -> Option<bool> {
+    let operation = BluetoothDevice::FromBluetoothAddressAsync(address).ok()?;
+    let device = await_operation(&operation, Duration::from_secs(2)).ok()?;
+    device
+        .ConnectionStatus()
+        .ok()
+        .map(|status| status == BluetoothConnectionStatus::Connected)
+}
+
+/// 等系统蓝牙链路（ACL）真正断开，返回是否在超时内观察到 Disconnected。
+///
+/// Windows 的 A2DP Sink 释放是异步的：`AudioPlaybackConnection.Close()` 返回后，
+/// 手机侧的链路还要过一会儿才断；进程提前退出会把手机关联状态留在「已连接」。
+fn wait_acl_disconnected(device_id: &str, timeout: Duration) -> bool {
+    let Some(address) = parse_bluetooth_address(device_id) else {
+        // 解析不出地址（理论上不会发生）时退回固定等待，给传输层留出释放时间。
+        thread::sleep(FALLBACK_CLOSE_SETTLE);
+        return false;
+    };
+    let started = Instant::now();
+    let deadline = started + timeout;
+    let mut last_report = 0u64;
+    loop {
+        let connected = device_acl_connected(address);
+        let elapsed_secs = started.elapsed().as_secs();
+        if elapsed_secs >= last_report.saturating_add(2) {
+            crate::exit_trace(format!(
+                "wait-acl: {elapsed_secs}s connected={connected:?}"
+            ));
+            last_report = elapsed_secs;
+        }
+        if connected != Some(true) {
+            // None = 蓝牙已关/设备不可达（关闭无线电后 FromBluetoothAddressAsync 会失败），
+            // 与 Disconnected 等价：链路不可能还连着。
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        thread::sleep(TEARDOWN_POLL);
     }
 }
 

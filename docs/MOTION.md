@@ -129,11 +129,14 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 **说明条（A2）**：同一个胶囊容器在「非欣赏 pill」与「欣赏态展开卡」之间 morph——非欣赏态只有主体按钮（无 chevron）；
 进入欣赏后出现 chevron 并默认展开详情（日期/来源 + AI 说明；标题/版权只在底部 pill 行出现，不重复，
 正文两端对齐），底部 pill 行保留：文字区=退出欣赏、chevron=折叠。
-- 宽度只向右 **+28**（`spacingHorizontalS` 8 + chevron 图标 20；44×44 命中区由伪元素外扩，不参与布局宽度）；圆角 circular → 12、shadow4 → shadow16；
-  展开 250ms `durationGentle` + `curveDecelerateMid`，收起 150ms `durationFast` + `curveAccelerateMid`；详情内容淡入（无延迟渲染）；reduced-motion 只保留 100ms 淡入淡出、尺寸瞬变。
+- 宽度由内容决定（v0.8.1 起不再测量）：非欣赏 = 文字 + 左右 padding 16；欣赏 = 同一内容 + gap 8 + chevron 20 + 行尾呼吸位 8 = **只向右 +36**；
+  44×44 命中区由伪元素外扩，不参与布局宽度。圆角 circular → 12、shadow4 → shadow16。
+- 展开/收起只补间**高度**（`grid-template-rows: 0fr → 1fr`，250ms `durationGentle` + `curveDecelerateMid`；收起 150ms `durationFast` + `curveAccelerateMid`）
+  + 详情内容淡入；不对 width/height 做 layout 过渡（那是逐帧重排的「拉伸」感来源）。reduced-motion 只保留 100ms 淡入淡出、尺寸瞬变。
+- hover / pressed 与 §2 桌面表面状态机统一（**hover 1.02 是整壳缩放，文字一起放大**，与 widget 卡同语言）；
+  pressed 不缩放：几何收缩会让 chevron 从指针下移开、click 丢目标，按压反馈改为背景加深；展开态不做 hover 缩放。
 - 展开卡是浮层：`H_p` 恒 26，网格 / Agent 入口 / 状态栏不动；欣赏态展开时点外部或 Esc **收起**（不退出欣赏）。
 - 说明刷新不在桌面：设置页「外观 → 壁纸 → 说明」行（低频；打开设置页只读缓存状态，点「刷新说明」才 force 一次，**不自动生成**）。
-- hover / pressed 与 §2 桌面表面状态机统一（1.02 / 0.98）。
 
 ### 5.3 状态栏快速设置面板（v0.8.0，D-43）
 
