@@ -8,8 +8,20 @@
  */
 
 import type { AgentToolDecl, AgentTransport } from '../types';
+import {
+  btConnectTool,
+  btDevicesTool,
+  btDisconnectTool,
+  btStatusTool,
+} from '../../system/bluetoothTools';
 
-export const BUILTIN_TOOL_NAMES = ['system.time'] as const;
+export const BUILTIN_TOOL_NAMES = [
+  'system.time',
+  'btAudio.status',
+  'btAudio.devices',
+  'btAudio.connect',
+  'btAudio.disconnect',
+] as const;
 
 export interface ToolBinding {
   /** 模型看到的函数名（已转义） */
@@ -36,6 +48,46 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   {
     name: 'system.time',
     description: '获取当前日期、时间、星期和时区。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'btAudio.status',
+    description: '读取蓝牙音箱状态：蓝牙是否可用、当前连接或串流中的设备、最近错误。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'btAudio.devices',
+    description: '列出已配对、可用作音频接收的蓝牙设备。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'btAudio.connect',
+    description:
+      '把平板连接到蓝牙设备并开始接收手机音频。可用 deviceName 精确匹配设备；必须提供 deviceId 或 deviceName。',
+    parameters: {
+      type: 'object',
+      properties: {
+        deviceId: { type: 'string', description: '设备 id（优先于 deviceName）' },
+        deviceName: { type: 'string', description: '设备名称，精确匹配' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'btAudio.disconnect',
+    description: '断开当前蓝牙音频接收连接。',
     parameters: {
       type: 'object',
       properties: {},
@@ -165,6 +217,17 @@ export async function executeTool(
   switch (binding.originalName) {
     case 'system.time':
       return { result: readSystemTime() };
+    case 'btAudio.status':
+      return { result: await btStatusTool() };
+    case 'btAudio.devices':
+      return { result: await btDevicesTool() };
+    case 'btAudio.connect': {
+      const args =
+        rawArgs && typeof rawArgs === 'object' ? (rawArgs as Record<string, unknown>) : {};
+      return { result: await btConnectTool(args) };
+    }
+    case 'btAudio.disconnect':
+      return { result: await btDisconnectTool() };
     default:
       throw new Error(`未知内置工具：${binding.originalName}`);
   }

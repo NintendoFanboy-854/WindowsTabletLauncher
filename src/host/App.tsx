@@ -15,6 +15,7 @@ import type { HostBridge } from './bridge';
 import { AgentSurface } from './agent';
 import { applySeeds } from './bootstrap/seeds';
 import Desktop from './desktop/Desktop';
+import { StatusBar } from './desktop/StatusBar';
 import { WallpaperCredit, WallpaperLayer } from './desktop/WallpaperLayer';
 import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
@@ -285,6 +286,15 @@ function HostShell({
             onOpenAgent={openAgent}
           />
         </PageTransition>
+        {/* 桌面底部状态栏：与说明条 / Agent 入口同一条底部带（下缘共线），
+            隐藏时仍保留高度上报，避免网格随 gallery/编辑模式抖动 */}
+        <StatusBar
+          hidden={gallery || desktopEditing}
+          onOpenSettings={() => {
+            setAgentOpen(false);
+            openSettings();
+          }}
+        />
       </div>
 
       {page !== 'desktop' && <PageTransition key={page}>{pageContent}</PageTransition>}

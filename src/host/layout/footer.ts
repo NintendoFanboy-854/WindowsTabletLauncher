@@ -38,12 +38,29 @@ import { FOOTER_PILL_ESTIMATE } from './breakpoints';
 
 /** 当前生效的说明条高度（整数 px）；首帧为 token 推算的估计值 */
 let pillHeight = FOOTER_PILL_ESTIMATE;
+/**
+ * 桌面底部状态栏的高度（整数 px，0 = 没挂载/不显示）。
+ * 说明条与状态栏共用同一条底部带：`H_p = max(说明条, 状态栏)`，谁在就按谁保留高度。
+ * 这样隐藏说明条时，状态栏仍会把底部带撑住，网格不会被状态栏压住。
+ */
+let statusBarHeight = 0;
 
 const listeners = new Set<() => void>();
 
+function notifyIfChanged(previous: number) {
+  const next = Math.max(pillHeight, statusBarHeight);
+  if (next === previous) return;
+  for (const listener of [...listeners]) listener();
+}
+
+/** 当前生效的底部带高度 = max(说明条, 状态栏)；0 = 两者都没有 */
+function effectiveFooterHeight(): number {
+  return Math.max(pillHeight, statusBarHeight);
+}
+
 /** 读取当前值（不订阅）：供纯函数/工具函数与测试使用 */
 export function readFooterPillHeight(): number {
-  return pillHeight;
+  return effectiveFooterHeight();
 }
 
 /**
@@ -59,8 +76,24 @@ export function reportFooterPillHeight(measured: number): void {
   if (!Number.isFinite(measured) || measured < 0) return;
   const next = Math.round(measured);
   if (next === pillHeight) return;
+  const previous = effectiveFooterHeight();
   pillHeight = next;
-  for (const listener of [...listeners]) listener();
+  notifyIfChanged(previous);
+}
+
+/**
+ * 上报桌面状态栏的实测高度（border-box，px）。
+ *
+ * 与说明条共用同一条底部带：`H_p = max(pill, statusBar)`。状态栏挂载时上报实际高度，
+ * 卸载/隐藏时上报 0。它和说明条各自的实测值都取整、去重，不产生抖动。
+ */
+export function reportFooterStatusBarHeight(measured: number): void {
+  if (!Number.isFinite(measured) || measured < 0) return;
+  const next = Math.round(measured);
+  if (next === statusBarHeight) return;
+  const previous = effectiveFooterHeight();
+  statusBarHeight = next;
+  notifyIfChanged(previous);
 }
 
 /** 订阅高度变化（`useSyncExternalStore` 的 subscribe；返回退订函数） */
@@ -73,14 +106,16 @@ export function subscribeFooterPillHeight(listener: () => void): () => void {
 
 /** 复位到首帧估计值并通知：只在测试/报告脚本里用，产品代码不调用 */
 export function resetFooterPillHeight(): void {
-  if (pillHeight === FOOTER_PILL_ESTIMATE) return;
+  const previous = effectiveFooterHeight();
   pillHeight = FOOTER_PILL_ESTIMATE;
-  for (const listener of [...listeners]) listener();
+  statusBarHeight = 0;
+  notifyIfChanged(previous);
 }
 
 /**
- * 订阅说明条实测高度：任何需要 `layoutFrame(..., pillHeight)` 的组件都用它取 `H_p`。
+ * 订阅底部带实测高度：任何需要 `layoutFrame(..., H_p)` 的组件都用它取值。
  *
+ * `H_p = max(说明条, 状态栏)`：说明条隐藏时状态栏仍保留底部带；两者都不存在时为 0。
  * 服务端快照与客户端快照同值（首帧估计），本项目无 SSR，第三个参数只为满足 API 形状。
  */
 export function useFooterPillHeight(): number {

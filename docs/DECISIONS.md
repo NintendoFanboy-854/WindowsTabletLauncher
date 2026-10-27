@@ -527,3 +527,41 @@
 - 文档落点：动效 `MOTION §5.2/§7/§8/§9`（§2 状态机数值表未改，只在文字里引用其 pressed 档）；材质与说明条视觉 `FLUENT2 §7`；一次性解释文本契约 `AGENT-SURFACE-CONTRACT §20.1/§20.2`；`TOKEN-MAP §11` 无新增 C 值（0.985、44 已在册；50/100/500ms 均为 `motionTokens` 档位），本轮不改。
 - 实现状态：`src/host/agent/oneshot/{prompt,sanitize,generate,useWallpaperNote}.ts`、`src/host/desktop/{WallpaperLayer.tsx,WidgetCard.tsx,desktop.styles.ts}`。
 
+## D-39 蓝牙音箱（A2DP Sink）：系统能力进宿主，UI 复用设置页（2026-10-27）
+
+- 背景：旧 WinUI 版有 `BtAudioPlugin`（`735c530`，2026-08-30），用 `AudioPlaybackConnection` 把平板当蓝牙音箱；`5fdc618` 删除 WinUI 实现时未做「不做蓝牙」的决策，能力丢失。当前插件是 iframe，拿不到 WinRT；按「系统能力进宿主」的口径，蓝牙音频不能做成插件。**初版实现额外加了宿主全屏页 / 路由 / 命令总线 / 偏好组，评审确认属于过度设计，按「勿增实体」收敛为设置页内的一个分组。**
+- 决策：
+  1. **宿主 Rust 后端**（`src-tauri/src/bluetooth_audio.rs`）：`BtAudioManager`（Mutex）持有 `AudioPlaybackConnection` 与设备缓存；6 个命令 `bt_audio_snapshot/refresh/connect/disconnect/set_bluetooth/open_settings`；WinRT 调用全部在 `spawn_blocking` 线程里先 `RoInitialize(MTA)`，`join()` 不跑 UI 线程；连接对象长期持有在 `enabled` 字典（社区已知的「~5 秒断连」根因是对象/委托被回收）。
+  2. **连接时序**：`TryCreateFromId → Start() → OpenAsync()` 3 次 ×500ms 重试；`OpenAsync` Success 后再轮询 `State` 至多 500ms 等 `Opened`。快照额外给 `connected`（已连、手机可能还没推流）与 `streaming`（`State=Opened`）两个布尔：打开成功但手机未播放时 State 本来就是 Closed，不能据此判掉线；`ever_opened` 记录本次是否进过 Opened，推流后回到 Closed 才判断开。
+  3. **UI 形态**：设置页「常规 → 设备」里的 `BluetoothSpeakerSettings` 分组（`src/host/pages/settings/BluetoothSpeakerSettings.tsx`）。不新增宿主页面 / 路由 / `PAGE_TITLES` / 事件总线 / 图标 / 搜索项；状态落在 `SettingsGroup` + `SettingsRow` 的 label/description 里，动作只有 Fluent Switch / Dropdown / Button / Badge / MessageBar；只在设置页挂载期间轮询快照，离开即停。
+  4. **Agent 内置工具（4 个）**：`btAudio.status/devices/connect/disconnect`；`connect` 支持 deviceId 或 deviceName 精确匹配，找不到时把设备列表回给模型重选；不做 `openSettings`（没有新页面可开）。
+  5. **不做的实体**：自动连接 / 连接通知 / 上次设备记忆（`wtsl.btAudio` 偏好整块删除）、桌面卡、底部状态簇入口、独立预览 mock。配对是外部一次性动作，空态/失败只给「蓝牙设置」兜底（复用 `settings_win::open` 的前台交接）。
+  6. **MVP 不配对**：只操作「已配对、可推送音频」的设备（`AudioPlaybackConnection.GetDeviceSelector`）；旧版配对 PIN 仪式（`PairingRequested` 必须 handler 内同步 Accept）与 SMTC 媒体信息/播放控制后置。
+- 探针证据（2026-10-27，Windows 10 19044 解包 exe）：`AudioPlaybackConnection.GetDeviceSelector()` 可用；`Radio.GetRadiosAsync` 找到蓝牙无线电，`SetStateAsync(当前状态)` 返回 `RadioAccessStatus.Allowed`；`GlobalSystemMediaTransportControlsSessionManager.RequestAsync()` 可用；无已配对手机时设备列表 0。解包 exe 下 A2DP Sink / 无线电 / SMTC 入口可用，配对与真实推流仍需手机实机验证。
+- 否掉的方案：
+  - **插件卡**：iframe 没有 WinRT，且插件被禁用/卸载时系统能力随之消失；真要做桌面常显卡，需先加 bridge + 新插件包，实体更多，等有需求再说。
+  - **宿主全屏页 + 路由 + hostCommandBus**（初版）：一个设备设置不需要新的页面框架；`WallpaperSettings` 已证明「宿主能力以分组形式进设置」的先例。
+  - **MVP 塞入自动连接/通知/偏好、配对 PIN 与媒体控制**：都是额外状态与额外 UI；先保证「能连上、能出声」。
+  - **把 `State=Closed` 直接当断开**：手机还没播放时就是 Closed，会误报「连接已断开」。
+- 文档落点：本节；`DESIGN §8`；`README` 特性与安装说明；旧行为考古 `.tmp/bt-speaker/{HISTORY,UX-SPEC,RUST-WINRT}.md`（本地证据，不入库）。
+- 实现状态：Rust `cargo check --lib` 通过；`typecheck` / `build` 通过；**v0.7.0 正式构建成功**（NSIS `Windows Tablet Launcher_0.7.0_x64-setup.exe` 4.10 MB / MSI 5.10 MB），`/S` 静默覆盖安装 exit 0，注册表 `DisplayVersion=0.7.0`，安装版 `app.exe` FileVersion 0.7.0 并正常运行；用户确认手机可连接播放；安装版状态栏显示「音箱 / 38% / 98%」。
+
+## D-40 桌面底部状态栏：系统状态（电量/充电/音量/蓝牙音箱）进宿主 chrome（2026-10-27）
+
+- 背景：用户要求桌面至少保留一个状态面，且电量、充电、音量等可以一起融进去；放在底部，并和现有说明条 / Agent 入口的底部几何对齐。这是宿主 chrome，不是插件（系统状态读取是宿主能力），也不新开页面。
+- 决策：
+  1. **只读系统状态走宿主 Rust**（`src-tauri/src/system_status.rs`）：`GetSystemPowerStatus` 读电量/AC 状态；CoreAudio 默认渲染端点 `IAudioEndpointVolume` 读主音量/静音；命令 `system_status_snapshot` 统一返回 camelCase 快照，失败项为 `null`。蓝牙音箱状态复用 `bt_audio_snapshot`。
+  2. **状态栏是桌面层的一个 chrome**（`src/host/desktop/StatusBar.tsx`）：右侧定位，右缘 = Agent 入口左侧一个 gutter，**下缘 = `layoutFrame().pill.bottom`**（与说明条、Agent 入口同一条线）；材质与说明条同一套 token（78% `colorNeutralBackground1` + `--wtsl-material-blur` + `shadow4` + 1px `colorNeutralStroke2` + 圆形圆角），高度由 20px 图标 + `size 200` 文本 + `spacingVerticalXXS` 内边距 + 1px 描边组成（= `FOOTER_PILL_ESTIMATE` 26）。
+  3. **布局输入复用 `H_p`，不新增第二套几何**：状态栏用 ResizeObserver 实测高度并上报 `reportFooterStatusBarHeight`，`footer.ts` 以 `H_p = max(说明条, 状态栏)` 通知所有消费者。说明条隐藏（`H_p` 原本 0）时状态栏仍把底部带撑住，网格不会压到状态栏；欣赏壁纸 / 编辑模式隐藏状态栏但保留高度上报，避免布局抖动。
+  4. **信息表达**：每项「20px 图标 + `Text size={200}`」冗余编码，不只靠颜色；蓝牙音箱项用品牌色/成功色 + 文字（接收中/已连接/音箱/蓝牙关）；音量显示百分比/静音；电量显示百分比，充电时用 BatteryCharge 图标。唯一交互项是蓝牙状态按钮：44×44 命中区由 `TOUCH_TARGET` 外扩（不改视觉高度），点击回设置页「常规 → 设备」；音量/电量为只读信息（控制面后置）。
+  5. **隐藏与层级**：桌面层内渲染，`visibility`+`inert` 隐藏（不卸载，保留高度测量）；层级用 `--wtsl-layer-desktop`，低于页面/浮层。浏览器预览用 `?statusDemo=1` 的静态假数据检查布局，不参与产品逻辑。
+- 否掉的方案：
+  - **做成插件卡 / 底部状态簇入口**：系统状态不是插件能力；桌面上再加一张常显卡会抢小组件的信息预算，用户要的是底部一条窄 chrome。
+  - **把状态塞进时钟/天气插件**：跨插件拼装属于宿主；插件只对自身数据负责。
+  - **单独做「系统状态」页面或 popover**：一个常显状态不值得一个新页面/浮层；只读信息直接放桌面层。
+  - **写死 bottom/right 像素**：全部由 `layoutFrame`、`FOOTER_PILL_ESTIMATE`、`TOUCH_TARGET` 与 Fluent spacing token 推导；命中区用 `TOUCH_TARGET` 外扩公式，不写裸 44。
+  - **用电量/音量做交互控件**：MVP 先只读，避免在没有明确控制语义时引入滑杆/弹层实体；控制面在后续系统控制能力里统一做。
+- 证据（本地，不入库）：`src-tauri/src/system_status.rs`、`src/host/desktop/StatusBar.tsx`、`src/host/layout/footer.ts`、`src/host/App.tsx`、`src-tauri/src/lib.rs`（启动预热 refresh）。
+- 真机验证（Tauri，2026-10-27）：`shots/bt-ui/tauri-installed-0.7.0-2.png`（安装版 0.7.0，状态栏「音箱 / 38% / 98%」；`tauri-desktop-final2.png` 为调试版同口径对照）、`shots/bt-ui/tauri-settings-2.png`（设置页「蓝牙已开启 / 还没有配对的手机 / 蓝牙设置」）。浏览器 1440×960 几何实测 `right=1350` / `bottom=933` / `height=26`，与 Agent 入口下缘 933 共线、间距一个 gutter；独立审查 `.tmp/bt-speaker/UI-REVIEW-2.md`。状态栏轮询 2s、设置分组轮询 1.5s（行为常量，不进设计 token）。
+- 文档落点：本节；`DESIGN §8`；`README` 特性；`DENSITY` 底部条口径在实现后按需补一句（本轮不改规范数值）。
+- 实现状态：Rust `cargo check --lib` 通过；`typecheck` / `build` 通过；独立审查 P0（蓝牙按钮命中区 40px < 44）已修为 `::after` 纵向 `TOUCH_TARGET_CSS`；手机配对推流待实机验证。

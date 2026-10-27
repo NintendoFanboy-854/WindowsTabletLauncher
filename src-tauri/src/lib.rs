@@ -7,11 +7,13 @@
 //! - ip.cn 网络归属地（失败返回 null，D-16）
 //! - 系统空闲秒数（GetLastInputInfo）
 //! - 防息屏（SetThreadExecutionState）
+//! - 蓝牙音箱（A2DP Sink：AudioPlaybackConnection，已配对手机把音频推给本机）
 //! - 插件目录读写、扫描、zip 安装
 //! - `wtsl://` 自定义协议：把插件目录里的静态文件喂给 iframe
 
 mod autostart;
 mod bingarchive;
+mod bluetooth_audio;
 mod iplocate;
 mod location;
 mod micsite;
@@ -19,8 +21,11 @@ mod plugins;
 mod power;
 mod protocol;
 mod settings_win;
+mod system_status;
 mod window;
 mod zip;
+
+use std::sync::Arc;
 
 use tauri::Manager;
 use tauri::webview::{PermissionKind, PermissionResponse};
@@ -162,12 +167,17 @@ fn plugin_env(state: tauri::State<'_, plugins::PluginState>) -> plugins::PluginE
 }
 
 #[tauri::command]
-fn plugin_list(state: tauri::State<'_, plugins::PluginState>) -> CmdResult<Vec<plugins::PluginRecord>> {
+fn plugin_list(
+    state: tauri::State<'_, plugins::PluginState>,
+) -> CmdResult<Vec<plugins::PluginRecord>> {
     plugins::list(state.inner())
 }
 
 #[tauri::command]
-fn plugin_read_manifest(state: tauri::State<'_, plugins::PluginState>, plugin_id: String) -> CmdResult<String> {
+fn plugin_read_manifest(
+    state: tauri::State<'_, plugins::PluginState>,
+    plugin_id: String,
+) -> CmdResult<String> {
     plugins::read_manifest(state.inner(), &plugin_id)
 }
 
@@ -191,7 +201,10 @@ fn plugin_write_text(
 }
 
 #[tauri::command]
-fn plugin_remove(state: tauri::State<'_, plugins::PluginState>, plugin_id: String) -> CmdResult<()> {
+fn plugin_remove(
+    state: tauri::State<'_, plugins::PluginState>,
+    plugin_id: String,
+) -> CmdResult<()> {
     plugins::remove(state.inner(), &plugin_id)
 }
 
@@ -204,6 +217,81 @@ async fn plugin_install_zip(
     tauri::async_runtime::spawn_blocking(move || plugins::install_zip(&root, &zip_path))
         .await
         .map_err(|err| format!("安装 zip 任务失败: {err}"))?
+}
+
+// ---------- 蓝牙音箱（A2DP Sink） ----------
+//
+// 所有命令都是 async + spawn_blocking：WinRT 的 `IAsyncOperation::join()` 是阻塞等待，
+// 直接跑在 UI 线程会卡住窗口；状态由 BtAudioManager（Mutex）持有，前端轮询快照。
+
+type BtAudioManagerHandle = Arc<bluetooth_audio::BtAudioManager>;
+
+#[tauri::command]
+async fn bt_audio_snapshot(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.snapshot())
+        .await
+        .map_err(|err| format!("读取蓝牙音箱状态失败: {err}"))
+}
+
+#[tauri::command]
+async fn bt_audio_refresh(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.refresh())
+        .await
+        .map_err(|err| format!("刷新蓝牙设备失败: {err}"))
+}
+
+#[tauri::command]
+async fn bt_audio_connect(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+    device_id: String,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.connect(&device_id))
+        .await
+        .map_err(|err| format!("连接蓝牙音箱失败: {err}"))
+}
+
+#[tauri::command]
+async fn bt_audio_disconnect(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.disconnect())
+        .await
+        .map_err(|err| format!("断开蓝牙音箱失败: {err}"))
+}
+
+#[tauri::command]
+async fn bt_audio_set_bluetooth(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+    on: bool,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.set_bluetooth(on))
+        .await
+        .map_err(|err| format!("切换蓝牙失败: {err}"))
+}
+
+/// 打开 Windows 蓝牙设置（配对/开关的系统兜底入口）。沿用麦克风设置页的前台交接逻辑。
+#[tauri::command]
+async fn bt_audio_open_settings() -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(|| settings_win::open("ms-settings:bluetooth"))
+        .await
+        .map_err(|err| format!("打开蓝牙设置任务失败: {err}"))?
+}
+
+/// 桌面底部状态栏：电量 / 充电 / 主音量（只读）。
+#[tauri::command]
+async fn system_status_snapshot() -> CmdResult<system_status::SystemStatus> {
+    tauri::async_runtime::spawn_blocking(system_status::snapshot)
+        .await
+        .map_err(|err| format!("读取系统状态失败: {err}"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -237,11 +325,26 @@ pub fn run() {
                         .build(),
                 )?;
             }
-            let state = plugins::PluginState::resolve(app.handle())
-                .map_err(|err| -> Box<dyn std::error::Error> {
-                    Box::new(std::io::Error::other(err))
-                })?;
+            let state = plugins::PluginState::resolve(app.handle()).map_err(
+                |err| -> Box<dyn std::error::Error> { Box::new(std::io::Error::other(err)) },
+            )?;
             app.manage(state);
+            // 蓝牙音箱状态（Mutex 由 Rust command 持有，前端只拿快照）。
+            // 启动后后台预热一次 refresh：蓝牙枚举可能比首帧慢一个数量级，
+            // 预热后状态栏拿 snapshot 就能直接显示真实状态，而不是一直「状态未知」。
+            let bluetooth_audio = Arc::new(bluetooth_audio::BtAudioManager::new());
+            let warm_bluetooth_audio = Arc::clone(&bluetooth_audio);
+            app.manage(bluetooth_audio);
+            std::thread::spawn(move || {
+                let snapshot = warm_bluetooth_audio.refresh();
+                log::info!(
+                    "蓝牙音箱预热: available={} supported={} on={:?} devices={}",
+                    snapshot.available,
+                    snapshot.bluetooth_supported,
+                    snapshot.bluetooth_on,
+                    snapshot.devices.len()
+                );
+            });
 
             // 全局快捷键：Ctrl+Shift+H 隐藏/显示主窗口（隐藏后也能恢复）
             let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH);
@@ -275,6 +378,13 @@ pub fn run() {
             bingarchive::fetch_bing_archive,
             ensure_mic_permission,
             open_mic_privacy_settings,
+            bt_audio_snapshot,
+            bt_audio_refresh,
+            bt_audio_connect,
+            bt_audio_disconnect,
+            bt_audio_set_bluetooth,
+            bt_audio_open_settings,
+            system_status_snapshot,
             plugin_env,
             plugin_list,
             plugin_read_manifest,
@@ -286,4 +396,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
 }
-

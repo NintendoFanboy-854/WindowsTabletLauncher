@@ -27,6 +27,7 @@ export type { FrameRect, LayoutFrame } from './breakpoints';
 export {
   readFooterPillHeight,
   reportFooterPillHeight,
+  reportFooterStatusBarHeight,
   resetFooterPillHeight,
   subscribeFooterPillHeight,
   useFooterPillHeight,

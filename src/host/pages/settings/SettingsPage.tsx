@@ -53,6 +53,7 @@ import { ContentTransition } from '../../shell/ContentTransition';
 import { quitApplication } from '../../shell/useGlobalShortcuts';
 import { PageScaffold } from '../shared/PageScaffold';
 import { useMediaQuery, WIDE_PAGE_QUERY } from '../shared/useMediaQuery';
+import { BluetoothSpeakerSettings } from './BluetoothSpeakerSettings';
 import { PluginSettings } from './PluginSettings';
 import { SettingsGroup, SettingsRow } from './SettingsBlocks';
 import { WallpaperSettings } from './WallpaperSettings';
@@ -317,6 +318,8 @@ export function SettingsPage({
         </SettingsRow>
         <SettingsRow label="启动时全屏" description="窗口创建即全屏，不显示标题栏和边框" />
       </SettingsGroup>
+
+      <BluetoothSpeakerSettings />
 
       <SettingsGroup title="退出" hint="Esc 只返回桌面，不退出应用；退出走这里或 Ctrl + Q。">
         <SettingsRow label="退出启动器" description="插件 iframe 随应用关闭，缓存数据由各插件自己保存">

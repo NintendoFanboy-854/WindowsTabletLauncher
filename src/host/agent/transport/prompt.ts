@@ -43,7 +43,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
   const { bindings, now, timeZone, webSearchEnabled } = options;
   const toolList = bindings.length
     ? bindings.map(formatToolLine).join('\n')
-    : '- （当前没有注册任何插件工具）';
+    : '- （当前没有可用工具）';
 
   const searchRule = webSearchEnabled
     ? '联网搜索已开启（MiMo 原生 web_search）：需要实时信息（新闻、价格、赛事、最新消息）时自行检索；系统会附上来源，回答里也要写出引用链接，不要编造未核实的内容。'
@@ -53,7 +53,7 @@ export function buildSystemPrompt(options: SystemPromptOptions): string {
 
 当前时间：${formatNow(now, timeZone)}。
 
-可用插件工具（共 ${bindings.length} 个）：
+可用工具（共 ${bindings.length} 个）：
 ${toolList}
 
 工作规则：

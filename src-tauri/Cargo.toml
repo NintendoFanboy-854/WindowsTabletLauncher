@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.6.0"
+version = "0.7.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -34,6 +34,13 @@ winreg = "0.56"           # 开机自启（HKCU Run）
 webview2-com = "0.39"
 windows = { version = "0.62", features = [
   "Devices_Geolocation",              # Windows Geolocator
+  "Devices_Enumeration",              # DeviceInformation（蓝牙音频设备枚举）
+  "Devices_Radios",                   # 蓝牙无线电开关
+  "Media_Audio",                      # AudioPlaybackConnection（A2DP Sink）
+  "Win32_Media_Audio",                # CoreAudio：默认渲染端点
+  "Win32_Media_Audio_Endpoints",      # IAudioEndpointVolume（主音量/静音）
+  "Win32_System_Com",                 # CoCreateInstance（CoreAudio COM）
+  "Win32_System_Com_StructuredStorage", # IMMDevice::Activate 的 PROPVARIANT 参数
   "Foundation",
   "Win32_System_Power",               # SetThreadExecutionState
   "Win32_System_SystemInformation",   # GetTickCount
