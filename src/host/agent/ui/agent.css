@@ -50,13 +50,16 @@
   overflow: hidden;
   border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
   border-radius: var(--borderRadius2XLarge);
-  background-color: var(--colorNeutralBackground1);
+  background-color: color-mix(in srgb, var(--colorNeutralBackground1) 72%, transparent);
+  -webkit-backdrop-filter: blur(var(--wtsl-material-blur));
+  backdrop-filter: blur(var(--wtsl-material-blur));
   box-shadow: var(--shadow8);
   color: var(--colorNeutralForeground1);
   font-family: var(--fontFamilyBase);
-  /* 只过渡宽高 / 圆角 / 描边 / 阴影：不做位移与模糊往返（MOTION §5.1）。
+  transform-origin: right bottom;
+  /* 只过渡宽高 / 圆角 / 描边 / 阴影 / hover 缩放：不做位移与模糊往返（MOTION §5.1）。
      圆角必须一起过渡——否则三态切换时圆角是瞬变的，会在收缩的第一帧把面板变成一个巨大胶囊。 */
-  transition-property: width, height, border-radius, border-color, box-shadow;
+  transition-property: width, height, border-radius, border-color, box-shadow, transform;
 }
 
 /*
@@ -100,12 +103,18 @@
   outline: none;
 }
 
-/* 悬停只对鼠标生效：保持 shadow8（入口的等级），描边升到 stroke1；不做 hover 缩放（契约 §3） */
+/* 悬停只对鼠标生效：与桌面表面同一套状态语言（shadow8 + stroke1 + 1.02 缩放）；不做模糊往返 */
 @media (hover: hover) {
   .wtsl-agent-surface[data-stage='collapsed']:hover {
     border-color: var(--colorNeutralStroke1);
     box-shadow: var(--shadow8);
+    transform: scale(1.02);
   }
+}
+
+/* 触控/鼠标按下：与桌面表面统一的 0.98 缩放（精确值见 design/metrics 的 SURFACE_PRESS_SCALE） */
+.wtsl-agent-surface[data-stage='collapsed']:active {
+  transform: scale(0.98);
 }
 
 /* 屏幕阅读器专用的状态文本（界面上不写“正在聆听/转写结果”等解释文字，契约 §5/§6） */
@@ -250,6 +259,11 @@
   }
 
   .wtsl-agent-entry:active {
+    transform: none !important;
+  }
+
+  .wtsl-agent-surface[data-stage='collapsed']:hover,
+  .wtsl-agent-surface[data-stage='collapsed']:active {
     transform: none !important;
   }
 }

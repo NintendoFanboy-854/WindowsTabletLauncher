@@ -221,19 +221,17 @@ async fn plugin_install_zip(
 
 // ---------- 蓝牙音箱（A2DP Sink） ----------
 //
-// 所有命令都是 async + spawn_blocking：WinRT 的 `IAsyncOperation::join()` 是阻塞等待，
-// 直接跑在 UI 线程会卡住窗口；状态由 BtAudioManager（Mutex）持有，前端轮询快照。
+// 所有 WinRT 对象都在 BtAudioManager 的后台 worker 线程里创建/调用（RoInitialize MTA 一次），
+// 命令只做「投递 → 等 worker 回传快照」；snapshot 是纯内存读取，不做 WinRT 调用。
+// 因此除 snapshot 外的命令都是 async + spawn_blocking（worker 可能正跑一轮连接尝试）。
 
 type BtAudioManagerHandle = Arc<bluetooth_audio::BtAudioManager>;
 
 #[tauri::command]
-async fn bt_audio_snapshot(
+fn bt_audio_snapshot(
     manager: tauri::State<'_, BtAudioManagerHandle>,
-) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
-    let manager = Arc::clone(manager.inner());
-    tauri::async_runtime::spawn_blocking(move || manager.snapshot())
-        .await
-        .map_err(|err| format!("读取蓝牙音箱状态失败: {err}"))
+) -> bluetooth_audio::BtAudioSnapshot {
+    manager.snapshot()
 }
 
 #[tauri::command]
@@ -278,6 +276,41 @@ async fn bt_audio_set_bluetooth(
         .map_err(|err| format!("切换蓝牙失败: {err}"))
 }
 
+/// 自动连接开关（持久化到 app_data_dir/bt-audio.json）。
+#[tauri::command]
+async fn bt_audio_set_auto_connect(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+    enabled: bool,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.set_auto_connect(enabled))
+        .await
+        .map_err(|err| format!("设置蓝牙自动连接失败: {err}"))
+}
+
+/// 首选设备（唯一 star）；传 null 清空。
+#[tauri::command]
+async fn bt_audio_set_preferred(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+    device_id: Option<String>,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.set_preferred(device_id))
+        .await
+        .map_err(|err| format!("设置蓝牙首选设备失败: {err}"))
+}
+
+/// 解除手动断开造成的 paused，恢复自动寻找。
+#[tauri::command]
+async fn bt_audio_resume_auto(
+    manager: tauri::State<'_, BtAudioManagerHandle>,
+) -> CmdResult<bluetooth_audio::BtAudioSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.resume_auto())
+        .await
+        .map_err(|err| format!("恢复蓝牙自动连接失败: {err}"))
+}
+
 /// 打开 Windows 蓝牙设置（配对/开关的系统兜底入口）。沿用麦克风设置页的前台交接逻辑。
 #[tauri::command]
 async fn bt_audio_open_settings() -> CmdResult<()> {
@@ -286,7 +319,7 @@ async fn bt_audio_open_settings() -> CmdResult<()> {
         .map_err(|err| format!("打开蓝牙设置任务失败: {err}"))?
 }
 
-/// 桌面底部状态栏：电量 / 充电 / 主音量（只读）。
+/// 桌面底部状态栏 / 快速设置面板：电量 / 充电 / 主音量 / 亮度 / 自动亮度（只读快照）。
 #[tauri::command]
 async fn system_status_snapshot() -> CmdResult<system_status::SystemStatus> {
     tauri::async_runtime::spawn_blocking(system_status::snapshot)
@@ -294,9 +327,41 @@ async fn system_status_snapshot() -> CmdResult<system_status::SystemStatus> {
         .map_err(|err| format!("读取系统状态失败: {err}"))
 }
 
+/// 设置主音量（0–100，CoreAudio）。
+#[tauri::command]
+async fn system_set_volume(percent: u8) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || system_status::set_volume(percent))
+        .await
+        .map_err(|err| format!("设置音量任务失败: {err}"))?
+}
+
+/// 设置静音（CoreAudio）。
+#[tauri::command]
+async fn system_set_muted(muted: bool) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || system_status::set_muted(muted))
+        .await
+        .map_err(|err| format!("设置静音任务失败: {err}"))?
+}
+
+/// 设置屏幕亮度（0–100，WMI WmiSetBrightness）；无内置屏/不可写时返回 Err。
+#[tauri::command]
+async fn system_set_brightness(percent: u8) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || system_status::set_brightness(percent))
+        .await
+        .map_err(|err| format!("设置亮度任务失败: {err}"))?
+}
+
+/// 设置系统「自适应亮度」开关；写不进去（策略/权限）时返回 Err。
+#[tauri::command]
+async fn system_set_auto_brightness(enabled: bool) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || system_status::set_auto_brightness(enabled))
+        .await
+        .map_err(|err| format!("设置自动亮度任务失败: {err}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         // WebView2 没有内建授权 UI：媒体权限请求落到 `COREWEBVIEW2_PERMISSION_STATE_DEFAULT`
         // 就等同于「无人应答 → 拒绝」，0.4.4 的 `Permission denied` 就是这么来的。
         // 这里只放行麦克风：应用内同意由 `MicPermissionCard` 负责（先解释再开麦），
@@ -329,22 +394,13 @@ pub fn run() {
                 |err| -> Box<dyn std::error::Error> { Box::new(std::io::Error::other(err)) },
             )?;
             app.manage(state);
-            // 蓝牙音箱状态（Mutex 由 Rust command 持有，前端只拿快照）。
-            // 启动后后台预热一次 refresh：蓝牙枚举可能比首帧慢一个数量级，
-            // 预热后状态栏拿 snapshot 就能直接显示真实状态，而不是一直「状态未知」。
-            let bluetooth_audio = Arc::new(bluetooth_audio::BtAudioManager::new());
-            let warm_bluetooth_audio = Arc::clone(&bluetooth_audio);
+            // 蓝牙音箱：worker 线程持有全部 WinRT 对象，managed state 只放只读快照 +
+            // 命令通道 + stop flag + JoinHandle。worker 启动时会自己完成一次预热
+            // （启动设备 watcher + 无线电状态枚举；设备列表由 watcher 事件补齐），
+            // 前端首帧后拿 snapshot 就是真实状态。
+            let app_data_dir = app.path().app_data_dir().ok();
+            let bluetooth_audio = Arc::new(bluetooth_audio::BtAudioManager::start(app_data_dir));
             app.manage(bluetooth_audio);
-            std::thread::spawn(move || {
-                let snapshot = warm_bluetooth_audio.refresh();
-                log::info!(
-                    "蓝牙音箱预热: available={} supported={} on={:?} devices={}",
-                    snapshot.available,
-                    snapshot.bluetooth_supported,
-                    snapshot.bluetooth_on,
-                    snapshot.devices.len()
-                );
-            });
 
             // 全局快捷键：Ctrl+Shift+H 隐藏/显示主窗口（隐藏后也能恢复）
             let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH);
@@ -383,8 +439,15 @@ pub fn run() {
             bt_audio_connect,
             bt_audio_disconnect,
             bt_audio_set_bluetooth,
+            bt_audio_set_auto_connect,
+            bt_audio_set_preferred,
+            bt_audio_resume_auto,
             bt_audio_open_settings,
             system_status_snapshot,
+            system_set_volume,
+            system_set_muted,
+            system_set_brightness,
+            system_set_auto_brightness,
             plugin_env,
             plugin_list,
             plugin_read_manifest,
@@ -393,6 +456,17 @@ pub fn run() {
             plugin_remove,
             plugin_install_zip,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while building tauri application");
+
+    // 退出时显式收敛蓝牙音频 worker（RunEvent::Exit）：停 watcher、撤销事件回调、
+    // 关闭连接、落盘配置；worker join 完成后进程才真正退出。
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            if let Some(manager) = app_handle.try_state::<BtAudioManagerHandle>() {
+                log::info!("应用退出，停止蓝牙音频 worker");
+                manager.shutdown();
+            }
+        }
+    });
 }

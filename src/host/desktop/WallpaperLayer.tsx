@@ -8,21 +8,22 @@
  * 说明条是「欣赏壁纸」模式的唯一入口：按钮自身保持 26 高的视觉尺寸（这个高度会
  * 通过 `reportFooterPillHeight` 反向驱动桌面网格，不能改），44×44 的命中区由
  * `::after` 绝对定位外扩，不占布局、不改 padding。按下反馈只加
- * `transform: scale(0.985)`（transform 不改变 border-box，H_p 仍为 26），高度测量
+ * `transform: scale(0.98)`（transform 不改变 border-box，H_p 仍为 26），高度测量
  * 因此改用 `offsetHeight`，不量会受 transform 影响的 `getBoundingClientRect()`。
  *
- * 解释文本只在欣赏壁纸模式下出现，位置在说明条上方；文本右侧的「重新生成说明」
- * 按钮也挂在这条绝对定位的说明行里，两者都不参与布局测量，因此不会改变说明条
- * 高度或网格几何。文本走 Agent 现有 Markdown 渲染器。
+ * A2（v0.8.0）：非欣赏态说明条只有一个按钮（无 chevron）；进入欣赏壁纸后出现 chevron
+ * 并默认展开详情（日期/来源 + AI 说明，正文两端对齐；标题/版权只在底部 pill 行出现，
+ * 不重复）。展开卡是浮层，不参与布局测量，H_p 仍为 26。说明刷新在设置页，不在这里。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { makeStyles, mergeClasses, motionTokens, tokens } from '@fluentui/react-components';
-import { ArrowClockwise20Regular } from '@fluentui/react-icons';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { makeStyles, mergeClasses, motionTokens, Spinner, tokens } from '@fluentui/react-components';
+import { ChevronDown20Regular, ChevronUp20Regular } from '@fluentui/react-icons';
 
 import { useWallpaperNote } from '../agent/oneshot/describeWallpaper';
 import { MessageContent } from '../agent/ui/MessageContent';
 import { useReducedMotion } from '../agent/ui/useReducedMotion';
-import { TOUCH_TARGET, TOUCH_TARGET_CSS } from '../design/metrics';
+import { SURFACE_HOVER_SCALE, SURFACE_PRESS_SCALE, TOUCH_TARGET, TOUCH_TARGET_CSS } from '../design/metrics';
 import {
   FOOTER_PILL_ESTIMATE,
   computeGridMetrics,
@@ -188,7 +189,7 @@ const useWallpaperStyles = makeStyles({
    */
   creditPressable: {
     ':active': {
-      transform: 'scale(0.985)',
+      transform: `scale(${SURFACE_PRESS_SCALE})`,
       // 按下 50ms 加速（MOTION §1「按下」）；松手后由 base / :hover 档回弹
       transitionDuration: `${motionTokens.durationUltraFast}ms`,
       transitionTimingFunction: motionTokens.curveAccelerateMin,
@@ -227,118 +228,179 @@ const useWallpaperStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   /**
-   * 解释文本：由 noteRow 绝对定位在说明条上方，自身不参与 pill 高度测量。
-   *
-   * 材质与说明条同一套（半透明中性面 + 单一 blur token + 大圆角），否则 14px 文字
-   * 直接压在必应照片上，亮天/雪景下的对比度会低于 FLUENT2 §10 的 4.5:1。
-   * 动效按 MOTION §1「常规进出」：`durationNormal`(200) + `curveDecelerateMid`，
-   * **不设延迟**（§8「禁止为动画延迟内容渲染」，120ms 曾是自造时长）。
-   * 宽度仍按内容收缩（max-content），上限见 NOTE_MAX_WIDTH（已给右侧按钮留位）。
+   * 壁纸说明（A2）：同一个表面容器承载「非欣赏 pill / 欣赏态展开卡」。
+   * 材质与 widget 卡片同源：72% 中性面 + blur 24 + stroke2 + shadow4；
+   * hover 1.02 + shadow8 + stroke1、pressed 0.98（数值来自 design/metrics，不在此写字面量）。
+   * 非欣赏态没有 chevron；欣赏态默认展开、chevron 只负责折叠。
    */
-  note: {
-    width: 'max-content',
-    maxWidth: NOTE_MAX_WIDTH,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalL}`,
-    borderRadius: tokens.borderRadiusXLarge,
-    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
-    backdropFilter: 'blur(var(--wtsl-material-blur))',
-    boxShadow: tokens.shadow4,
-    color: tokens.colorNeutralForeground1,
-    opacity: 0,
-    transform: `translateY(${tokens.spacingVerticalSNudge})`,
-    pointerEvents: 'none',
-    transitionProperty: 'opacity, transform',
-    transitionDuration: `${motionTokens.durationNormal}ms`,
-    transitionTimingFunction: motionTokens.curveDecelerateMid,
-  },
-  /**
-   * 说明行：解释文本 + 手动「重新生成说明」按钮的定位壳。
-   *
-   * 绝对定位在说明条上方（left/bottom 与旧 note 相同），宽度 = 文本宽度：
-   * 不占 creditStack 的布局，因此不进 H_p 测量、也不改 pill 几何。
-   * 按钮在本壳内再绝对定位到文本右侧，所以按钮存在与否都不改变文本宽度。
-   */
-  noteRow: {
-    position: 'absolute',
-    left: 0,
-    bottom: `calc(100% + ${tokens.spacingVerticalS})`,
-    width: 'max-content',
-    maxWidth: NOTE_MAX_WIDTH,
-    pointerEvents: 'none',
-  },
-  noteVisible: {
-    opacity: 1,
-    transform: 'none',
-  },
-  /** 减少动效：100ms 纯 opacity，无位移（MOTION §7「≤100ms 淡入」） */
-  noteReduced: {
-    transform: 'none',
-    transitionProperty: 'opacity',
-    transitionDuration: `${motionTokens.durationFaster}ms`,
-  },
-  /**
-   * 手动「重新生成说明」按钮（仅欣赏壁纸模式、有说明文本 / 加载中时出现）。
-   *
-   * 绝对定位在说明文本右侧（**自身** position:absolute），不参与 H_p 测量、
-   * 不改 pill 几何；命中区 44×44 直接取 `TOUCH_TARGET_CSS`，不写裸 44。
-   * 材质复用 note 的同一条表达式（78% 中性面 + 单一 blur token + shadow4），
-   * 圆角/描边/前景色全部来自 tokens。按压只做颜色反馈（与说明条同一档 hover/active
-   * 混合比例），不引入第二套缩放；时长用 motionTokens(durationFaster)。
-   */
-  regenerate: {
-    position: 'absolute',
-    // 贴在文本右缘外一个间距处，底边与文本行底边对齐
-    left: `calc(100% + ${tokens.spacingHorizontalS})`,
-    bottom: 0,
+  noteShell: {
+    position: 'relative',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: TOUCH_TARGET_CSS,
-    height: TOUCH_TARGET_CSS,
-    margin: 0,
-    padding: 0,
+    flexDirection: 'column',
     boxSizing: 'border-box',
-    appearance: 'none',
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 78%, transparent)`,
-    backdropFilter: 'blur(var(--wtsl-material-blur))',
-    boxShadow: tokens.shadow4,
-    color: tokens.colorNeutralForeground2,
-    cursor: 'pointer',
+    // creditDock 是整层 pointer-events:none（壁纸说明不是桌面手势区）；表面本身必须显式恢复
+    // auto，否则整条说明条不可点（旧 credit 按钮样式里有这条，A2 重写时遗漏）。
     pointerEvents: 'auto',
-    transitionProperty: 'background-color, border-color',
-    transitionDuration: `${motionTokens.durationFaster}ms`,
+    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
+    backdropFilter: 'blur(var(--wtsl-material-blur))',
+    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow4,
+    borderRadius: tokens.borderRadiusCircular,
+    transformOrigin: 'left bottom',
+    overflow: 'visible',
+    transitionProperty: 'width, height, border-radius, box-shadow, border-color, transform',
+    transitionDuration: `${motionTokens.durationFast}ms`,
     transitionTimingFunction: motionTokens.curveAccelerateMin,
     ':hover': {
-      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 88%, transparent)`,
+      boxShadow: tokens.shadow8,
+      border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
+      transform: `scale(${SURFACE_HOVER_SCALE})`,
+      transitionDuration: `${motionTokens.durationFaster}ms`,
       transitionTimingFunction: motionTokens.curveDecelerateMin,
     },
     ':active': {
-      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
+      transform: `scale(${SURFACE_PRESS_SCALE})`,
     },
+    '@media (prefers-reduced-motion: reduce)': {
+      transitionProperty: 'background-color, border-color, box-shadow',
+      ':hover': { transform: 'none' },
+      ':active': { transform: 'none' },
+    },
+  },
+  noteShellExpanded: {
+    borderRadius: tokens.borderRadius2XLarge,
+    boxShadow: tokens.shadow16,
+    overflow: 'hidden',
+    transitionDuration: `${motionTokens.durationGentle}ms`,
+    transitionTimingFunction: motionTokens.curveDecelerateMid,
+    ':hover': {
+      boxShadow: tokens.shadow16,
+      border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+      transform: 'none',
+    },
+  },
+  noteDetail: {
+    display: 'flex',
+    flexDirection: 'column',
+    // 关键：不能被父级 flex 压缩，否则 offsetHeight 量到的是被压扁的高度 → shell 高度跟着变矮，
+    // 说明正文被裁进滚动区（实测 v0.8.0 首版只显示日期行 + 滚动条箭头）。
+    flex: '0 0 auto',
+    gap: tokens.spacingVerticalS,
+    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalM} ${tokens.spacingVerticalM}`,
+    overflowY: 'auto',
+    maxHeight: '60vh',
+    overscrollBehavior: 'contain',
+    // 触控产品不显示经典滚动条（与 Agent 消息列表同口径），滑动仍可滚动
+    scrollbarWidth: 'none',
+    '::-webkit-scrollbar': {
+      width: 0,
+      height: 0,
+    },
+  },
+  noteDate: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    textAlign: 'left',
+  },
+  noteBody: {
+    margin: 0,
+    color: tokens.colorNeutralForeground1,
+    fontSize: tokens.fontSizeBase300,
+    lineHeight: tokens.lineHeightBase300,
+    // 中文正文两端对齐：左右轴与说明条内容带对齐（最后一行自然左对齐）
+    textAlign: 'justify',
+    textAlignLast: 'left',
+  },
+  noteRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+    height: `${FOOTER_PILL_ESTIMATE}px`,
+    flexShrink: 0,
+  },
+  noteMain: {
+    appearance: 'none',
+    boxSizing: 'border-box',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
+    flex: '1 1 auto',
+    height: `${FOOTER_PILL_ESTIMATE}px`,
+    margin: 0,
+    border: 0,
+    backgroundColor: 'transparent',
+    fontFamily: 'inherit',
+    color: 'inherit',
+    paddingBlock: 0,
+    paddingInline: tokens.spacingHorizontalM,
+    cursor: 'pointer',
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+    whiteSpace: 'nowrap',
     ':focus-visible': {
       outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
       outlineOffset: tokens.strokeWidthThin,
-    },
-    ':disabled': {
-      color: tokens.colorNeutralForegroundDisabled,
-      cursor: 'default',
+      borderRadius: tokens.borderRadiusCircular,
     },
   },
-  /**
-   * 加载中图标旋转：时长取 motionTokens 里最长的一档 `durationUltraSlow`(500) +
-   * `curveLinear`，不新增裸毫秒数。reduced-motion 下不合并这个类——静态图标 + 禁用
-   * 态颜色已是可见反馈，MOTION §7 不再加装饰动画。
-   */
-  regenerateSpin: {
-    animationName: {
-      from: { transform: 'rotate(0deg)' },
-      to: { transform: 'rotate(360deg)' },
+  noteMainExpanded: {
+    flex: '0 0 auto',
+    justifyContent: 'flex-start',
+    paddingInline: `${tokens.spacingHorizontalM} 0`,
+  },
+  noteTitle: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  noteMeta: {
+    color: tokens.colorNeutralForeground3,
+  },
+  noteChevron: {
+    appearance: 'none',
+    boxSizing: 'border-box',
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '20px',
+    height: `${FOOTER_PILL_ESTIMATE}px`,
+    margin: 0,
+    border: 0,
+    padding: 0,
+    backgroundColor: 'transparent',
+    fontFamily: 'inherit',
+    flexShrink: 0,
+    color: tokens.colorNeutralForeground2,
+    cursor: 'pointer',
+    ':hover': { color: tokens.colorNeutralForeground1 },
+    ':focus-visible': {
+      outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
+      outlineOffset: tokens.strokeWidthThin,
+      borderRadius: tokens.borderRadiusMedium,
     },
-    animationDuration: `${motionTokens.durationUltraSlow}ms`,
-    animationTimingFunction: motionTokens.curveLinear,
-    animationIterationCount: 'infinite',
+    '::after': {
+      content: "''",
+      position: 'absolute',
+      left: `-${tokens.spacingHorizontalM}`,
+      right: `-${tokens.spacingHorizontalM}`,
+      top: '50%',
+      height: TOUCH_TARGET_CSS,
+      transform: 'translateY(-50%)',
+    },
+  },
+  noteLoading: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+  },
+  noteError: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
   },
 });
 
@@ -449,13 +511,22 @@ function resolveCredit(wallpaper: WallpaperState): CreditModel | null {
 }
 
 /**
- * 壁纸说明（左下角）：点击进入 / 退出「欣赏壁纸」模式。
+ * 展开宽度的增量：spacing 8 + chevron 图标 20（与 `tokens.spacingHorizontalS` 同值；
+ * chevron 的 44×44 命中区由样式外扩，不参与布局宽度）。
+ */
+const NOTE_CHEVRON_SIZE = 20;
+const NOTE_CHEVRON_GAP = 8;
+const NOTE_EXPAND_DELTA = NOTE_CHEVRON_SIZE + NOTE_CHEVRON_GAP;
+
+/**
+ * 壁纸说明（左下角，A2）。
  *
- * `captionHidden` 为真时整条不渲染（本机图片没有说明文字时同理，由 `credit === null` 体现）。
- * 这两种「没有说明条」的情形都必须上报 `H_p = 0`：`0` 在 `layout/footer` 里是**合法值**，
- * 语义是「没有说明条」，`layoutFrame` 据此不再预留 pill 行与 gutter，网格自己在视口内
- * 上下居中（1440×960 下上/下各 46）、入口下缘贴网格下缘。
- * 跳过上报会让布局停在最后一次实测的 26 上，出现上 27 / 下 65 的不对称。
+ * - 非欣赏态：整条 pill 是一个按钮（点击进入欣赏壁纸），无 chevron、无省略号，
+ *   宽度跟文字、短标题走 min-width；
+ * - 欣赏态：出现 chevron，进入默认展开详情（日期/来源 + AI 说明；标题/版权不重复，
+ *   正文两端对齐），底部 pill 行保留：文字区 = 退出欣赏，chevron = 折叠；
+ * - 展开卡是浮层：`H_p` 恒 26，网格 / Agent 入口 / 状态栏不动；点外部或 Esc 收起。
+ * - 说明刷新在设置页，不在这里；说明走 Agent 现有 Markdown 渲染器。
  */
 export interface WallpaperCreditProps {
   wallpaper: WallpaperState;
@@ -475,23 +546,31 @@ export function WallpaperCredit({
   const viewport = useViewportSize();
   const pillHeight = useFooterPillHeight();
   const reducedMotion = useReducedMotion();
-  const pillRef = useRef<HTMLButtonElement | null>(null);
-  const [noteVisible, setNoteVisible] = useState(false);
-  /**
-   * 最近一次成功取到的说明 + 它所属的图片 key。
-   *
-   * 手动刷新时 `useWallpaperNote` 会先把 `text` 置空并进入 loading；若此时按空文本渲染，
-   * 说明行宽度会先塌成左右 padding、再随新文本恢复，右侧「重新生成」按钮会左右各跳一次。
-   * 因此加载 / 失败期间继续显示**同一张图**的上一份说明：宽度和按钮位置都不动，也不涉及
-   * H_p。用 key 同步判断，换图时旧文本不会串到新图上（不依赖 effect 的下一帧）。
-   */
-  const [lastNote, setLastNote] = useState<{ key: string; text: string } | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = useRef<HTMLButtonElement | null>(null);
+  const detailRef = useRef<HTMLDivElement | null>(null);
 
-  /**
-   * 一次性说明只在欣赏壁纸模式、且当前是必应图时请求；本机图片没有模型可搜的元数据。
-   */
+  const [expanded, setExpanded] = useState(false);
+  /** 非欣赏态（无 chevron）的 pill 宽度：展开宽度 = 它 + 28 */
+  const [baseWidth, setBaseWidth] = useState(0);
+  const [detailHeight, setDetailHeight] = useState(0);
+  const [showSpinner, setShowSpinner] = useState(false);
+
+  const metrics = useMemo(
+    () => computeGridMetrics(viewport.width, viewport.height),
+    [viewport.width, viewport.height],
+  );
+  const frame = useMemo(
+    () => layoutFrame(metrics, viewport.width, viewport.height, pillHeight),
+    [metrics, viewport.width, viewport.height, pillHeight],
+  );
+  const { pill } = frame;
+
+  const localCaption = wallpaper.mode === 'local' ? (wallpaper.local?.caption?.trim() ?? '') : '';
+
+  // 只有欣赏态展开时才请求说明（收起/非欣赏态不产生请求）
   const noteInput = useMemo(() => {
-    if (!gallery || !credit || captionHidden) return null;
+    if (!gallery || !expanded || !credit || captionHidden) return null;
     if (wallpaper.mode === 'local') return null;
     const entry = wallpaper.current;
     if (!entry) return null;
@@ -501,95 +580,125 @@ export function WallpaperCredit({
       title: entry.title,
       copyright: entry.copyright,
       date: entry.date,
-      // 把今日壁纸本身一起发给模型（pro 多模态看图）
       imageUrl: entry.imageUrl,
     };
-  }, [captionHidden, credit, gallery, wallpaper.current, wallpaper.mode]);
+  }, [captionHidden, credit, expanded, gallery, wallpaper.current, wallpaper.mode]);
 
-  const { text: noteText, status: noteStatus, refresh: refreshNote } = useWallpaperNote(noteInput);
-  const noteKey = noteInput?.key ?? '';
-  const hasCredit = Boolean(credit);
-  /** 手动重新生成进行中：按钮禁用 + 图标旋转，给出可见但不新增长时的反馈 */
-  const noteLoading = noteStatus === 'loading';
-  /** 实际渲染的文本：新文本优先；加载/失败时回落到同一张图的上一份（避免按钮横向跳动） */
-  const shownNoteText = noteText ?? (lastNote?.key === noteKey ? lastNote.text : null);
-  /**
-   * 手动入口只在欣赏壁纸模式、且已有说明文本或正在加载时显示。
-   * 首轮就失败（没有任何可显示的文本）时不显示：入口只服务「重新生成」而不是「首次失败重试」。
-   */
-  const showRegenerate = gallery && (Boolean(shownNoteText) || noteLoading);
+  const { text: noteText, status: noteStatus } = useWallpaperNote(noteInput);
 
-  // 换图（或退出再进入）时先回到隐藏态：同一张图会复用 lastNote 再淡入，换图则等新文本。
+  // 欣赏模式 = 默认展开；退出 = 收起
   useEffect(() => {
-    setNoteVisible(false);
-  }, [noteKey]);
+    setExpanded(gallery);
+  }, [gallery]);
 
-  // 记录成功返回的文本，供加载 / 失败期间回退显示（key 一起存，换图后旧文本自动失效）。
+  // 加载超过 1s 才显示 Spinner（FLUENT2 §12 等待阈值；文案先出现，不闪）
   useEffect(() => {
-    if (!noteText) return;
-    setLastNote({ key: noteKey, text: noteText });
-  }, [noteKey, noteText]);
+    if (noteStatus !== 'loading') {
+      setShowSpinner(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setShowSpinner(true), 1000);
+    return () => window.clearTimeout(timer);
+  }, [noteStatus]);
 
-  // 只观测 pill 自身：offsetHeight 是**布局 border-box**（padding + 描边 + 行高），
-  // 不受按下时 `transform: scale(0.985)` 影响；不用 getBoundingClientRect().height——
-  // 那量到的是缩放后的视觉高度（26×0.985≈25.6），经 reportFooterPillHeight 会把整个
-  // 网格在按下/松手时抖动一次。H_p 的语义仍是 border-box=26。
-  // 没有说明条时上报 0（= 无底部条，见组件文档），这样隐藏前后网格都对称。
-  // hasCredit 入依赖：首帧壁纸还没到时组件返回 null，图片就绪后要重新挂观察器。
+  // 非欣赏态测一次 pill 宽度（欣赏态有 chevron，宽度不同，不在这里测）
+  useLayoutEffect(() => {
+    if (gallery || expanded) return undefined;
+    const element = shellRef.current;
+    if (!element) return undefined;
+    const measure = () => setBaseWidth(Math.round(element.offsetWidth));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [credit?.title, credit?.location, expanded, gallery]);
+
+  // 展开区高度（说明异步到达/失败都会改高度）
+  useLayoutEffect(() => {
+    if (!expanded) {
+      setDetailHeight(0);
+      return undefined;
+    }
+    const element = detailRef.current;
+    if (!element) return undefined;
+    const measure = () => setDetailHeight(Math.round(element.offsetHeight));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [expanded, noteStatus, noteText, localCaption]);
+
+  // H_p 只测底部 pill 行（26）：展开区是浮层，不能参与布局
   useEffect(() => {
-    if (captionHidden || !hasCredit) {
+    if (captionHidden || !credit) {
       reportFooterPillHeight(0);
       return undefined;
     }
-    const element = pillRef.current;
+    const element = mainRef.current;
     if (!element) return undefined;
     const measure = () => reportFooterPillHeight(element.offsetHeight);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [captionHidden, hasCredit]);
+  }, [captionHidden, credit, gallery]);
 
-  /**
-   * 文本就绪后再切到可见态：元素先在 DOM 里以 opacity 0 挂一帧，
-   * 下一帧加类名才会触发过渡（不做骨架屏 / spinner）。
-   */
+  // 展开时点外部 / Esc 收起（回到欣赏态 pill；不退出欣赏）
   useEffect(() => {
-    if (!gallery || !shownNoteText) {
-      setNoteVisible(false);
-      return undefined;
-    }
-    if (noteVisible) return undefined;
-    const frame = window.requestAnimationFrame(() => setNoteVisible(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [gallery, shownNoteText, noteVisible]);
-
-  const frame = useMemo(
-    () =>
-      layoutFrame(
-        computeGridMetrics(viewport.width, viewport.height),
-        viewport.width,
-        viewport.height,
-        pillHeight,
-      ),
-    [viewport.width, viewport.height, pillHeight],
-  );
-  const { pill } = frame;
+    if (!gallery || !expanded) return undefined;
+    const onPointerDown = (event: PointerEvent) => {
+      const shell = shellRef.current;
+      if (!shell) return;
+      if (event.target instanceof Node && shell.contains(event.target)) return;
+      setExpanded(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [expanded, gallery]);
 
   if (captionHidden || !credit) return null;
 
   const label = credit.full ? `壁纸：${credit.title}。${credit.full}` : `壁纸：${credit.title}`;
-  const noteClassName = mergeClasses(
-    styles.note,
-    noteVisible && styles.noteVisible,
-    reducedMotion && styles.noteReduced,
-  );
-  // 按下形变类只在允许动效时合并：reduced-motion 下按钮完全没有 transform（MOTION §7）
-  const creditClassName = mergeClasses(
-    styles.credit,
-    !reducedMotion && styles.creditPressable,
-    reducedMotion && styles.creditReduced,
-  );
+  const hasChevron = gallery;
+  const shellWidth = baseWidth > 0 ? (hasChevron ? baseWidth + NOTE_EXPAND_DELTA : baseWidth) : undefined;
+  const maxWidth = Math.max(0, frame.entry.x - metrics.gap - pill.left - metrics.gap);
+  const shellStyle: CSSProperties = {
+    width: shellWidth,
+    height: expanded ? detailHeight + FOOTER_PILL_ESTIMATE : undefined,
+    maxWidth,
+  };
+  const dateLabel =
+    wallpaper.mode === 'local'
+      ? ''
+      : `${wallpaper.current?.date ?? ''}${wallpaper.current?.date ? ' · ' : ''}必应每日壁纸`;
+  const noteClassName = mergeClasses(styles.noteShell, expanded && styles.noteShellExpanded);
+
+  let body: ReactNode;
+  if (wallpaper.mode === 'local') {
+    body = (
+      <div className={styles.noteBody}>
+        {localCaption || '本机图片没有说明文字'}
+      </div>
+    );
+  } else if (noteStatus === 'loading') {
+    body = (
+      <div className={styles.noteLoading}>
+        {showSpinner ? <Spinner size="extra-tiny" /> : null}
+        <span>正在生成说明…</span>
+      </div>
+    );
+  } else if (noteStatus === 'failed') {
+    body = <div className={styles.noteError}>说明暂时无法生成</div>;
+  } else {
+    body = <div className={styles.noteBody}><MessageContent text={noteText ?? ''} /></div>;
+  }
 
   return (
     <div
@@ -597,65 +706,60 @@ export function WallpaperCredit({
       style={{ left: pill.left, top: pill.top, width: pill.width, height: pill.height }}
     >
       <div className={styles.creditStack}>
-        {gallery ? (
-          <div className={styles.noteRow} data-wallpaper-note-row="true">
+        <div
+          ref={shellRef}
+          className={noteClassName}
+          style={shellStyle}
+          data-wallpaper-note-shell="true"
+          data-expanded={expanded ? 'true' : undefined}
+          data-reduced-motion={reducedMotion ? 'true' : undefined}
+        >
+          {expanded ? (
             <div
-              className={noteClassName}
+              ref={detailRef}
+              className={styles.noteDetail}
               data-wallpaper-note="true"
               aria-live="polite"
             >
-              {shownNoteText ? <MessageContent text={shownNoteText} /> : null}
+              {dateLabel ? <div className={styles.noteDate}>{dateLabel}</div> : null}
+              {body}
             </div>
-            {showRegenerate ? (
+          ) : null}
+          <div className={styles.noteRow}>
+            <button
+              ref={mainRef}
+              type="button"
+              className={mergeClasses(styles.noteMain, expanded && styles.noteMainExpanded)}
+              aria-label={label}
+              aria-pressed={gallery}
+              onClick={(event) => {
+                // 把焦点收回宿主文档，确保 iframe 里的旧焦点不会吞掉 Esc
+                event.currentTarget.focus({ preventScroll: true });
+                onToggleGallery();
+              }}
+            >
+              <span className={styles.noteTitle}>{credit.title}</span>
+              {credit.location ? (
+                <span className={styles.noteMeta}>&nbsp;·&nbsp;{credit.location}</span>
+              ) : null}
+            </button>
+            {hasChevron ? (
               <button
                 type="button"
-                className={styles.regenerate}
-                data-wallpaper-regen="true"
-                data-wallpaper-regen-state={noteLoading ? 'loading' : 'ready'}
-                aria-label={REGENERATE_NOTE_LABEL}
-                aria-busy={noteLoading ? true : undefined}
-                disabled={noteLoading}
-                onClick={() => refreshNote()}
+                className={styles.noteChevron}
+                aria-label={expanded ? '收起说明' : '展开说明'}
+                aria-expanded={expanded}
+                onClick={() => setExpanded((previous) => !previous)}
               >
-                <ArrowClockwise20Regular
-                  aria-hidden="true"
-                  className={
-                    noteLoading && !reducedMotion ? styles.regenerateSpin : undefined
-                  }
-                />
+                {expanded ? (
+                  <ChevronDown20Regular aria-hidden="true" />
+                ) : (
+                  <ChevronUp20Regular aria-hidden="true" />
+                )}
               </button>
             ) : null}
           </div>
-        ) : null}
-        <button
-          ref={pillRef}
-          type="button"
-          className={creditClassName}
-          data-wallpaper-credit="true"
-          data-gallery={gallery ? 'true' : undefined}
-          aria-pressed={gallery}
-          aria-label={label}
-          title={credit.full || undefined}
-          onClick={(event) => {
-            // 把焦点收回宿主文档，确保 iframe 里的旧焦点不会吞掉 Esc
-            event.currentTarget.focus({ preventScroll: true });
-            onToggleGallery();
-          }}
-        >
-          <span className={styles.creditContent}>
-            <span className={mergeClasses(styles.creditLine, styles.creditTitle)}>{credit.title}</span>
-            {credit.location ? (
-              <>
-                <span className={styles.creditDivider} aria-hidden="true">
-                  ·
-                </span>
-                <span className={mergeClasses(styles.creditLine, styles.creditMeta)}>
-                  {credit.location}
-                </span>
-              </>
-            ) : null}
-          </span>
-        </button>
+        </div>
       </div>
     </div>
   );

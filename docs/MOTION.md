@@ -28,7 +28,7 @@
 
 禁止：自定义毫秒数、自定义 cubic-bezier、弹簧/回弹超调、`ease-in-out` 字面量。
 
-## 2. 卡片状态机（宿主统一驱动）
+## 2. 桌面表面状态机（widget 卡片 + 桌面 chrome，宿主统一驱动）
 
 ```
 rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed ──hold 500ms──▶ longpress ──▶ 编辑模式
@@ -39,14 +39,15 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 | 状态 | transform | 阴影/描边 | 过渡 |
 |---|---|---|---|
 | rest | scale(1) | `shadow4` + 材质 token | — |
-| hover | scale(1.015) | `shadow8` + 1px `colorNeutralStroke1` | 100ms `curveDecelerateMin` |
+| hover | scale(1.02) | `shadow8` + 1px `colorNeutralStroke1` | 100ms `curveDecelerateMin` |
 | hover 离开 | scale(1) | 回 rest | 100ms `curveAccelerateMin` |
-| pressed | scale(0.985) | `shadow4`，描边保持 | 50ms `curveAccelerateMin` |
-| longpress（500ms 内） | scale(0.985 → 0.97) 线性下沉 | 描边渐显到 `colorBrandStroke1`（透明度 0→0.35） | 500ms `curveLinear` |
+| pressed | scale(0.98) | `shadow4`，描边保持 | 50ms `curveAccelerateMin` |
+| longpress（500ms 内） | scale(0.98 → 0.97) 线性下沉 | 描边渐显到 `colorBrandStroke1`（透明度 0→0.35） | 500ms `curveLinear` |
 | 松手未触发 | 回 hover/rest | 回原样 | 150ms `curveDecelerateMid` |
 | 进入编辑模式 | 0.97 → 0.96 | `shadow8`、chrome 淡入 | 200ms `curveDecelerateMid` |
 
-- 放大上限 **1.5%**：164px 卡片每侧约 1.2px，在 12–16px gap 内不会挤到邻居；同时用描边/阴影补充“抬起”感，不靠单一缩放。
+- 数值来自 `design/metrics` 的 `SURFACE_HOVER_SCALE = 1.02` / `SURFACE_PRESS_SCALE = 0.98` / `SURFACE_LONG_PRESS_SCALE = 0.97`（**项目 C 值，不是 Fluent token**：Fluent 2 的 tokens 只覆盖颜色/字体/间距/圆角/描边/动效时长与曲线，没有交互缩放 token）；widget 卡片与桌面 chrome（说明条、chat 入口、状态栏、快速设置面板）共用这一套。
+- 放大 2%：164px 卡片每侧约 1.6px，在 12–16px gap 内不会挤到邻居；同时用描边/阴影补充“抬起”感，不靠单一缩放。2880×1920 @200% DPI 下缩放不担心发虚（用户拍板）。
 - 长按进度用**卡片逐渐下沉**表达，不加进度环；到 500ms 才切编辑模式，期间任何移动/松手都可中断。
 - 只对卡片主体生效；SDK 转发 pointer 时过滤掉 `button/input/[role=button]` 等交互目标。
 - 编辑模式中卡片不参与 hover/press；由编辑覆盖层接管。
@@ -116,7 +117,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 - Reduced Motion：只保留 120ms 透明度，无尺寸/阴影/位移动画；声纹/脉冲静止。
 - 入场方向定义出场方向：永远从右下角长出、原路收回；关闭后焦点回入口按钮。
 
-### 5.2 欣赏壁纸模式（v0.6.0）
+### 5.2 欣赏壁纸模式（v0.6.0；v0.8.0 说明条 A2 修订，D-42）
 
 桌面进入「欣赏壁纸」时只做一次**退场**、退出时做一次**回场**，不新增第三套时长口径——两类过渡直接套 §1 用途表：
 
@@ -124,14 +125,24 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 |---|---|---|
 | 进入欣赏壁纸（卡片淡出、`PageIndicator` 与编辑 chrome 淡出） | 「退出类（浮层收回、chrome 淡出）」 | 只做 opacity（卡片可叠一个 §3/§6 已有的 4–8px 量级 `translateY`）；**不允许 scale**（§10 不做跨 iframe 内容缩放，卡片容器也不缩放）；不碰 width/height，不触发布局 |
 | 退出欣赏壁纸（卡片回场） | 「常规进出」 | 同上的属性集合，方向不变；回场不叠错峰 |
-| 说明条上方的解释文本淡入 | 「常规进出」 | 只 opacity（可叠同一量级 `translateY`），**延迟为 0**——§8 禁止「为动画延迟内容渲染」；等文本回来前元素保持不可见（`opacity: 0` 先挂一帧），不做骨架屏 / spinner / 打字机（§6） |
 
-- **说明条按下形变**（v0.6.0 收口，DECISIONS D-38）：`scale(0.985)`（TOKEN-MAP §11 登记值，与 §2 卡片 pressed 同档）——按下 `durationUltraFast` + `curveAccelerateMin`、hover 进入 `durationFaster` + `curveDecelerateMin`、hover 离开与松手回弹 `durationFaster` + `curveAccelerateMin`（松手后仍停在 hover 上时走 hover 进入档 `curveDecelerateMin`；档位见 §1，不在此重复毫秒）；`transform` 不改变 border-box，`H_p` 仍为 26（D 类，见 TOKEN-MAP §1），说明条高度因此改按 `offsetHeight` 实测。reduced-motion 下不合并按下形变类，按钮没有任何 transform，只保留 100ms 颜色/描边变化（§7）。
-- **手动「重新生成说明」**：解释文本右侧的 44×44 图标按钮（`aria-label`「重新生成说明」），仅在欣赏壁纸模式、且有文本或加载中时出现；加载中按 `durationUltraSlow`（§1「长按进度」档的时长）+ `curveLinear` 旋转，reduced-motion 下静止；`refresh` 走 `force`（跳过缓存成功命中与失败冷静期），失败静默并保留旧说明行；不做自动刷新 / 自动重试 / 轮询。
+**说明条（A2）**：同一个胶囊容器在「非欣赏 pill」与「欣赏态展开卡」之间 morph——非欣赏态只有主体按钮（无 chevron）；
+进入欣赏后出现 chevron 并默认展开详情（日期/来源 + AI 说明；标题/版权只在底部 pill 行出现，不重复，
+正文两端对齐），底部 pill 行保留：文字区=退出欣赏、chevron=折叠。
+- 宽度只向右 **+28**（`spacingHorizontalS` 8 + chevron 图标 20；44×44 命中区由伪元素外扩，不参与布局宽度）；圆角 circular → 12、shadow4 → shadow16；
+  展开 250ms `durationGentle` + `curveDecelerateMid`，收起 150ms `durationFast` + `curveAccelerateMid`；详情内容淡入（无延迟渲染）；reduced-motion 只保留 100ms 淡入淡出、尺寸瞬变。
+- 展开卡是浮层：`H_p` 恒 26，网格 / Agent 入口 / 状态栏不动；欣赏态展开时点外部或 Esc **收起**（不退出欣赏）。
+- 说明刷新不在桌面：设置页「外观 → 壁纸 → 说明」行（低频；打开设置页只读缓存状态，点「刷新说明」才 force 一次，**不自动生成**）。
+- hover / pressed 与 §2 桌面表面状态机统一（1.02 / 0.98）。
 
-- **不新增错峰**：§6「明确不做 stagger 逐项入场」仍然有效。若将来确实要给桌面卡片分批退场，必须先在本文登记这条例外、再把新数值登记进 `TOKEN-MAP §11`，不得在组件里用「token × 系数」派生出一档未登记时长。
-- **reduced-motion**：按 §7「只保留 ≤100ms 纯 opacity 淡入淡出」——位移置 0、错峰置 0、无尺寸/阴影过渡。
-- 本文不复制实现里的毫秒数值：具体档位以 §1 表为准（v0.6.0 实现已按 §1 收敛：卡片退场走 `durationFast` + `curveAccelerateMid`、回场走 `durationNormal` + `curveDecelerateMid`、解释文本 `durationNormal` + `curveDecelerateMid` 且延迟 0、无错峰；本文不另立第二套数字）。
+### 5.3 状态栏快速设置面板（v0.8.0，D-43）
+
+与说明条同源的「胶囊 → 展开卡」morph：状态栏 pill 向上、向左（宽高增长，右缘/下缘不动，`right: 90`、`bottom: 27`），
+圆角 circular → 12、shadow4 → shadow16；展开 250ms / 收起 150ms（同 §5.2）；面板内容淡入；reduced-motion 只淡入。
+- 底部保留状态栏行 + chevron；**chevron 只在展开态存在**，折叠时随面板一起隐藏（回到普通状态栏）——与说明条不同：说明条有欣赏/非欣赏两个桌面状态，chevron 在欣赏态一直存在。
+- 面板内容：自动连接开关、设备列表（唯一首选 star：已选 `Star20Filled` 实心 + brand 色、未选空心）、音量/静音、亮度、自动亮度（仅检测到能力才渲染）、打开 Windows 蓝牙设置。
+- 点外部 / Esc 折叠、焦点回状态栏；与说明条展开互斥（同时最多一个桌面浮层）。
+- 暗色面板填充用 Fluent brand ramp brand 90（#2886de），亮色用主题 `colorBrandBackground`；链接/选中 star 用 `colorBrandForeground1`（D-43 记录）。
 
 ## 6. 插件内部动效（全部按 Fluent motion）
 

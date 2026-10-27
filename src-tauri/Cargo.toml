@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.7.0"
+version = "0.8.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -32,17 +32,25 @@ winreg = "0.56"           # 开机自启（HKCU Run）
 # 站点权限自愈：ICoreWebView2Profile4::SetPermissionState
 # （麦克风被 WebView2 持久化成 Block 之后，只有这条 API 能覆盖它；版本与 wry 传递的那份一致，不多编一份）
 webview2-com = "0.39"
+# WinRT 异步操作类型（IAsyncOperation / AsyncStatus）在 windows-future 里；
+# 状态机需要用 Status()/Cancel() 做超时兜底，直接依赖它才能写类型。
+windows-future = "0.3"
 windows = { version = "0.62", features = [
   "Devices_Geolocation",              # Windows Geolocator
-  "Devices_Enumeration",              # DeviceInformation（蓝牙音频设备枚举）
+  "Devices_Enumeration",              # DeviceInformation / DeviceWatcher（蓝牙音频设备枚举与事件）
   "Devices_Radios",                   # 蓝牙无线电开关
+  "Devices_Sensors",                  # LightSensor.GetDefault（自动亮度能力检测）
   "Media_Audio",                      # AudioPlaybackConnection（A2DP Sink）
   "Win32_Media_Audio",                # CoreAudio：默认渲染端点
   "Win32_Media_Audio_Endpoints",      # IAudioEndpointVolume（主音量/静音）
-  "Win32_System_Com",                 # CoCreateInstance（CoreAudio COM）
+  "Win32_System_Com",                 # CoCreateInstance（CoreAudio / WMI COM）
   "Win32_System_Com_StructuredStorage", # IMMDevice::Activate 的 PROPVARIANT 参数
+  "Win32_System_Ole",                 # WMI 需要的 OLE 基础类型
+  "Win32_System_Variant",             # VARIANT（WMI 属性读写）
+  "Win32_System_Wmi",                 # root\wmi：WmiMonitorBrightness（亮度）
+  "Win32_System_Registry",            # PowerRead/WriteACValueIndex 的 HKEY 参数
   "Foundation",
-  "Win32_System_Power",               # SetThreadExecutionState
+  "Win32_System_Power",               # GetSystemPowerStatus / 自适应亮度电源设置
   "Win32_System_SystemInformation",   # GetTickCount
   "Win32_System_Threading",           # OpenProcess / QueryFullProcessImageNameW（按进程名认设置窗口）
   "Win32_System_WinRT",               # RoInitialize（WinRT 线程初始化）

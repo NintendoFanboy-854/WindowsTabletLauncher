@@ -56,7 +56,8 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   },
   {
     name: 'btAudio.status',
-    description: '读取蓝牙音箱状态：蓝牙是否可用、当前连接或串流中的设备、最近错误。',
+    description:
+      '读取蓝牙音箱状态：蓝牙是否可用、当前连接或串流中的设备、自动连接状态（是否暂停/退避）、首选设备与最近错误。',
     parameters: {
       type: 'object',
       properties: {},
@@ -65,7 +66,8 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   },
   {
     name: 'btAudio.devices',
-    description: '列出已配对、可用作音频接收的蓝牙设备。',
+    description:
+      '列出已配对、可用作音频接收的蓝牙设备，按自动连接顺序排列，并给出首选设备 preferredDeviceId 与自动连接状态。',
     parameters: {
       type: 'object',
       properties: {},
@@ -75,7 +77,7 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   {
     name: 'btAudio.connect',
     description:
-      '把平板连接到蓝牙设备并开始接收手机音频。可用 deviceName 精确匹配设备；必须提供 deviceId 或 deviceName。',
+      '把平板连接到蓝牙设备并开始接收手机音频。可用 deviceName 精确匹配，或直接给 deviceId；都不给时连接首选设备。手动连接不会修改首选设备。',
     parameters: {
       type: 'object',
       properties: {
@@ -87,7 +89,8 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   },
   {
     name: 'btAudio.disconnect',
-    description: '断开当前蓝牙音频接收连接。',
+    description:
+      '断开当前蓝牙音频接收连接。手动断开后自动连接会暂停，直到再次手动连接或恢复自动连接。',
     parameters: {
       type: 'object',
       properties: {},

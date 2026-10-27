@@ -1,12 +1,12 @@
 /**
- * 蓝牙音箱设置分组（A2DP Sink）。
+ * 蓝牙音箱设置分组（A2DP Sink，宿主系统能力）。
  *
- * 形态：宿主系统能力（`src-tauri/src/bluetooth_audio.rs`）+ **设置页「常规 → 设备」里的一个分组**。
- * 不新增宿主页面 / 路由 / 图标 / 搜索项：蓝牙是设备设置与一次性任务，现有设置框架足以承载。
- * 入口只有：设置页（`Ctrl+,` / 右键 → 设置 / 编辑工具栏 → 设置）；Agent 通过 4 个内置工具操作。
+ * 形态（D-39 / D-43 收敛后）：**设置页「常规 → 设备」里的一个分组**，不新增页面/路由/图标/搜索项。
+ * 日常连接、断连、音量/亮度这些即时操作在桌面状态栏的快速设置面板里（`QuickSettingsPanel`）；
+ * 这里只保留「需要看清状态再改」的长期项：蓝牙开关、自动连接、首选设备、错误详情与系统兜底入口。
+ * 因而 **不重复** 面板里的设备列表点击连接 / 断开按钮——两处只保留一处可编辑（D-43）。
  *
- * 状态全部来自宿主快照（轮询），页面只负责把 `connected / streaming / devices` 映射成
- * 一行描述 + 一个动作；不写说明书、不造 hero、不引新视觉语言。
+ * 状态全部来自宿主快照（轮询），不写说明书、不造 hero、不引新视觉语言。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,28 +20,32 @@ import {
   Option,
   Spinner,
   Switch,
-  makeStyles,
   tokens,
+  makeStyles,
 } from '@fluentui/react-components';
+import { Star20Filled } from '@fluentui/react-icons';
 
 import { TOUCH_TARGET_CSS } from '../../design/metrics';
 import { isTauriRuntime } from '../../plugins/tauri';
 import {
-  btAudioConnect,
-  btAudioDisconnect,
+  AUTO_CONNECT_STATE_TEXT,
   btAudioOpenSettings,
   btAudioRefresh,
+  btAudioResumeAuto,
+  btAudioSetAutoConnect,
   btAudioSetBluetooth,
+  btAudioSetPreferred,
   btAudioSnapshot,
+  orderedDevices,
   type BtAudioSnapshot,
   type BtDeviceInfo,
 } from '../../system/bluetoothAudio';
 import { SettingsGroup, SettingsRow } from './SettingsBlocks';
 
-/** 状态轮询间隔：只在设置页挂载期间跑；连接/断开命令进行中跳过，避免旧快照覆盖。 */
+/** 设置页分组轮询间隔：只在挂载期间跑；命令进行中跳过，避免旧快照覆盖 */
 const POLL_INTERVAL_MS = 1500;
 
-type BusyAction = 'connect' | 'disconnect' | 'bluetooth' | 'refresh';
+type BusyAction = 'bluetooth' | 'autoConnect' | 'preferred' | 'resume' | 'refresh';
 
 interface FriendlyError {
   title: string;
@@ -66,6 +70,9 @@ function friendlyError(message: string | null): FriendlyError | null {
   ) {
     return { title: '打开蓝牙失败', detail: '系统没有允许蓝牙操作' };
   }
+  if (/自动连接|尝试连接|回连/.test(message)) {
+    return { title: '自动连接失败', detail: '稍后会自动重试，也可以现在手动连接' };
+  }
   return { title: '蓝牙操作失败', detail: '重试一次' };
 }
 
@@ -89,6 +96,14 @@ const useStyles = makeStyles({
   errorBody: {
     color: tokens.colorNeutralForeground2,
   },
+  optionText: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+  },
+  star: {
+    color: tokens.colorBrandForeground1,
+  },
 });
 
 export function BluetoothSpeakerSettings() {
@@ -98,13 +113,13 @@ export function BluetoothSpeakerSettings() {
   const [snapshot, setSnapshot] = useState<BtAudioSnapshot | null>(null);
   const [loading, setLoading] = useState(tauri);
   const [busy, setBusy] = useState<BusyAction | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
   const busyRef = useRef(false);
   const mountedRef = useRef(true);
   /** 最近一次失败动作的重试入口：错误条「重试」优先重放它，而不是只刷新状态。 */
   const retryRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -137,7 +152,7 @@ export function BluetoothSpeakerSettings() {
   }, [load]);
 
   useEffect(() => {
-    if (!tauri) return;
+    if (!tauri) return undefined;
     const timer = window.setInterval(() => {
       if (busyRef.current || !mountedRef.current) return;
       void btAudioSnapshot()
@@ -151,20 +166,15 @@ export function BluetoothSpeakerSettings() {
     return () => window.clearInterval(timer);
   }, [tauri]);
 
-  // 选中项跟随设备列表：当前连接设备优先，否则第一台；设备消失时回落到第一台。
-  useEffect(() => {
-    if (!snapshot) return;
-    const ids = snapshot.devices.map((device) => device.id);
-    if (selectedId && ids.includes(selectedId)) return;
-    setSelectedId(snapshot.activeDeviceId ?? snapshot.devices[0]?.id ?? null);
-  }, [snapshot, selectedId]);
-
   const run = useCallback(
     async (action: BusyAction, task: () => Promise<BtAudioSnapshot>) => {
       if (busyRef.current) return;
       busyRef.current = true;
       setBusy(action);
       setPageError(null);
+      retryRef.current = () => {
+        void run(action, task);
+      };
       try {
         const next = await task();
         if (!mountedRef.current) return;
@@ -187,40 +197,45 @@ export function BluetoothSpeakerSettings() {
     [],
   );
 
-  const connect = useCallback(
-    (deviceId: string) => {
-      retryRef.current = () => {
-        void run('connect', () => btAudioConnect(deviceId));
-      };
-      void run('connect', () => btAudioConnect(deviceId));
-    },
-    [run],
-  );
-
-  const disconnect = useCallback(() => {
-    retryRef.current = () => {
-      void run('disconnect', () => btAudioDisconnect());
-    };
-    void run('disconnect', () => btAudioDisconnect());
-  }, [run]);
-
   const toggleBluetooth = useCallback(
     (on: boolean) => {
-      retryRef.current = () => {
-        void run('bluetooth', () => btAudioSetBluetooth(on));
-      };
       void run('bluetooth', () => btAudioSetBluetooth(on));
     },
     [run],
   );
 
-  const openSettings = useCallback(async () => {
+  const changeAutoConnect = useCallback(
+    (enabled: boolean) => {
+      void run('autoConnect', async () => {
+        const next = await btAudioSetAutoConnect(enabled);
+        // 重新打开自动连接时顺带解除「手动断开」造成的 paused（D-44 用户意图）
+        if (enabled && next.autoConnectState === 'paused') {
+          return btAudioResumeAuto();
+        }
+        return next;
+      });
+    },
+    [run],
+  );
+
+  const resumeAuto = useCallback(() => {
+    void run('resume', () => btAudioResumeAuto());
+  }, [run]);
+
+  const changePreferred = useCallback(
+    (deviceId: string | null) => {
+      void run('preferred', () => btAudioSetPreferred(deviceId));
+    },
+    [run],
+  );
+
+  const openSystemBluetooth = useCallback(async () => {
     try {
       await btAudioOpenSettings();
     } catch (error) {
       setPageError(errorText(error));
       retryRef.current = () => {
-        void openSettings();
+        void openSystemBluetooth();
       };
     }
   }, []);
@@ -233,21 +248,26 @@ export function BluetoothSpeakerSettings() {
     );
   }
 
-  const connectionLookup = snapshot?.activeDeviceId
-    ? snapshot.devices.find((device) => device.id === snapshot.activeDeviceId) ?? null
+  const devices = snapshot ? orderedDevices(snapshot) : [];
+  const activeDevice = snapshot?.activeDeviceId
+    ? devices.find((device) => device.id === snapshot.activeDeviceId) ?? null
+    : null;
+  const preferredDevice = snapshot?.preferredDeviceId
+    ? devices.find((device) => device.id === snapshot.preferredDeviceId) ?? null
     : null;
   const streaming = snapshot?.streaming === true;
   const connected = snapshot?.connected === true;
-  const disconnected = Boolean(snapshot?.activeDeviceId) && snapshot?.connected === false;
+  const paused = snapshot?.autoConnectState === 'paused';
   const bluetoothOff = snapshot?.bluetoothOn === false;
   const unavailable = !loading && snapshot !== null && !snapshot.available;
   const loadFailed = pageError !== null && snapshot === null;
-  const devices = snapshot?.devices ?? [];
-  const activeDevice = connectionLookup;
-  const error = friendlyError(pageError ?? snapshot?.lastError ?? null);
-  const selectedDevice = devices.find((device) => device.id === selectedId) ?? null;
-  const showDevicePicker = !unavailable && !bluetoothOff && devices.length > 0 && !connected && !disconnected;
   const actionDisabled = busy !== null || loading;
+
+  const error = friendlyError(
+    pageError ??
+      snapshot?.lastError ??
+      (snapshot?.autoConnectState === 'backoff' ? snapshot.lastAttemptError : null),
+  );
 
   const statusText = loading
     ? '正在读取蓝牙状态…'
@@ -258,19 +278,30 @@ export function BluetoothSpeakerSettings() {
         : bluetoothOff
           ? '蓝牙已关闭'
           : streaming
-          ? `正在接收「${deviceName(activeDevice)}」的音频`
-          : connected
-            ? `已连接「${deviceName(activeDevice)}」`
-            : disconnected
-              ? `与「${deviceName(activeDevice)}」的连接已断开`
-              : devices.length === 0
-                ? '还没有配对的手机'
-                : '选一台设备开始';
+            ? `正在接收「${deviceName(activeDevice)}」的音频`
+            : connected
+              ? `已连接「${deviceName(activeDevice)}」`
+              : activeDevice
+                ? `与「${deviceName(activeDevice)}」的连接已断开`
+                : devices.length === 0
+                  ? '还没有配对的手机'
+                  : '未连接';
+
+  const autoConnectDescription = snapshot
+    ? AUTO_CONNECT_STATE_TEXT[snapshot.autoConnectState] ?? '状态未知'
+    : '状态未知';
+  const autoConnectHint = paused
+    ? '手动断开后已暂停，点「恢复自动连接」继续'
+    : snapshot?.autoConnectEnabled === false
+      ? '关闭后不会再自动回连首选设备'
+      : '首选设备优先，失败按顺序尝试下一台';
+
+  const preferredValue = preferredDevice?.name ?? '不设首选';
 
   return (
     <SettingsGroup
       title="设备"
-      hint="蓝牙音箱把平板当手机外放；先在手机或 Windows 蓝牙里配对，设备会出现在这里。"
+      hint="蓝牙音箱把平板当手机外放；日常连接在桌面状态栏点开快速设置即可。"
     >
       <SettingsRow
         label="蓝牙"
@@ -296,101 +327,81 @@ export function BluetoothSpeakerSettings() {
       </SettingsRow>
 
       <SettingsRow label="蓝牙音箱" description={statusText}>
+        {loading ? (
+          <Spinner size="tiny" />
+        ) : connected ? (
+          <Badge appearance="filled" color={streaming ? 'success' : 'informative'}>
+            {streaming ? '正在接收' : '已连接'}
+          </Badge>
+        ) : null}
+      </SettingsRow>
+
+      <SettingsRow label="自动连接" description={`${autoConnectDescription}。${autoConnectHint}`}>
         <div className={styles.control}>
-          {loading ? (
-            <Spinner size="tiny" />
-          ) : loadFailed ? null : unavailable ? (
+          <Switch
+            className={styles.touch}
+            checked={snapshot?.autoConnectEnabled === true}
+            disabled={actionDisabled || snapshot === null || snapshot.autoConnectState === 'unavailable'}
+            onChange={(_event, data) => {
+              changeAutoConnect(data.checked);
+            }}
+            aria-label="自动连接"
+          />
+          {paused ? (
             <Button
               appearance="secondary"
               size="large"
               className={styles.touch}
-              onClick={() => void openSettings()}
+              disabled={actionDisabled}
+              onClick={resumeAuto}
             >
-              蓝牙设置
+              恢复自动连接
             </Button>
-          ) : bluetoothOff ? (
-            <Button
-              appearance="secondary"
-              size="large"
-              className={styles.touch}
-              onClick={() => void openSettings()}
-            >
-              蓝牙设置
-            </Button>
-          ) : connected ? (
-            <>
-              <Badge appearance="filled" color={streaming ? 'success' : 'informative'}>
-                {streaming ? '正在接收' : '已连接'}
-              </Badge>
-              <Button
-                appearance="secondary"
-                size="large"
-                className={styles.touch}
-                disabled={actionDisabled}
-                onClick={disconnect}
-              >
-                断开
-              </Button>
-            </>
-          ) : disconnected && activeDevice ? (
-            <>
-              <Button
-                appearance="primary"
-                size="large"
-                className={styles.touch}
-                disabled={actionDisabled}
-                onClick={() => connect(activeDevice.id)}
-              >
-                重连
-              </Button>
-              <Button
-                appearance="subtle"
-                size="large"
-                className={styles.touch}
-                onClick={() => void openSettings()}
-              >
-                蓝牙设置
-              </Button>
-            </>
-          ) : showDevicePicker ? (
-            <>
-              <Dropdown
-                size="large"
-                className={`${styles.touch} ${styles.select}`}
-                aria-label="选择蓝牙设备"
-                value={selectedDevice?.name ?? ''}
-                selectedOptions={selectedId ? [selectedId] : []}
-                onOptionSelect={(_event, data) => {
-                  if (data.optionValue) setSelectedId(data.optionValue);
-                }}
-              >
-                {devices.map((device) => (
-                  <Option key={device.id} value={device.id} text={device.name}>
-                    {device.name}
-                  </Option>
-                ))}
-              </Dropdown>
-              <Button
-                appearance="primary"
-                size="large"
-                className={styles.touch}
-                disabled={actionDisabled || !selectedId}
-                onClick={() => selectedId && connect(selectedId)}
-              >
-                {busy === 'connect' ? '连接中…' : '连接'}
-              </Button>
-            </>
-          ) : (
-            <Button
-              appearance="secondary"
-              size="large"
-              className={styles.touch}
-              onClick={() => void openSettings()}
-            >
-              蓝牙设置
-            </Button>
-          )}
+          ) : null}
         </div>
+      </SettingsRow>
+
+      <SettingsRow
+        label="首选设备"
+        description={preferredDevice ? `自动连接优先「${preferredDevice.name}」` : '未设置首选设备'}
+      >
+        <Dropdown
+          size="large"
+          className={`${styles.touch} ${styles.select}`}
+          aria-label="首选设备"
+          value={preferredValue}
+          selectedOptions={preferredDevice ? [preferredDevice.id] : []}
+          disabled={actionDisabled || devices.length === 0 || unavailable || bluetoothOff}
+          onOptionSelect={(_event, data) => {
+            if (!data.optionValue) return;
+            changePreferred(data.optionValue === '__none__' ? null : data.optionValue);
+          }}
+        >
+          <Option value="__none__" text="不设首选">
+            不设首选
+          </Option>
+          {devices.map((device) => (
+            <Option key={device.id} value={device.id} text={device.name}>
+              <span className={styles.optionText}>
+                {device.id === snapshot?.preferredDeviceId ? (
+                  <Star20Filled aria-hidden="true" className={styles.star} />
+                ) : null}
+                {device.name}
+              </span>
+            </Option>
+          ))}
+        </Dropdown>
+      </SettingsRow>
+
+      <SettingsRow label="系统蓝牙设置" description="配对手机、开关蓝牙、排查连接问题">
+        <Button
+          appearance="secondary"
+          size="large"
+          className={styles.touch}
+          onClick={() => void openSystemBluetooth()}
+        >
+          打开
+        </Button>
       </SettingsRow>
 
       {error && (
@@ -411,27 +422,14 @@ export function BluetoothSpeakerSettings() {
                     retry();
                     return;
                   }
-                  if (activeDevice) {
-                    connect(activeDevice.id);
-                  } else {
-                    void load();
-                  }
+                  void load();
                 }}
                 disabled={actionDisabled}
               >
                 重试
               </Button>
             }
-          >
-            <Button
-              appearance="subtle"
-              size="large"
-              className={styles.touch}
-              onClick={() => void openSettings()}
-            >
-              蓝牙设置
-            </Button>
-          </MessageBarActions>
+          />
         </MessageBar>
       )}
     </SettingsGroup>

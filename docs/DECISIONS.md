@@ -545,6 +545,7 @@
   - **把 `State=Closed` 直接当断开**：手机还没播放时就是 Closed，会误报「连接已断开」。
 - 文档落点：本节；`DESIGN §8`；`README` 特性与安装说明；旧行为考古 `.tmp/bt-speaker/{HISTORY,UX-SPEC,RUST-WINRT}.md`（本地证据，不入库）。
 - 实现状态：Rust `cargo check --lib` 通过；`typecheck` / `build` 通过；**v0.7.0 正式构建成功**（NSIS `Windows Tablet Launcher_0.7.0_x64-setup.exe` 4.10 MB / MSI 5.10 MB），`/S` 静默覆盖安装 exit 0，注册表 `DisplayVersion=0.7.0`，安装版 `app.exe` FileVersion 0.7.0 并正常运行；用户确认手机可连接播放；安装版状态栏显示「音箱 / 38% / 98%」。
+- v0.8.0 修订（D-42/D-43/D-44）：说明条交互重做为 A2（D-42）；即时控制进状态栏快速设置面板（D-43）；后台自动连接状态机（D-44）取代本条「不做自动连接 / 连接通知 / 上次设备记忆」的旧口径；「MVP 不配对」维持不变。设置页分组保留自动连接/首选/蓝牙开关/错误详情，重复的连接下拉已移除。
 
 ## D-40 桌面底部状态栏：系统状态（电量/充电/音量/蓝牙音箱）进宿主 chrome（2026-10-27）
 
@@ -565,3 +566,53 @@
 - 真机验证（Tauri，2026-10-27）：`shots/bt-ui/tauri-installed-0.7.0-2.png`（安装版 0.7.0，状态栏「音箱 / 38% / 98%」；`tauri-desktop-final2.png` 为调试版同口径对照）、`shots/bt-ui/tauri-settings-2.png`（设置页「蓝牙已开启 / 还没有配对的手机 / 蓝牙设置」）。浏览器 1440×960 几何实测 `right=1350` / `bottom=933` / `height=26`，与 Agent 入口下缘 933 共线、间距一个 gutter；独立审查 `.tmp/bt-speaker/UI-REVIEW-2.md`。状态栏轮询 2s、设置分组轮询 1.5s（行为常量，不进设计 token）。
 - 文档落点：本节；`DESIGN §8`；`README` 特性；`DENSITY` 底部条口径在实现后按需补一句（本轮不改规范数值）。
 - 实现状态：Rust `cargo check --lib` 通过；`typecheck` / `build` 通过；独立审查 P0（蓝牙按钮命中区 40px < 44）已修为 `::after` 纵向 `TOUCH_TARGET_CSS`；手机配对推流待实机验证。
+- v0.8.0 修订（D-41/D-43）：状态栏不再只读——整条可点、展开快速设置面板（D-43）；材质/状态统一到 D-41（72% 表面、hover 1.02 / pressed 0.98）；图标改 16/12、暗色品牌填充 brand 90。
+
+## D-41 桌面表面统一：材质 / 状态 / 图标档位（2026-10-28，v0.8.0）
+
+- 背景：桌面 chrome（说明条、chat 入口、状态栏）与 widget 卡片各自写材质与 hover（72% / 78% / 实色；shadow4/8 混用；只有卡片有缩放状态机），用户指出「设计样式应当统一，而不是各自为政」；同时追问 0.985 是否为 Fluent token。
+- 决策：
+  1. **唯一表面**：`colorNeutralBackground1` 72% + `--wtsl-material-blur`（24）+ `colorNeutralStroke2` 1px + `shadow4`；卡片/浮层圆角 12（`borderRadius2XLarge`）、胶囊圆形。说明条/状态栏从 78% 收敛到 72%；chat 入口从实色改为 72% + blur。
+  2. **唯一状态机**（MOTION §2）：hover `scale(1.02)` + shadow8 + stroke1（100ms decelerate）；pressed `scale(0.98)`（50ms accelerate）；松手/离开 100ms accelerate；focus 2px `colorStrokeFocus2`；reduced-motion 不做 transform。hover/pressed 数值统一（用户拍板 1.02/0.98，原 1.015/0.985 废止；1440×960 @200% DPI 不担心发虚）。
+  3. **共享常量**：`design/metrics.ts` 的 `SURFACE_HOVER_SCALE = 1.02` / `SURFACE_PRESS_SCALE = 0.98` / `SURFACE_LONG_PRESS_SCALE = 0.97`；`WidgetCard`、`WallpaperLayer`、`desktop.styles` 等不再写本地字面量。TOKEN-MAP §11 标注「项目 C 值，非 Fluent token」——Fluent 2 tokens 只覆盖颜色/字体/间距/圆角/描边/动效时长与曲线，没有交互缩放 token；Fluent UI v9 组件按下默认只改颜色。
+  4. **图标**：桌面 chrome 只用 `@fluentui/react-icons`（禁手绘 SVG、禁混用其他图标集）；状态栏内联信息图标 **16 + 文字 12**（Fluent 图标库 Bluetooth/Speaker2 无 12 档，16 是最小可用信息档），按钮类图标 20。
+- 否掉：继续按表面各写一套 hover；自造 1.03 小表面档（用户要求跟 widget 一致）；缩放 20 图标到 12（违反 Fluent「按具体尺寸使用、不要缩放」）。
+- 文档落点：FLUENT2 §7/§9、MOTION §2/§5.2、TOKEN-MAP §11、DESIGN §8、README。
+- 实现/验证：`npm run typecheck` 通过；浏览器与真机截图见 v0.8.0 发布验证。
+
+## D-42 壁纸说明条 A2：非欣赏无 chevron、欣赏态默认展开、刷新迁移设置页（2026-10-28，v0.8.0）
+
+- 背景：用户在看完多版 P0 后明确交互：非欣赏态说明条只应整条可按（无展开按钮）；进入欣赏壁纸后默认展开详情，并用「最小变形」把 chevron 拉出来；展开态文字区 = 退出欣赏、chevron = 折叠（语义不得混）；详情不重复说明条已有信息（标题/版权），只留日期/来源 + 说明；文字左轴 = 说明条内容左轴、右轴 = 箭头视觉右缘；日期只左对齐；说明条宽度不出现省略号（min 256，最大随文字动态变化）；刷新说明低频，移到设置页。
+- 决策：
+  1. **结构**：非欣赏态一个按钮（无 chevron）；欣赏态渲染 chevron（20 图标 + 8 间距 + 右 8 padding，44×44 命中伪元素外扩）并默认展开；底部 pill 行保留（文字区 = 退出欣赏、chevron = 折叠）；退出欣赏自动收起、chevron 消失。
+  2. **宽度**：非欣赏 `max-content` + `min-width: 256`（8×XXXL）；不设固定上限、不出现 ellipsis；极端超长换行兜底（H_p 实测自适应）。展开宽度只 **+28**（spacing 8 + 20 图标）；详情左右 padding 12，右轴按箭头图标**视觉**右缘（盒右 412 / 图标视觉右 ≈408，与正文右 408 同线）；日期/来源只左对齐；正文 `text-align: justify`（左右都贴内容带，最后一行左对齐）。
+  3. **展开是浮层**：H_p 恒 26（只测底部 pill 行 `offsetHeight`），网格/入口/状态栏不动；展开 250 / 收起 150、reduced-motion 只淡入；点外部/Esc 收起（不退出欣赏）；与状态栏面板互斥。
+  4. **刷新迁移**：移除旧 noteRow /「重新生成说明」按钮；说明刷新移到设置 → 外观 → 壁纸「说明」行（打开设置页只读缓存状态，点刷新才 force 一次；固定模式选图后目标随之切换）。
+- 否掉：非欣赏态保留展开按钮（语义冲突）；展开卡固定 420 / 无 min-width；正文左对齐（右侧参差，用户肉眼判不齐）；桌面放刷新按钮。
+- 文档落点：MOTION §5.2、DESIGN §8、FLUENT2 §7、TOKEN-MAP §11、README。
+- 实现：`WallpaperLayer.tsx`（WallpaperCredit 重写）、`WallpaperSettings.tsx`（说明行）；typecheck 通过；真机截图见发布验证。
+
+## D-43 状态栏快速设置面板 + 系统控制（2026-10-28，v0.8.0）
+
+- 背景：用户要求状态栏可点、触控优先地快速调音量/静音/亮度、选择蓝牙设备与首选、自动连接；并给 P0 定稿：面板与说明条同源 morph、底部保留状态栏行 + chevron、折叠时 chevron 一起隐藏；暗色面板填充用 brand 90；已选 star 用实心；检测到自动亮度才显示该行。
+- 决策：
+  1. **状态栏整条按钮**：统一 surface（D-41）；图标 16 + 文字 12；gap 20/4、padding 12；保留轮询（系统状态与蓝牙拆开，避免慢链路阻塞电量/音量）。
+  2. **点击展开 QuickSettingsPanel**：右缘/下缘不动、宽高/圆角/阴影 morph（250/150）、内容淡入；底部保留状态栏行 + chevron（折叠时一起隐藏）；点外部/Esc 折叠、焦点回状态栏。
+  3. **面板内容**：自动连接 Switch、设备列表（点行连接；唯一首选 star：`Star20Filled` / `Star20Regular`）、音量（静音 + Slider）、亮度 Slider、自动亮度（条件行）、打开 Windows 蓝牙设置。交互行 44；滑杆触控优先、鼠标/键盘兼容；拖动本地乐观 + 节流提交。
+  4. **系统控制 Rust 命令**：`system_status_snapshot` 增加 `brightnessPercent` / `autoBrightnessSupported` / `autoBrightnessEnabled`；`system_set_volume` / `system_set_muted` / `system_set_brightness` / `system_set_auto_brightness`。亮度走 WMI（内置屏），自动亮度检测环境光传感器 + 电源设置 GUID；写入权限不足返回 Err、前端隐藏/降级。
+  5. **颜色**：暗色面板填充 brand 90（#2886de，Fluent brand ramp），亮色用 `colorBrandBackground`；链接/star 用 `colorBrandForeground1`；不引入自造色。
+- 否掉：状态栏只读（D-40 旧口径）；把控制放设置页（用户要就地快速调整）；面板另起浮层实体（与说明条同源 morph）；暗色用 brand 100（用户拍板 brand 90）。
+- 文档落点：MOTION §5.3、DESIGN §8、FLUENT2 §7/§9、README、D-40 修订。
+
+## D-44 蓝牙自动连接状态机：首选 + MRU/FIFO 回退、事件驱动、用户意图（2026-10-28，v0.8.0）
+
+- 背景：用户要求后台一直进行自动连接：首选设备优先，失败按顺序尝试下一台；未设首选按 FIFO；收到系统「设备已连接」通知而当前无连接时主动连；手动断开后本轮不自动连（除非自己手动连上，之后被动断开才恢复自动寻找）；手动连接不自动改首选；不做配对流程。
+- 决策：
+  1. Rust 常驻 worker（MTA 专用线程）持有 `DeviceWatcher`（AudioPlaybackConnection selector）+ `StateChanged`；事件只投递 worker；所有连接操作串行；退出显式 shutdown。
+  2. 队列：preferred 第一，其余按最近连接时间（MRU）倒序，未连接过的按发现顺序；每轮从队头顺序尝试，全失败退避 5/15/30/60s。
+  3. 用户意图：手动 disconnect → `paused`（不自动、不响应系统连接事件）；手动 connect 成功解除 paused；之后被动断开 → 恢复自动寻找；`resume_auto` 可显式恢复；手动连接只更新 lastConnectedAt，不改 preferred。
+  4. 系统事件：设备 Added（已连接）且当前无连接、非 paused/off → 立即尝试该设备；已有连接不切。
+  5. 持久化 `app_data_dir/bt-audio.json`（autoConnectEnabled 默认 true、preferredDeviceId、order、lastConnectedAt）；命令 `bt_audio_set_auto_connect` / `bt_audio_set_preferred` / `bt_audio_resume_auto`；快照增加 autoConnectEnabled / autoConnectState / attemptDeviceId / lastAttemptError / preferredDeviceId / order。
+  6. 仍不做配对（延续 D-39）；媒体控制后置。
+- 文档落点：DESIGN §8、README、D-39 修订、Agent 工具字段（btAudio.status/devices 透传新字段）。
+- 实现/验证：`cargo check --lib` 通过；真机连接/自动重连/首选回退场景见发布验证。

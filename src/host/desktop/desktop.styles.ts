@@ -9,6 +9,8 @@
  */
 import { makeStyles, tokens, motionTokens } from '@fluentui/react-components';
 
+import { SURFACE_PRESS_SCALE } from '../design/metrics';
+
 /** 卡片圆角：Fluent `borderRadius2XLarge`（12px），不再自造项目变量 */
 export const CARD_RADIUS = tokens.borderRadius2XLarge;
 
@@ -163,7 +165,7 @@ export const useStyles = makeStyles({
     cursor: 'grab',
     touchAction: 'none',
     opacity: 0,
-    transform: `translateY(calc(${tokens.spacingVerticalXS} * -1)) scale(0.985)`,
+    transform: `translateY(calc(${tokens.spacingVerticalXS} * -1)) scale(${SURFACE_PRESS_SCALE})`,
     transformOrigin: 'center center',
     pointerEvents: 'none',
     // 退出走退出类 token（MOTION §1/§3：150ms curveAccelerateMid），

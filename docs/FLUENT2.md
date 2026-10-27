@@ -113,6 +113,9 @@
   hover/active 只改同一中性面的 `color-mix` 百分比（88% / 72%），不引入新色值；焦点环用 `colorStrokeFocus2`；44×44 命中区由 `::after` 外扩，
   **不改变 26 的视觉高度**（它仍是桌面网格布局的输入 `H_p`）。说明条同时是「欣赏壁纸」模式的入口（点击 / Esc 退出）。
   **（v0.6.0 收口，DECISIONS D-38）**按下形变 `transform: scale(0.985)`（TOKEN-MAP §11 登记值，与卡片 pressed 同档；按下 / 回弹档位见 MOTION §1 与 §5.2），reduced-motion 不做 transform；高度仍按 `offsetHeight` 实测、`H_p` 不变。欣赏壁纸模式下解释文本右侧加 44×44「重新生成说明」按钮（手动触发，失败保留旧说明）；说明文字必须简体中文、禁止来源旁白——提示词 v2 + 客户端硬校验，命中即按失败处理、不落库。
+- **v0.8.0 桌面表面统一**（DECISIONS D-41）：桌面所有可点表面（widget 卡片、壁纸说明条、chat 入口、状态栏、快速设置面板）共用同一套材质：`colorNeutralBackground1` **72%** + 单一 `--wtsl-material-blur` + `colorNeutralStroke2` 1px + `shadow4`；
+  hover = `scale(1.02)` + `shadow8` + `colorNeutralStroke1`（100ms `curveDecelerateMin`），按下 = `scale(0.98)`（50ms `curveAccelerateMin`），松手/离开 100ms `curveAccelerateMin`；focus 用 2px `colorStrokeFocus2`；reduced-motion 不做 transform，只保留颜色/描边。
+  缩放值来自 `design/metrics` 的 `SURFACE_HOVER_SCALE = 1.02` / `SURFACE_PRESS_SCALE = 0.98`（**项目 C 值，不是 Fluent design token**，MOTION §2 定义），所有表面统一引用，不再各写一套 hover 底色。
 - 弹层/菜单/遮罩一律用 Fluent 组件自带的材质与 scrim，不自己画。
 
 ## 8. 动效（官方原则 + 时长/曲线）
@@ -139,6 +142,7 @@
 
 - 界面图标统一 Fluent System Icons；导航/动作 Regular，选中态 Filled。
 - 常用尺寸 16 / 20 / 24（共享层 `ICON_SIZE` 阶梯是 16/20/24/32/48：32 给详情空态与内容图形，48 只给天气等内容图形；空态主图标另有 `EMPTY_STATE_ICON_SIZE_LARGE = 40`）；交互目标 ≥ 44×44（见无障碍）。
+- **v0.8.0 桌面 chrome 图标档位**（DECISIONS D-41）：状态栏内联信息图标 **16px + 文字 12px**（Fluent 图标库 Bluetooth/Speaker2 无 12 档，16 是可用最小信息档；不缩放 20 图标）；按钮类图标（说明条 chevron / 静音 / star / 设备行手机图标）20px。禁止手绘 SVG、禁止混用其他图标集；尺寸引用 Fluent 尺寸档组件，不逐个写死。
 - 唯一例外：天气现象图标用和风 SVG（Fluent 覆盖不全），只作为内容图形，尺寸/颜色按本规范排。
 
 ## 10. 无障碍（官方 A11y）

@@ -34,6 +34,8 @@ import {
 import { CheckmarkCircle20Filled } from '@fluentui/react-icons';
 
 import { TOUCH_TARGET_CSS } from '../../design/metrics';
+import { cacheKeyFor, readNoteRecord } from '../../agent/oneshot/cache';
+import { describeWallpaper } from '../../agent/oneshot/generate';
 import { useWallpaper, type WallpaperEntry, type WallpaperMode } from '../../shell/wallpaper';
 import { useWallpaperUi } from '../../shell/wallpaperUi';
 import { SettingsGroup, SettingsRow } from './SettingsBlocks';
@@ -182,6 +184,76 @@ export function WallpaperSettings() {
     clearLocal,
   } = useWallpaper();
   const { captionHidden, setCaptionHidden } = useWallpaperUi();
+
+  /**
+   * 壁纸说明（A2）：刷新是低频操作，从桌面的说明条移到设置页——只针对当前/选中的图片。
+   * 打开设置页只读缓存状态（不主动生成）；点「刷新说明」才 force 生成一次。
+   */
+  const noteInput = useMemo(() => {
+    if (state.mode === 'local' || !state.current) return null;
+    const entry = state.current;
+    return {
+      key: entry.key,
+      market: entry.market,
+      title: entry.title,
+      copyright: entry.copyright,
+      date: entry.date,
+      imageUrl: entry.imageUrl,
+    };
+  }, [state.mode, state.current]);
+  const [noteState, setNoteState] = useState<'idle' | 'ready' | 'failed'>('idle');
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [showNoteSpinner, setShowNoteSpinner] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!noteInput) {
+      setNoteState('idle');
+      return () => {
+        alive = false;
+      };
+    }
+    void readNoteRecord(cacheKeyFor(noteInput)).then((record) => {
+      if (!alive) return;
+      if (record?.text.trim()) setNoteState('ready');
+      else if (record?.lastFailureAt) setNoteState('failed');
+      else setNoteState('idle');
+    });
+    return () => {
+      alive = false;
+    };
+  }, [noteInput?.key, noteInput?.market]);
+
+  // 生成超过 1s 才出 Spinner（FLUENT2 §12 等待阈值）
+  useEffect(() => {
+    if (!noteBusy) {
+      setShowNoteSpinner(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setShowNoteSpinner(true), 1000);
+    return () => window.clearTimeout(timer);
+  }, [noteBusy]);
+
+  const refreshNote = async () => {
+    if (!noteInput || noteBusy) return;
+    setNoteBusy(true);
+    try {
+      const note = await describeWallpaper(noteInput, { force: true });
+      setNoteState(note?.text.trim() ? 'ready' : 'failed');
+    } catch {
+      setNoteState('failed');
+    } finally {
+      setNoteBusy(false);
+    }
+  };
+
+  const noteDescription = noteBusy
+    ? '正在重新生成说明…'
+    : noteState === 'ready'
+      ? '已为当前壁纸生成说明'
+      : noteState === 'failed'
+        ? '上次生成失败，可以重试'
+        : '还没有生成说明';
 
   const filePicker = useRef<HTMLInputElement | null>(null);
   /** 受控 RadioGroup 的兜底重渲染：打开选择器后模式没变，得让 DOM 回到真实模式 */
@@ -389,6 +461,21 @@ export function WallpaperSettings() {
           event.target.value = '';
         }}
       />
+
+      {state.mode !== MODE_LOCAL && noteInput && (
+        <SettingsRow label="说明" description={noteDescription}>
+          <Button
+            appearance="secondary"
+            size="large"
+            disabled={noteBusy}
+            aria-busy={noteBusy}
+            icon={showNoteSpinner ? <Spinner size="extra-tiny" /> : undefined}
+            onClick={() => void refreshNote()}
+          >
+            刷新说明
+          </Button>
+        </SettingsRow>
+      )}
 
       <SettingsRow label="隐藏说明条">
         <Switch

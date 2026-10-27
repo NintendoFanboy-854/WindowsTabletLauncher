@@ -50,6 +50,11 @@ import { withIdentityTheme } from '../plugins';
 import type { IdentityHue } from '../plugins';
 import { CARD_MATERIAL, CARD_RADIUS, useStyles } from './desktop.styles';
 import { EDIT_CARD_SCALE, EDIT_TOUCH_TARGET } from './interaction';
+import {
+  SURFACE_HOVER_SCALE as HOVER_SCALE,
+  SURFACE_LONG_PRESS_SCALE as LONG_PRESS_SCALE,
+  SURFACE_PRESS_SCALE as PRESS_SCALE,
+} from '../design/metrics';
 import { WidgetFrame } from './WidgetFrame';
 import type { WidgetFrameHandle } from './WidgetFrame';
 
@@ -63,10 +68,7 @@ const TOUCH_TARGET: CSSProperties = {
   minHeight: EDIT_TOUCH_TARGET,
 };
 
-/** MOTION §2 卡片状态机：hover 放大 1.5%，按下 0.985，长按线性下沉到 0.97 */
-const HOVER_SCALE = 1.015;
-const PRESS_SCALE = 0.985;
-const LONG_PRESS_SCALE = 0.97;
+/** MOTION §2 卡片状态机：数值统一来自 `design/metrics`（hover 1.02 / pressed 0.98 / 长按 0.97） */
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
