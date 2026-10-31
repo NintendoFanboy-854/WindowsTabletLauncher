@@ -12,6 +12,7 @@ import {
   btConnectTool,
   btDevicesTool,
   btDisconnectTool,
+  btRestoreOutputTool,
   btStatusTool,
 } from '../../system/bluetoothTools';
 
@@ -21,6 +22,7 @@ export const BUILTIN_TOOL_NAMES = [
   'btAudio.devices',
   'btAudio.connect',
   'btAudio.disconnect',
+  'btAudio.restoreOutput',
 ] as const;
 
 export interface ToolBinding {
@@ -57,7 +59,7 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   {
     name: 'btAudio.status',
     description:
-      '读取蓝牙音箱状态：蓝牙是否可用、当前连接或串流中的设备、自动连接状态（是否暂停/退避）、首选设备与最近错误。',
+      '读取蓝牙音箱状态：linkPhase（idle/connecting/connected/streaming/disconnecting/closed）、radioPhase、正在进行的 operation、unverifiedDisconnect（断开未确认时手机可能仍显示已连接）、蓝牙是否可用、当前连接或串流中的设备、自动连接状态（是否暂停/退避）、首选设备与最近错误。',
     parameters: {
       type: 'object',
       properties: {},
@@ -77,7 +79,7 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   {
     name: 'btAudio.connect',
     description:
-      '把平板连接到蓝牙设备并开始接收手机音频。可用 deviceName 精确匹配，或直接给 deviceId；都不给时连接首选设备。手动连接不会修改首选设备。',
+      '把平板连接到蓝牙设备并开始接收手机音频。可用 deviceName 精确匹配，或直接给 deviceId；都不给时连接首选设备。工具会等到操作结束再返回真实 linkPhase / 错误，不把「已发起」当成「已完成」；手动连接不会修改首选设备。',
     parameters: {
       type: 'object',
       properties: {
@@ -90,7 +92,17 @@ const BUILTIN_TOOLS: BuiltinToolSpec[] = [
   {
     name: 'btAudio.disconnect',
     description:
-      '断开当前蓝牙音频接收连接。手动断开后自动连接会暂停，直到再次手动连接或恢复自动连接。',
+      '断开当前蓝牙音频接收连接，等到操作结束再返回真实 linkPhase（可能在断开后仍无法确认 ACL，此时 unverifiedDisconnect 为 true，手机可能仍显示已连接）。手动断开后自动连接会暂停，直到再次手动连接或恢复自动连接。',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'btAudio.restoreOutput',
+    description:
+      '解除因双音源冲突（本机媒体在播放）导致的蓝牙音乐本地静音。只恢复平板本地输出：不断开蓝牙连接、不碰蓝牙无线电、不控制手机端；手机仍照常推流。',
     parameters: {
       type: 'object',
       properties: {},
@@ -231,6 +243,8 @@ export async function executeTool(
     }
     case 'btAudio.disconnect':
       return { result: await btDisconnectTool() };
+    case 'btAudio.restoreOutput':
+      return { result: await btRestoreOutputTool() };
     default:
       throw new Error(`未知内置工具：${binding.originalName}`);
   }

@@ -241,10 +241,15 @@ function instanceFromEntry({ plugin, widget }: CatalogEntry): WidgetInstance {
  *
  * 不用 `PluginManager.createInstances`：它只在单页里找位置，放不下就跳过，
  * 小窗口下会把组件悄悄丢掉。这里交给布局引擎 autoPlace——单页放不下就顺延到下一页。
+ *
+ * `manifest.autoPlace === false` 的插件不自动上桌（P3c 通用机制，不认插件 id）：
+ * 首次没有存档时也不放，热重载/zip 安装后的 additions 同样跳过。用户手动添加走
+ * `instanceFromEntry`（编辑模式「添加组件」/ 插件管理页「添加到桌面」），不受这里影响。
  */
 function instancesFromCatalog(catalog: Catalog, page: number): WidgetInstance[] {
   const instances: WidgetInstance[] = [];
   for (const entry of catalog.values()) {
+    if (entry.plugin.autoPlace === false) continue;
     instances.push({ ...instanceFromEntry(entry), page });
   }
   return instances;

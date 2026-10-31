@@ -17,6 +17,7 @@
  *   <TrailingCount total={12} shown={5} />
  *   <MiniBars values={[...]} labels={[...]} ariaLabel="最近 7 天久坐" />
  *   <HeroProgress value={0.42} active={running} label="本轮进度" />
+ *   <Artwork src={artworkDataUrl} alt="曲目封面" size={ARTWORK_SIZE.XL} />
  *   <EmptyState align="start" icon={<CalendarLtr24Regular />} title="还没有倒数日" action={<ActionButton appearance="secondary" icon={<Add20Regular />}>添加事件</ActionButton>} />
  *   <EmptyState compact icon={<Key24Regular />} title="未配置 Key" action={<ActionButton icon={<Settings20Regular />}>打开设置</ActionButton>} />
  *   <DetailPage><DetailHeader trailing={...}>...</DetailHeader><DetailScroll>...</DetailScroll></DetailPage>
@@ -28,6 +29,9 @@
  *
  * 空态不接收说明文字（PLUGIN-CONTRACT §4.4.3）：可做的事由图标 + 一个次操作按钮承担，
  * 卡片的「可展开」由 `CardIdentity disclosure` 的行尾 chevron 承担。
+ *
+ * `Artwork` 是 P3b 新增的封面原语：尺寸只取白名单档（48/96/160/240/320），
+ * 圆角/占位/无阴影由共享层强制；alt 必填，style 只接受定位属性。
  *
  * 注意：不要用本文件的组件再画设置表单；设置统一走 manifest.settings + 宿主设置页。
  */
@@ -53,7 +57,7 @@ import {
   tokens,
   webLightTheme,
 } from '@fluentui/react-components';
-import { ArrowLeft24Regular, ChevronRight16Regular } from '@fluentui/react-icons';
+import { ArrowLeft24Regular, ChevronRight16Regular, MusicNote220Regular } from '@fluentui/react-icons';
 import { useHostCardGesture, useHostSize } from './host.js';
 import { sizeKeyOf } from './sizes.js';
 import { SlidePage, useReducedMotion } from './motion.js';
@@ -146,6 +150,22 @@ export const EMPTY_STATE_ICON_SIZE_LARGE = 40;
  * 这里取同族最大的 `strokeWidthThickest`（4px），仍是 stroke token、不写裸像素。
  */
 export const HERO_PROGRESS_THICKNESS_PX = tokenPx(webLightTheme.strokeWidthThickest);
+
+/**
+ * 封面固定尺寸档（P3b `Artwork` 白名单，插件不得再传其它数值）。
+ *
+ * 320 是大面板规格的主档；其余为同一 8px 基线的派生档（48/96/160/240），
+ * 供卡片/缩略图使用。这里集中定义，避免共享原语和调用点各写一套裸数字。
+ */
+export const ARTWORK_SIZE = Object.freeze({
+  XS: 48,
+  S: 96,
+  M: 160,
+  L: 240,
+  XL: 320,
+});
+const ARTWORK_SIZE_VALUES = Object.freeze(Object.values(ARTWORK_SIZE));
+const ARTWORK_DEFAULT_SIZE = ARTWORK_SIZE.XL;
 /** L1 固定骨架高度（PLUGIN-CONTRACT §4.1） */
 const DETAIL_HEADER_HEIGHT = 56;
 const DETAIL_TOOLBAR_HEIGHT = 48;
@@ -483,6 +503,183 @@ export function CardIdentity({
       {disclosure ? (
         <CardDisclosure style={trailing ? undefined : { marginInlineStart: 'auto' }} />
       ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Artwork（封面）                                                      */
+/* ------------------------------------------------------------------ */
+
+/** style 只允许“摆在哪里”，不允许改“长什么样”（尺寸/圆角/颜色/阴影由共享层强制）。 */
+const ARTWORK_POSITION_STYLE_KEYS = new Set([
+  'position',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'inset',
+  'insetBlock',
+  'insetBlockStart',
+  'insetBlockEnd',
+  'insetInline',
+  'insetInlineStart',
+  'insetInlineEnd',
+  'margin',
+  'marginBlock',
+  'marginBlockStart',
+  'marginBlockEnd',
+  'marginInline',
+  'marginInlineStart',
+  'marginInlineEnd',
+  'marginTop',
+  'marginRight',
+  'marginBottom',
+  'marginLeft',
+  'alignSelf',
+  'justifySelf',
+  'order',
+  'flex',
+  'flexGrow',
+  'flexShrink',
+  'flexBasis',
+  'gridArea',
+  'gridColumn',
+  'gridColumnStart',
+  'gridColumnEnd',
+  'gridRow',
+  'gridRowStart',
+  'gridRowEnd',
+  'zIndex',
+]);
+
+function pickArtworkPositionStyle(style) {
+  if (!style || typeof style !== 'object') return undefined;
+  const picked = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (ARTWORK_POSITION_STYLE_KEYS.has(key)) picked[key] = value;
+  }
+  return Object.keys(picked).length > 0 ? picked : undefined;
+}
+
+function pickArtworkA11yProps(rest) {
+  const picked = {};
+  for (const [key, value] of Object.entries(rest)) {
+    // 只透传 data-* / aria-*；className、尺寸、颜色、事件处理器等一律不接收。
+    if (key.startsWith('data-') || key.startsWith('aria-')) picked[key] = value;
+  }
+  return picked;
+}
+
+const useArtworkStyles = makeStyles({
+  root: {
+    position: 'relative',
+    display: 'inline-flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    // 与浮层 surface 同一圆角档（12）；封面无阴影，不参与 elevation。
+    borderRadius: tokens.borderRadius2XLarge,
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  image: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center',
+    borderRadius: tokens.borderRadius2XLarge,
+  },
+  /** 无图 / 加载失败：中性底 + 20px 音符，禁止彩色块。 */
+  placeholder: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground3,
+  },
+});
+
+/**
+ * 封面图（P3b 通用原语，契约 §4.4）。
+ *
+ * 契约表（与 PLUGIN-CONTRACT §4.4 的 `Artwork` 行对应）：
+ *
+ * | props | 约束 |
+ * |---|---|
+ * | `src?` | data URL / 图片地址；空串或加载失败时渲染中性音符占位 |
+ * | `alt` | **必填**；封面内容的可读名称（不能写“图片”“封面图”） |
+ * | `size` | 只接受 `ARTWORK_SIZE` 白名单 48 / 96 / 160 / 240 / 320；默认 320 |
+ * | `style` | 仅定位（margin / inset / grid / flex / alignSelf 等）；尺寸、圆角、颜色会被丢弃 |
+ * | `...rest` | 只透传 `data-*` / `aria-*`，不接收 className |
+ *
+ * 外观固定：`borderRadius2XLarge`（与浮层 surface 同值）、无阴影、`object-fit: cover`；
+ * 占位底 `colorNeutralBackground3` + 20px `MusicNote220Regular`（Fluent 当前 20 档音符），
+ * 不做彩色块。`MusicNote220Regular` 是图标本身尺寸，不缩放。
+ *
+ * 用法：
+ *   <Artwork src={artwork} alt="《晴天》封面" size={ARTWORK_SIZE.XL} />
+ *   <Artwork src={artwork} alt="当前曲目封面" size={ARTWORK_SIZE.M} style={{ alignSelf: 'center' }} />
+ *
+ * 尺寸表集中在 `ARTWORK_SIZE`，调用点不要写 320/160 等裸数字。
+ *
+ * @param {object} props
+ * @param {string} [props.src] 封面地址；空/失败显示占位
+ * @param {string} props.alt 必填的封面替代文本
+ * @param {number} [props.size=ARTWORK_SIZE.XL] 固定档位（48/96/160/240/320）
+ * @param {object} [props.style] 仅定位属性
+ */
+export function Artwork({ src, alt, size = ARTWORK_DEFAULT_SIZE, style, ...rest }) {
+  const styles = useArtworkStyles();
+  const [failedSrc, setFailedSrc] = useState(null);
+  const requestedSizeValid = ARTWORK_SIZE_VALUES.includes(size);
+  const resolvedSize = requestedSizeValid ? size : ARTWORK_DEFAULT_SIZE;
+  const normalizedAlt = typeof alt === 'string' ? alt.trim() : '';
+
+  useEffect(() => {
+    if (!requestedSizeValid) {
+      console.warn(
+        `[Artwork] 非法 size=${String(size)}；只允许 ${ARTWORK_SIZE_VALUES.join(' / ')}，已回落到 ${ARTWORK_DEFAULT_SIZE}。`,
+      );
+    }
+    if (!normalizedAlt) console.warn('[Artwork] alt 为必填项，请传入封面内容的可读名称。');
+  }, [normalizedAlt, requestedSizeValid, size]);
+
+  const showImage = Boolean(src) && failedSrc !== src;
+  const positionStyle = pickArtworkPositionStyle(style);
+  const a11yProps = pickArtworkA11yProps(rest);
+
+  return (
+    <div
+      {...a11yProps}
+      className={styles.root}
+      style={{ width: `${resolvedSize}px`, height: `${resolvedSize}px`, ...positionStyle }}
+      data-artwork="true"
+      data-artwork-size={resolvedSize}
+      data-artwork-state={showImage ? 'image' : 'placeholder'}
+    >
+      {showImage ? (
+        <img
+          className={styles.image}
+          src={src}
+          alt={normalizedAlt}
+          draggable={false}
+          onError={() => setFailedSrc(src)}
+        />
+      ) : (
+        <span
+          className={styles.placeholder}
+          role={normalizedAlt ? 'img' : undefined}
+          aria-label={normalizedAlt || undefined}
+          data-artwork-placeholder="true"
+        >
+          <MusicNote220Regular aria-hidden="true" />
+        </span>
+      )}
     </div>
   );
 }

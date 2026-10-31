@@ -1,6 +1,6 @@
 /**
  * 宿主桥接层（A5）：
- * - 实现插件调用的 8 个宿主 API（`plugin:call` → `host:reply`）
+ * - 实现插件可调用的全部宿主 API（`plugin:call` → `host:reply`）
  * - 维护 iframe 句柄注册表（reply / focus / toolCall）
  * - 汇总插件上报的 Agent 工具（`plugin:ready`），替 Agent 路由工具调用（`host:tool-call`）
  * - 键盘焦点交接（host:focus / plugin:focus-exit）
@@ -9,15 +9,25 @@
  */
 
 import {
+  browserWindowControl as tauriBrowserWindowControl,
+  browserWindowDebugTargets as tauriBrowserWindowDebugTargets,
+  browserWindowOpen as tauriBrowserWindowOpen,
+  browserWindowState as tauriBrowserWindowState,
   getIdleSeconds as tauriGetIdleSeconds,
   getLocation as tauriGetLocation,
   ipLocate as tauriIpLocate,
   isTauriRuntime,
+  mediaArtwork as tauriMediaArtwork,
+  mediaCommand as tauriMediaCommand,
+  mediaKey as tauriMediaKey,
+  mediaSessions as tauriMediaSessions,
   setKeepAwake as tauriSetKeepAwake,
 } from '../plugins/tauri';
 import type {
   AgentToolDecl,
+  BrowserWindowAction,
   HostApiMethod,
+  MediaPlaybackCommand,
   PluginCallMessage,
   PluginFocusExitMessage,
   PluginReadyMessage,
@@ -174,7 +184,7 @@ export class HostBridge {
     }
   }
 
-  // ---------- 8 个宿主 API ----------
+  // ---------- 宿主 API ----------
 
   private async runApi(pluginId: string, method: HostApiMethod, params: unknown): Promise<unknown> {
     switch (method) {
@@ -216,6 +226,37 @@ export class HostBridge {
           console.warn('[bridge] ipLocate 失败', error);
           return null;
         }
+      }
+      case 'openBrowserWindow': {
+        const { url } = params as { url: string };
+        return tauriBrowserWindowOpen(url);
+      }
+      case 'browserWindowControl': {
+        const { action } = params as { action: BrowserWindowAction };
+        return tauriBrowserWindowControl(action);
+      }
+      case 'browserWindowState':
+        return tauriBrowserWindowState();
+      case 'browserWindowDebugTargets':
+        // 通用透传：宿主不挑目标、不过滤类型/URL，调用方自己决定怎么用。
+        return tauriBrowserWindowDebugTargets();
+      case 'mediaSessions':
+        return tauriMediaSessions();
+      case 'mediaCommand': {
+        const { sessionId, command } = params as {
+          sessionId: string;
+          command: MediaPlaybackCommand;
+        };
+        return tauriMediaCommand(sessionId, command);
+      }
+      case 'mediaArtwork': {
+        const { sessionId } = params as { sessionId: string };
+        return tauriMediaArtwork(sessionId);
+      }
+      case 'mediaKey': {
+        const { command } = params as { command: MediaPlaybackCommand };
+        await tauriMediaKey(command);
+        return undefined;
       }
       default:
         throw new Error(`未知宿主 API: ${String(method)}`);

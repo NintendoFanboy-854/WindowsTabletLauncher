@@ -1,0 +1,16 @@
+{
+  "id": "appleMusic",
+  "name": "Apple Music",
+  "version": "0.1.0",
+  "identityHue": "pink",
+  "background": false,
+  "autoPlace": false,
+  "widgets": [
+    {
+      "id": "appleMusic",
+      "title": "Apple Music",
+      "sizes": [[2, 1], [3, 2], [4, 2]],
+      "defaultSize": [2, 1]
+    }
+  ]
+}

@@ -9,7 +9,8 @@
  * 宽高/圆角/阴影 morph 长出 QuickSettingsPanel（250ms decelerate / 150ms accelerate，内容淡入）；
  * 展开态底部保留状态栏行 + chevron，折叠时 chevron 一起隐藏；点外部 / Esc 折叠、焦点回状态栏。
  *
- * 数据：系统状态与蓝牙快照**拆成两条轮询**（各 2s），避免蓝牙 refresh 枚举慢时阻塞音量/电量。
+ * 数据：系统状态在本组件内 2s 轮询；蓝牙快照来自 `useBluetoothAudio` 单例 store（P2，D-51），
+ * 组件不再自己起蓝牙 interval，也不再有本地 btBusy/pending* 状态。
  * 视觉：与说明条/卡片同一套 72% 中性面 + blur 24 + stroke2 + shadow4；hover 1.02 / pressed 0.98
  * 数值来自 design/metrics，时长曲线只用 motionTokens。图标：内联信息 16、按钮 20。
  */
@@ -55,18 +56,7 @@ import {
   useFooterPillHeight,
 } from '../layout';
 import { isTauriRuntime } from '../plugins/tauri';
-import {
-  btAudioConnect,
-  btAudioDisconnect,
-  btAudioOpenSettings,
-  btAudioRefresh,
-  btAudioResumeAuto,
-  btAudioSetAutoConnect,
-  btAudioSetEnabled,
-  btAudioSetPreferred,
-  btAudioSnapshot,
-  type BtAudioSnapshot,
-} from '../system/bluetoothAudio';
+import { btOperationText, type BtAudioSnapshot } from '../system/bluetoothAudio';
 import {
   systemSetAutoBrightness,
   systemSetBrightness,
@@ -75,6 +65,7 @@ import {
   systemStatusSnapshot,
   type SystemStatusSnapshot,
 } from '../system/systemStatus';
+import { useBluetoothAudio } from '../system/useBluetoothAudio';
 import { QuickSettingsPanel } from './QuickSettingsPanel';
 
 const POLL_INTERVAL_MS = 2000;
@@ -114,6 +105,13 @@ const DEMO_BT: BtAudioSnapshot = {
   lastAttemptError: null,
   preferredDeviceId: 'demo-phone',
   order: ['demo-phone', 'demo-phone-2'],
+  linkPhase: 'streaming',
+  radioPhase: 'on',
+  operation: null,
+  lastTransitionAtMs: 0,
+  unverifiedDisconnect: false,
+  outputSuppressed: false,
+  suppressReason: null,
 };
 
 /** 电量分级图标（Fluent 只提供 20 档分级；16 档仅满电，见实现说明） */
@@ -159,15 +157,21 @@ function useViewportSize(): { width: number; height: number } {
   return size;
 }
 
-/** 收起态 pill 的一句话蓝牙文案（短、动词/状态开头，不带句号） */
+/**
+ * 收起态 pill 的一句话蓝牙文案（短、动词/状态开头，不带句号）：
+ * 操作阶段优先 → FIFO 本地静音（被本机音乐压住）→ 链路/无线电状态。
+ */
 function bluetoothLabel(bt: BtAudioSnapshot | null): string {
   if (!bt) return '状态未知';
-  if (!bt.available) return '不可用';
-  if (bt.bluetoothOn === false) return '蓝牙关';
+  const operationText = btOperationText(bt.operation);
+  if (operationText) return operationText;
+  if (bt.outputSuppressed === true) return '已静音';
+  if (!bt.available) return '蓝牙不可用';
+  if (bt.bluetoothOn === false) return '蓝牙已关';
   if (bt.streaming) return '接收中';
   if (bt.connected) return '已连接';
-  if (bt.activeDeviceId) return '已断开';
-  return '音箱';
+  if (bt.unverifiedDisconnect) return '可能仍连接';
+  return '未连接';
 }
 
 type PanelPhase = 'closed' | 'opening' | 'open' | 'closing';
@@ -294,6 +298,10 @@ const useStyles = makeStyles({
   itemStreaming: {
     color: tokens.colorStatusSuccessForeground1,
   },
+  /** FIFO 本地静音：文字已说「已静音」，图标同时退回中性色，不用 success 冒充正在出声 */
+  itemMuted: {
+    color: tokens.colorNeutralForeground3,
+  },
   icon: {
     flexShrink: 0,
   },
@@ -375,11 +383,22 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
   const visible = tauri || demo;
 
   const [status, setStatus] = useState<SystemStatusSnapshot | null>(demo ? DEMO_STATUS : null);
-  const [bt, setBt] = useState<BtAudioSnapshot | null>(demo ? DEMO_BT : null);
-  const [btError, setBtError] = useState(false);
-  const [btBusy, setBtBusy] = useState(false);
-  const [pendingDeviceId, setPendingDeviceId] = useState<string | null>(null);
-  const [pendingDisconnect, setPendingDisconnect] = useState(false);
+
+  // 蓝牙快照统一来自模块级 store（P2，D-51）：组件里不再有本地 bt / btBusy / pending* 与轮询 interval。
+  const bluetooth = useBluetoothAudio();
+  const {
+    refreshNow: refreshBluetooth,
+    connect: connectBluetooth,
+    disconnect: disconnectBluetooth,
+    setEnabled: setBluetoothEnabled,
+    setPreferred: setBluetoothPreferred,
+    restoreOutput: restoreBluetoothOutputAction,
+    openSettings: openBluetoothSettings,
+  } = bluetooth;
+  /** 浏览器演示态（`?statusDemo`）的假数据：只在组件内变化，不参与产品逻辑 */
+  const [demoBt, setDemoBt] = useState<BtAudioSnapshot | null>(demo ? DEMO_BT : null);
+  const bt = demo ? demoBt : bluetooth.snapshot;
+  const btError = demo ? false : bluetooth.error;
 
   const [phase, setPhase] = useState<PanelPhase>('closed');
   const [contentShown, setContentShown] = useState(false);
@@ -397,8 +416,6 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
     height: FOOTER_PILL_ESTIMATE,
   });
   const lockedSizeRef = useRef<{ width: number; height: number } | null>(null);
-  /** 最近一次操作失败的原始错误（页面重试用；面板只显示归一文案） */
-  const retryRef = useRef<(() => void) | null>(null);
 
   const footerPillHeight = useFooterPillHeight();
   const viewport = useViewportSize();
@@ -411,96 +428,33 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
     [metrics, viewport.width, viewport.height, footerPillHeight],
   );
 
-  // ---------- 数据轮询（系统状态 / 蓝牙拆成两条，互不阻塞） ----------
+  // ---------- 系统状态轮询（蓝牙由 useBluetoothAudio 按自己的节奏轮询，互不阻塞） ----------
 
   const readSystemStatus = useCallback(async () => {
     const next = await systemStatusSnapshot().catch(() => null);
     if (next) setStatus(next);
   }, []);
 
-  const refreshBluetooth = useCallback(async () => {
-    try {
-      const next = await btAudioRefresh();
-      setBt(next);
-      setBtError(false);
-    } catch {
-      setBtError(true);
-    }
-  }, []);
-
   useEffect(() => {
     if (!tauri) return undefined;
     let alive = true;
-    let bluetoothReady = false;
-
-    // 首刷要枚举设备（慢）；系统状态不等它，立刻单独读一次
-    void (async () => {
-      try {
-        const next = await btAudioRefresh();
-        if (alive) {
-          setBt(next);
-          setBtError(false);
-        }
-      } catch {
-        if (alive) setBtError(true);
-      } finally {
-        bluetoothReady = true;
-      }
-    })();
     void readSystemStatus();
-
     const systemTimer = window.setInterval(() => {
       if (!alive) return;
       void readSystemStatus();
     }, POLL_INTERVAL_MS);
-    const bluetoothTimer = window.setInterval(() => {
-      if (!alive || !bluetoothReady) return;
-      void btAudioSnapshot()
-        .then((next) => {
-          if (!alive) return;
-          setBt(next);
-          setBtError(false);
-        })
-        .catch(() => {
-          /* 轮询失败保留上一帧；下一次 tick 再试 */
-        });
-    }, POLL_INTERVAL_MS);
-
     return () => {
       alive = false;
       window.clearInterval(systemTimer);
-      window.clearInterval(bluetoothTimer);
     };
   }, [tauri, readSystemStatus]);
 
-  // ---------- 蓝牙命令（手动操作与 Agent 同一语义：disconnect 由后端置 paused） ----------
-
-  const runBluetoothAction = useCallback(
-    async (action: () => Promise<BtAudioSnapshot>, deviceId: string | null = null) => {
-      if (!tauri) return;
-      setBtBusy(true);
-      setPendingDeviceId(deviceId);
-      retryRef.current = () => {
-        void runBluetoothAction(action, deviceId);
-      };
-      try {
-        const next = await action();
-        setBt(next);
-        setBtError(false);
-      } catch {
-        setBtError(true);
-      } finally {
-        setBtBusy(false);
-        setPendingDeviceId(null);
-      }
-    },
-    [tauri],
-  );
+  // ---------- 蓝牙命令（store actions；手动操作与 Agent 同一语义：disconnect 由后端置 paused） ----------
 
   const connectDevice = useCallback(
     (deviceId: string) => {
       if (!tauri) {
-        setBt((previous) =>
+        setDemoBt((previous) =>
           previous
             ? {
                 ...previous,
@@ -508,6 +462,7 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
                 connected: true,
                 streaming: false,
                 connectionState: 'enabled',
+                linkPhase: 'connected',
                 autoConnectState: 'waiting',
                 lastError: null,
               }
@@ -515,14 +470,14 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
         );
         return;
       }
-      void runBluetoothAction(() => btAudioConnect(deviceId), deviceId);
+      void connectBluetooth(deviceId);
     },
-    [tauri, runBluetoothAction],
+    [tauri, connectBluetooth],
   );
 
   const disconnectDevice = useCallback(() => {
     if (!tauri) {
-      setBt((previous) =>
+      setDemoBt((previous) =>
         previous
           ? {
               ...previous,
@@ -530,77 +485,78 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
               connected: false,
               streaming: false,
               connectionState: 'idle',
+              linkPhase: 'idle',
+              unverifiedDisconnect: false,
               autoConnectState: 'paused',
             }
           : previous,
       );
       return;
     }
-    setPendingDisconnect(true);
-    retryRef.current = () => void runBluetoothAction(() => btAudioDisconnect());
-    void runBluetoothAction(() => btAudioDisconnect()).finally(() =>
-      setPendingDisconnect(false),
-    );
-  }, [tauri, runBluetoothAction]);
+    void disconnectBluetooth();
+  }, [tauri, disconnectBluetooth]);
 
   /**
    * 面板顶部的「蓝牙音箱」总开关（不是自动连接偏好）：一个动作联动后端
    * 「开蓝牙 / 开始寻找 / 自动连接」或「断开 / 停止寻找」（命令 bt_audio_set_enabled）。
-   * 关闭过程用 pendingDisconnect 驱动行内「正在断开…」+ 转圈，不假装瞬间完成。
+   * 非阻塞：调用立即返回，过渡态来自快照的 `operation`（不假装瞬间完成）。
    */
   const setBluetoothSpeakerEnabled = useCallback(
     (enabled: boolean) => {
       if (!tauri) {
-        setBt((previous) =>
+        setDemoBt((previous) =>
           previous
             ? {
                 ...previous,
                 enabled,
                 bluetoothOn: enabled ? true : previous.bluetoothOn,
+                radioPhase: enabled ? 'on' : previous.radioPhase,
                 autoConnectEnabled: enabled,
                 autoConnectState: enabled ? 'waiting' : 'off',
                 activeDeviceId: enabled ? previous.activeDeviceId : null,
                 connected: enabled ? previous.connected : false,
                 streaming: enabled ? previous.streaming : false,
                 connectionState: enabled ? previous.connectionState : 'idle',
+                linkPhase: enabled ? previous.linkPhase : 'idle',
               }
             : previous,
         );
         return;
       }
-      const finish = async (): Promise<BtAudioSnapshot> => {
-        if (!enabled) setPendingDisconnect(true);
-        try {
-          return await btAudioSetEnabled(enabled);
-        } finally {
-          setPendingDisconnect(false);
-        }
-      };
-      retryRef.current = () => {
-        void runBluetoothAction(finish);
-      };
-      void runBluetoothAction(finish);
+      void setBluetoothEnabled(enabled);
     },
-    [tauri, runBluetoothAction],
+    [tauri, setBluetoothEnabled],
   );
 
   const setPreferred = useCallback(
     (deviceId: string | null) => {
       if (!tauri) {
-        setBt((previous) => (previous ? { ...previous, preferredDeviceId: deviceId } : previous));
+        setDemoBt((previous) => (previous ? { ...previous, preferredDeviceId: deviceId } : previous));
         return;
       }
-      void runBluetoothAction(() => btAudioSetPreferred(deviceId));
+      void setBluetoothPreferred(deviceId);
     },
-    [tauri, runBluetoothAction],
+    [tauri, setBluetoothPreferred],
   );
 
   const openWindowsBluetooth = useCallback(() => {
     if (!tauri) return;
-    void btAudioOpenSettings().catch(() => {
-      /* 系统设置被策略拦时静默：面板仍有状态可读 */
-    });
-  }, [tauri]);
+    void openBluetoothSettings();
+  }, [tauri, openBluetoothSettings]);
+
+  /**
+   * FIFO 手动恢复（P3c）：解除「被本机音乐压住」的蓝牙本地静音。
+   * 只恢复平板本地输出：不断连接、不操控手机端（手机照旧推流，只是重新出声）。
+   */
+  const restoreBluetoothOutput = useCallback(() => {
+    if (!tauri) {
+      setDemoBt((previous) =>
+        previous ? { ...previous, outputSuppressed: false, suppressReason: null } : previous,
+      );
+      return;
+    }
+    void restoreBluetoothOutputAction();
+  }, [tauri, restoreBluetoothOutputAction]);
 
   // ---------- 系统控制（滑杆/开关）：先本地乐观，再写 Rust；失败由下一次轮询纠正 ----------
 
@@ -641,11 +597,6 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
   );
 
   const retry = useCallback(() => {
-    const retryAction = retryRef.current;
-    if (retryAction) {
-      retryAction();
-      return;
-    }
     if (!tauri) return;
     void readSystemStatus();
     void refreshBluetooth();
@@ -783,6 +734,7 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
   const label = bluetoothLabel(bt);
   const btConnected = bt?.connected === true;
   const btStreaming = bt?.streaming === true;
+  const btSuppressed = bt?.outputSuppressed === true;
   const bluetoothOff = bt?.bluetoothOn === false || bt?.available === false;
 
   const surfaceStyle: CSSProperties =
@@ -803,8 +755,10 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
               height: `${closedSizeRef.current.height + contentHeight}px`,
             };
 
+  /** 读屏用的动作词跟着展开态走：同一颗按钮不同时承诺“打开”和“收起” */
+  const panelAction = phase === 'open' ? '收起快速设置' : '打开快速设置';
   const accessibleLabel = [
-    `蓝牙音箱：${label}`,
+    `蓝牙音箱：${btSuppressed ? '已被本机音乐静音' : label}`,
     status?.volumePercent != null
       ? status.muted === true
         ? '音量已静音'
@@ -815,7 +769,7 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
         ? `电量 ${status.batteryPercent}%，正在充电`
         : `电量 ${status.batteryPercent}%`
       : null,
-    '打开快速设置',
+    panelAction,
   ]
     .filter((part): part is string => Boolean(part))
     .join('；');
@@ -848,9 +802,6 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
               status={status}
               bt={bt}
               btError={btError}
-              btBusy={btBusy}
-              pendingDeviceId={pendingDeviceId}
-              pendingDisconnect={pendingDisconnect}
               onRetry={retry}
               onConnect={connectDevice}
               onDisconnect={disconnectDevice}
@@ -861,6 +812,7 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
               onSetBrightness={setBrightness}
               onSetAutoBrightness={setAutoBrightness}
               onOpenWindowsBluetooth={openWindowsBluetooth}
+              onRestoreOutput={restoreBluetoothOutput}
               contentRef={panelContentRef}
             />
           </div>
@@ -881,13 +833,15 @@ export function StatusBar({ hidden = false }: StatusBarProps) {
                 aria-hidden="true"
                 className={mergeClasses(
                   styles.icon,
-                  btStreaming
-                    ? styles.itemStreaming
-                    : btConnected
-                      ? styles.itemConnected
-                      : bluetoothOff
-                        ? undefined
-                        : styles.itemInfo,
+                  btSuppressed
+                    ? styles.itemMuted
+                    : btStreaming
+                      ? styles.itemStreaming
+                      : btConnected
+                        ? styles.itemConnected
+                        : bluetoothOff
+                          ? undefined
+                          : styles.itemInfo,
                 )}
               />
               <Text size={200} style={{ color: 'inherit' }}>

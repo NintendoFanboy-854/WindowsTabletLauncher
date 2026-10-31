@@ -9,9 +9,15 @@
 
 /**
  * 2：新增 `host:config`（宿主写配置后主动推送增量）。
- * 旧的 1 版插件不认识这条消息、直接忽略即可；宿主不依赖插件回包。
+ * 3：新增通用受管浏览器窗口 / SMTC 媒体会话 API（openBrowserWindow / browserWindow* /
+ *    mediaSessions / mediaCommand / mediaArtwork / mediaKey）。
+ *
+ * 另有 `browserWindowDebugTargets`（受管窗口的 CDP 调试目标透传）后续追加进 v3，不单独升版本：
+ * 协议版本只在宿主需要按版本分支时才起作用，这类「只新增、旧插件不调用」的能力与 v3 同代。
+ *
+ * 版本只增不改：旧插件不认识新增 API，也不会调用；宿主不依赖插件回包。
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** 宿主注入给插件的主题：直接给 Fluent token 的最终颜色值 */
 export interface ThemePayload {
@@ -134,7 +140,15 @@ export type HostApiMethod =
   | 'getIdleSeconds'
   | 'showReminder'
   | 'getLocation'
-  | 'ipLocate';
+  | 'ipLocate'
+  | 'openBrowserWindow'
+  | 'browserWindowControl'
+  | 'browserWindowState'
+  | 'browserWindowDebugTargets'
+  | 'mediaSessions'
+  | 'mediaCommand'
+  | 'mediaArtwork'
+  | 'mediaKey';
 
 /** 插件调用宿主 API */
 export interface PluginCallMessage {
@@ -226,6 +240,66 @@ export interface IpLocation {
   isp?: string;
 }
 
+// ---------- 通用受管浏览器窗口 / 媒体会话（P3b，宿主不认插件） ----------
+
+export type BrowserWindowAction = 'show' | 'hide' | 'minimize' | 'close';
+
+/**
+ * 受管浏览器窗口状态。Rust 的 `Option<String>` 序列化为 null，因此 `url` 未运行时为 null。
+ */
+export interface BrowserWindowState {
+  running: boolean;
+  visible: boolean;
+  minimized: boolean;
+  url: string | null;
+}
+
+/**
+ * 受管窗口的一条 CDP 调试目标：四个字段原样来自 `GET /json/list`。
+ *
+ * 宿主不判断、不过滤（没有类型白名单、没有 URL 匹配）：挑哪个目标、要不要连
+ * WebSocket 都是调用方（插件）的事。
+ */
+export interface BrowserDebugTarget {
+  /** CDP 目标类型（`page` / `iframe` / `service_worker` …） */
+  type: string;
+  url: string;
+  title: string;
+  /** CDP WebSocket 调试地址；调用方自己连 */
+  webSocketDebuggerUrl: string;
+}
+
+/** 受管窗口的调试目标快照：DevTools 端口 + 目标列表。 */
+export interface BrowserDebugTargets {
+  port: number;
+  targets: BrowserDebugTarget[];
+}
+
+export type MediaPlaybackCommand = 'play' | 'pause' | 'toggle' | 'next' | 'previous';
+
+/**
+ * 一个 SMTC 会话的只读快照。
+ * `Option` 字段统一序列化为 null（不是 undefined），前端按 `null` 判断“未知/拿不到”。
+ */
+export interface MediaSessionInfo {
+  id: string;
+  appId: string;
+  title: string;
+  artist: string;
+  album: string;
+  playing: boolean;
+  positionMs: number | null;
+  durationMs: number | null;
+  canPlayPause: boolean | null;
+  canNext: boolean | null;
+  canPrevious: boolean | null;
+  artworkKey: string | null;
+}
+
+export interface MediaSessionSnapshot {
+  sessions: MediaSessionInfo[];
+}
+
 export interface HostApiMap {
   getConfig: { params: { key: string }; result: unknown };
   setConfig: { params: { key: string; value: unknown }; result: void };
@@ -235,6 +309,20 @@ export interface HostApiMap {
   showReminder: { params: ShowReminderParams; result: ReminderResult };
   getLocation: { params: never; result: GeoLocation | null };
   ipLocate: { params: never; result: IpLocation | null };
+  openBrowserWindow: { params: { url: string }; result: BrowserWindowState };
+  browserWindowControl: {
+    params: { action: BrowserWindowAction };
+    result: BrowserWindowState;
+  };
+  browserWindowState: { params: never; result: BrowserWindowState };
+  browserWindowDebugTargets: { params: never; result: BrowserDebugTargets };
+  mediaSessions: { params: never; result: MediaSessionSnapshot };
+  mediaCommand: {
+    params: { sessionId: string; command: MediaPlaybackCommand };
+    result: MediaSessionSnapshot;
+  };
+  mediaArtwork: { params: { sessionId: string }; result: string };
+  mediaKey: { params: { command: MediaPlaybackCommand }; result: void };
 }
 
 // ---------- manifest ----------
@@ -321,6 +409,14 @@ export interface PluginManifest {
   identityHue: string;
   /** 没有组件、只后台运行的插件 */
   background?: boolean;
+  /**
+   * 新插件是否允许自动上桌（P3c）。
+   *
+   * 缺省 true：插件目录里的组件在首次布局 / 热重载合并时自动摆到空位。
+   * 显式 false：不参与自动摆放（首次没有存档时也不放），只能由用户在编辑模式「添加组件」
+   * 或插件管理页「添加到桌面」手动添加；已经保存过的布局条目不受影响。
+   */
+  autoPlace?: boolean;
   widgets: WidgetManifest[];
   /** 声明式设置：宿主设置页据此渲染通用表单（插件不提供设置界面） */
   settings?: PluginSettingsManifest;

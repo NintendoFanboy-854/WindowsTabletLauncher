@@ -125,6 +125,9 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
         !!widget && typeof widget === 'object' && (widget as Record<string, unknown>).background === true,
     );
 
+  // 只有显式 false 才禁止自动上桌；缺省 / 任何非 false 值都按 true（默认行为不变）。
+  const autoPlace = record.autoPlace !== false;
+
   // 设置 schema 与组件无关；坏字段在 normalizeSettingsSchema 里跳过并记录，
   // 让设置页显示「暂不支持」而不是把整份配置写坏。
   const settings = normalizeSettingsSchema(record.settings);
@@ -135,6 +138,7 @@ export function normalizeManifest(raw: unknown, dir: string): NormalizedPlugin |
     name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : id,
     version: typeof record.version === 'string' ? record.version : '0.0.0',
     background,
+    autoPlace,
     dir,
     widgets,
     ...(settings ? { settings } : {}),

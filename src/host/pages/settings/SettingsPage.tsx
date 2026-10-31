@@ -34,6 +34,16 @@ import {
 import { updateSettings } from '../../agent/settings';
 import { useSettings } from '../../agent/hooks/useSettings';
 import { IDLE_COLLAPSE_DEFAULT_SECONDS, IDLE_COLLAPSE_PRESETS } from '../../agent/types';
+import {
+  AUDIO_GAIN_PRESETS,
+  AUDIO_SETTINGS_EVENT,
+  AUDIO_SETTINGS_KEY,
+  DEFAULT_AUDIO_SETTINGS,
+  readAudioSettings,
+  writeAudioSettings,
+  type AudioSettings,
+} from '../../system/audioSettings';
+import { setAudioFifoEnabled } from '../../system/audioFocus';
 import { getHostBridge } from '../../bridge';
 import { TOUCH_TARGET_CSS } from '../../design/metrics';
 import {
@@ -111,6 +121,12 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
 function idleCollapseLabel(seconds: number): string {
   if (seconds === 0) return '关闭（不自动收回）';
   return seconds === IDLE_COLLAPSE_DEFAULT_SECONDS ? `${seconds} 秒（默认）` : `${seconds} 秒`;
+}
+
+/** 声音压低档位 → 选项文案（0 = 静音，默认档由调用方按字段传入） */
+function audioGainLabel(gain: number, defaultGain: number): string {
+  if (gain === 0) return '静音';
+  return gain === defaultGain ? `${gain}%（默认）` : `${gain}%`;
 }
 
 /** 当前选中的是固定分区，还是某个插件的 settings schema */
@@ -200,6 +216,10 @@ const useStyles = makeStyles({
     minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalM})`,
     minWidth: `calc(${tokens.spacingHorizontalXXXL} * 5)`,
   },
+  /** 开关命中区 44：Fluent Switch 视觉高度不变，只抬高可点区域（touch 目标 ≥44） */
+  touch: {
+    minHeight: TOUCH_TARGET_CSS,
+  },
   /** 下拉列表项行高同 44：Fluent 默认按 size 走 32，手指容易误选相邻项 */
   option: {
     display: 'flex',
@@ -233,6 +253,8 @@ export function SettingsPage({
   const manager = getPluginManager();
   /** Agent 设置（面板行为）：跨窗口靠 settings 的 storage 事件同步 */
   const agentSettings = useSettings();
+  /** 声音设置（wtsl.audio）：本页即时保存，事件同步回 state */
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(() => readAudioSettings());
 
   // 插件 → 宿主：`plugin:request-host-settings`；App 每次请求都会递增 token，
   // 同一插件重复请求、或用户已切到别处时都能重新选中。
@@ -256,6 +278,20 @@ export function SettingsPage({
       });
     return () => {
       active = false;
+    };
+  }, []);
+
+  // 声音设置：本页写入后靠自定义事件同步；其它窗口改同一个键时靠 storage 事件。
+  useEffect(() => {
+    const sync = () => setAudioSettings(readAudioSettings());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === AUDIO_SETTINGS_KEY) sync();
+    };
+    window.addEventListener(AUDIO_SETTINGS_EVENT, sync);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(AUDIO_SETTINGS_EVENT, sync);
+      window.removeEventListener('storage', onStorage);
     };
   }, []);
 
@@ -297,6 +333,28 @@ export function SettingsPage({
     notify(seconds === 0 ? '面板不再自动收回' : `面板无操作 ${seconds} 秒后自动收回`);
   };
 
+  /** 声音设置：归一化后即时保存（无保存按钮）；writeAudioSettings 会派发同步事件。 */
+  const changeAudioSettings = (patch: Partial<AudioSettings>) => {
+    setAudioSettings(writeAudioSettings(patch));
+  };
+
+  const changeAudioGain = (
+    key: 'voiceGain' | 'ttsGain',
+    optionValue: string | undefined,
+  ) => {
+    const gain = Number(optionValue);
+    if (!AUDIO_GAIN_PRESETS.includes(gain)) return;
+    changeAudioSettings(key === 'voiceGain' ? { voiceGain: gain } : { ttsGain: gain });
+  };
+
+  const changeConflictPolicy = (optionValue: string | undefined) => {
+    if (optionValue === 'fifo' || optionValue === 'off') {
+      changeAudioSettings({ conflictPolicy: optionValue });
+      // 立即同步给宿主：FIFO 冲突处理开关（关闭后只保留语音/TTS 压低）。
+      void setAudioFifoEnabled(optionValue === 'fifo').catch(() => {});
+    }
+  };
+
   const renderGeneral = () => (
     <>
       <SettingsGroup title="启动" hint="启动器是全屏无边框窗口，正常启动即铺满整屏。">
@@ -320,6 +378,91 @@ export function SettingsPage({
       </SettingsGroup>
 
       <BluetoothSpeakerSettings />
+
+      <SettingsGroup
+        title="声音"
+        hint="语音输入与朗读时压低本机音乐，不改手机端输出"
+      >
+        <SettingsRow label="语音输入时压低音乐">
+          <Switch
+            className={styles.touch}
+            aria-label="语音输入时压低音乐"
+            checked={audioSettings.duckVoice}
+            onChange={(_event, data) => changeAudioSettings({ duckVoice: data.checked })}
+            label={audioSettings.duckVoice ? '已开启' : '已关闭'}
+          />
+        </SettingsRow>
+        <SettingsRow label="语音输入压低到">
+          <Dropdown
+            size="large"
+            className={styles.control}
+            aria-label="语音输入压低到"
+            value={audioGainLabel(audioSettings.voiceGain, DEFAULT_AUDIO_SETTINGS.voiceGain)}
+            selectedOptions={[String(audioSettings.voiceGain)]}
+            onOptionSelect={(_event, data) => changeAudioGain('voiceGain', data.optionValue)}
+            disabled={!audioSettings.duckVoice}
+          >
+            {AUDIO_GAIN_PRESETS.map((gain) => (
+              <Option
+                key={gain}
+                value={String(gain)}
+                text={audioGainLabel(gain, DEFAULT_AUDIO_SETTINGS.voiceGain)}
+                className={styles.option}
+              >
+                {audioGainLabel(gain, DEFAULT_AUDIO_SETTINGS.voiceGain)}
+              </Option>
+            ))}
+          </Dropdown>
+        </SettingsRow>
+        <SettingsRow label="朗读时压低音乐">
+          <Switch
+            className={styles.touch}
+            aria-label="朗读时压低音乐"
+            checked={audioSettings.duckTts}
+            onChange={(_event, data) => changeAudioSettings({ duckTts: data.checked })}
+            label={audioSettings.duckTts ? '已开启' : '已关闭'}
+          />
+        </SettingsRow>
+        <SettingsRow label="朗读时压低到">
+          <Dropdown
+            size="large"
+            className={styles.control}
+            aria-label="朗读时压低到"
+            value={audioGainLabel(audioSettings.ttsGain, DEFAULT_AUDIO_SETTINGS.ttsGain)}
+            selectedOptions={[String(audioSettings.ttsGain)]}
+            onOptionSelect={(_event, data) => changeAudioGain('ttsGain', data.optionValue)}
+            disabled={!audioSettings.duckTts}
+          >
+            {AUDIO_GAIN_PRESETS.map((gain) => (
+              <Option
+                key={gain}
+                value={String(gain)}
+                text={audioGainLabel(gain, DEFAULT_AUDIO_SETTINGS.ttsGain)}
+                className={styles.option}
+              >
+                {audioGainLabel(gain, DEFAULT_AUDIO_SETTINGS.ttsGain)}
+              </Option>
+            ))}
+          </Dropdown>
+        </SettingsRow>
+        <SettingsRow label="两个音源同时播放">
+          <Dropdown
+            size="large"
+            className={styles.control}
+            aria-label="两个音源同时播放"
+            value={audioSettings.conflictPolicy === 'off' ? '不处理' : '后播优先（默认）'}
+            selectedOptions={[audioSettings.conflictPolicy]}
+            onOptionSelect={(_event, data) => changeConflictPolicy(data.optionValue)}
+          >
+            <Option value="fifo" text="后播优先（默认）" className={styles.option}>
+              后播优先（默认）
+            </Option>
+            <Option value="off" text="不处理" className={styles.option}>
+              不处理
+            </Option>
+          </Dropdown>
+        </SettingsRow>
+      </SettingsGroup>
 
       <SettingsGroup title="退出" hint="Esc 只返回桌面，不退出应用；退出走这里或 Ctrl + Q。">
         <SettingsRow label="退出启动器" description="插件 iframe 随应用关闭，缓存数据由各插件自己保存">

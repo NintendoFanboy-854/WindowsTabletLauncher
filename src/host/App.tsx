@@ -21,6 +21,9 @@ import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
 import { ReviewPage } from './pages/review/ReviewPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { isTauriRuntime } from './plugins/tauri';
+import { setAudioFifoEnabled } from './system/audioFocus';
+import { readAudioSettings } from './system/audioSettings';
 import {
   PageTransition,
   applyColorSchemeToDocument,
@@ -67,6 +70,12 @@ export default function App() {
   useEffect(() => {
     applyColorSchemeToDocument(colorScheme);
   }, [colorScheme]);
+
+  // 声音：把持久化的「双音源冲突」开关同步给宿主（默认 FIFO；浏览器预览下跳过）。
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    void setAudioFifoEnabled(readAudioSettings().conflictPolicy === 'fifo').catch(() => {});
+  }, []);
 
   /*
    * 窗口几何自校正（v0.4.1 白带修复）：Windows 上窗口可能以「最大化」姿态起来——

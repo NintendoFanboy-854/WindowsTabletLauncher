@@ -25,13 +25,15 @@ import {
 } from '@fluentui/react-components';
 import { Dismiss24Regular } from '@fluentui/react-icons';
 
+import { TOUCH_TARGET_CSS } from '../design/metrics';
 import { useOverlayTransform } from './overlayMotion';
 import type { OverlaySource } from './overlayMotion';
 
 const useStyles = makeStyles({
   /**
    * 浮层 surface 的自然尺寸（container transform 的终点由它决定）：
-   * 1440 下 880×680，1024×768 下 880×553（min(72vh, 680px)）。
+   * default：1440 下 880×680，1024×768 下 880×553（min(72vh, 680px)）；
+   * large：1120×760，1024 屏按 92vw / 80vh 自适应（inline 尺寸在下面覆盖）。
    * 圆角起止同值（卡片 12）；动画期间由内联样式接管定位与尺寸。
    */
   surface: {
@@ -56,9 +58,13 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     boxSizing: 'border-box',
   },
+  /**
+   * 关闭按钮是图标按钮：视觉沿用 Fluent large，命中区按 TOUCH_TARGET 44 兜住
+   * （TOKEN-MAP §8：浮层关闭按钮 = 44；不靠视觉撑高，图标仍是 24 档）。
+   */
   closeButton: {
-    minWidth: `calc(${tokens.spacingHorizontalXL} + ${tokens.spacingHorizontalXL})`,
-    minHeight: `calc(${tokens.spacingVerticalXL} + ${tokens.spacingVerticalXL})`,
+    minWidth: TOUCH_TARGET_CSS,
+    minHeight: TOUCH_TARGET_CSS,
   },
   /** 自定义 scrim：只负责透明度，点击关闭仍由 Fluent 的 backdrop 处理 */
   scrim: {
@@ -73,6 +79,11 @@ export interface PluginOverlayProps {
   ariaLabel: string;
   /** 标题栏文字 */
   title: string;
+  /**
+   * 浮层尺寸：default（880×680）/ large（1120×760）。缺省保持旧行为。
+   * large 的宽高由 PluginWidgetFrame 校验后传入；这里不接收任意字符串。
+   */
+  size?: 'default' | 'large';
   /** 关闭动画结束：父组件在这里卸载浮层并把焦点还给来源卡片 */
   onClosed: () => void;
   /** 拿到 close 后挂到插件 iframe 的 Esc / 设置跳转上 */
@@ -83,6 +94,7 @@ export function PluginOverlay({
   source,
   ariaLabel,
   title,
+  size = 'default',
   onClosed,
   children,
 }: PluginOverlayProps) {
@@ -93,6 +105,15 @@ export function PluginOverlay({
     surfaceRef,
     onClosed,
   });
+
+  /**
+   * large 用内联几何覆盖默认 class：overlayMotion 在首帧后按实测 rect 量终点，
+   * 不依赖 class 的层叠胜负；fallback/reduced-motion 也保留同一尺寸。
+   */
+  const sizeStyle =
+    size === 'large'
+      ? { width: 'min(1120px, 92vw)', height: 'min(80vh, 760px)' }
+      : undefined;
 
   return (
     <Dialog
@@ -106,11 +127,12 @@ export function PluginOverlay({
       <DialogSurface
         ref={surfaceRef}
         className={styles.surface}
-        style={surfaceStyle}
+        style={{ ...(sizeStyle ?? {}), ...surfaceStyle }}
         aria-label={ariaLabel}
         // 状态属性：验收脚本按它区分 container transform / 兜底 / 关闭阶段（同 E2 的 data-hover 约定）
         data-overlay-mode={mode}
         data-overlay-phase={phase}
+        data-overlay-size={size}
         // 默认 backdrop 淡入（FadeRelaxed）会和自定义 scrim 叠加，这里直接关掉
         backdropMotion={null}
         backdrop={{ className: styles.scrim, style: scrimStyle }}

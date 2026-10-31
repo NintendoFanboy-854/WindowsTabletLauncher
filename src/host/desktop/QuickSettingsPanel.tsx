@@ -2,7 +2,8 @@
  * 桌面快速设置面板（P2，D-43；P0 定稿视觉 `shots/p0-surface/v4-panel-detail.png`）。
  *
  * 由状态栏 pill 经同一套 surface morph 长出来（morph 容器在 `StatusBar.tsx`），这里只负责
- * 面板内容本身：蓝牙设备/首选/自动连接、音量/静音、亮度、自动亮度、系统蓝牙设置。
+ * 面板内容本身：蓝牙设备/首选/自动连接、FIFO 本地静音恢复（P3c）、音量/静音、亮度、
+ * 自动亮度、系统蓝牙设置。
  *
  * 约束：
  * - 只用 Fluent 原生控件（Switch / Slider / Button）与 `@fluentui/react-icons`，图标 20；
@@ -36,6 +37,7 @@ import { TOUCH_TARGET_CSS } from '../design/metrics';
 import {
   AUTO_CONNECT_STATE_TEXT,
   btErrorText,
+  btOperationText,
   orderedDevices,
   type BtAudioSnapshot,
   type BtDeviceInfo,
@@ -86,7 +88,14 @@ const useStyles = makeStyles({
   root: {
     display: 'grid',
     alignContent: 'start',
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    /**
+     * 底部留 12（`spacingVerticalM`）：状态栏与 chevron 的 44×44 命中区由 `::after`
+     * 向上外扩 10px，展开时那 10px 落在面板底边。底部 padding 必须 ≥10，否则最后一行
+     * （系统蓝牙 / 断开）的下半截会被这两块伪元素抢走点击。
+     */
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingInline: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground1,
     minWidth: 0,
   },
@@ -268,6 +277,17 @@ const useStyles = makeStyles({
     color: tokens.colorBrandForeground1,
   },
   spacer: { flex: 1 },
+  /**
+   * FIFO 静音行（P3c）的「恢复」按钮：secondary 外观直接取 Fluent 默认样式，
+   * 只把命中高度抬到 44（`TOUCH_TARGET_CSS`），字号与面板其它行同一档。
+   */
+  restoreButton: {
+    flexShrink: 0,
+    minHeight: TOUCH_TARGET_CSS,
+    paddingInline: tokens.spacingHorizontalM,
+    fontSize: tokens.fontSizeBase200,
+    lineHeight: tokens.lineHeightBase200,
+  },
 });
 
 /** 拖动滑杆：本地乐观 + 节流提交，避免每像素一次 invoke */
@@ -312,12 +332,6 @@ export interface QuickSettingsPanelProps {
   bt: BtAudioSnapshot | null;
   /** 快照读取失败（无 snapshot 可显示） */
   btError: boolean;
-  /** 蓝牙命令进行中：全部蓝牙控件禁用 */
-  btBusy: boolean;
-  /** 正在手动连接的设备 id（行内显示「正在连接…」） */
-  pendingDeviceId: string | null;
-  /** 手动断开 / 关闭蓝牙音箱进行中（行内显示「正在断开…」+ 转圈） */
-  pendingDisconnect: boolean;
   onRetry: () => void;
   onConnect: (deviceId: string) => void;
   onDisconnect: () => void;
@@ -329,6 +343,8 @@ export interface QuickSettingsPanelProps {
   onSetBrightness: (percent: number) => void;
   onSetAutoBrightness: (enabled: boolean) => void;
   onOpenWindowsBluetooth: () => void;
+  /** FIFO 手动恢复（P3c）：解除「已被本机音乐静音」，不断连接、不操控手机端 */
+  onRestoreOutput: () => void;
   /** StatusBar 用它量面板内容高度来驱动 surface morph */
   contentRef?: Ref<HTMLDivElement>;
 }
@@ -337,9 +353,6 @@ export function QuickSettingsPanel({
   status,
   bt,
   btError,
-  btBusy,
-  pendingDeviceId,
-  pendingDisconnect,
   onRetry,
   onConnect,
   onDisconnect,
@@ -350,6 +363,7 @@ export function QuickSettingsPanel({
   onSetBrightness,
   onSetAutoBrightness,
   onOpenWindowsBluetooth,
+  onRestoreOutput,
   contentRef,
 }: QuickSettingsPanelProps) {
   const styles = useStyles();
@@ -361,9 +375,17 @@ export function QuickSettingsPanel({
     onSetBrightness,
   );
 
+  const operation = bt?.operation ?? null;
+  const operationText = btOperationText(operation);
+  const busy = operation !== null;
+  const disconnecting =
+    operation?.kind === 'disconnect' ||
+    operation?.kind === 'disable' ||
+    bt?.linkPhase === 'disconnecting';
+  const connectingDeviceId = operation?.kind === 'connect' ? operation.deviceId ?? null : null;
   const devices = bt ? sortDevices(bt) : [];
   const bluetoothReady = Boolean(bt && bt.available && bt.bluetoothOn !== false);
-  const bluetoothBusy = btBusy || !bluetoothReady;
+  const bluetoothBusy = busy || !bluetoothReady;
   const muted = status?.muted === true;
   /**
    * 顶部开关是「蓝牙音箱」总开关，不是自动连接偏好：
@@ -375,11 +397,14 @@ export function QuickSettingsPanel({
   );
   const connected = bt?.connected === true;
   const errorText = btErrorText(bt?.lastAttemptError ?? bt?.lastError ?? null);
+  /** 主动断开且 active 设备已知时，设备行要显示「断开中…」（linkPhase 在 Close 后才切换） */
+  const disconnectingDeviceId = disconnecting ? bt?.activeDeviceId ?? null : null;
 
   let body: ReactNode;
   if (!bt) {
     body = (
       <div className={styles.row}>
+        {!btError ? <Spinner size="extra-tiny" aria-label="正在读取蓝牙状态" /> : null}
         <Text size={200} className={btError ? styles.danger : styles.hint}>
           {btError ? '读取蓝牙状态失败' : '正在读取蓝牙状态…'}
         </Text>
@@ -397,12 +422,17 @@ export function QuickSettingsPanel({
           <Text size={300} weight="semibold" className={styles.title}>
             蓝牙音箱
           </Text>
-          {btBusy ? <Spinner size="extra-tiny" aria-label="蓝牙操作进行中" /> : null}
+          {busy ? <Spinner size="extra-tiny" aria-label="蓝牙操作进行中" /> : null}
+          {operationText ? (
+            <Text size={200} className={styles.mutedStatus}>
+              {operationText}
+            </Text>
+          ) : null}
           <Switch
             aria-label="蓝牙音箱"
             checked={btEnabled}
             /** 蓝牙关闭时仍可点：打开总开关会先打开蓝牙再恢复接收（见 onSetEnabled） */
-            disabled={btBusy || !bt.available}
+            disabled={busy || !bt.available}
             onChange={(_event, data) => onSetEnabled(data.checked)}
           />
         </div>
@@ -416,8 +446,13 @@ export function QuickSettingsPanel({
                   ? '蓝牙音箱已关闭'
                   : '还没有配对的设备'}
             </Text>
-            <Button appearance="transparent" className={styles.textButton} onClick={onOpenWindowsBluetooth}>
-              蓝牙设置
+            <Button
+              appearance="transparent"
+              className={styles.textButton}
+              aria-label="打开 Windows 蓝牙设置"
+              onClick={onOpenWindowsBluetooth}
+            >
+              系统蓝牙
             </Button>
           </div>
         ) : (
@@ -427,22 +462,25 @@ export function QuickSettingsPanel({
             const deviceStreaming = active && bt.streaming;
             const preferred = bt.preferredDeviceId === device.id;
             const connecting =
-              pendingDeviceId === device.id ||
+              connectingDeviceId === device.id ||
               (bt.autoConnectState === 'trying' && bt.attemptDeviceId === device.id);
-            const disconnecting = pendingDisconnect && active;
-            // 状态优先级：正在断开 > 正在连接 > 接收中/已连接 > 等待重试 > 未连接
-            const statusText = disconnecting
-              ? '正在断开…'
+            const deviceDisconnecting = disconnectingDeviceId === device.id;
+            const deviceSuppressed = active && bt.outputSuppressed === true;
+            // 状态优先级：正在断开 > 正在连接 > 已静音 > 接收中/已连接 > 等待重试 > 未连接
+            const statusText = deviceDisconnecting
+              ? '断开中…'
               : connecting
-                ? '正在连接…'
-                : deviceConnected
-                  ? deviceStreaming
-                    ? '接收中'
-                    : '已连接'
-                  : bt.autoConnectState === 'backoff' && bt.attemptDeviceId === device.id
-                    ? '等待重试…'
-                    : '未连接';
-            const statusBusy = disconnecting || connecting;
+                ? '连接中…'
+                : deviceSuppressed
+                  ? '已静音'
+                  : deviceConnected
+                    ? deviceStreaming
+                      ? '接收中'
+                      : '已连接'
+                    : bt.autoConnectState === 'backoff' && bt.attemptDeviceId === device.id
+                      ? '等待重试…'
+                      : '未连接';
+            const statusBusy = deviceDisconnecting || connecting;
             return (
               <div className={styles.row} key={device.id}>
                 <button
@@ -460,7 +498,9 @@ export function QuickSettingsPanel({
                     <Text
                       size={200}
                       className={mergeClasses(
-                        deviceConnected && !disconnecting ? styles.success : styles.mutedStatus,
+                        deviceConnected && !deviceDisconnecting && !deviceSuppressed
+                          ? styles.success
+                          : styles.mutedStatus,
                       )}
                     >
                       {statusText}
@@ -472,7 +512,7 @@ export function QuickSettingsPanel({
                   className={styles.starButton}
                   aria-label={preferred ? `取消首选：${device.name}` : `设为首选：${device.name}`}
                   aria-pressed={preferred}
-                  disabled={btBusy}
+                  disabled={busy}
                   onClick={() => onSetPreferred(preferred ? null : device.id)}
                 >
                   {preferred ? (
@@ -486,6 +526,30 @@ export function QuickSettingsPanel({
           })
         )}
 
+        {bt.outputSuppressed === true ? (
+          <div className={styles.row}>
+            <Text size={200} className={styles.title}>
+              已被本机音乐静音
+            </Text>
+            <Button
+              appearance="secondary"
+              className={styles.restoreButton}
+              aria-label="恢复蓝牙音箱声音"
+              onClick={onRestoreOutput}
+            >
+              恢复
+            </Button>
+          </div>
+        ) : null}
+
+        {bt.unverifiedDisconnect ? (
+          <div className={styles.row}>
+            <Text size={200} className={styles.hint}>
+              上次断开未确认
+            </Text>
+          </div>
+        ) : null}
+
         {bt.autoConnectState === 'backoff' ? (
           <div className={styles.row}>
             <Text size={200} className={styles.hint}>
@@ -498,6 +562,18 @@ export function QuickSettingsPanel({
           <div className={styles.row}>
             <Text size={200} className={styles.danger}>
               {errorText}
+            </Text>
+          </div>
+        ) : null}
+
+        {/*
+          store 的失败旗标（快照仍可用时）：恢复 FIFO 静音、设首选、开关等动作失败不会
+          出现在 lastError 里，没有这一行就是静默失败（HIG 反馈：命令无法执行要说明原因）。
+        */}
+        {!errorText && btError ? (
+          <div className={styles.row}>
+            <Text size={200} className={styles.danger}>
+              蓝牙操作失败
             </Text>
           </div>
         ) : null}
@@ -564,18 +640,23 @@ export function QuickSettingsPanel({
         ) : null}
 
         <div className={styles.linkRow}>
-          <Button appearance="transparent" className={styles.linkButton} onClick={onOpenWindowsBluetooth}>
-            打开 Windows 蓝牙设置
+          <Button
+            appearance="transparent"
+            className={styles.linkButton}
+            aria-label="打开 Windows 蓝牙设置"
+            onClick={onOpenWindowsBluetooth}
+          >
+            系统蓝牙
           </Button>
           <span className={styles.spacer} />
           {connected ? (
             <Button
               appearance="transparent"
               className={styles.textButton}
-              disabled={btBusy}
+              disabled={busy}
               onClick={onDisconnect}
             >
-              {pendingDisconnect ? '正在断开…' : '断开'}
+              {disconnecting ? '断开中…' : '断开'}
             </Button>
           ) : null}
         </div>

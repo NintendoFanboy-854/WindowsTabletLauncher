@@ -70,6 +70,16 @@ import {
 } from '../types';
 import { TtsPlayer } from '../voice/ttsPlayer';
 import { VoiceRecorder, type RecordedAudio } from '../voice/recorder';
+import {
+  acquireAudioFocus,
+  releaseAudioFocus,
+  type AudioFocusReason,
+} from '../../system/audioFocus';
+import {
+  DEFAULT_AUDIO_SETTINGS,
+  readAudioSettings,
+  type AudioSettings,
+} from '../../system/audioSettings';
 
 /** 工具调用轮次上限：防止模型在工具之间无限循环；达到后让它直接回答 */
 export const MAX_TOOL_ROUNDS = 12;
@@ -189,6 +199,30 @@ interface RunTurnParams {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 声音设置（localStorage）：读失败按默认，渲染期异常不能影响录音/朗读主流程。
+ * 不引入 Hook：设置改动即时落盘，下一次录音/朗读直接读最新值即可。
+ */
+function readAudioPreferences(): AudioSettings {
+  try {
+    return readAudioSettings();
+  } catch {
+    return DEFAULT_AUDIO_SETTINGS;
+  }
+}
+
+/**
+ * 音频焦点是增强能力（`docs/history/V090-AUDIO-MUSIC-SPEC.md §3`）：
+ * IPC 失败只吞掉（浏览器运行时没有 Rust 侧），不打断录音、不弹错。
+ */
+function acquireAudioFocusQuietly(reason: AudioFocusReason, gainPercent: number): void {
+  void acquireAudioFocus(reason, gainPercent).catch(() => {});
+}
+
+function releaseAudioFocusQuietly(reason: AudioFocusReason): void {
+  void releaseAudioFocus(reason).catch(() => {});
 }
 
 function initStore(seed?: AgentSeed): ConversationStore {
@@ -311,6 +345,9 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       recorderRef.current?.cancel();
       ttsPlayerRef.current?.dispose();
       ttsPlayerRef.current = null;
+      // 面板卸载时把两个焦点都还回去，避免音乐一直停在压低态。
+      releaseAudioFocusQuietly('voiceInput');
+      releaseAudioFocusQuietly('speechOutput');
     };
   }, []);
 
@@ -369,6 +406,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     speakAbortRef.current = null;
     ttsPlayerRef.current?.stop();
     setSpeakingMessageId(null);
+    // 中止播报也要立刻恢复音乐：speakText 的 finally 在「被新朗读接替」时会被跳过。
+    releaseAudioFocusQuietly('speechOutput');
   };
 
   /** 朗读一段文本；失败不再静默，写入 voice.speechError */
@@ -378,6 +417,14 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     const controller = new AbortController();
     speakAbortRef.current = controller;
     setSpeakingMessageId(messageId);
+    // 朗读压低音乐：和 speak() 并行发起，第一段声音出来前就开始淡出。
+    // `duckTts` 被关掉时顺手清掉上一次朗读留下的焦点（设置可能在朗读中途被改）。
+    const audio = readAudioPreferences();
+    if (audio.duckTts) {
+      acquireAudioFocusQuietly('speechOutput', audio.ttsGain);
+    } else {
+      releaseAudioFocusQuietly('speechOutput');
+    }
     try {
       await getTtsPlayer().speak({
         transport,
@@ -397,6 +444,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
       if (speakAbortRef.current === controller) {
         speakAbortRef.current = null;
         setSpeakingMessageId(null);
+        // 正常结束 / abort / 出错都恢复音乐；若已被下一次朗读接替，焦点由新的 speakText 持有。
+        releaseAudioFocusQuietly('speechOutput');
       }
     }
   };
@@ -863,6 +912,13 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     }
     // 开始录音前先停止播报（契约 §5）
     stopSpeaking();
+    // 先申请焦点、不 await：让音乐在开口前就开始淡出，与启动麦克风并行。
+    const audio = readAudioPreferences();
+    if (audio.duckVoice) {
+      acquireAudioFocusQuietly('voiceInput', audio.voiceGain);
+    } else {
+      releaseAudioFocusQuietly('voiceInput');
+    }
     recordingStartingRef.current = true;
     recordingCancelRequestedRef.current = false;
     const recorder = recorderRef.current ?? new VoiceRecorder();
@@ -870,6 +926,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     try {
       await recorder.start();
     } catch (recordError) {
+      // 麦克风没起来：立刻归还焦点，音乐不能留在压低态。
+      releaseAudioFocusQuietly('voiceInput');
       if (recorderRef.current === recorder) recorderRef.current = null;
       recordingStartingRef.current = false;
       const next: AgentVoiceState = {
@@ -888,6 +946,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
     // 启动过程中用户已经松开空格（<300ms）：取消，不进入录音态
     if (recordingCancelRequestedRef.current) {
       recordingCancelRequestedRef.current = false;
+      // start 在途时取消的路径：焦点同样要归还。
+      releaseAudioFocusQuietly('voiceInput');
       recorder.cancel();
       recorderRef.current = null;
       recordingStartedAtRef.current = null;
@@ -916,6 +976,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   };
 
   const stopRecording = async (): Promise<void> => {
+    // 用户松手即恢复音乐：不等解码 / ASR / 模型。
+    releaseAudioFocusQuietly('voiceInput');
     const recorder = recorderRef.current;
     if (!recorder || voiceRef.current.stage !== 'recording') return;
 
@@ -1126,6 +1188,8 @@ export function useAgentSession(options: UseAgentSessionOptions = {}): AgentSess
   };
 
   const cancelRecording = (): void => {
+    // 取消录音：包括「start 还在 await」的路径，焦点都要归还（上面的分支只是补意图）。
+    releaseAudioFocusQuietly('voiceInput');
     // recorder.start() 还在 await：先记下取消意图，start 完成后由 startRecording 自己清理
     if (recordingStartingRef.current) {
       recordingCancelRequestedRef.current = true;

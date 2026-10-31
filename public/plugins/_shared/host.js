@@ -344,17 +344,45 @@ export function isSettingsView() {
  * 请求宿主打开本插件的浮层视图。
  * 宿主用 `?view=<view>` 把同一插件页面装进全窗口 Fluent Dialog，这样浮层
  * 不会被小卡片的 iframe 边界裁掉（DECISIONS D-02b / docs/PLUGIN-REACT.md）。
+ *
  * @param {'settings'|string} view 视图名，插件在 main.jsx 里按它分支渲染
  * @param {string} title 宿主浮层标题（用户语言）
+ * @param {{ size?: 'default'|'large' }} [options] 浮层尺寸；不传时沿用旧协议（不带 size）
  */
-export function requestOverlay(view, title) {
-  window.parent.postMessage({ type: 'plugin:request-overlay', payload: { view, title } }, '*');
+export function requestOverlay(view, title, options) {
+  const payload = { view, title };
+  // 只有显式给出白名单值时 payload 才带 size：旧插件/旧宿主互发不带 size 的消息仍然兼容。
+  if (options?.size === 'default' || options?.size === 'large') payload.size = options.size;
+  window.parent.postMessage({ type: 'plugin:request-overlay', payload }, '*');
 }
 
 /** 打开插件设置浮层（= requestOverlay('settings')） */
 export function requestSettings(title = '设置') {
   requestOverlay('settings', title);
 }
+
+/* ------------------------------------------------------------------ */
+/* 通用受管浏览器窗口 / 媒体会话（转发 /plugin-sdk.js 的 plugin.*）     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 通用能力便利函数。业务 URL、会话选择、文案全部留在插件里；这里只做转发，
+ * 因此任何插件都可以使用，共享层不需要知道调用方是谁。
+ */
+export const openBrowserWindow = (url) => plugin.browserWindow.open(url);
+export const controlBrowserWindow = (action) => plugin.browserWindow.control(action);
+export const browserWindowState = () => plugin.browserWindow.state();
+/**
+ * 受管窗口的 CDP 调试目标（`{ port, targets }`，字段原样来自 `/json/list`）。
+ *
+ * 通用能力：宿主不判断 target 的类型/URL/标题，挑哪个、连哪个都是插件自己的逻辑。
+ * 脱离宿主（独立开发）时返回空列表，插件按“没有调试端口”降级。
+ */
+export const browserWindowDebugTargets = () => plugin.browserWindow.debugTargets();
+export const mediaSessions = () => plugin.media.sessions();
+export const mediaCommand = (sessionId, command) =>
+  plugin.media.command(sessionId, command);
+export const mediaArtwork = (sessionId) => plugin.media.artwork(sessionId);
 
 /**
  * 请求宿主导航到「设置页 → 插件 → 本插件」分区（契约 §5）。

@@ -6,7 +6,14 @@
  */
 
 import type { GeoLocation, PluginEnv, PluginRecord } from './types';
-import type { IpLocation } from '../bridge/types';
+import type {
+  BrowserDebugTargets,
+  BrowserWindowAction,
+  BrowserWindowState,
+  IpLocation,
+  MediaPlaybackCommand,
+  MediaSessionSnapshot,
+} from '../bridge/types';
 
 export type { GeoLocation } from './types';
 export type { IpLocation } from '../bridge/types';
@@ -84,3 +91,40 @@ export const getLocation = () => invokeCommand<GeoLocation | null>('get_location
 
 /** ip.cn 网络归属地（D-16），失败/非 Tauri 返回 null */
 export const ipLocate = () => invokeCommand<IpLocation | null>('ip_locate');
+
+// ---------- 通用受管浏览器窗口 / SMTC（P3b，宿主不认插件） ----------
+
+/** 打开/显示受管浏览器窗口；Rust 只接受 https URL */
+export const browserWindowOpen = (url: string) =>
+  invokeCommand<BrowserWindowState>('browser_window_open', { url });
+
+/** 受管窗口控制：show / hide / minimize / close */
+export const browserWindowControl = (action: BrowserWindowAction) =>
+  invokeCommand<BrowserWindowState>('browser_window_control', { action });
+
+/** 受管窗口运行状态 */
+export const browserWindowState = () =>
+  invokeCommand<BrowserWindowState>('browser_window_state');
+
+/**
+ * 受管窗口的 CDP 调试目标（`GET /json/list` 原样透传，宿主不过滤）。
+ * 窗口未运行 / 调试端口没起来时命令返回 Err，由调用方降级。
+ */
+export const browserWindowDebugTargets = () =>
+  invokeCommand<BrowserDebugTargets>('browser_window_debug_targets');
+
+/** 当前 SMTC 媒体会话列表（宿主只透传，不挑会话） */
+export const mediaSessions = () =>
+  invokeCommand<MediaSessionSnapshot>('media_session_list');
+
+/** 按会话 id 发传输命令，返回命令后的新快照 */
+export const mediaCommand = (sessionId: string, command: MediaPlaybackCommand) =>
+  invokeCommand<MediaSessionSnapshot>('media_session_command', { sessionId, command });
+
+/** 按会话 id 取封面 data URL；拿不到返回空串 */
+export const mediaArtwork = (sessionId: string) =>
+  invokeCommand<string>('media_session_artwork', { sessionId });
+
+/** 媒体键兜底（通用能力；不经过具体会话） */
+export const mediaKey = (command: MediaPlaybackCommand) =>
+  invokeCommand<void>('media_key', { command });

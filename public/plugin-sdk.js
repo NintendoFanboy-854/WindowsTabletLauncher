@@ -52,6 +52,24 @@ function fallback(method, params) {
       return null;
     case 'ipLocate':
       return null;
+    // 通用受管窗口 / 媒体会话：脱离宿主时没有 Rust 后端，只返回可渲染的空状态。
+    case 'openBrowserWindow':
+      return null;
+    case 'browserWindowControl':
+      return null;
+    case 'browserWindowState':
+      return { running: false, visible: false, minimized: false, url: null };
+    case 'browserWindowDebugTargets':
+      // 没有 Rust 后端就没有调试端口；调用方看到空列表即可降级。
+      return { port: 0, targets: [] };
+    case 'mediaSessions':
+      return { sessions: [] };
+    case 'mediaCommand':
+      return null;
+    case 'mediaArtwork':
+      return '';
+    case 'mediaKey':
+      return undefined;
     default:
       return null;
   }
@@ -187,6 +205,33 @@ export const plugin = {
   getLocation: () => call('getLocation', {}),
   /** ip.cn 网络归属地（D-16）：失败/脱离宿主返回 null */
   ipLocate: () => call('ipLocate', {}),
+
+  /**
+   * 通用受管浏览器窗口（宿主不认插件，任何插件都能用）：
+   * 打开 https URL、显示/最小化/关闭、读取运行状态。URL 由调用方自己提供。
+   *
+   * `debugTargets()` 返回该受管窗口的 CDP 调试目标（`{ port, targets }`，字段原样来自
+   * `/json/list`）。宿主不判断类型/URL，挑哪个目标、连哪个 WebSocket 都是调用方的事；
+   * 窗口没跑或端口没起来时返回 `{ port: 0, targets: [] }`。
+   */
+  browserWindow: {
+    open: (url) => call('openBrowserWindow', { url }),
+    control: (action) => call('browserWindowControl', { action }),
+    state: () => call('browserWindowState', {}),
+    debugTargets: () => call('browserWindowDebugTargets', {}),
+  },
+
+  /**
+   * 通用 SMTC 媒体会话：列出系统会话、按会话 id 发传输命令、取封面。
+   * 挑哪个会话 / 怎么显示完全是插件自己的逻辑。
+   */
+  media: {
+    sessions: () => call('mediaSessions', {}),
+    command: (sessionId, command) => call('mediaCommand', { sessionId, command }),
+    artwork: (sessionId) => call('mediaArtwork', { sessionId }),
+    /** 媒体键兜底（不经过具体会话）；本轮插件 UI 默认不用。 */
+    key: (command) => call('mediaKey', { command }),
+  },
 
   get inHost() {
     return isInHost;

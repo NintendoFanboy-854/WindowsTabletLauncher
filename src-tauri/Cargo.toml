@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.8.1"
+version = "0.9.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -42,10 +42,15 @@ windows = { version = "0.62", features = [
   "Devices_Radios",                   # 蓝牙无线电开关
   "Devices_Sensors",                  # LightSensor.GetDefault（自动亮度能力检测）
   "Media_Audio",                      # AudioPlaybackConnection（A2DP Sink）
+  "Media_Control",                    # GlobalSystemMediaTransportControlsSessionManager（SMTC 媒体会话）
+  "Storage_Streams",                  # 封面缩略图：IRandomAccessStream / DataReader
+  "Foundation_Collections",           # WinRT 集合（SMTC 的会话列表 IVectorView 等）
+  "Win32_Devices_Bluetooth",          # bluetoothapis：退出时停用/启动时恢复手机 A2DP 音频服务
   "Win32_Media_Audio",                # CoreAudio：默认渲染端点
   "Win32_Media_Audio_Endpoints",      # IAudioEndpointVolume（主音量/静音）
   "Win32_System_Com",                 # CoCreateInstance（CoreAudio / WMI COM）
   "Win32_System_Com_StructuredStorage", # IMMDevice::Activate 的 PROPVARIANT 参数
+  "Win32_System_Diagnostics_ToolHelp",  # Toolhelp32：自身进程树（含 msedgewebview2 子进程）
   "Win32_System_Ole",                 # WMI 需要的 OLE 基础类型
   "Win32_System_Variant",             # VARIANT（WMI 属性读写）
   "Win32_System_Wmi",                 # root\wmi：WmiMonitorBrightness（亮度）
@@ -55,6 +60,8 @@ windows = { version = "0.62", features = [
   "Win32_System_SystemInformation",   # GetTickCount
   "Win32_System_Threading",           # OpenProcess / QueryFullProcessImageNameW（按进程名认设置窗口）
   "Win32_System_WinRT",               # RoInitialize（WinRT 线程初始化）
+  "Win32_NetworkManagement_IpHelper", # GetExtendedTcpTable：从调试端口反查真实浏览器进程
+  "Win32_Networking_WinSock",         # AF_INET（GetExtendedTcpTable 地址族参数）
   "Win32_UI_Input_KeyboardAndMouse",  # GetLastInputInfo
   "Win32_UI_WindowsAndMessaging",     # EnumWindows / SetForegroundWindow（设置页切前台）
 ] }

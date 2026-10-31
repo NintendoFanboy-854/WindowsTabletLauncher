@@ -7,7 +7,7 @@
  * 3. 配置写入后发 `host:config`（跨 origin 里 storage 事件到不了插件 iframe），
  *    并把插件发来的消息按协议分发给宿主（桥接层 / 桌面层）。
  *
- * 8 个宿主 API 的 `host:reply` 由桥接层（A5）通过 `onApiCall` 注入；没注入时
+ * 宿主 API 的 `host:reply` 由桥接层（A5）通过 `onApiCall` 注入；没注入时
  * 直接回 `ok:false`，免得插件 await 一个永远不来的响应。
  */
 
@@ -41,6 +41,13 @@ import type { OverlaySource } from './overlayMotion';
 import { PluginOverlay } from './PluginOverlay';
 
 export type HostApiReply = (ok: boolean, result?: unknown, error?: string) => void;
+
+/** 插件浮层尺寸（P3b）：非法输入一律按 default 处理，插件不能传任意几何 */
+export type OverlaySize = 'default' | 'large';
+
+function normalizeOverlaySize(value: unknown): OverlaySize {
+  return value === 'large' ? 'large' : 'default';
+}
 
 export interface PluginWidgetFrameProps {
   /** iframe 地址（用 PluginManager.widgetFrameSrc / backgroundFrameSrc 生成） */
@@ -203,12 +210,17 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     const frameRef = useRef<HTMLIFrameElement>(null);
     const [loadedAt, setLoadedAt] = useState(0);
     /**
-     * 插件请求的全窗口浮层视图：`{ view, title, source }`。
+     * 插件请求的全窗口浮层视图：`{ view, title, size, source }`。
      * `source` 是请求那一刻的卡片快照（rect + 节点 + 窗口尺寸），container transform
      * 的起点和“关闭后焦点回哪张卡片”都用它（MOTION §4）。
      */
     const [overlay, setOverlay] = useState(
-      null as null | { view: string; title: string; source: OverlaySource },
+      null as null | {
+        view: string;
+        title: string;
+        size: OverlaySize;
+        source: OverlaySource;
+      },
     );
     const readyRef = useRef(false);
     const lastSize = useRef<WidgetSize | null>(null);
@@ -217,17 +229,25 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
     const overlaySourceRef = useRef<OverlaySource | null>(null);
     const hadOverlayRef = useRef(false);
 
-    const openOverlay = useCallback((view?: unknown, overlayTitle?: unknown) => {
-      const viewName = typeof view === 'string' && view.trim() ? view.trim() : 'settings';
-      // 卡片 rect 在“请求浮层”这一刻量：此时卡片一定还在原位，动画起点才准
-      const source = captureOverlaySource(frameRef.current);
-      overlaySourceRef.current = source;
-      setOverlay({
-        view: viewName,
-        title: typeof overlayTitle === 'string' && overlayTitle.trim() ? overlayTitle.trim() : '设置',
-        source,
-      });
-    }, []);
+    const openOverlay = useCallback(
+      (view?: unknown, overlayTitle?: unknown, overlaySize?: unknown) => {
+        const viewName = typeof view === 'string' && view.trim() ? view.trim() : 'settings';
+        // 卡片 rect 在“请求浮层”这一刻量：此时卡片一定还在原位，动画起点才准
+        const source = captureOverlaySource(frameRef.current);
+        overlaySourceRef.current = source;
+        setOverlay({
+          view: viewName,
+          title:
+            typeof overlayTitle === 'string' && overlayTitle.trim()
+              ? overlayTitle.trim()
+              : '设置',
+          // payload 里的 size 是外部输入：只认 large，其余（含拼错/missing）都按 default。
+          size: normalizeOverlaySize(overlaySize),
+          source,
+        });
+      },
+      [],
+    );
 
     /** 浮层卸载：清状态 + 焦点还给来源卡片（MOTION §4「关闭后焦点回到原卡片」） */
     const handleOverlayClosed = useCallback(() => {
@@ -361,8 +381,12 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         }
         // 插件请求全窗口浮层视图（D-02b：设置/详情是独立视图，宿主用 ?view=... 加载）
         if (rawType === 'plugin:request-overlay') {
-          const payload = (data as unknown as { payload?: { view?: unknown; title?: unknown } }).payload;
-          openOverlay(payload?.view, payload?.title);
+          const payload = (
+            data as unknown as {
+              payload?: { view?: unknown; title?: unknown; size?: unknown };
+            }
+          ).payload;
+          openOverlay(payload?.view, payload?.title, payload?.size);
           return;
         }
         // 兼容旧协议：只请求设置浮层
@@ -450,10 +474,11 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         />
         {overlay && overlaySrc && (
           <PluginOverlay
-            key={overlay.view}
+            key={`${overlay.view}:${overlay.size}`}
             source={overlay.source}
             ariaLabel={`${title ?? pluginId} ${overlay.title}`}
             title={title ? `${title} · ${overlay.title}` : overlay.title}
+            size={overlay.size}
             onClosed={handleOverlayClosed}
           >
             {(close) => (

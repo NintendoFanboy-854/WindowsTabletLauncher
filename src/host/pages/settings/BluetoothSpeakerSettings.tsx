@@ -6,10 +6,11 @@
  * 这里只保留「需要看清状态再改」的长期项：蓝牙开关、自动连接、首选设备、错误详情与系统兜底入口。
  * 因而 **不重复** 面板里的设备列表点击连接 / 断开按钮——两处只保留一处可编辑（D-43）。
  *
- * 状态全部来自宿主快照（轮询），不写说明书、不造 hero、不引新视觉语言。
+ * P2（D-51）：快照改由 `useBluetoothAudio` 单例 store 提供（不再有自己的 interval/state）；
+ * 蓝牙开关/自动连接/首选都走同一套 store action，非阻塞命令的阶段文案来自快照 `operation`。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -29,51 +30,31 @@ import { TOUCH_TARGET_CSS } from '../../design/metrics';
 import { isTauriRuntime } from '../../plugins/tauri';
 import {
   AUTO_CONNECT_STATE_TEXT,
-  btAudioOpenSettings,
-  btAudioRefresh,
-  btAudioResumeAuto,
-  btAudioSetAutoConnect,
-  btAudioSetBluetooth,
-  btAudioSetPreferred,
-  btAudioSnapshot,
+  btOperationText,
   orderedDevices,
-  type BtAudioSnapshot,
   type BtDeviceInfo,
 } from '../../system/bluetoothAudio';
+import { useBluetoothAudio } from '../../system/useBluetoothAudio';
 import { SettingsGroup, SettingsRow } from './SettingsBlocks';
 
-/** 设置页分组轮询间隔：只在挂载期间跑；命令进行中跳过，避免旧快照覆盖 */
-const POLL_INTERVAL_MS = 1500;
-
-type BusyAction = 'bluetooth' | 'autoConnect' | 'preferred' | 'resume' | 'refresh';
-
-interface FriendlyError {
-  title: string;
-  detail: string;
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** `lastError` 前缀归一成两行用户文案；不透传 HRESULT。 */
-function friendlyError(message: string | null): FriendlyError | null {
+/** `lastError` 前缀归一成一句事实文案；不透传 HRESULT，也不写教程式后缀。 */
+function friendlyError(message: string | null): string | null {
   if (!message) return null;
   if (/^(创建音频连接失败|启用音频接收失败|建立音频连接失败|读取连接状态失败)/.test(message)) {
-    return { title: '连接失败', detail: '手机上确认在范围内再试一次' };
+    return '连接失败';
   }
   if (/^(枚举音频设备失败|蓝牙音频不可用)/.test(message)) {
-    return { title: '读取设备失败', detail: '到系统蓝牙设置里检查' };
+    return '读取设备失败';
   }
   if (
     /^(系统不允许切换蓝牙开关|没有找到蓝牙无线电|切换蓝牙失败|读取蓝牙状态失败)/.test(message)
   ) {
-    return { title: '打开蓝牙失败', detail: '系统没有允许蓝牙操作' };
+    return '系统未允许蓝牙操作';
   }
   if (/自动连接|尝试连接|回连/.test(message)) {
-    return { title: '自动连接失败', detail: '稍后会自动重试，也可以现在手动连接' };
+    return '自动连接失败';
   }
-  return { title: '蓝牙操作失败', detail: '重试一次' };
+  return '蓝牙操作失败';
 }
 
 function deviceName(device: BtDeviceInfo | null | undefined): string {
@@ -93,9 +74,6 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     flexWrap: 'wrap',
   },
-  errorBody: {
-    color: tokens.colorNeutralForeground2,
-  },
   optionText: {
     display: 'flex',
     alignItems: 'center',
@@ -109,144 +87,82 @@ const useStyles = makeStyles({
 export function BluetoothSpeakerSettings() {
   const styles = useStyles();
   const tauri = isTauriRuntime();
+  const store = useBluetoothAudio();
+  const {
+    refreshNow,
+    setBluetooth,
+    setAutoConnect,
+    setPreferred,
+    resumeAuto,
+    openSettings: openSystemBluetooth,
+  } = store;
 
-  const [snapshot, setSnapshot] = useState<BtAudioSnapshot | null>(null);
-  const [loading, setLoading] = useState(tauri);
-  const [busy, setBusy] = useState<BusyAction | null>(null);
+  const [busy, setBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
-
   const busyRef = useRef(false);
-  const mountedRef = useRef(true);
-  /** 最近一次失败动作的重试入口：错误条「重试」优先重放它，而不是只刷新状态。 */
-  const retryRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const load = useCallback(async () => {
-    if (!tauri) return;
-    retryRef.current = () => {
-      void load();
-    };
+  const run = useCallback(async (task: () => Promise<unknown>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setPageError(null);
     try {
-      const next = await btAudioRefresh();
-      if (!mountedRef.current) return;
-      setSnapshot(next);
-      setPageError(null);
-      retryRef.current = null;
-    } catch (error) {
-      if (!mountedRef.current) return;
-      console.warn('[bt-audio] 读取状态失败', error);
-      setPageError(errorText(error));
+      const result = await task();
+      // store action 失败返回 null（并把 error 置 true）；这里只补一条可重试的文案。
+      if (result === null) setPageError('蓝牙操作失败');
     } finally {
-      if (mountedRef.current) setLoading(false);
+      busyRef.current = false;
+      setBusy(false);
     }
-  }, [tauri]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!tauri) return undefined;
-    const timer = window.setInterval(() => {
-      if (busyRef.current || !mountedRef.current) return;
-      void btAudioSnapshot()
-        .then((next) => {
-          if (mountedRef.current) setSnapshot(next);
-        })
-        .catch(() => {
-          /* 轮询失败不覆盖已有画面；下一次 tick 再试 */
-        });
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [tauri]);
-
-  const run = useCallback(
-    async (action: BusyAction, task: () => Promise<BtAudioSnapshot>) => {
-      if (busyRef.current) return;
-      busyRef.current = true;
-      setBusy(action);
-      setPageError(null);
-      retryRef.current = () => {
-        void run(action, task);
-      };
-      try {
-        const next = await task();
-        if (!mountedRef.current) return;
-        setSnapshot(next);
-        if (next.lastError) {
-          setPageError(next.lastError);
-        } else {
-          retryRef.current = null;
-        }
-      } catch (error) {
-        if (mountedRef.current) {
-          console.warn('[bt-audio] 操作失败', error);
-          setPageError(errorText(error));
-        }
-      } finally {
-        busyRef.current = false;
-        if (mountedRef.current) setBusy(null);
-      }
-    },
-    [],
-  );
+  }, []);
 
   const toggleBluetooth = useCallback(
     (on: boolean) => {
-      void run('bluetooth', () => btAudioSetBluetooth(on));
+      void run(() => setBluetooth(on));
     },
-    [run],
+    [run, setBluetooth],
   );
 
   const changeAutoConnect = useCallback(
     (enabled: boolean) => {
-      void run('autoConnect', async () => {
-        const next = await btAudioSetAutoConnect(enabled);
-        // 重新打开自动连接时顺带解除「手动断开」造成的 paused（D-44 用户意图）
-        if (enabled && next.autoConnectState === 'paused') {
-          return btAudioResumeAuto();
-        }
-        return next;
-      });
+      // store 的 setAutoConnect 在重新打开时会顺带解除「手动断开」造成的 paused（D-44）
+      void run(() => setAutoConnect(enabled));
     },
-    [run],
+    [run, setAutoConnect],
   );
 
-  const resumeAuto = useCallback(() => {
-    void run('resume', () => btAudioResumeAuto());
-  }, [run]);
+  const resumeAutoConnect = useCallback(() => {
+    void run(resumeAuto);
+  }, [run, resumeAuto]);
 
   const changePreferred = useCallback(
     (deviceId: string | null) => {
-      void run('preferred', () => btAudioSetPreferred(deviceId));
+      void run(() => setPreferred(deviceId));
     },
-    [run],
+    [run, setPreferred],
   );
-
-  const openSystemBluetooth = useCallback(async () => {
-    try {
-      await btAudioOpenSettings();
-    } catch (error) {
-      setPageError(errorText(error));
-      retryRef.current = () => {
-        void openSystemBluetooth();
-      };
-    }
-  }, []);
 
   if (!tauri) {
     return (
-      <SettingsGroup title="设备" hint="蓝牙音箱把平板当手机外放。">
+      <SettingsGroup title="设备" hint="蓝牙音箱把平板当手机外放">
         <SettingsRow label="蓝牙音箱" description="浏览器预览不支持系统蓝牙，桌面应用内可用" />
       </SettingsGroup>
     );
   }
+
+  const snapshot = store.snapshot;
+  const loading = !store.loaded;
+  const actionDisabled = busy || loading;
+  const operation = snapshot?.operation ?? null;
+  const operationText = btOperationText(operation);
+  const radioOperationText =
+    operation?.kind === 'bluetoothOn' || operation?.kind === 'bluetoothOff'
+      ? operationText
+      : null;
+  const disconnecting =
+    snapshot?.linkPhase === 'disconnecting' ||
+    operation?.kind === 'disconnect' ||
+    operation?.kind === 'disable';
 
   const devices = snapshot ? orderedDevices(snapshot) : [];
   const activeDevice = snapshot?.activeDeviceId
@@ -260,11 +176,11 @@ export function BluetoothSpeakerSettings() {
   const paused = snapshot?.autoConnectState === 'paused';
   const bluetoothOff = snapshot?.bluetoothOn === false;
   const unavailable = !loading && snapshot !== null && !snapshot.available;
-  const loadFailed = pageError !== null && snapshot === null;
-  const actionDisabled = busy !== null || loading;
+  const loadFailed = snapshot === null && (store.error || pageError !== null);
 
   const error = friendlyError(
     pageError ??
+      (store.error ? '蓝牙操作失败' : null) ??
       snapshot?.lastError ??
       (snapshot?.autoConnectState === 'backoff' ? snapshot.lastAttemptError : null),
   );
@@ -273,52 +189,56 @@ export function BluetoothSpeakerSettings() {
     ? '正在读取蓝牙状态…'
     : loadFailed
       ? '读取蓝牙状态失败'
-      : unavailable
-        ? '没有找到可用的蓝牙适配器'
-        : bluetoothOff
-          ? '蓝牙已关闭'
-          : streaming
-            ? `正在接收「${deviceName(activeDevice)}」的音频`
-            : connected
-              ? `已连接「${deviceName(activeDevice)}」`
-              : activeDevice
-                ? `与「${deviceName(activeDevice)}」的连接已断开`
-                : devices.length === 0
-                  ? '还没有配对的手机'
-                  : '未连接';
+      : operationText
+        ? operationText
+        : unavailable
+          ? '没有找到可用的蓝牙适配器'
+          : bluetoothOff
+            ? '蓝牙已关闭'
+            : snapshot?.unverifiedDisconnect
+              ? '可能仍连接'
+              : streaming
+                ? `正在接收「${deviceName(activeDevice)}」的音频`
+                : connected
+                  ? `已连接「${deviceName(activeDevice)}」`
+                  : activeDevice
+                    ? `与「${deviceName(activeDevice)}」的连接已断开`
+                    : devices.length === 0
+                      ? '还没有配对的手机'
+                      : '未连接';
 
   const autoConnectDescription = snapshot
     ? AUTO_CONNECT_STATE_TEXT[snapshot.autoConnectState] ?? '状态未知'
     : '状态未知';
-  const autoConnectHint = paused
-    ? '手动断开后已暂停，点「恢复自动连接」继续'
-    : snapshot?.autoConnectEnabled === false
-      ? '关闭后不会再自动回连首选设备'
-      : '首选设备优先，失败按顺序尝试下一台';
-
   const preferredValue = preferredDevice?.name ?? '不设首选';
 
   return (
     <SettingsGroup
       title="设备"
-      hint="蓝牙音箱把平板当手机外放；日常连接在桌面状态栏点开快速设置即可。"
+      hint="蓝牙音箱把平板当手机外放，日常连接在桌面状态栏"
     >
       <SettingsRow
         label="蓝牙"
         description={
           snapshot?.bluetoothSupported === false
             ? '这台设备没有蓝牙无线电'
-            : snapshot?.bluetoothOn === true
-              ? '已开启'
-              : snapshot?.bluetoothOn === false
-                ? '已关闭'
-                : '状态未知'
+            : radioOperationText
+              ? radioOperationText
+              : snapshot?.bluetoothOn === true
+                ? '已开启'
+                : snapshot?.bluetoothOn === false
+                  ? '已关闭'
+                  : '状态未知'
         }
       >
         <Switch
           className={styles.touch}
           checked={snapshot?.bluetoothOn === true}
-          disabled={actionDisabled || snapshot?.bluetoothSupported !== true}
+          disabled={
+            actionDisabled ||
+            snapshot?.bluetoothSupported !== true ||
+            radioOperationText !== null
+          }
           onChange={(_event, data) => {
             toggleBluetooth(data.checked);
           }}
@@ -329,19 +249,23 @@ export function BluetoothSpeakerSettings() {
       <SettingsRow label="蓝牙音箱" description={statusText}>
         {loading ? (
           <Spinner size="tiny" />
+        ) : disconnecting ? (
+          <Spinner size="tiny" />
         ) : connected ? (
-          <Badge appearance="filled" color={streaming ? 'success' : 'informative'}>
-            {streaming ? '正在接收' : '已连接'}
+          <Badge appearance="tint" color={streaming ? 'success' : 'informative'}>
+            {streaming ? '接收中' : '已连接'}
           </Badge>
         ) : null}
       </SettingsRow>
 
-      <SettingsRow label="自动连接" description={`${autoConnectDescription}。${autoConnectHint}`}>
+      <SettingsRow label="自动连接" description={autoConnectDescription}>
         <div className={styles.control}>
           <Switch
             className={styles.touch}
             checked={snapshot?.autoConnectEnabled === true}
-            disabled={actionDisabled || snapshot === null || snapshot.autoConnectState === 'unavailable'}
+            disabled={
+              actionDisabled || snapshot === null || snapshot.autoConnectState === 'unavailable'
+            }
             onChange={(_event, data) => {
               changeAutoConnect(data.checked);
             }}
@@ -352,10 +276,11 @@ export function BluetoothSpeakerSettings() {
               appearance="secondary"
               size="large"
               className={styles.touch}
+              aria-label="恢复自动连接"
               disabled={actionDisabled}
-              onClick={resumeAuto}
+              onClick={resumeAutoConnect}
             >
-              恢复自动连接
+              恢复
             </Button>
           ) : null}
         </div>
@@ -398,6 +323,7 @@ export function BluetoothSpeakerSettings() {
           appearance="secondary"
           size="large"
           className={styles.touch}
+          aria-label="打开系统蓝牙设置"
           onClick={() => void openSystemBluetooth()}
         >
           打开
@@ -406,27 +332,20 @@ export function BluetoothSpeakerSettings() {
 
       {error && (
         <MessageBar intent="error">
-          <MessageBarBody>
-            {error.title}
-            <span className={styles.errorBody}> {error.detail}</span>
-          </MessageBarBody>
+          <MessageBarBody>{error}</MessageBarBody>
           <MessageBarActions
             containerAction={
               <Button
                 appearance="secondary"
                 size="large"
                 className={styles.touch}
+                aria-label="重新读取蓝牙状态"
                 onClick={() => {
-                  const retry = retryRef.current;
-                  if (retry) {
-                    retry();
-                    return;
-                  }
-                  void load();
+                  void refreshNow();
                 }}
                 disabled={actionDisabled}
               >
-                重试
+                刷新
               </Button>
             }
           />

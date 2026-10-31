@@ -12,10 +12,13 @@
 //! - `wtsl://` 自定义协议：把插件目录里的静态文件喂给 iframe
 
 mod autostart;
+mod audio_focus;
 mod bingarchive;
 mod bluetooth_audio;
+mod browser_window;
 mod iplocate;
 mod location;
+mod media_session;
 mod micsite;
 mod plugins;
 mod power;
@@ -27,6 +30,7 @@ mod zip;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use tauri::Manager;
 use tauri::webview::{PermissionKind, PermissionResponse};
@@ -36,9 +40,8 @@ type CmdResult<T> = Result<T, String>;
 
 /// 退出链路专用同步日志（append 到 `%TEMP%\wtsl-exit-trace.log`）。
 ///
-/// `tauri-plugin-log` 的写入在进程快速退出时可能来不及落盘（实测退出日志停在
-/// 「应用退出，停止蓝牙音频 worker」），这个函数每次 open/write/flush，用来还原
-/// CloseRequested → shutdown → 进程退出 的时间线。
+/// `tauri-plugin-log` 的写入在进程快速退出时可能来不及落盘，这个函数每次 open/write/flush，
+/// 用来还原 CloseRequested / app_exit → coordinator（恢复音频 → 断开 A2DP）→ 进程退出的时间线。
 pub(crate) fn exit_trace(message: impl AsRef<str>) {
     use std::io::Write;
     let path = std::env::temp_dir().join("wtsl-exit-trace.log");
@@ -75,9 +78,11 @@ fn window_is_fullscreen(window: tauri::WebviewWindow) -> CmdResult<bool> {
     window::is_fullscreen(&window)
 }
 
+/// 统一退出入口（Ctrl+Q / 设置页退出按钮）。语义已改为 P2 的退出 coordinator，
+/// 命令本身立即返回；真正的清理与 `process::exit` 在后台线程完成。
 #[tauri::command]
 fn app_exit(app: tauri::AppHandle) {
-    app.exit(0);
+    begin_exit(&app);
 }
 
 /// 隐藏/显示主窗口，返回切换后的可见状态（全局快捷键与外壳共用）。
@@ -248,9 +253,9 @@ async fn plugin_install_zip(
 
 // ---------- 蓝牙音箱（A2DP Sink） ----------
 //
-// 所有 WinRT 对象都在 BtAudioManager 的后台 worker 线程里创建/调用（RoInitialize MTA 一次），
-// 命令只做「投递 → 等 worker 回传快照」；snapshot 是纯内存读取，不做 WinRT 调用。
-// 因此除 snapshot 外的命令都是 async + spawn_blocking（worker 可能正跑一轮连接尝试）。
+// 所有 WinRT 对象都在 BtAudioManager 的后台 worker 线程里创建/调用（RoInitialize MTA 一次）。
+// snapshot 是纯内存读取；P2 起 connect/disconnect/set_enabled/set_bluetooth 是非阻塞的
+// （manager 先把 operation 写进快照再入队），refresh 仍是阻塞的显式重扫。
 
 type BtAudioManagerHandle = Arc<bluetooth_audio::BtAudioManager>;
 
@@ -398,6 +403,219 @@ async fn system_set_auto_brightness(enabled: bool) -> CmdResult<()> {
         .map_err(|err| format!("设置自动亮度任务失败: {err}"))?
 }
 
+// ---------- 音频焦点（录音 / TTS 压低其他应用的会话） ----------
+//
+// 与蓝牙一样：所有 CoreAudio COM 对象都在 AudioFocusManager 的 worker 线程里创建/调用
+// （RoInitialize MTA 一次），命令只做「投递 → 等 worker 回传快照」；snapshot 是纯内存读取。
+// acquire/release 返回快照但不抛错（音频焦点失败不能影响录音/朗读），restore_all 供退出兜底。
+
+type AudioFocusManagerHandle = Arc<audio_focus::AudioFocusManager>;
+
+#[tauri::command]
+fn audio_focus_snapshot(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+) -> audio_focus::AudioFocusSnapshot {
+    manager.snapshot()
+}
+
+// 注意：Tauri 的 async 命令带 `State` 这类引用入参时必须返回 `Result`（`AsyncCommandMustReturnResult`），
+// 所以这里统一返回 `CmdResult<Snapshot>`；失败分支仍然返回 Ok(当前快照)，不把错误抛给录音/朗读主流程。
+
+#[tauri::command]
+async fn audio_focus_acquire(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+    reason: String,
+    gain: u8,
+) -> CmdResult<audio_focus::AudioFocusSnapshot> {
+    let worker = Arc::clone(manager.inner());
+    let fallback = Arc::clone(manager.inner());
+    Ok(match tauri::async_runtime::spawn_blocking(move || {
+        worker.acquire(&reason, f32::from(gain) / 100.0)
+    })
+    .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            log::warn!("音频焦点 acquire 任务失败（不影响录音）: {err}");
+            fallback.snapshot()
+        }
+    })
+}
+
+#[tauri::command]
+async fn audio_focus_release(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+    reason: String,
+) -> CmdResult<audio_focus::AudioFocusSnapshot> {
+    let worker = Arc::clone(manager.inner());
+    let fallback = Arc::clone(manager.inner());
+    Ok(
+        match tauri::async_runtime::spawn_blocking(move || worker.release(&reason)).await {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                log::warn!("音频焦点 release 任务失败（不影响主流程）: {err}");
+                fallback.snapshot()
+            }
+        },
+    )
+}
+
+/// 退出兜底：立即恢复所有被压低的会话音量（P2 的退出 coordinator 会接进退出路径）。
+#[tauri::command]
+async fn audio_focus_restore_all(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+) -> CmdResult<()> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.restore_all())
+        .await
+        .map_err(|err| format!("恢复音频会话音量任务失败: {err}"))?
+}
+
+/// 设置页开关：启用/关闭双音源 FIFO 冲突处理（关闭 = 不处理，仍保留语音/TTS 压低）。
+#[tauri::command]
+async fn audio_focus_set_fifo(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+    enabled: bool,
+) -> CmdResult<audio_focus::AudioFocusSnapshot> {
+    let manager = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || manager.set_fifo_enabled(enabled))
+        .await
+        .map_err(|err| format!("设置音频冲突处理失败: {err}"))
+}
+
+/// FIFO 手动恢复（P3c）：解除因双音源冲突造成的压制，并进入手动覆盖。
+///
+/// 只作用于平板本地输出：蓝牙音乐 = 解除本地静音（连接与手机推流原样保留）；
+/// 本机媒体 = 恢复会话音量（仍是暂停态，播放要用户自己点）。不自动播放、不操控手机端。
+#[tauri::command]
+async fn audio_focus_restore_suppressed(
+    manager: tauri::State<'_, AudioFocusManagerHandle>,
+) -> CmdResult<audio_focus::AudioFocusSnapshot> {
+    let worker = Arc::clone(manager.inner());
+    let fallback = Arc::clone(manager.inner());
+    Ok(
+        match tauri::async_runtime::spawn_blocking(move || worker.restore_suppressed()).await {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                log::warn!("音频焦点手动恢复任务失败: {err}");
+                fallback.snapshot()
+            }
+        },
+    )
+}
+
+// ---------- 受管浏览器窗口（P3a，通用能力） ----------
+//
+// 插件只给一个 https URL，宿主拉起 Edge 的 app 窗口并管生命周期（进程 + 窗口句柄）。
+// 宿主不认识任何插件、不内置业务 URL；三条命令都是同步短操作（拉起进程 / 枚举窗口），
+// 进程退出由 browser_window 内部的监控线程清理，不会让命令看到僵尸。
+
+type BrowserWindowManagerHandle = Arc<browser_window::BrowserWindowManager>;
+
+/// 打开受管窗口；已在运行则 show/restore 并返回当前状态。非 https 返回 Err。
+#[tauri::command]
+fn browser_window_open(
+    manager: tauri::State<'_, BrowserWindowManagerHandle>,
+    url: String,
+) -> CmdResult<browser_window::BrowserWindowState> {
+    manager.open(&url)
+}
+
+/// 窗口控制：show / hide / minimize / close；非法动作返回 Err。
+#[tauri::command]
+fn browser_window_control(
+    manager: tauri::State<'_, BrowserWindowManagerHandle>,
+    action: String,
+) -> CmdResult<browser_window::BrowserWindowState> {
+    manager.control(&action)
+}
+
+/// 当前受管窗口状态（进程已退出则 running=false）。
+#[tauri::command]
+fn browser_window_state(
+    manager: tauri::State<'_, BrowserWindowManagerHandle>,
+) -> browser_window::BrowserWindowState {
+    manager.state()
+}
+
+/// 受管窗口的调试目标（`/json/list` 原样透传，宿主不判断类型/URL/标题）。
+///
+/// 通用能力：任何调用方都可以用它挑自己的 target；宿主不认识业务，也不替调用方连
+/// WebSocket。窗口未运行、调试端口没起来或 HTTP 失败都返回 Err（中文一句事实），
+/// 由调用方决定怎么降级。
+#[tauri::command]
+async fn browser_window_debug_targets(
+    manager: tauri::State<'_, BrowserWindowManagerHandle>,
+) -> CmdResult<browser_window::BrowserDebugTargets> {
+    let worker = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || worker.debug_targets())
+        .await
+        .map_err(|err| format!("读取浏览器调试目标失败: {err}"))?
+}
+
+// ---------- SMTC 媒体会话（P3a，通用能力） ----------
+//
+// 与蓝牙/音频焦点一样：所有 WinRT 对象都在 MediaSessionManager 的 worker 线程里创建/调用
+// （RoInitialize MTA 一次），命令只投递请求等回包；每次 list 重新枚举会话，不缓存会话对象。
+// 会话选择不在宿主（宿主不认 appId），由调用方自己按 appId/最近更新挑。
+
+type MediaSessionManagerHandle = Arc<media_session::MediaSessionManager>;
+
+/// 会话列表；失败返回空列表（不抛错）。
+#[tauri::command]
+async fn media_session_list(
+    manager: tauri::State<'_, MediaSessionManagerHandle>,
+) -> CmdResult<media_session::MediaSessionSnapshot> {
+    let worker = Arc::clone(manager.inner());
+    let fallback = Arc::clone(manager.inner());
+    Ok(
+        match tauri::async_runtime::spawn_blocking(move || worker.list()).await {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                log::warn!("读取媒体会话列表任务失败: {err}");
+                fallback.snapshot()
+            }
+        },
+    )
+}
+
+/// 按会话 id 发传输命令（play/pause/toggle/next/previous），返回重新枚举后的快照。
+#[tauri::command]
+async fn media_session_command(
+    manager: tauri::State<'_, MediaSessionManagerHandle>,
+    session_id: String,
+    command: String,
+) -> CmdResult<media_session::MediaSessionSnapshot> {
+    let worker = Arc::clone(manager.inner());
+    tauri::async_runtime::spawn_blocking(move || worker.command(&session_id, &command))
+        .await
+        .map_err(|err| format!("媒体会话命令任务失败: {err}"))?
+}
+
+/// 按会话 id 取封面 data URL（`data:<mime>;base64,...`）；拿不到返回空串。
+#[tauri::command]
+async fn media_session_artwork(
+    manager: tauri::State<'_, MediaSessionManagerHandle>,
+    session_id: String,
+) -> CmdResult<String> {
+    let worker = Arc::clone(manager.inner());
+    Ok(
+        match tauri::async_runtime::spawn_blocking(move || worker.artwork(&session_id)).await {
+            Ok(data) => data,
+            Err(err) => {
+                log::warn!("读取媒体封面任务失败: {err}");
+                String::new()
+            }
+        },
+    )
+}
+
+/// 媒体键兜底（SendInput 发全局媒体键）；非法命令返回 Err。
+#[tauri::command]
+fn media_key(command: String) -> CmdResult<()> {
+    media_session::send_media_key(&command)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -438,8 +656,31 @@ pub fn run() {
             // （启动设备 watcher + 无线电状态枚举；设备列表由 watcher 事件补齐），
             // 前端首帧后拿 snapshot 就是真实状态。
             let app_data_dir = app.path().app_data_dir().ok();
-            let bluetooth_audio = Arc::new(bluetooth_audio::BtAudioManager::start(app_data_dir));
-            app.manage(bluetooth_audio);
+            let bluetooth_audio = Arc::new(bluetooth_audio::BtAudioManager::start(
+                app_data_dir.clone(),
+            ));
+            app.manage(Arc::clone(&bluetooth_audio));
+            // 受管浏览器窗口（P3a 通用能力）：插件给 https URL，宿主拉 Edge app 窗口并管进程。
+            // 独立 profile 放在 app_data_dir/browser-window-profile；拿不到 app_data_dir 时
+            // 退回临时目录（只是 profile 不持久）。退出时由 `begin_exit` 结束进程。
+            let browser_window =
+                Arc::new(browser_window::BrowserWindowManager::start(app_data_dir.clone()));
+            app.manage(browser_window);
+            // SMTC 媒体会话（P3a 通用能力）：独立 worker 线程（MTA），命令只走通道 + 只读快照。
+            // 宿主只列会话、不认 appId；会话选择是调用方（未来插件）的事。
+            let media_session = Arc::new(media_session::MediaSessionManager::start());
+            app.manage(Arc::clone(&media_session));
+            // 音频焦点：同样是自己起 worker 线程并各自 RoInitialize(MTA)，与蓝牙 worker 互不依赖。
+            // app_data_dir 用于崩溃保护 journal（拿不到只是失去残留恢复能力）。
+            // P3c：注入蓝牙与 SMTC 的 manager（只读快照 + 命令通道），在同一个 worker 里做
+            // 双音源 FIFO 仲裁；不引入新线程，也不改变两个 manager 的职责。
+            // 退出由 `begin_exit` 调 `restore_all`；强杀仍由 journal 兜底。
+            let audio_focus = Arc::new(audio_focus::AudioFocusManager::start(
+                app_data_dir,
+                Some(Arc::clone(&bluetooth_audio)),
+                Some(Arc::clone(&media_session)),
+            ));
+            app.manage(audio_focus);
 
             // 全局快捷键：Ctrl+Shift+H 隐藏/显示主窗口（隐藏后也能恢复）
             let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH);
@@ -488,6 +729,20 @@ pub fn run() {
             system_set_muted,
             system_set_brightness,
             system_set_auto_brightness,
+            audio_focus_snapshot,
+            audio_focus_acquire,
+            audio_focus_release,
+            audio_focus_restore_all,
+            audio_focus_set_fifo,
+            audio_focus_restore_suppressed,
+            browser_window_open,
+            browser_window_control,
+            browser_window_state,
+            browser_window_debug_targets,
+            media_session_list,
+            media_session_command,
+            media_session_artwork,
+            media_key,
             plugin_env,
             plugin_list,
             plugin_read_manifest,
@@ -499,66 +754,85 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // 退出路径（v0.8.1 真机回归）：
-    // - 直接点窗口关闭时，Tauri 会先销毁 WebView2 / 停事件循环；若在 RunEvent::Exit 里才调
+    // 退出路径（P2，D-51）：所有入口都走 `begin_exit`。
+    // - 直接点窗口关闭：Tauri 会先销毁 WebView2 / 停事件循环，若此时才调
     //   `AudioPlaybackConnection.Close()`，WinRT 同步调用会卡在正在拆除的 COM 环境里
-    //   （实测：进程 10s 后被系统结束，日志停在「应用退出」前一行，手机仍显示已连接）。
-    // - 因此在 CloseRequested 时先拦住关闭、隐藏窗口，再在后台线程里做蓝牙清理，
-    //   完成后才真正退出；Exit 回调只做兜底（注销/关机等路径）。
-    app.run(|app_handle, event| match event {
-        tauri::RunEvent::WindowEvent {
-            label,
+    //   （v0.8.1 实测：进程 10s 后被系统结束，手机仍显示已连接）。所以 CloseRequested
+    //   先 prevent_close + hide，再在后台线程里清理，最后 `process::exit`。
+    // - 不碰蓝牙无线电：蓝牙键盘/鼠标不掉线；只释放 A2DP Sink 连接。
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::WindowEvent {
             event: tauri::WindowEvent::CloseRequested { api, .. },
             ..
-        } => {
-            exit_trace("close-requested: prevent_close + hide");
+        } = event
+        {
+            exit_trace("close-requested: prevent_close");
             api.prevent_close();
-            if let Some(window) = app_handle.get_webview_window(&label) {
-                let _ = window.hide();
-            }
-            let handle = app_handle.clone();
-            std::thread::spawn(move || {
-                shutdown_bluetooth_audio(&handle);
-                handle.exit(0);
-            });
-            // 兜底：清理线程若被蓝牙栈卡住，也不能让「隐藏窗口 + 进程残留」挂死。
-            let fallback = app_handle.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(15));
-                exit_trace("fallback: 15s 强退");
-                fallback.exit(0);
-                std::process::exit(0);
-            });
+            begin_exit(app_handle);
         }
-        tauri::RunEvent::Exit => {
-            exit_trace("exit-event 兜底清理");
-            shutdown_bluetooth_audio(app_handle);
-        }
-        _ => {}
     });
 }
 
-/// 蓝牙退出清理只执行一次：窗口关闭时后台线程做，Exit 回调兜底。
-static BLUETOOTH_SHUTDOWN_DONE: AtomicBool = AtomicBool::new(false);
+// ---------- 退出 coordinator（P2，D-51） ----------
 
-/// 收敛蓝牙音频 worker：停 watcher、关连接并等系统蓝牙链路断开、落盘配置。
-/// 重复调用安全（只执行一次）。
-fn shutdown_bluetooth_audio(app: &tauri::AppHandle) {
-    if BLUETOOTH_SHUTDOWN_DONE.swap(true, Ordering::SeqCst) {
+/// 退出只执行一次：窗口关闭 / `app_exit`（Ctrl+Q / 设置页）都汇聚到这里。
+static EXITING: AtomicBool = AtomicBool::new(false);
+
+/// 等蓝牙 worker 关闭 A2DP Sink 连接的上限（Close 是同步释放，worker 忙时也最多等这么久）。
+const EXIT_BT_CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// 内部兜底：某一步卡死时也能退进程。只防挂死，不是性能验收目标（P2 明确不设耗时指标）。
+const EXIT_FALLBACK_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// 统一退出：先隐藏窗口（体感即时关闭），再在后台依次
+/// 恢复音频会话 → 断开 A2DP Sink 连接 → 结束受管浏览器窗口 → `process::exit(0)`。
+///
+/// 所有清理都发生在 WebView2 拆除之前（hide 之后、进程退出之前），避免在拆除中的 COM 环境里
+/// 调 WinRT。音频焦点 `restore_all` 自己最多等 3s，蓝牙 `close_for_exit` 最多等 2s，
+/// 受管浏览器窗口不等待（尽力结束进程）；内部兜底 6s 只用来防止某一步永久卡住。
+fn begin_exit(app: &tauri::AppHandle) {
+    if EXITING.swap(true, Ordering::SeqCst) {
         return;
     }
-    let started = std::time::Instant::now();
-    exit_trace("shutdown-start");
-    match app.try_state::<BtAudioManagerHandle>() {
-        Some(manager) => {
-            log::info!("应用退出，停止蓝牙音频 worker");
-            manager.shutdown();
-            log::info!("蓝牙音频 worker 已停止，退出清理耗时 {:?}", started.elapsed());
-            exit_trace(format!("shutdown-done {:?}", started.elapsed()));
-        }
-        None => {
-            log::warn!("应用退出时找不到蓝牙音频 managed state，跳过清理");
-            exit_trace("shutdown-skip: no managed state");
-        }
+    exit_trace("begin-exit: hide-window");
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
     }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        exit_trace("exit-step: audio-focus-restore-all");
+        match handle.try_state::<AudioFocusManagerHandle>() {
+            Some(manager) => match manager.restore_all() {
+                Ok(()) => exit_trace("exit-step: audio-focus-restore-all done"),
+                Err(error) => {
+                    exit_trace(format!("exit-step: audio-focus-restore-all failed: {error}"))
+                }
+            },
+            None => exit_trace("exit-step: audio-focus state missing"),
+        }
+        exit_trace("exit-step: bt-close-for-exit");
+        match handle.try_state::<BtAudioManagerHandle>() {
+            Some(manager) => {
+                let closed = manager.close_for_exit(EXIT_BT_CLOSE_TIMEOUT);
+                exit_trace(format!("exit-step: bt-close-for-exit done={closed}"));
+            }
+            None => exit_trace("exit-step: bt-audio state missing"),
+        }
+        // 受管浏览器窗口（P3a）：尽力结束 Edge 子进程（WM_CLOSE → taskkill /T /F），
+        // 不等待、不阻塞退出，失败只记日志（close_for_exit 内部吞掉错误）。
+        exit_trace("exit-step: browser-window-close-for-exit");
+        if let Some(manager) = handle.try_state::<BrowserWindowManagerHandle>() {
+            manager.close_for_exit();
+            exit_trace("exit-step: browser-window-close-for-exit done");
+        } else {
+            exit_trace("exit-step: browser-window state missing");
+        }
+        exit_trace("exit-step: process-exit");
+        std::process::exit(0);
+    });
+    // 内部兜底线程：不参与功能验收，只保证「窗口已隐藏但进程残留」不会挂死。
+    std::thread::spawn(move || {
+        std::thread::sleep(EXIT_FALLBACK_TIMEOUT);
+        exit_trace("exit-fallback: 强制退出");
+        std::process::exit(0);
+    });
 }
