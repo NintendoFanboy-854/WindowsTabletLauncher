@@ -702,3 +702,45 @@ chat 入口下缘贴网格下缘 (1362,858)-(1418,914)、对话面板 516×868 �
 0 通道在实现侧成立：`layout/footer.ts` 只拒绝负数/NaN（0 合法，说明条不渲染时上报 0），
 `layout/breakpoints.ts` 的 `normalizeFooterPillHeight` 把 0 当有效值。
 
+## 21. 音频焦点：录音 / 朗读压低本机音乐（P1 / P3c，2026-10-31）
+
+> 范围：§5 语音 UI 与 §7 音频上传约束不变；本节只登记「语音 / 朗读与音乐同时出声」时的宿主行为。
+> 实现：`src-tauri/src/audio_focus.rs` + `src/host/system/audioFocus.ts`；设置 `wtsl.audio`；
+> 决策 D-50（焦点与压低）/ D-53（双音源 FIFO）。
+
+### 21.1 行为
+
+- **录音开始**（`useAgentSession` 的 `startRecording`）→ 申请 `voiceInput` 焦点，与启动麦克风并行、不 await；
+  音乐在开口前淡出（150ms）。**用户松手 / 停止录音**（`stopRecording` 第一行）→ 立即释放，
+  音乐淡回（300ms）：不等解码、ASR、模型；恢复过渡受 300ms 最短保持约束（防快速点按抽动）。
+- 麦克风启动失败、启动在途取消、`cancelRecording`、面板卸载都释放 `voiceInput`；不会把音乐留在压低态。
+- **朗读开始**（`speakText`）→ 申请 `speechOutput`；正常结束 / 用户停止 / 合成失败都会在 `finally` 释放。
+  `stopSpeaking`（收起 / 关闭 / 新一轮录音 / 发送新消息）立即释放；被下一次朗读接替时由新朗读持有。
+- **失败静默**：所有 acquire / release 调用点 `void ...catch()`；音频焦点是增强能力，IPC 失败不弹错、
+  不影响录音与朗读主流程。
+- **只压其他应用**：本进程与 `msedgewebview2.exe` 子树永不压低；宿主拉起的 Edge（Apple Music）不排除，
+  它的音频和其他应用一样参与压低与 FIFO。
+
+### 21.2 设置
+
+设置 → 常规 → 声音（设备分组之后、退出分组之前），5 行即时生效：
+
+| 行 | 取值 |
+|---|---|
+| 语音输入时压低音乐 | 开关 |
+| 语音输入压低到 | 50% / 30% / 20% / 10% / 静音（默认 20%） |
+| 朗读时压低音乐 | 开关 |
+| 朗读时压低到 | 50% / 30% / 20% / 10% / 静音（默认 20%） |
+| 两个音源同时播放 | 后播优先（默认）/ 不处理 |
+
+存储键 `wtsl.audio`（`duckVoice` / `voiceGain` / `duckTts` / `ttsGain` / `conflictPolicy`）；下一次录音 /
+朗读直接读最新值。朗读中途改设置不会追溯当前这段朗读。
+
+### 21.3 边界
+
+- **不控制手机端**：蓝牙 Sink 只能收不能发；所有动作只作用于平板本地输出（会话音量 / 静音）。
+- **不动主音量**：逐会话 `ISimpleAudioVolume`，不写默认端点 `IAudioEndpointVolume`；朗读 / TTS 自己不会被压。
+- 双音源冲突按 FIFO（D-53）：语音 / 朗读只压低、不停止；与 FIFO 压制叠加时取各自增益的最小值，互不覆盖。
+- 已知未决：A2DP 推流会话归属（P1a）待真机；当前**没有主音量 fallback**，会话不可写时压低可能无效（只记日志）。
+- 真机验收：P1-1…P1-6、P3-6 / P3-7（`docs/history/V090-AUDIO-MUSIC-SPEC.md` §8.1）。
+

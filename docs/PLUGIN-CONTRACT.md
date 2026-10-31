@@ -26,6 +26,8 @@
 | Agent 工具 | `plugin.ready(tools)` 声明 + `onToolCall` 处理 | 注册、路由、交给 Agent；不解释工具语义 |
 | 通知/强提醒 | 调桥接 API `notify` / `showReminder` | 宿主统一 Toaster / 遮罩 |
 | 定位 | 调桥接 API `getLocation`（系统坐标）/ `ipLocate`（ip.cn 网络归属地，D-16） | 宿主提供能力；失败返回 null，插件自己降级 |
+| 受管浏览器窗口 | 请求打开哪个 https URL、显示 / 最小化 / 关闭 | 通用实现（`src-tauri/src/browser_window.rs`）：Edge app 窗口、独立 profile、单实例、退出清理；宿主不认插件、不内置业务 URL |
+| 媒体会话（SMTC） | 轮询、挑哪个会话、映射成 UI | 通用实现（`src-tauri/src/media_session.rs`）：会话列表 / 元数据 / 封面 / 传输命令 / 媒体键兜底；宿主不写死 appId |
 | 后台常驻 | `"background": true` | 宿主挂隐藏 iframe，路由工具调用 |
 | 复盘聚合 | 声明 `*.stats` 工具 | 按工具聚合，展示名从 manifest 取，不写死 |
 | 主题/尺寸 | 监听 `host:init` / `host:theme` / `host:resize` | 注入同一套 Fluent token |
@@ -40,6 +42,28 @@
 > `useStoredConfig` 或 `plugin.onConfig` 消费即可，**不能依赖 `window 'storage'` 事件**：Tauri 打包版
 > 宿主页（`http://tauri.localhost`）与插件 iframe（`http://wtsl.localhost`）不同 origin，storage 事件
 > 不会派发到插件文档；dev 浏览器（HTTP 插件源）同源只是巧合。
+>
+> **通用系统能力（P3b，2026-10-31，D-52）**：宿主新增 7 个通用 HostApi（`src/host/bridge/types.ts`，
+> `PROTOCOL_VERSION 2 → 3`，仅新增）：
+> `openBrowserWindow({ url }) → BrowserWindowState`、`browserWindowControl({ action }) → BrowserWindowState`、
+> `browserWindowState() → BrowserWindowState`、`mediaSessions() → MediaSessionSnapshot`、
+> `mediaCommand({ sessionId, command }) → MediaSessionSnapshot`、`mediaArtwork({ sessionId }) → string`、
+> `mediaKey({ command }) → void`。URL 由插件给（只接受 `https://`）；宿主不认插件 id、不内置业务地址、
+> 不执行插件传入的路径 / 命令；会话选择（挑哪个 appId）是插件逻辑。SDK 对应 `plugin.browserWindow.*` /
+> `plugin.media.*`，`_shared/host.js` 有同名便利函数。
+>
+> **受管窗口调试目标（P3d，2026-10-31，D-55）**：在 v3 内追加第 8 个通用 HostApi
+> `browserWindowDebugTargets() → { port: number, targets: BrowserDebugTarget[] }`
+> （`BrowserDebugTarget = { type, url, title, webSocketDebuggerUrl }`）。
+> 宿主在拉起 Edge 时带一个**系统分配的空闲回环调试端口**，本 API 把 `http://127.0.0.1:<port>/json/list`
+> 的四个字段**原样透传**：不判断 `type` / `url`、不过滤、不替调用方连 WebSocket、不出现业务字样；
+> 窗口未运行 / 端口未监听 / HTTP 或 JSON 失败返回 `Err`，由插件按连接失败降级。
+> 端口只绑 `127.0.0.1`；浏览器侧 `--remote-allow-origins` 只放行本项目三个渲染面
+> （`http://wtsl.localhost` / `http://tauri.localhost` / `http://localhost:5173`）。
+> SDK 对应 `plugin.browserWindow.debugTargets()`；独立运行 fallback 返回 `{ port: 0, targets: [] }`。
+> 使用约定：WebSocket 由插件自己连，一个 page target 只保留一个业务客户端；连接后可用
+> `Emulation.setFocusEmulationEnabled(true)` 让隐藏窗口的页面按「已聚焦/激活」处理（隐藏窗口下
+> 媒体起播需要，宿主不代做）。`PROTOCOL_VERSION` 仍为 3（宿主不按版本分支）。
 
 ## 2. manifest 声明
 
@@ -50,6 +74,7 @@
   "version": "0.2.0",
   "identityHue": "blue",
   "background": false,
+  "autoPlace": true,
   "widgets": [
     {
       "id": "clock",
@@ -142,6 +167,20 @@ manifest 顶层必须声明一个身份 hue：
   `--wtsl-identity` 的唯一来源）、`wtslIdentityBorder`、`wtslIdentitySurface`（契约保留，
   默认不用于装饰）。插件不得引用其它 palette token 名，也不得用 border/surface 铺卡背景。
 
+### 2.3 autoPlace：是否自动上桌（2026-10-31 追加）
+
+```json
+{ "autoPlace": false }
+```
+
+- 顶层可选布尔，缺省 **true**；只有显式 `false` 才禁止自动上桌（`src/host/plugins/manifest.ts`
+  归一化为 `record.autoPlace !== false`）。
+- `false` = 首次布局、热重载、zip 安装后的自动补位都不摆这张卡；用户仍可在编辑模式「添加组件」
+  或插件管理页手动添加（手动添加走 `instanceFromEntry`，不受影响）。
+- 用途：不希望占默认布局的插件（例如需要独立窗口 / 外部程序配合的媒体遥控卡；卡片仍存在，只是不自动摆上桌）。
+  不要用它做“临时隐藏”——隐藏 / 删除卡片用编辑模式（D-19）。
+- 通用机制，宿主不认插件 id（`src/host/desktop/Desktop.tsx` 的 `instancesFromCatalog`）。
+
 ## 3. 卡片交互契约（触控优先）
 
 项目是平板桌面，**一切以触控为基线**；鼠标/键盘只保证“能完成”，不为其设计专属手势。
@@ -215,7 +254,7 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 | 按钮层级 | `TouchButton` / `ActionButton` 的 secondary 默认；只有状态触发才 `primary` | 不得把多个按钮同时做成 accent 实心；不得自画按钮 |
 | 内边距 / 组间距 | `CardRoot` 强制 16 / 8；宿主 6px 内衬；合计内容轴 22 | 不得用 `className/style` 覆盖 CardRoot 的 padding/gap，不得在插件根节点再叠 padding |
 | 栅格 / 卡片尺寸 | `src/host/layout/**`：8×5、164 cell、12 gutter、居中留白 22 / 27（`layoutFrame`；底部 27 = 960 − 933，933 是说明条 pill 与 chat 入口共用的下缘）；右下角 1 格为 Agent 入口的保留格 | 不得改列数/步长/页边距；尺寸只能从 manifest 允许档位里选 |
-| 浮层几何 / 关闭 | `PluginOverlay`：880×680、12 圆角、`shadow64`、24+16 内容内衬、X/Esc/遮罩同义 | 不得自造浮层、关闭按钮或遮罩；L2 的←/取消只 pop 不关闭 |
+| 浮层几何 / 关闭 | `PluginOverlay`：`size='default'` 880×680（`min(880px, 92vw)` × `min(72vh, 680px)`）或 `size='large'` `min(1120px, 92vw)` × `min(80vh, 760px)`、12 圆角、`shadow64`、24+16 内容内衬、X/Esc/遮罩同义 | 不得自造浮层、关闭按钮或遮罩；L2 的←/取消只 pop 不关闭；尺寸只能传白名单 `default` / `large` |
 | 动效 | 宿主 `motionTokens` 与 `overlayMotion` | 不得写自定义时长/曲线；不得用循环呼吸表达状态 |
 
 > 唯一合法变量仍是 manifest 的 `identityHue` + 图标形状 + 内容 + 状态文案。
@@ -256,6 +295,11 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 - 六个插件共用同一套详情骨架（header 56 / 可选工具栏 48 / 可选 Tabs 40 / 内容滚动 / 可选 footer），
   通过 `_shared` 的布局组件实现，不各画一套。
 - 「设置…」是跨页导航：关闭浮层、跳到宿主设置页对应分区；暂不提供返回详情（记入后续优化）。
+- **浮层尺寸（2026-10-31，P3b，D-52）**：`size: 'default' | 'large'`。default = `min(880px, 92vw) ×
+  min(72vh, 680px)`（既有行为不变）；large = `min(1120px, 92vw) × min(80vh, 760px)`。插件用
+  `requestOverlay(view, title, { size: 'large' })` 请求；`plugin:request-overlay` 的 payload 多一个可选
+  `size`，宿主只认白名单值，其它一律按 default（`PluginWidgetFrame` 的 `normalizeOverlaySize`）。
+  large 用于媒体播放器等大面板，不做第三种尺寸。
 
 ### 4.2 关闭 / 返回 / 保存语义（全插件一致）
 
@@ -299,13 +343,15 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 | `TrailingCount` | `<TrailingCount total={n} shown={m} />` | 固定「共 X · 显示 Y」口径，12px fg3、tabular-nums；不占独立行 |
 | `CardIdentity` | `icon?` / `label?` / `trailing?` / `compact=false` / **`placeholder=false`** / **`disclosure=false`** / `...rest` | 24 高 identity 行（`CARD_IDENTITY_HEIGHT_PX`）；`trailing` 限高 24；图标 20（`IDENTITY_ICON_SIZE`）且是身份色唯一落点。**不传 `icon`** 时渲染 20×20 空槽（label 不左移，`data-card-identity-empty`）；**`placeholder`** 只保留 24 高空行（本档不放 identity，如 weather 1×1）；**`disclosure`** 在行尾追加 `ChevronRight16Regular`（整卡可点开详情的唯一视觉信号，§4.4.3） |
 | `CardDisclosure` | `<CardDisclosure />`（2026-10-24 新增） | 行尾 16px 中性 chevron，`aria-hidden="true"` + `data-card-disclosure="true"`；不抢命中区、不进 Tab 序列（点它等于点卡片）。自定义行（如早期自绘 identity 行）用它，不要在插件里手写 SVG/图标 |
+| `Artwork` | `src?` / **`alt`（必填）** / `size=ARTWORK_SIZE.XL` / `style`（仅定位） / `...rest`（只透传 `data-*` / `aria-*`） | 封面图（2026-10-31 新增）：尺寸只取 48 / 96 / 160 / 240 / 320 档；`borderRadius2XLarge`（12）、无阴影、`object-fit: cover`；无图 / 加载失败 = 中性底 + 20px 音符占位（禁止彩色块）；`alt` 为空会告警。`style` 只允许 margin / inset / grid / flex / alignSelf 等定位属性，尺寸、圆角、颜色会被丢弃；不接收 `className` |
 | `CardRoot` | `onActivate` / `ariaLabel` / children | 系统内容栅格 16 / 8 强制生效；插件传 style 也不能覆盖 padding/gap |
 
 常量（`ui.jsx` 导出，插件只许引用、不得复写数值）：
 `TOUCH_TARGET=44`、`LIST_ROW_HEIGHT=44`、`LIST_ROW_GAP=4`、`LIST_ROW_PITCH=48`、
 `CARD_PADDING_PX=16`、`CARD_GAP_PX=8`、`HERO_LINE_HEIGHT_PX=52`、`CARD_IDENTITY_HEIGHT_PX=24`、
 `ICON_SIZE={ XS:16, S:20, M:24, L:32, XL:48 }`（冻结）、`IDENTITY_ICON_SIZE=20`（= `ICON_SIZE.S`）、
-`EMPTY_STATE_ICON_SIZE=24`（= `ICON_SIZE.M`）、`EMPTY_STATE_ICON_SIZE_LARGE=40`（空态主图标专用档）、`HERO_PROGRESS_THICKNESS_PX=4`（= `strokeWidthThickest`）。
+`EMPTY_STATE_ICON_SIZE=24`（= `ICON_SIZE.M`）、`EMPTY_STATE_ICON_SIZE_LARGE=40`（空态主图标专用档）、`HERO_PROGRESS_THICKNESS_PX=4`（= `strokeWidthThickest`）、
+`ARTWORK_SIZE={ XS:48, S:96, M:160, L:240, XL:320 }`（封面档，冻结）。
 
 新增共享原语必须同时更新本表与 `_shared/ui.jsx` 顶部用法注释；不得只在一个插件里本地实现。
 
@@ -314,7 +360,7 @@ iframe 不发，宿主也没有新增 host → plugin 消息：
 卡片、L1、L2 里的**结构**只允许用下面这组原语拼；插件负责的是「放哪些字段、文案、数据」，
 不是「长什么样」。白名单是封闭集合：
 
-`EmptyState` / `CardIdentity` / `CardDisclosure` / `ListRow` / `ListStack` / `DataRow` / `MiniBars` / `HeroProgress` /
+`EmptyState` / `CardIdentity` / `CardDisclosure` / `Artwork` / `ListRow` / `ListStack` / `DataRow` / `MiniBars` / `HeroProgress` /
 `StatusDot` / `TrailingCount` / `HeroText`（外加外壳 `CardRoot` / `CardHeader`、按钮 `TouchButton` / `ActionButton`、
 骨架 `Detail*` / `Subpage`）。
 
@@ -385,6 +431,9 @@ FIELDS.has('3x2');        // 是否声明了该档
 **禁止**：`在……里添加`、`卡片会显示……`、`你可以……`、`先记录一次……`、`点击说话`、`说点什么，或按住空格`、
 `换个关键词……`、`完成后会自动……`、`请检查/请稍后/请填写`。错误与校验文案只陈述事实，动作由按钮承担。
 
+**已接受例外（2026-10-31，D-52）**：媒体播放器窗口的三个动作「打开播放器 / 显示播放器 / 关闭播放器」，
+其对象名本身超过 4 字；不把「播放器」缩成单字换合规，按已接受例外登记。其余按钮文字仍按 ≤4 字。
+
 **用 affordance 替代被删掉的文字**（唯一做法，不允许用更多小字补偿）：
 
 | 要表达的事 | 承载方式 |
@@ -432,6 +481,11 @@ plugin → host: { type: 'plugin:request-host-settings' }
   宿主**直接执行该工具**，不再等模型决定。只适合「用户报告自身状态、必须立即生效」的动作
   （如久坐的「我站起来了 / 我坐下了」）；带疑问或长句仍交给模型判断。
 - 插件文档的「Agent 工具」表必须同时列出 **UI 路径 ↔ 工具** 的对应关系。
+- **媒体 / 窗口类工具（2026-10-31，D-52）**：插件使用通用 `browserWindow` / `mediaSession` 能力时，
+  工具必须与 UI 动作一一对等（打开 / 显示 / 最小化 / 关闭窗口，播放 / 暂停 / 上一曲 / 下一曲），
+  并返回结构化结果；失败用 `{ ok:false, code, error }`，不要假装成功。内置 `appleMusic` 插件是参考实现：
+  `appleMusic.status`（只读）+ `appleMusic.playback` + `openPlayer` / `minimizePlayer` / `closePlayer`；
+  宿主代码里没有该插件的分支，这些工具与卡片 / 面板动作走同一组宿主 API。
 - 宿主不校验对等性（无法通用校验），由插件验收清单与文档负责。
 
 ## 7. 验收清单（插件进入本项目的硬门槛）

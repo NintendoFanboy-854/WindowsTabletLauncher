@@ -692,3 +692,147 @@
 - 否掉：前端串联三个命令（不原子、容易竞态）；系统蓝牙关掉仍保留设备列表（陈旧且在"找"）；只关自动连接不关寻找（用户明确要求不寻找）。
 - 文档落点：D-49、`bluetooth_audio.rs` / `StatusBar.tsx` / `QuickSettingsPanel.tsx` 注释、D-44 修订。
 - 实现/验证：`cargo check --lib`、`npm run typecheck` 通过；真机联动（开总开关 → 开蓝牙 + 自动连接；关总开关 → 断开 + 停止寻找；系统关蓝牙 → 总开关跟关）待安装复测。
+
+## D-50 音频焦点：录音 / 朗读逐会话压低本机音乐（2026-10-31）
+
+- 背景：本轮需求 1。录音走 WebView2 `getUserMedia`（`src/host/agent/voice/recorder.ts`），朗读走 WebAudio（`ttsPlayer.ts`），主音量是另一套 CoreAudio（`system_status.rs`），三者互不认识；Windows 也没有「一句话把别人音量压低」的公开 API（系统通信闪避的压低量由系统设置决定、不可控）。同时 P3 会让本机 Apple Music 与手机 A2DP 推流同时出声，需要先有可精确控制的执行层，才谈得上双音源仲裁（D-53）。
+- 决策：
+  1. 新增 `src-tauri/src/audio_focus.rs`：独立 worker 线程（MTA，长期持有 `IMMDeviceEnumerator` → 默认渲染端点 → `IAudioSessionManager2`）+ 命令通道 + 只读快照 Mutex，结构与 `bluetooth_audio.rs` 一致，不引入框架。命令：`audio_focus_snapshot` / `audio_focus_acquire(reason, gain)` / `audio_focus_release(reason)` / `audio_focus_restore_all` / `audio_focus_set_fifo(enabled)` / `audio_focus_restore_suppressed`；`gain` 是 0–100 整数百分比，Rust 侧归一成 0..1。
+  2. 压低粒度是**逐会话**：`GetSessionEnumerator` → `IAudioSessionControl2`（pid / session instance id / state）→ `ISimpleAudioVolume`（`GetMasterVolume` / `SetMasterVolume` / `SetMute`）。只写各应用自己的会话音量，**不动默认端点主音量**（没有 `IAudioEndpointVolume` 写路径），所以朗读 / TTS 自己不会被一起压掉。
+  3. reasons 只有 `voiceInput`（录音）与 `speechOutput`（TTS）：同一 reason 重复 acquire 不叠加、release 只移除该 reason；每个会话目标增益 = min(所有 active reasons 的增益)，没有 reason = 1.0（恢复）。首次接管记原始音量 / 静音态，之后只写 `original × gain`；原本静音的会话保持静音。会话按 session instance id 管理，重枚举不会把已压低后的音量误当原始值。
+  4. 过渡（听感参数，不是验收指标）：淡出 150ms / 恢复 300ms、10ms 步进；最短保持 300ms，快速点按与「录音 → TTS」之间不中间回弹。焦点活跃时每 500ms 重枚举一次（录音中途新出现的会话也纳入），空闲不枚举。
+  5. 生命周期接线（`src/host/agent/hooks/useAgentSession.ts`）：`startRecording` 先 acquire（不 await，与启动麦克风并行）；麦克风启动失败、启动在途取消、`cancelRecording`、面板卸载都 release。`stopRecording` 第一行 release（松手即发，恢复受 300ms 最短保持约束；不等解码 / ASR / 模型）。`speakText` 先 acquire `speechOutput`，`finally` 释放；`stopSpeaking`（收起 / 关闭 / 新一轮录音 / 发送新消息）立即释放，被下一次朗读接替时由新朗读持有。所有调用点统一 `void ...catch()`：焦点失败不影响录音 / 朗读。
+  6. 设置：`wtsl.audio`（`src/host/system/audioSettings.ts`）字段 `duckVoice` / `voiceGain` / `duckTts` / `ttsGain` / `conflictPolicy`；档位白名单 50/30/20/10/0（0 = 静音），默认 20；写入后派发 `wtsl:audio-settings-changed`。UI 位于设置 → 常规 → 声音（5 行）。
+  7. 「自身」判定：本进程 + `msedgewebview2.exe` 子树（TTS / 插件 iframe 声音）永不压低。**不排除宿主拉起的 Edge**：`msedge.exe` 是本进程直接子进程，但它的音频（本机媒体）必须参与压低与 FIFO；不能排除整棵子孙树，否则 AM 永远不被压。
+  8. 崩溃保护：首次压低 / 静音写 `app_data_dir/audio-focus-journal.json`（session instance id + pid + process + 原始音量 / 静音态 + 时间），正常恢复后删除；worker 启动时按残留 journal best-effort 恢复（没有默认端点时保留、下次会话枚举重试）；退出路径另调 `restore_all`。
+  9. 降级（当前实现）：会话 `SetMasterVolume` 失败只记一次日志并接受本次写入（避免每 10ms 重试刷屏）；**没有主音量 fallback**。A2DP 推流会话归属（P1a 探针）尚未实测；FIFO 对 external 的压制按「非 local-media 的会话」执行，避免会话归属不明时蓝牙音乐漏静音（见 D-53）。
+- 否掉的方案：
+  - **调主音量压低**：会把 TTS / 本机媒体一起压掉，也会和用户手动调音量互相打架；只作为后续降级候选，当前不实现。
+  - **系统通信闪避（ducking）**：压低量由 Windows 设置决定，用户不可控，也不区分音源。
+  - **排除整棵子进程树**：会把宿主拉起的 Edge 误当自身，AM 永不被压低。
+  - **CoreAudio 会话事件驱动**：需要额外的 COM 回调与线程模型；本轮用 500ms 重枚举覆盖，不做事件总线。
+  - **在插件里实现压低**：插件是 iframe，拿不到 CoreAudio；系统能力必须留在宿主。
+- 文档落点：本节；`DESIGN §8`；`AGENT-SURFACE-CONTRACT §21`；`TOKEN-MAP §11`（档位与过渡时长登记）；`README`（特性 / 已知限制）；`docs/history/V090-AUDIO-MUSIC-SPEC.md §12`。
+- 实现/验证：`cargo check` / `npx tsc --noEmit` 通过（Lead 执行；本轮文档回填未重跑构建）。真机 P1-1…P1-6 待用户验证（`V090-AUDIO-MUSIC-SPEC §8.1`）；A2DP 会话归属（P1a）未决。
+
+## D-51 蓝牙状态机 v2 与统一退出路径（2026-10-31）
+
+- 背景：v0.8.1 的退出链路（D-46）在 `CloseRequested` 里后台关无线电、等 ACL、15s 强退——退出会关掉蓝牙无线电（蓝牙键鼠一起掉线），且 `radioOffByExit` 在关成功后才落盘，强退可能留下「蓝牙被关且没有恢复标记」。同时用户意图与物理状态混在一起：`Close()` 调完快照立刻 `connected:false`，前端各组件用本地 `btBusy` / `pendingDisconnect` 假装进行中，跨入口不一致；所有命令排队进唯一 WinRT worker 并等回包，断开 / 关总开关只能整体禁用。
+- 决策：
+  1. 快照四层：`radioPhase`（`unavailable / off / turningOn / on / turningOff`；退出不碰）、`linkPhase`（`idle / connecting / connected / streaming / disconnecting / closed`）、`autoConnectState`（D-44 保留）、`operation`（`id / kind / deviceId / stage / startedAtMs`）；另加 `lastTransitionAtMs` / `unverifiedDisconnect` / `outputSuppressed` / `suppressReason`。旧字段 `connectionState` / `connected` / `streaming` 保留兼容（`disconnecting` 期间 `connected` 仍为 true，UI 以 `linkPhase` 为准）。
+  2. `connect / disconnect / set_enabled / set_bluetooth` 改为非阻塞：manager 先把 `operation(stage=queued)` 写进快照并立即返回，worker 执行时**收养**这条 operation（复用 id / startedAtMs）、替换 stage，结束后清空；`bt_audio_refresh` 仍是阻塞的显式重扫。
+  3. 断开观察 ACL：`Close()` 后在 3s 窗口内轮询 `BluetoothDevice.ConnectionStatus`（150ms 步进）；确认 `Disconnected` → `idle`，确认不了 → `closed + unverifiedDisconnect`，UI 文案「可能仍连接」（不撒谎）。`disconnecting` 期间不访问 `State()`（D-46 实测会卡）。
+  4. 关总开关的 transition stages：`closing` → `verifying-link` → `stopping-watcher`；开：`turning-on-radio` → `starting-watcher`。`refresh_radio` 仍刷新无线电状态，但「关总开关 / 清设备 / 断连」的联动只在检测到系统蓝牙被外部关闭时触发一次，副作用不再散在轮询函数里（D-49 语义保留）。
+  5. 自动连接保留 D-44：preferred → MRU/FIFO 回退、5/15/30/60s 退避、手动断开的 paused、系统连接事件优先；自动尝试也体现为 operation / stage。
+  6. 退出统一 `begin_exit`（`src-tauri/src/lib.rs`）：所有入口（窗口关闭 / Ctrl+Q / `app_exit` / 设置页退出）→ `EXITING` 只执行一次 → `window.hide()` → `audio_focus_restore_all` → `close_for_exit` 断开 A2DP Sink（`Close()`；不碰无线电、不关 watcher、不等 ACL，最多等 2s）→ 结束受管 Edge 窗口（`WM_CLOSE` → `taskkill /T /F`，最多等 300ms）→ `std::process::exit(0)`。内部兜底：音频 3s、蓝牙 2s、总兜底 6s，只防挂死；**不设耗时验收指标**。
+  7. 删除 15s 强退与 `radioOffByExit` 写入；`bt-audio.json` 中旧字段只在启动时一次性恢复（`initialize`：若 `radioOffByExit == true` 则打开无线电并清标记）。
+  8. 前端单一数据源：`src/host/system/useBluetoothAudio.ts` 模块级 store（`useSyncExternalStore`），状态栏 pill / 快速设置面板 / 设置页共用一份快照与一套 action；空闲 2s、`operation != null` 或 linkPhase 处于过渡态时 500ms 轮询；组件本地 `btBusy` / `pending*` 删除。过渡文案集中在 `btOperationText`（连接中… / 断开中… / 打开蓝牙中… / 正在停止寻找… / 关闭中…等），Rust 只给英文 stage。
+  9. Agent：`btAudio.status/devices` 透传新字段；`connect / disconnect` 非阻塞发起后用 `waitForBluetoothSettled()` 轮询到 `operation === null` 再返回真实终态（不把「已发起」当「已完成」）；新增 `btAudio.restoreOutput`（解除 FIFO 本地静音，与面板「恢复」对等）。
+- 否掉的方案：
+  - **退出关无线电**（D-46 旧口径）：蓝牙键鼠一起掉线，还要跨启动恢复标记；本轮明确退出只释放应用侧 A2DP。
+  - **退出等 ACL 断开**：真机实测 `Close()` 后 ACL 可能十几秒不断，等待只会拖住进程；手机端显示可能滞后，写进已知限制。
+  - **阻塞命令 + 前端本地 pending**：跨入口不一致、面板只能整体禁用；改为快照里的显式 operation。
+  - **`Close()` 后轮询 `State()`**：D-46 实测会同步卡死；改看 `BluetoothDevice.ConnectionStatus`。
+- 文档落点：本节；`DESIGN §8`；`README`（特性 / 已知限制 / 验证状态）；`V090-AUDIO-MUSIC-SPEC §12`；`bluetooth_audio.rs` / `lib.rs` 注释。
+- 实现/验证：`cargo check` / `npx tsc --noEmit` 通过（Lead 执行）。真机 P2-1…P2-6 待用户验证；`%TEMP%\wtsl-exit-trace.log` 打点保留（不作为验收指标）。
+
+## D-52 通用受管浏览器窗口 + SMTC：Apple Music 做成插件（2026-10-31）
+
+- 背景：需求 3 的三条硬约束（`V090-AUDIO-MUSIC-SPEC §1.3` 实测 / 已确认）：① 官网 `https://music.apple.com/cn/` 返回 `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`，现有插件 iframe 不能嵌；② WebView2 只有 PlayReady、没有 Widevine，Apple Music 全曲播放靠 DRM，自家窗口拿不到 30s 以上；③ Apple Music API 需要 Apple Developer Program 会员，本机没有。→ 不逆向的天花板 = Edge 子进程里的官方网页 + Windows SMTC 遥控 + 我们自己的 Fluent 面板。
+- 决策：
+  1. 宿主只提供两个通用能力，零业务字样：
+     - `browser_window.rs`：`browser_window_open({ url })` / `browser_window_control({ action })` / `browser_window_state()`。只接受 `https://`（大小写不敏感，拒绝控制字符与无主机名），定位 `msedge.exe`（注册表 App Paths → 已知安装路径），以 `--app=<url>` + `--user-data-dir=<app_data_dir>/browser-window-profile`（独立 profile，不碰用户 Edge）+ `--no-first-run --no-default-browser-check --window-size=1200,800` 启动，按屏幕工作区 clamp 并居中；单窗口单实例（已运行则 show/restore）；close = `WM_CLOSE` → `taskkill /PID <pid> /T /F`；`close_for_exit` 用 300ms 版 taskkill，不阻塞退出。
+     - `media_session.rs`：SMTC `GlobalSystemMediaTransportControlsSessionManager`。列表（id = `<appId>#<枚举下标>`、appId、标题 / 歌手 / 专辑、playing、position / duration、can*、artworkKey）+ 按会话 id 的 `play / pause / toggle / next / previous` + 封面 data URL（8MB 上限，按 key 由调用方缓存）+ `media_key` 媒体键兜底（`SendInput`）。宿主不认 appId、不做会话选择。
+  2. 桥接与 SDK：`HostApiMethod` 新增 7 个通用方法 `openBrowserWindow` / `browserWindowControl` / `browserWindowState` / `mediaSessions` / `mediaCommand` / `mediaArtwork` / `mediaKey`；`PROTOCOL_VERSION 2 → 3`（仅新增，旧插件无感）；`plugin-sdk.js` 补 `plugin.browserWindow.*` / `plugin.media.*`，`_shared/host.js` 补同名便利函数。插件可请求受管窗口，但宿主不认插件、不写业务 URL、不执行插件传入的路径 / 命令。
+  3. 插件 `public/plugins/appleMusic`：manifest `identityHue: "pink"`、`autoPlace: false`、无 settings schema；widgets 一个卡片，sizes `[[2,1],[3,2],[4,2]]`、defaultSize `[2,1]`。卡片 2×1 = identity 行 + 曲名 / 歌手 + 播放暂停 + 进度带；3×2 加 160 封面与专辑；4×2 把封面升到 240 并加时间。空态只有中性音符 +「未在播放」。点卡片 `requestOverlay('detail', '音乐详情', { size: 'large' })`。
+  4. 大面板：`large` 浮层 `min(1120px, 92vw) × min(80vh, 760px)`（`PluginOverlay` 内联几何，`data-overlay-size="large"`），三块：Artwork 320 + 曲名 / 歌手 / 专辑 + 播放状态；`HeroProgress` + 时间 + 上一曲 / 播放暂停 / 下一曲；打开 / 最小化 / 关闭播放器。不做 seek。
+  5. Agent 工具（与 UI 对等）：`appleMusic.status`（只读）/ `appleMusic.playback`（`play / pause / toggle / next / previous`）/ `appleMusic.openPlayer` / `appleMusic.minimizePlayer` / `appleMusic.closePlayer`。会话选择在插件：优先 appId 含 `edge` / `msedge` 且 playing 的会话，其次任一 edge 会话，否则只有一个会话时用它，否则空态；宿主只给列表。
+  6. 插件化：URL、登录引导、卡片 / 面板 UI、会话选择、工具全在插件；宿主代码无 appleMusic 分支。新增通用 manifest 能力 `autoPlace?: boolean`（缺省 true；false = 不自动上桌，只能编辑模式「添加组件」/ 插件管理手动添加；`manifest.ts` 与 `Desktop.tsx` 实现）。
+  7. 共享原语 `Artwork`（`_shared/ui.jsx`）：尺寸档 48/96/160/240/320、12 圆角、无阴影、`object-fit: cover`、`alt` 必填、无图中性音符占位、`style` 只允许定位；契约 §4.4 登记。
+  8. 登录与退出：首次「打开播放器」拉起 Edge app 窗口，用户在窗口里正常登录 Apple ID（含 2FA），登录态存在受管 profile；插件不读取 / 不保存凭据，也无法知道是否已登录，只按播放器 / 媒体会话状态显示。启动器退出时由 `begin_exit` 结束该 Edge 进程。
+  9. UI/UX 评审结论（已接受，不修）：
+     - 暗色快速设置面板填充 `#2886de` = Fluent brand ramp brand 90，D-43 已登记（`QuickSettingsPanel.tsx` 的 `DARK_BRAND_FILL`，全文件唯一字面色值）；
+     - Apple Music 2×1 空态走 `EmptyState compact`，单块空带约 23%，按契约 §4.4.3 的短卡 compact 规则（图标槽 24 / 组距 4）处理，不按 DENSITY 22% 空带门禁改版；
+     - 「打开播放器 / 显示播放器 / 关闭播放器」的对象名超过 4 字，属于窗口动作的已接受例外（契约 §4.4.3 补注）；
+     - v0.8.0 既有状态色（接收中 success / 电量等）视觉不动。
+- 否掉的方案：
+  - **iframe 嵌官网**：`X-Frame-Options: DENY` + `frame-ancestors 'none'`，直接被拒。
+  - **WebView2 内嵌播放**：无 Widevine，只有 30s 试听；PlayReady 对 Apple Music 不适用。
+  - **官方 API / 资料库 / 搜索重写**：无开发者账号；不做逆向、不抓包。
+  - **CDP / UI 自动化点网页**：脆弱且等于逆向；不做。**（已被 D-55 推翻并限定场景：只操作受管 Edge 里用户自己已登录的官方网页，不逆向、不读凭据；见 D-55。）**
+  - **宿主内置 Apple Music 业务 / 写死 appId / URL**：违反宿主不认插件的铁律；URL 与选择逻辑全在插件。
+  - **默认把 AM 卡放上桌**：六卡定稿不动；用 `autoPlace: false` 让用户手动添加。
+- 文档落点：本节；`DESIGN §8`；`PLUGIN-CONTRACT §1/§2.3/§3.5/§4.1/§4.4/§6`；`TOKEN-MAP §8/§11`；`README`（特性 / 安装 / 已知限制 / 验证状态）；`V090-AUDIO-MUSIC-SPEC §12`。
+- 实现/验证：`cargo check` / `npx tsc --noEmit` 通过；`node scripts/build-plugin.mjs appleMusic` 产物已更新（`public/plugins/appleMusic/app/app.js`）；UI/UX 评审完成。真机 P3-1…P3-8 待用户验证；SMTC 的 Edge AUMID 识别、A2DP 会话归属均待真机确认。
+- **修订（D-55，2026-10-31 晚）**：卡片 3×2/4×2 增加状态行与「上一曲/播放暂停/下一曲」44 组（2×1 不变，仍只有行内播放键）；面板改为 CDP 数据层 + 富信息布局（hero 160 紧凑条、两列播放列表带封面/描述/数量、L2 序号/专辑/E/时长、固定页脚）；`large` 浮层几何与「单 CDP 客户端、卡片走 SMTC」不变。以 D-55 与当前实现为准。
+
+## D-53 双音源 FIFO：后播优先、输家手动恢复（2026-10-31）
+
+- 背景：P3c。蓝牙 A2DP 推流（external）与本机 SMTC 媒体（local，当前是 Apple Music）可以同时在播；spec v3 明确「后开始者胜出、先开始者淡出后停止」，且**不操控手机端、不断开蓝牙连接**；输家手动恢复、不自动恢复。需要一套仲裁把 D-50 的逐会话音量能力用到两个音源上。
+- 决策：
+  1. 仲裁在 `audio_focus.rs` 的同一 worker 里，每 1000ms 评估一次（`FIFO_POLL_INTERVAL`），命令与过渡可随时打断；不新线程。
+  2. 两路判定：external = `bt.snapshot().streaming`；local = SMTC 快照里 `playing == true` 的会话非空。任一方 false → true 记开始时间；同时在播时后开始者胜出；同一拍或缺失时间戳按本机媒体优先（tie-break）。
+  3. 输家动作：external 输 = 淡出到 0 后**平板本地静音**（`bt.set_output_suppressed(true, "local-media-playing")` 只写快照字段，会话增益 0 由 `target_gain_for` 施加），不断连接、不碰无线电、不操控手机；local 输 = 淡出 150ms 后发一次 SMTC `pause`（每集只发一次），不自动播放回来。
+  4. 不自动恢复：只有三种情况解除压制——用户手动恢复、输家自己停止播放、冲突消失（另一方不再播放）。手动恢复 = `audio_focus_restore_suppressed`：清除本地静音旗标 / 恢复会话音量，并进入 `manual_override`，直到下一次任一方新的播放开始再重新判定。本机媒体手动恢复只恢复音量，播放仍需用户点（不替用户按播放）。
+  5. 入口：快速设置面板「已被本机音乐静音」+「恢复」按钮（读 `bt.outputSuppressed`）、状态栏 pill「已静音」、Agent `btAudio.restoreOutput`；本机媒体由用户在面板 / Edge / 媒体键点播放。
+  6. 与语音 / TTS 压低的关系：FIFO 不停止录音 / TTS、也不被它们释放；两者同时生效时目标增益取 min（`target_gain_for`），互不覆盖。
+  7. 不触发 FIFO：录音 / TTS、同一方的暂停 / 恢复、两个本地媒体会话之间（交给 Windows）。
+  8. 设置「两个音源同时播放」= 后播优先（默认）/ 不处理，存 `wtsl.audio.conflictPolicy`；**已接线**：`audio_focus_set_fifo` 命令 + App 启动按持久化值同步（`App.tsx`）+ 设置页切换立即同步（`SettingsPage.tsx`）。关闭时不压制，并清掉残留压制状态（只恢复音量，不动播放）；语音 / TTS 压低保留。
+  9. 降级：external 的压制作用于「非 local-media」的会话（A2DP 会话归属待真机，宁可按同一侧处理）；会话不可写时 `SetMasterVolume` 失败只记日志，没有主音量回退。
+- 否掉的方案：
+  - **自动恢复**（赢家停止后把输家放回来）：v3 明确不要，FIFO 语义就是「后播优先，输家等人」；自动恢复会在推流断续时反复抢音。
+  - **控制手机端暂停 / 断开**：蓝牙 Sink 只收不发，物理上办不到；「停止」只能是平板本地静音。
+  - **local 输家直接关会话 / 杀进程**：超出音频焦点职责；只发一次 SMTC pause。
+  - **常驻高频轮询**：1s 一拍足够，命令与过渡可打断；不做事件总线。
+- 文档落点：本节；`DESIGN §8`；`README`（特性 / 已知限制）；`AGENT-SURFACE-CONTRACT §21.3`；`V090-AUDIO-MUSIC-SPEC §12`。
+- 实现/验证：`cargo check` / `npx tsc --noEmit` 通过；真机 P3-6 / P3-7 待用户验证（蓝牙先播 / AM 先播两条冲突路径）。
+
+## D-54 退出 / 关总开关真正停止 A2DP 接收：系统层停用手机 A2DP 音频源服务（2026-10-31 修复）
+
+- 背景：用户报告「退出启动器后电脑仍然可以当音箱」。真机核查：退出链路本身正常（`Close()` + `process::exit`），当前也没有启动器进程；但系统里 A2DP SNK **采集端点**仍有活跃会话、默认扬声器有活跃渲染会话（peak≈0.5），说明 Windows 在应用退出后仍继续渲染手机推流。D-46 已确认 `Close()` 不会断开 ACL；本轮进一步确认**音频也继续**——只靠应用侧 `Close()` 不足以让 PC 停止当音箱。
+- 决策：
+  1. 退出 / 关总开关时，在系统蓝牙层**停用该设备（手机）的 A2DP 音频源服务**（Bluetooth AudioSource，0x110A；`BluetoothSetServiceState` / `bluetoothapis`）。不碰蓝牙无线电，也不影响 AVRCP/HFP/PBAP 等服务（蓝牙键鼠不受影响）。
+  2. 停用的设备 id 持久化到 `bt-audio.json` 的 `a2dpServiceDisabled`；下次启动 / 开总开关**先恢复服务再起 watcher**（驱动重装需要一点时间），恢复失败每 5s 重试；已恢复的条目从列表删除。
+  3. 需要 windows crate 的 `Win32_Devices_Bluetooth` feature（无新第三方依赖）。实测普通用户权限即可调用（medium integrity 探针 rc=0）。
+  4. 退出等待上限从 2s 放宽到 5s（驱动卸载实测约 4s），内部兜底 10s；仍然不碰无线电、不等 ACL、不设耗时验收指标。
+- 否掉的方案：
+  - **退出时关蓝牙无线电**（旧 D-46 行为）：会断蓝牙键鼠 / 其它蓝牙设备，用户明确不要。
+  - **只 `Close()` AudioPlaybackConnection**：真机确认应用退出后音频仍继续（本轮根因）。
+  - **保持后台进程 / 隐藏常驻**：用户要退出进程。
+  - **让用户手动去系统里断开手机**：不是产品行为；但强杀等无法覆盖的场景写进已知限制。
+- 已知边界：进程被强杀 / 崩溃不走退出清理（A2DP 服务保持启用，PC 仍可当音箱）；干净退出后卸载启动器，手机侧 A2DP 音频服务需要在 Windows 蓝牙设置里手动恢复；手动「断开」按钮目前仍只释放应用侧连接（不保证停手机推流）。这些写入 README 已知限制。
+- 实现/验证：`cargo check` 通过；release 构建 + NSIS `/S` 静默安装（0.9.0 同版本覆盖）；程序化验证：启动 → 自动连接 → 关闭后 exit trace 出现 `a2dp-service-disable-done pending=1`、A2DP SNK MEDIA 设备与采集端点消失、`bt-audio.json.a2dpServiceDisabled` 写入；再启动日志出现「蓝牙音频服务恢复」、列表清空、设备与自动连接恢复。真机听感（退出后手机推流是否真的停止）待用户验证。
+- 文档落点：本节；`DESIGN §8`；`README`（特性 / 已知限制 / 验证状态）；`V090-AUDIO-MUSIC-SPEC §12`。
+
+## D-55 Apple Music 走 CDP 接管：受管 Edge 调试端口 + 插件直连（2026-10-31）
+
+- 背景：D-52 交付的 SMTC 版本只能拿到「正在播放 / 传输控制」，面板里的资料库、播放列表、点歌都无法用；SMTС 也不提供曲目列表与进度（进度要轮询会话快照）。用户明确选择 CDP 路线（原话「肯定选 CDP 那条路」），边界仍是**不逆向、不拦截凭据**：用户正常登录官方网页，插件操作的是同一个已登录页面。D-52 里「CDP / UI 自动化点网页一律不做」的结论据此改写（限定场景，见本节）。
+- 决策：
+  1. **宿主通用调试端口**：`browser_window.rs` 拉起 Edge 时追加 `--remote-debugging-port=<系统分配的空闲回环端口>`、`--remote-debugging-address=127.0.0.1`、`--remote-allow-origins=http://wtsl.localhost,http://tauri.localhost,http://localhost:5173`（只放行本项目三个渲染面 origin，绑定失败不阻塞窗口）。新增 HostApi `browserWindowDebugTargets() → { port, targets[] }`：用原生 `std::net::TcpStream` 发 HTTP/1.1 GET `/json/list`，按 `Content-Length` 收满即停，把 `type / url / title / webSocketDebuggerUrl` 四个字段原样透传；宿主**不判断 type/url、不过滤、不替调用方连 WebSocket**，也不出现任何业务 URL/字样。bridge types、`bridge.ts`、`tauri.ts`、`plugin-sdk.js`（独立运行 fallback `{port:0,targets:[]}`）、`_shared/host.js` 同步；`PROTOCOL_VERSION` 保持 3（v3 内追加，宿主不按版本分支）。
+  2. **窗口身份改为「调试端口 owner pid」**：真机实测 Edge 156 会**中继启动**——`Command::spawn` 的 msedge 进程约 1s 内退出，真正持有调试端口并创建窗口的是另一个浏览器进程（原进程的子进程）。旧实现用 spawned pid 判断存活，导致「启动即判定退出」→ 面板认为窗口没开、再 open 被同 profile 旧实例吞掉、退出也没有 pid 可杀（用户报告的「退出 launcher 后 AM 没退」）。改为 `GetExtendedTcpTable` 从调试端口反查监听 pid（校验镜像名是 `msedge.exe`），窗口枚举、show/hide/minimize、结束全部按该 pid；启动 12s 宽限期内「进程没认出来 / 窗口还没建好」按 running 处理，避免插件冷启动误判。
+  3. **遗留实例与退出清理**：每次识别出真实浏览器 pid 后写 `profile_dir/managed-window.json`（debugPort + browserPid）；open 前若发现上次遗留的受管浏览器（pid 存活或端口 owner 存活，且镜像名 msedge）先结束它，再拉起新实例（同 profile 的 Edge 单实例会吞掉新命令，导致新端口永不监听）；兼容 Chromium 的 `DevToolsActivePort`（显式端口模式实测不写）。退出路径改为 `WM_CLOSE` → **立即 `TerminateProcess`** → 后台异步 `taskkill /T /F` 清子进程：旧实现退出只等 300ms taskkill，真机实测超时后应用先退出、Edge 反而留在桌面上。
+  4. **插件数据层（CDP）**：新增 `public/plugins/appleMusic/src/cdp.js`（WebSocket JSON-RPC：`Runtime.evaluate` 带 `userGesture/returnByValue/awaitPromise`、`Input.dispatchMouseEvent`、关闭/重连回调）与 `library.js`（单例 store + 状态机）。连接流程：`browserWindowState` → 未运行则 `openBrowserWindow(LIBRARY_URL)` 并**立即隐藏**（冷启动轮询到 `visible:false`）→ 轮询 `browserWindowDebugTargets`（300ms，总 12s）→ 优先 `music.apple.com` 的 page target → 连 WS → 等 `readyState` → 首同步。轮询 1.8s（复用 `player.js` 的节奏），面板 iframe `visibilityState === 'hidden'` 时暂停、回可见补一拍；离线/断线自动重取 target 重连，失败 5s 退避；用户关掉 Edge 后停在「播放器未打开」不自动重开。动作全部走真实指针点击：`openPlaylist(href)`（点侧栏/列表 anchor 中心，等 URL 与曲目行）、`playTrack(index)`（点行内 `button[aria-label^="播放"]`，等标题变化或 `currentTime>0.5`，上限 15s）、`transport('toggle'|'next'|'previous')`（toggle 先读 `audio.paused` 选 `playback-play__play` / `playback-play__pause`，next/prev 用 `item-skip[direction]`）、`show/hide/closePlayer`。
+  5. **数据范围**：`sync()` 一次 evaluate 读 `{url, ready, needLogin, playlists, tracks, nowPlaying}`；`playlists` 来自页面侧栏 `a[href*="/library/playlist/"]`；`tracks` 只在当前页是播放列表详情时读（避免 1.8s 重传长列表）；`nowPlaying` = `navigator.mediaSession.metadata`（artwork 取最大尺寸）+ `audio.paused/currentTime/duration`。登录判断 = 没有播放列表且正文出现登录入口文案时才 `needLogin`，首次登录态显示一次 Edge、登录成功后自动隐藏一次。
+  6. **单 CDP 客户端**：只有详情面板连 WebSocket（卡片继续 SMTC：媒体会话 + 传输命令）；一个 page target 同时只保留一个业务 WS 客户端（Edge 156 实测允许多客户端，但不依赖该行为）。
+  7. 安全边界：只操作受管 Edge 自己的 profile 与官方网页；**不读取/不保存 token、cookie、凭据，不抓包、不逆向**；`LIBRARY_URL` 等业务常量只在插件里，宿主 grep 无 `appleMusic` / `music.apple.com` / `Apple Music` 字样；调试端口只绑 `127.0.0.1`，Origin 白名单最小化。
+  8. **富信息面板与数据采集**（插件）：`collectSnapshot` 采集侧栏播放列表的名称/href，并用前端主内容区 `[data-testid="product-lockup"]` 的 `picture source[srcset]` 最大档补封面、`product-lockup-subtitle` 补描述（缺省取卡片 aria-label「、」后一段）；打开播放列表详情后补歌曲数（`tracklist-footer-description`）与策展/描述。曲目采集 `track-list-item[data-row]` 的显示序号、`track-title` / `track-column-secondary` / `track-column-tertiary`、`track-duration`（解析毫秒）、`.songs-list-row__badge--explicit`、行内 `artwork-component` 封面（40/80 档按 mzstatic 尺寸段升到 160；已采集，行内暂不上屏）。取不到一律降级为空，不编造。
+  9. **面板 UI（HIG + Fluent 2 重做）**：L1 三块 = ① 正在播放紧凑条（Artwork 160 + 状态/曲名 24/歌手 16/专辑 14 + 进度与 12px tabular 时间 + 44 传输）；② 播放列表两列（48 封面 + 名称 + 描述或「N 首」 + chevron，首屏 12 个）；③ **固定页脚**（显示/隐藏播放器、关闭播放器，不随内容滚动）。L2 = 共享 `Subpage`（56 header：← + 播放列表名 + 歌曲数/策展行）+ 曲目行（序号/播放指示 + 标题 + 歌手·专辑 + explicit E + 时长，44+4 pitch）。四态（连接中/登录/错误/未运行）统一图标 + 标题 + 下一步。卡片 2×1 不变；3×2/4×2 增加 `StatusLine` 与「上一曲/播放暂停/下一曲」44 组（SMTC 数据，2×1 仍只有行内播放键）。D-52 里「卡片只有播放暂停、面板 Artwork 320、3×2 封面 160/4×2 240」的旧口径据此修订。
+  10. **隐藏窗口下的 DRM 起播**：Edge 窗口被 `SW_HIDE` 后页面 `visibilityState=hidden`，Apple Music 的 DRM/MSE 初始缓冲不推进（真机 15s+ `paused=false`、`readyState=0`、`currentTime=0`）；连接后调用 CDP `Emulation.setFocusEmulationEnabled(true)` 把页面模拟成「已聚焦/激活」（窗口仍隐藏），同一套 `Input` 真实指针点击即可正常起播，真机 `currentTime` 正常前进。
+  11. **轮询 / 显隐 / 首同步兜底**：插件 iframe 的 `visibilityState` 在 WebView2 里可能长期是 hidden，tick 不能永久停摆（hidden 时 5s 后重试，回可见立即补一拍）；冷启动 Apple 资料库 hydration 真机需 40–60s，首同步在「已登录但播放列表为空」时保持「正在连接播放器」每 500ms 重试（上限 60s），避免先闪「没有播放列表」；已登录时每轮同步兜底隐藏可见的 Edge 窗口，但用户主动点「显示播放器」后（`userWantsVisible`）不再自动隐藏；`main.jsx` 的 `colorScheme` 改为跟随主题 `scheme` 并给滚动区 token 色 `scrollbar-color`，修掉深色面板右侧的白色 UA 滚动条。
+- 否掉的方案：
+  - **继续只用 SMTC**：没有资料库/曲目列表，面板只能当遥控器；用户明确要 CDP。
+  - **在 Rust 侧连 CDP WebSocket**：要引第三方 WS crate，且宿主不该懂业务；数据层放插件（iframe 原生 WebSocket）。
+  - **固定调试端口**：与其他软件冲突且暴露面固定；用系统分配的空闲回环端口。
+  - **用 hwnd/窗口标题当身份**：标题随导航变化、可能撞车；端口 owner pid 是唯一可靠身份。
+  - **退出继续用 300ms taskkill 等**：真机已证伪（超时 → Edge 留存）。
+  - **隐藏窗口时用 show 一下再起播**：会打断「默认不可见」的设计；用 `Emulation.setFocusEmulationEnabled` 不显示窗口即可解决。
+- 已知限制：
+  - DOM 选择器来自真实页面（`track-list-item`、`button[aria-label^="播放"]`、`amp-playback-controls-*`、侧栏 `a[href*="/library/playlist/"]`、`product-lockup*`），Apple 改版会让对应动作/字段退化（动作返回一句事实错误，字段降级为空），不静默做错事；
+  - DRM 起播有 5–7s 延迟，`playTrack` 的等待上限 15s；
+  - 冷启动独立 profile 的 Apple 资料库 hydration 真机 40–60s，期间显示「正在连接播放器」；之后的首屏数据依赖 1.8s 轮询补齐；
+  - 受管 Edge 被用户手动关掉后不自动重开（按设计）；面板关闭即断开 CDP，重开面板会重连；
+  - 显式 `--remote-debugging-port` 模式 Edge 不写 `DevToolsActivePort`，遗留实例清理依赖本应用自己的 `managed-window.json`（旧版本遗留的实例可能无法找回，重启一次即可）；
+  - 一个 page target 只保留一个业务 WS 客户端；卡片与 Agent 工具仍走 SMTC（资料库/点歌是面板内的 CDP 路径，Agent 工具暂未对等——工具化需要后台数据层或宿主代理，后续再做）；
+  - 隐藏窗口起播依赖 `Emulation.setFocusEmulationEnabled`（Edge 156 真机正常）；若浏览器不支持会退化为需要在窗口可见时起播。
+- 文档落点：本节；D-52 修订；`PLUGIN-CONTRACT §1`（通用 HostApi + D-55 段）；`README`（特性 / 已知限制 / 验证状态）；`V090-AUDIO-MUSIC-SPEC §12.6`；`browser_window.rs` / `lib.rs` / `cdp.js` / `library.js` / `Detail.jsx` / `Card.jsx` 注释。
+- 实现/验证：`cargo check --lib` / `npx tsc --noEmit` 通过；插件离线 E2E（headless Edge + 宿主替身 + 假 CDP）**41 断言 PASS**、采集器 fixture **18 断言 PASS**、状态机 harness **23 断言 PASS**；release NSIS 构建 + `/S` 静默安装。真机（安装版 + 真实登录态 Edge 156，1440×960@200%）已验证：面板列出 21 个播放列表（封面/描述/数量）→ 进 L2 31 首（序号/专辑/时长）→ 点曲目在 Edge 隐藏状态下真实起播（`audio.currentTime` 5.77s、`readyState=4`、mediaSession=Afterwards）→ 面板暂停后 `audio.paused=true` → 「显示播放器」窗口可见 → 「关闭播放器」结束 Edge 进程并回到「播放器未打开」→ 退出 launcher 后受管 Edge 一并结束（修复了旧版「退出 launcher 但 AM 不退」）。

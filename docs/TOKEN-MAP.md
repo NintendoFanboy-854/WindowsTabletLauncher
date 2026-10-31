@@ -184,7 +184,8 @@
 
 | 数值 | 用途 | 出处 |
 |---:|---|---|
-| 880 / 680 | 浮层宽高 | C（host 规格 §3.5；`min(880px, 92vw)` / `min(72vh, 680px)`） |
+| 880 / 680 | 浮层宽高（`default`） | C（host 规格 §3.5；`min(880px, 92vw)` / `min(72vh, 680px)`） |
+| 1120 / 760 | 浮层宽高（`large`） | C（D-52；`min(1120px, 92vw)` / `min(80vh, 760px)`；`PluginOverlay` 内联几何，`data-overlay-size="large"`） |
 | 12 | 浮层圆角 | T（`borderRadius2XLarge` 12） |
 | shadow64 | 浮层投影 | T（`tokens.shadow64`） |
 | 16 | DialogContent 内衬 | T（`spacingHorizontalL` / `spacingVerticalL`） |
@@ -245,6 +246,13 @@
 | 500ms | `DESIGN.md` §2 | 长按进编辑的手势阈值 |
 | 80–320ms（80/120/150/200/220/240/250/280/300/320） | Agent 契约 §12 | 已登记为 `motionTokens` 就近取值（`durationFaster/Fast/Normal/Gentle/Slow`） |
 | 22% / 60% / 70% / 40 | DENSITY §2.1 | 门禁比例与空洞上限 |
+| 1120 / 760 / 92vw / 80vh | D-52 / `PLUGIN-CONTRACT §3.5` | `large` 浮层几何；default 880 / 680 / 92vw / 72vh 维持不变 |
+| 48 / 96 / 160 / 240 / 320 | `_shared/ui.jsx` 的 `ARTWORK_SIZE` | `Artwork` 封面尺寸白名单（XS / S / M / L / XL）；320 为 large 面板主档，其余为 8px 基线派生档；与 `ICON_SIZE` 的图标档位（16/20/24/32/48）是两套常量 |
+| 150 / 300ms | D-50 / `audio_focus.rs` | 音频压低淡出 / 恢复（听感参数，不是 `motionTokens` 动效时长，也不作验收指标）；150 / 300 同时出现在上方 80–320ms 的 motionTokens 就近取值清单里，用途不同 |
+| 50 / 30 / 20 / 10 / 0 | D-50 / `audioSettings.ts` | `wtsl.audio` 压低档位（0 = 静音；默认 20），行为整数不是设计 token |
+
+> **2026-10-31（P1–P3c）无新增颜色 / 字号 / 圆角 / 阴影 token**：`Artwork` 圆角取 `borderRadius2XLarge`（12）、无阴影；
+> `large` 浮层只改宽高；音频压低过渡是行为参数（不取 `motionTokens`）；`wtsl.audio` 档位是行为整数。
 
 > v0.4.2 作废项：Agent 宽高钳位 `420 / 320 / 440` 已不再存在于实现（`agent.css` 只读
 > `--wtsl-agent-width/height`，值由 `entryGeometry.ts` 从栅格推导，见 §6）；「3 条 peek」改为 2 条（§6）。

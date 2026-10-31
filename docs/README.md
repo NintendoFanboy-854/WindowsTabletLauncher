@@ -62,7 +62,8 @@ docs/
 │   ├── UI-REWRITE-SPEC.md         # UI 重写规格 v2（2026-10-19）
 │   ├── OVERLAY-REWRITE-SPEC.md    # 浮层重排规格（2026-10-19）
 │   ├── OVERLAY-REWRITE-RESULT.md  # 浮层重排结果
-│   └── V040-VISUAL-REWORK-SPEC.md # v0.4.0 视觉升级实施规范
+│   ├── V040-VISUAL-REWORK-SPEC.md # v0.4.0 视觉升级实施规范
+│   └── V090-AUDIO-MUSIC-SPEC.md   # v0.9/v0.10 计划：音频焦点 / 蓝牙 FSM / Apple Music 一次性实施规格（含实现状态回填）
 │
 ├── audits/                        # 审计报告与证据索引（见 audits/README.md）
 │   ├── README.md
