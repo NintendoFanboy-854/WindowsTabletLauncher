@@ -241,6 +241,12 @@ release/                # 本机安装包产物（本地不入库）
   「关闭播放器」结束 Edge 并回到「播放器未打开」→ 退出 launcher 后受管 Edge 一并结束（同时修复了
   「退出 launcher 但 AM 没退出」：根因是 Edge 中继启动导致宿主用错 pid + 退出 taskkill 只等 300ms）。
   白滚动条（`colorScheme` 写死 normal）一并修复。验证脚本与截图在本地 `.tmp/e2e/`。
+- 2026-11-01 超时策略整改轮（D-56，用户反馈「这台电脑性能奇差无比，不要按经验给超时」）：
+  `cargo check --lib` / `npx tsc --noEmit` / 插件构建通过；release 构建（16m35s）+ NSIS `/S` 静默安装。
+  用户可见等待改为状态驱动（CDP 连接/命令、Edge target、document、导航、曲目行、DRM 起播、首同步、
+  蓝牙操作、音频恢复都不再按秒数判失败；10 分钟仅日志）；宿主 open 不阻塞等窗口、退出不等待清理；
+  网络类保留 30s 安全阀。真机抽验：打开 AM 面板后 33s 内显示 21 个播放列表（连接期显示「正在连接播放器」，
+  不再闪「没有播放列表」）；退出 launcher 应用 4.84s 退出、受管 Edge 在应用退出后 <250ms 消失。只记录耗时，不作为验收门槛。
 
 - v0.6.0（2026-10-25，壁纸三模式 + 欣赏壁纸 + 说明文字收口，D-37 / D-38）：壁纸改为必应**官方归档**（`HPImageArchive`，15 天历史、4K；归档接口缺 CORS 头，改由 Rust `reqwest` 代取 JSON，`src-tauri/src/bingarchive.rs` 注册到 `lib.rs`）；自动 / 固定 / 本机图片三模式互斥（本机图存 IndexedDB、按内容哈希寻址）；说明条改为按钮，同时是**欣赏壁纸**唯一入口（全屏观图，Esc/再点退出，会话内不持久化），并新增一次性释义（独立调用、强制 `web_search`、按内容地址缓存、失败 24h 冷静期）。**说明文字 v3（D-38）**：固定 `mimo-v2.6-pro`、开启深度思考，并把今日壁纸 4K 图片以 `image_url` 多模态消息随请求发送；SYSTEM_PROMPT 要求简体中文、禁任何语言来源旁白、建议 2–4 句 ≤200 字（长度只由提示词约束，客户端不截断）；客户端新增语言/旁白硬校验，命中即失败不落库；欣赏壁纸模式可手动「重新生成说明」（失败保留旧释义）。**动效收口**：说明条按下 `scale(0.985)` 形变（`H_p` 改 `offsetHeight` 测量，44×44 命中区不变）；hover/press/长按/编辑缩放全部回到 **Card 本体**，iframe 内容不参与（reduced-motion 无 transform）。**磨砂诊断**：真实 DPR2 截图实测 `backdrop-filter` 正常对壁纸合成（卡片区域 / 锐利壁纸 Laplacian 方差比 1.9e-05），`will-change`/`isolation` 移除前后像素 diff 0.0，非合成层截断；材质 72% + blur 24 维持 D-31 登记值。证据：本地 `shots/acceptance-v060/REPORT.md`。文档落点：DESIGN §6 / TOKEN-MAP §1·§6 / AGENT-SURFACE-CONTRACT §1·§14.1·§20 / MOTION §5.2 / FLUENT2 §5·§7·§14 / DECISIONS D-37·D-38。
 - v0.5.0（2026-10-24，布局 / Agent / 插件 / 宿主收敛轮）：桌面布局收敛为「网格 + 底部条（说明条 / chat 入口）」单一算法；Agent 增加轮次时间线、「触控 + 语音」混合手势、空闲自动收回、麦克风权限自愈；宿主全屏页磨砂底与层级契约、44px 命中区垂直居中；插件卡片内对齐收敛到内容轴、时钟 Agent 工具收紧（先搜后加）；构建升级 Tauri 2.12.4 并修复 WebView2 权限，版本号统一 0.5.0。
