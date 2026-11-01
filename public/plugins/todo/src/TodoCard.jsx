@@ -4,7 +4,7 @@
  * - 固定「今日」视图：已逾期 + 今天到期，已完成不上卡片；
  * - 1×1：identity compact + 今日未完成数 40 +「今日待办」14 +（有逾期）「逾期 N」12 danger；
  * - 列表档：identity 24 + 行 44 / 行距 4；行数由 iframe 高度代入唯一公式决定，
- *   2×2 与 3×2 同为 5 行，3×2 / 4×2 每行多清单名，3×3 再多子任务进度；
+ *   2×2 与 3×2 同为 5 行，3×2 / 4×2 每行多清单名；
  * - 溢出不在卡内滚动：identity 行尾恒写 TrailingCount「共 X · 显示 Y」；
  * - 空态：EmptyState（中性单色图标）+ 单个次操作；有任务但今日为空时文案与操作分开；
  * - 行内只有 checkbox 40 + 优先级旗标 16（形状二态）+ 标题 16 + 一个元信息 12；
@@ -61,6 +61,18 @@ const useStyles = makeStyles({
   root: {
     boxSizing: 'border-box',
     color: tokens.colorNeutralForeground1,
+  },
+  /** 1×1：hero + 标签块在 identity 以下的剩余空间垂直居中（DENSITY §1.1-2 均分判据） */
+  summaryBody: {
+    display: 'flex',
+    flex: '1 1 auto',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 0,
+    minWidth: 0,
+    /** 抵消 CardRoot 的 8 组距，实测上下留白相等（与 clock 1×1 同口径） */
+    paddingBlockEnd: tokens.spacingVerticalS,
   },
   /** 1×1：Hero 52 + 2 + 标签行 20，与 identity 24 + CardRoot gap 8 合计 106 */
   summaryContent: {
@@ -181,17 +193,16 @@ function CardCheck({ task, onToggle }) {
   );
 }
 
-/** 行内第二个字段（横向，放在数值之前）：3×2/4×2 清单名；3×3 再加子任务进度。 */
+/**
+ * 行内第二个字段（横向，放在数值之前）：3×2 / 3×3 / 4×2 清单名。
+ * 不再追加「子任务 N/M」——`docs/components/todo.md:32` 明确行内不显示子任务数。
+ */
 function TaskSecondary({ task, kind }) {
   const styles = useStyles();
   const parts = [];
   if (kind === 'medium' || kind === 'wide' || kind === 'full') {
     const list = store.listById(task.listId);
     if (list?.name) parts.push(list.name);
-  }
-  if (kind === 'full' && task.subtasks?.length) {
-    const done = task.subtasks.filter((subtask) => subtask.done).length;
-    parts.push(`子任务 ${done}/${task.subtasks.length}`);
   }
   if (!parts.length) return null;
   return (
@@ -291,17 +302,19 @@ export default function TodoCard({ defaultSizeKey = '3x3' }) {
     return (
       <CardRoot ariaLabel={ariaLabel} onActivate={openTodoDetail} className={styles.root}>
         <CardIdentity icon={<TaskListSquareLtr20Regular />} compact />
-        <div className={styles.summaryContent}>
-          <HeroText>{tasks.length}</HeroText>
-          <div className={styles.summaryLabels}>
-            <Text size={300} className={styles.summaryLabel}>
-              今日待办
-            </Text>
-            {overdue > 0 ? (
-              <Text size={200} className={styles.danger}>
-                逾期 {overdue}
+        <div className={styles.summaryBody}>
+          <div className={styles.summaryContent}>
+            <HeroText>{tasks.length}</HeroText>
+            <div className={styles.summaryLabels}>
+              <Text size={300} className={styles.summaryLabel}>
+                今日待办
               </Text>
-            ) : null}
+              {overdue > 0 ? (
+                <Text size={200} className={styles.danger}>
+                  逾期 {overdue}
+                </Text>
+              ) : null}
+            </div>
           </div>
         </div>
       </CardRoot>

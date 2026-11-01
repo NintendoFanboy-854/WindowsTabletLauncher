@@ -100,6 +100,8 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    /** 不被 flex 压缩：内容超高时宁可少显示别的行，也不要把 22 行高压成 14 再裁字 */
+    flexShrink: 0,
   },
   /**
    * 统计块统一走共享 `DataRow`（label 左 / 值右 / 28 行高）。
@@ -300,13 +302,20 @@ export default function PomodoroApp({ fallbackSizeKey }) {
     );
   }
 
-  /* ---- 2×2：identity + hero + 阶段 + 轮次 + 关联任务(有才渲染) + 今日统计两块 + 按钮行 ---- */
+  /* ---- 2×2：identity + hero + 阶段·轮次同一行 + 关联任务(有才渲染) + 今日统计两块 + 按钮行 ---- */
   return (
     <CardRoot {...cardRootProps} className={mergeClasses(styles.root, styles.rootStack)}>
       <CardIdentity icon={<Timer20Regular />} label="番茄钟" disclosure />
       <HeroText data-pomodoro-time="true">{snapshot.remainingText}</HeroText>
-      {phaseText}
-      {roundLine}
+      {/*
+        阶段 + 轮次合并一行（与 3×2 同一 `subline`）：2×2 在 1024 断点内容框只有 276 高，
+        分两行 + 任务行会把内容挤到 290，任务标题被压成 14（audit P2-2）。合行后 262，
+        全部按自然行高渲染，不再出现非省略裁切。
+      */}
+      <div className={styles.subline}>
+        {phaseText}
+        {roundLine}
+      </div>
       {taskTitle ? (
         <Text size={400} className={styles.task} title={taskTitle}>
           {taskTitle}

@@ -53,7 +53,7 @@ export function BackgroundFrames({ plugins, manager, bridge, theme }: Background
         return (
           <PluginBackgroundFrames
             key={plugin.id}
-            frames={[{ pluginId: plugin.id, src }]}
+            frames={[{ pluginId: plugin.id, src, title: plugin.name }]}
             theme={theme}
             bridge={bridge}
             onApiCall={onApiCall}

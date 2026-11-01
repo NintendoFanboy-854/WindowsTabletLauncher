@@ -216,6 +216,16 @@ const useStyles = makeStyles({
     minHeight: `calc(${tokens.spacingVerticalXXXL} + ${tokens.spacingVerticalM})`,
     minWidth: `calc(${tokens.spacingHorizontalXXXL} * 5)`,
   },
+  /**
+   * 设置页内 Fluent 控件的**真实可点元素**也要 ≥44：
+   * `minHeight` 只抬了 Dropdown / Input 的外壳（44），内层 button / input 实测 42；
+   * 命中区补到 44 后外壳随内容变 46，仍在 48 行高内（TOKEN-MAP §8 / DESIGN §1.2）。
+   */
+  controlTarget: {
+    '& .fui-Dropdown__button': { minHeight: TOUCH_TARGET_CSS },
+    '& .fui-Input__input': { minHeight: TOUCH_TARGET_CSS },
+    '& .fui-Combobox__input': { minHeight: TOUCH_TARGET_CSS },
+  },
   /** 开关命中区 44：Fluent Switch 视觉高度不变，只抬高可点区域（touch 目标 ≥44） */
   touch: {
     minHeight: TOUCH_TARGET_CSS,
@@ -730,7 +740,12 @@ export function SettingsPage({
       onBack={onBack}
       maxContentWidth="1040px"
     >
-      <div className={wide ? styles.layout : mergeClasses(styles.layout, styles.layoutNarrow)}>
+      <div
+        className={mergeClasses(
+          wide ? styles.layout : mergeClasses(styles.layout, styles.layoutNarrow),
+          styles.controlTarget,
+        )}
+      >
         <nav className={wide ? styles.nav : styles.navNarrow} aria-label="设置导航">
           <TabList
             vertical={wide}

@@ -135,6 +135,12 @@ export function WidgetCard({
   /** Card 本体节点：状态 scale 与 down→holding 的 transitionend 都盯它（缩放已搬到 Card） */
   const cardRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
+  /**
+   * 键盘焦点环（D-41 / FLUENT2 §8）：卡片自己的 1px 描边是材质边界，不能当焦点指示；
+   * 用 Fluent 焦点 token 的 2px 内描边，且只在 `:focus-visible` 时出现（鼠标点击不亮）。
+   * 焦点事件时现查 matches()，避免为“程序化聚焦”也点亮。
+   */
+  const [focusRing, setFocusRing] = useState(false);
 
   /** Card 节点同时交给桌面层登记（焦点用）和本卡状态机（transitionend 用） */
   const setCardNode = useCallback(
@@ -455,6 +461,15 @@ export function WidgetCard({
     opacity: gallery ? 0 : 1,
     pointerEvents: gallery ? 'none' : undefined,
     boxShadow: editMode || (hoverActive && !visiblePress) ? tokens.shadow8 : tokens.shadow4,
+    ...(focusRing && !editMode
+      ? {
+          outlineStyle: 'solid',
+          outlineWidth: tokens.strokeWidthThick,
+          outlineColor: tokens.colorStrokeFocus2,
+          // 向内画：卡片 overflow hidden，向外会被裁掉
+          outlineOffset: `calc(${tokens.strokeWidthThick} * -1)`,
+        }
+      : null),
     // 欣赏壁纸只动容器 opacity 与 translateY；减少动效时只保留 opacity
     transitionProperty: galleryMotion
       ? reducedMotion
@@ -529,7 +544,11 @@ export function WidgetCard({
       inert={gallery}
       data-hover={hoverActive ? 'true' : undefined}
       data-press={visiblePress ?? undefined}
-      onFocus={() => onFocus(widget)}
+      onFocus={(event) => {
+        setFocusRing(event.currentTarget.matches(':focus-visible'));
+        onFocus(widget);
+      }}
+      onBlur={() => setFocusRing(false)}
     >
       <div
         className={styles.gestureArea}

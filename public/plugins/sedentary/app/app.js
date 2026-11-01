@@ -16707,13 +16707,14 @@ function zd() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function Bd(e, t) {
-	window.parent.postMessage({
+function Bd(e, t, n) {
+	let r = {
+		view: e,
+		title: t
+	};
+	(n?.size === "default" || n?.size === "large") && (r.size = n.size), window.parent.postMessage({
 		type: "plugin:request-overlay",
-		payload: {
-			view: e,
-			title: t
-		}
+		payload: r
 	}, "*");
 }
 function Vd() {
@@ -17005,7 +17006,15 @@ var lf = sf(Oo.spacingHorizontalSNudge) + sf(Oo.spacingHorizontalL), uf = Object
 uf.S;
 var df = uf.M;
 Oo.strokeWidthThickest;
-var ff = 56, pf = 48, Z = 44, mf = 56, hf = [
+var ff = Object.freeze({
+	XS: 48,
+	S: 96,
+	M: 160,
+	L: 240,
+	XL: 320
+});
+Object.freeze(Object.values(ff)), ff.XL;
+var pf = 56, Z = 48, mf = 44, hf = 56, gf = [
 	"button",
 	"input",
 	"textarea",
@@ -17019,12 +17028,12 @@ var ff = 56, pf = 48, Z = 44, mf = 56, hf = [
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function gf(e, t) {
+function _f(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(hf);
+	let n = t.closest(gf);
 	return !!(n && n !== e && e.contains(n));
 }
-var _f = Jn({ root: {
+var vf = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -17042,8 +17051,8 @@ var _f = Jn({ root: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function vf({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = _f(), s = Kd(), c = {
+function yf({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = vf(), s = Kd(), c = {
 		...r,
 		paddingTop: V.spacingVerticalL,
 		paddingBottom: V.spacingVerticalL,
@@ -17051,9 +17060,9 @@ function vf({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, 
 		paddingRight: V.spacingHorizontalL,
 		gap: V.spacingVerticalS
 	}, l = (0, M.useCallback)((t) => {
-		gf(t.currentTarget, t.target) || e?.(t);
+		_f(t.currentTarget, t.target) || e?.(t);
 	}, [e]), u = (0, M.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (gf(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (_f(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		...a,
@@ -17092,7 +17101,7 @@ Jn({
 		gap: V.spacingHorizontalXS
 	}
 });
-var yf = Jn({
+var bf = Jn({
 	root: {
 		display: "flex",
 		flexShrink: 0,
@@ -17136,8 +17145,8 @@ var yf = Jn({
 		color: V.colorNeutralForeground3
 	}
 });
-function bf({ className: e, style: t }) {
-	let n = yf();
+function xf({ className: e, style: t }) {
+	let n = bf();
 	return /* @__PURE__ */ (0, N.jsx)("span", {
 		className: D(n.disclosure, e),
 		style: t,
@@ -17146,8 +17155,8 @@ function bf({ className: e, style: t }) {
 		children: /* @__PURE__ */ (0, N.jsx)(ds, {})
 	});
 }
-function xf({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
-	let l = yf(), u = !i && !!e;
+function Sf({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
+	let l = bf(), u = !i && !!e;
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		...c,
 		className: D(l.root, o),
@@ -17175,19 +17184,49 @@ function xf({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = 
 				className: l.trailing,
 				children: n
 			}) : null,
-			a ? /* @__PURE__ */ (0, N.jsx)(bf, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
+			a ? /* @__PURE__ */ (0, N.jsx)(xf, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
 		]
 	});
 }
-var Sf = Jn({ hero: {
+Jn({
+	root: {
+		position: "relative",
+		display: "inline-flex",
+		flexShrink: 0,
+		alignItems: "center",
+		justifyContent: "center",
+		overflow: "hidden",
+		boxSizing: "border-box",
+		borderRadius: V.borderRadius2XLarge,
+		backgroundColor: V.colorNeutralBackground3
+	},
+	image: {
+		display: "block",
+		width: "100%",
+		height: "100%",
+		objectFit: "cover",
+		objectPosition: "center",
+		borderRadius: V.borderRadius2XLarge
+	},
+	placeholder: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		height: "100%",
+		backgroundColor: V.colorNeutralBackground3,
+		color: V.colorNeutralForeground3
+	}
+});
+var Cf = Jn({ hero: {
 	...of,
 	...rf,
 	fontWeight: af,
 	color: V.colorNeutralForeground1,
 	whiteSpace: "nowrap"
 } });
-function Cf({ children: e, className: t, ...n }) {
-	let r = Sf();
+function wf({ children: e, className: t, ...n }) {
+	let r = Cf();
 	return /* @__PURE__ */ (0, N.jsx)("span", {
 		...n,
 		className: D(r.hero, t),
@@ -17195,7 +17234,7 @@ function Cf({ children: e, className: t, ...n }) {
 		children: e
 	});
 }
-var wf = Jn({
+var Tf = Jn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -17220,8 +17259,8 @@ var wf = Jn({
 	label: { color: V.colorNeutralForeground2 },
 	caption: { color: V.colorNeutralForeground3 }
 });
-function Tf({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, className: a, style: o, ...s }) {
-	let c = wf(), l = !!(n || r), u = i && !!n;
+function Ef({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, className: a, style: o, ...s }) {
+	let c = Tf(), l = !!(n || r), u = i && !!n;
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		...s,
 		className: D(c.root, a),
@@ -17230,7 +17269,7 @@ function Tf({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, c
 		"data-metric-reserve-caption": u ? "true" : void 0,
 		children: [/* @__PURE__ */ (0, N.jsxs)("div", {
 			className: c.valueRow,
-			children: [/* @__PURE__ */ (0, N.jsx)(Cf, { children: e }), t ? /* @__PURE__ */ (0, N.jsx)(X, {
+			children: [/* @__PURE__ */ (0, N.jsx)(wf, { children: e }), t ? /* @__PURE__ */ (0, N.jsx)(X, {
 				size: 300,
 				className: c.unit,
 				children: t
@@ -17292,7 +17331,7 @@ Jn({
 	},
 	inset: { paddingBlock: V.spacingVerticalL }
 });
-var Ef = Jn({
+var Df = Jn({
 	row: {
 		display: "flex",
 		alignItems: "center",
@@ -17342,8 +17381,8 @@ var Ef = Jn({
 		gap: V.spacingHorizontalXS
 	}
 });
-function Df({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = Ef(), d = (e) => {
+function Of({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = Df(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -17386,7 +17425,7 @@ function Df({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var Of = Object.freeze({
+var kf = Object.freeze({
 	[uf.XS]: {
 		width: V.spacingHorizontalL,
 		height: V.spacingVerticalL
@@ -17411,7 +17450,7 @@ var Of = Object.freeze({
 		width: `calc(${V.spacingHorizontalXXXL} + ${V.spacingHorizontalL})`,
 		height: `calc(${V.spacingVerticalXXXL} + ${V.spacingVerticalL})`
 	}
-}), kf = Jn({
+}), Af = Jn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -17440,8 +17479,8 @@ var Of = Object.freeze({
 	title: { color: V.colorNeutralForeground1 },
 	action: { marginTop: 0 }
 });
-function Af({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = df, className: o, style: s, ...c }) {
-	let l = kf(), u = Id(Yd, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = Of[f] || Of[df];
+function jf({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = df, className: o, style: s, ...c }) {
+	let l = Af(), u = Id(Yd, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = kf[f] || kf[df];
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		...c,
 		className: D(l.root, r === "start" && l.start, i && l.compact, o),
@@ -17471,7 +17510,7 @@ function Af({ icon: e, title: t, action: n, align: r = "center", compact: i = !1
 		]
 	});
 }
-var jf = Jn({
+var Mf = Jn({
 	dot: {
 		display: "inline-block",
 		flexShrink: 0,
@@ -17492,8 +17531,8 @@ var jf = Jn({
 		color: V.colorNeutralForeground3
 	}
 });
-function Mf({ tone: e = "neutral", label: t, className: n, style: r, ...i }) {
-	let a = jf(), o = e === "success" ? a.success : e === "warning" ? a.warning : e === "danger" ? a.danger : e === "info" ? a.info : a.neutral;
+function Nf({ tone: e = "neutral", label: t, className: n, style: r, ...i }) {
+	let a = Mf(), o = e === "success" ? a.success : e === "warning" ? a.warning : e === "danger" ? a.danger : e === "info" ? a.info : a.neutral;
 	return /* @__PURE__ */ (0, N.jsx)("span", {
 		...i,
 		role: t ? "img" : void 0,
@@ -17563,11 +17602,11 @@ Jn({ count: {
 		backgroundColor: V.colorBrandBackground
 	}
 });
-var Nf = Jn({ button: {
+var Pf = Jn({ button: {
 	minWidth: "44px",
 	minHeight: "44px"
-} }), Pf = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = Nf();
+} }), Ff = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = Pf();
 	return /* @__PURE__ */ (0, N.jsx)(_d, {
 		...i,
 		ref: a,
@@ -17578,7 +17617,7 @@ var Nf = Jn({ button: {
 		style: n,
 		children: r
 	});
-}), Ff = Pf, If = Jn({ root: {
+}), If = Ff, Lf = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -17592,8 +17631,8 @@ var Nf = Jn({ button: {
 	color: V.colorNeutralForeground1,
 	fontFamily: V.fontFamilyBase
 } });
-function Lf({ children: e, className: t, style: n }) {
-	let r = If();
+function Rf({ children: e, className: t, style: n }) {
+	let r = Lf();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.root, t),
 		style: n,
@@ -17601,14 +17640,14 @@ function Lf({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var Rf = Jn({
+var zf = Jn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: V.spacingHorizontalM,
-		minHeight: `${ff}px`,
+		minHeight: `${pf}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -17626,8 +17665,8 @@ var Rf = Jn({
 		gap: V.spacingHorizontalS
 	}
 });
-function zf({ children: e, trailing: t, className: n, style: r }) {
-	let i = Rf();
+function Bf({ children: e, trailing: t, className: n, style: r }) {
+	let i = zf();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(i.header, n),
 		style: r,
@@ -17641,17 +17680,17 @@ function zf({ children: e, trailing: t, className: n, style: r }) {
 		}) : null]
 	});
 }
-var Bf = Jn({ toolbar: {
+var Vf = Jn({ toolbar: {
 	display: "flex",
 	flexShrink: 0,
 	alignItems: "center",
 	gap: V.spacingHorizontalS,
-	minHeight: `${pf}px`,
+	minHeight: `${Z}px`,
 	paddingInline: 0,
 	boxSizing: "border-box"
 } });
-function Vf({ children: e, className: t, style: n }) {
-	let r = Bf();
+function Q({ children: e, className: t, style: n }) {
+	let r = Vf();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.toolbar, t),
 		style: n,
@@ -17662,20 +17701,20 @@ function Vf({ children: e, className: t, style: n }) {
 Jn({
 	tabs: {
 		flexShrink: 0,
-		height: `${Z}px`,
-		minHeight: `${Z}px`,
+		height: `${mf}px`,
+		minHeight: `${mf}px`,
 		paddingInline: 0,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${Z}px`,
-		minHeight: `${Z}px`,
+		height: `${mf}px`,
+		minHeight: `${mf}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: V.spacingHorizontalXS }
 });
-var Q = Jn({
+var Hf = Jn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -17706,7 +17745,7 @@ var Q = Jn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function Hf(e) {
+function Uf(e) {
 	let [t, n] = (0, M.useState)(!1);
 	return (0, M.useEffect)(() => {
 		let t = e.current;
@@ -17730,8 +17769,8 @@ function Hf(e) {
 		};
 	}, [e]), t;
 }
-function Uf({ children: e, className: t, style: n }) {
-	let r = Q(), i = (0, M.useRef)(null), a = Hf(i);
+function Wf({ children: e, className: t, style: n }) {
+	let r = Hf(), i = (0, M.useRef)(null), a = Uf(i);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -17768,7 +17807,7 @@ function Uf({ children: e, className: t, style: n }) {
 		flexShrink: 0,
 		alignItems: "center",
 		gap: V.spacingHorizontalS,
-		minHeight: `${mf}px`,
+		minHeight: `${hf}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -17823,7 +17862,7 @@ function Uf({ children: e, className: t, style: n }) {
 		boxSizing: "border-box"
 	}
 });
-function Wf(e = 1e3) {
+function Gf(e = 1e3) {
 	let [t, n] = (0, M.useState)(() => Date.now()), [r, i] = (0, M.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, M.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -17838,43 +17877,43 @@ function Wf(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/sedentary/src/data/engine.js
-var Gf = "settings", Kf = "sedentary.days", qf = "sedentary.runtime", Jf = "sedentary.command", Yf = 1e4, Xf = 500, Zf = 5, Qf = 400, $f = 7, ep = "wtsl.sedentary.engine", $ = "sedentary:command", tp = Object.freeze({
+var Kf = "settings", qf = "sedentary.days", Jf = "sedentary.runtime", Yf = "sedentary.command", Xf = 1e4, Zf = 500, Qf = 5, $f = 400, ep = 7, $ = "wtsl.sedentary.engine", tp = "sedentary:command", np = Object.freeze({
 	enabled: !0,
 	thresholdMin: 45,
 	remindEveryMin: 10,
 	strongReminder: !0
-}), np = {
+}), rp = {
 	thresholdMin: [5, 120],
 	remindEveryMin: [1, 60]
-}, rp = {
+}, ip = {
 	success: "久坐中",
 	warning: "接近提醒",
 	danger: "该起身了",
 	resting: "休息中",
 	off: "已关闭"
-}, ip = {
+}, ap = {
 	sitting: "坐着",
 	standing: "站立"
-}, ap = /^\d{4}-\d{2}-\d{2}$/, op = (e) => String(e).padStart(2, "0");
-function sp(e) {
-	return `${e.getFullYear()}-${op(e.getMonth() + 1)}-${op(e.getDate())}`;
-}
+}, op = /^\d{4}-\d{2}-\d{2}$/, sp = (e) => String(e).padStart(2, "0");
 function cp(e) {
-	return `${sp(e)}T${op(e.getHours())}:${op(e.getMinutes())}`;
+	return `${e.getFullYear()}-${sp(e.getMonth() + 1)}-${sp(e.getDate())}`;
 }
 function lp(e) {
-	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${op(e.getHours())}:${op(e.getMinutes())}`;
+	return `${cp(e)}T${sp(e.getHours())}:${sp(e.getMinutes())}`;
 }
 function up(e) {
+	return !(e instanceof Date) || Number.isNaN(e.getTime()) ? "—" : `${sp(e.getHours())}:${sp(e.getMinutes())}`;
+}
+function dp(e) {
 	if (typeof e != "string") return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function dp(e) {
+function fp(e) {
 	let t = new Date(e);
 	return t.setHours(0, 0, 0, 0), t;
 }
-function fp(e, t) {
+function pp(e, t) {
 	try {
 		let n = localStorage.getItem(e);
 		return n == null ? t : JSON.parse(n);
@@ -17882,101 +17921,101 @@ function fp(e, t) {
 		return t;
 	}
 }
-function pp(e, t) {
+function mp(e, t) {
 	try {
 		localStorage.setItem(e, JSON.stringify(t));
 	} catch {}
 }
-function mp(e, [t, n], r) {
+function hp(e, [t, n], r) {
 	let i = Math.round(Number(e));
 	return Number.isFinite(i) ? Math.min(n, Math.max(t, i)) : r;
 }
-function hp(e) {
+function gp(e) {
 	let t = Number(e);
 	return Number.isFinite(t) && t > 0 ? t : 0;
 }
-function gp(e) {
+function _p(e) {
 	return Math.round(e * 10) / 10;
 }
-function _p(e) {
+function vp(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		enabled: typeof t.enabled == "boolean" ? t.enabled : tp.enabled,
-		thresholdMin: mp(t.thresholdMin ?? tp.thresholdMin, np.thresholdMin, tp.thresholdMin),
-		remindEveryMin: mp(t.remindEveryMin ?? tp.remindEveryMin, np.remindEveryMin, tp.remindEveryMin),
-		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : tp.strongReminder
+		enabled: typeof t.enabled == "boolean" ? t.enabled : np.enabled,
+		thresholdMin: hp(t.thresholdMin ?? np.thresholdMin, rp.thresholdMin, np.thresholdMin),
+		remindEveryMin: hp(t.remindEveryMin ?? np.remindEveryMin, rp.remindEveryMin, np.remindEveryMin),
+		strongReminder: typeof t.strongReminder == "boolean" ? t.strongReminder : np.strongReminder
 	};
 }
-async function vp() {
+async function yp() {
 	let t = null;
 	try {
-		t = await e.getConfig(Gf);
+		t = await e.getConfig(Kf);
 	} catch {
 		t = null;
 	}
-	return _p(t);
-}
-function yp(e) {
-	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {};
-	typeof t.enabled == "boolean" && (n.enabled = t.enabled), typeof t.strongReminder == "boolean" && (n.strongReminder = t.strongReminder);
-	for (let e of Object.keys(np)) typeof t[e] == "number" && Number.isFinite(t[e]) && (n[e] = t[e]);
-	return n;
+	return vp(t);
 }
 function bp(e) {
+	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = {};
+	typeof t.enabled == "boolean" && (n.enabled = t.enabled), typeof t.strongReminder == "boolean" && (n.strongReminder = t.strongReminder);
+	for (let e of Object.keys(rp)) typeof t[e] == "number" && Number.isFinite(t[e]) && (n[e] = t[e]);
+	return n;
+}
+function xp(e) {
 	if (!e || typeof e != "object" || Array.isArray(e)) return {};
 	let t = { ...e };
 	return delete t.quietHours, t;
 }
-async function xp() {
+async function Sp() {
 	let t = null;
 	try {
-		t = await e.getConfig(Gf);
+		t = await e.getConfig(Kf);
 	} catch {
 		return null;
 	}
 	if (!t || typeof t != "object" || Array.isArray(t)) return null;
 	let n = {
-		...bp(t),
-		..._p(t)
+		...xp(t),
+		...vp(t)
 	};
 	if (JSON.stringify(n) === JSON.stringify(t)) return n;
 	try {
-		await e.setConfig(Gf, n);
+		await e.setConfig(Kf, n);
 	} catch {
 		return n;
 	}
 	return n;
 }
-async function Sp(t) {
+async function Cp(t) {
 	let n = null;
 	try {
-		n = await e.getConfig(Gf);
+		n = await e.getConfig(Kf);
 	} catch {
 		n = null;
 	}
-	let r = _p({
-		..._p(n),
-		...yp(t)
+	let r = vp({
+		...vp(n),
+		...bp(t)
 	}), i = {
-		...bp(n),
+		...xp(n),
 		...r
 	};
 	try {
-		await e.setConfig(Gf, i);
+		await e.setConfig(Kf, i);
 	} catch {}
 	return r;
 }
-function Cp(e, t) {
+function wp(e, t) {
 	let n = t && typeof t == "object" ? t : {};
 	return {
 		date: e,
-		sittingMinutes: hp(n.sittingMinutes),
-		standingMinutes: hp(n.standingMinutes),
-		longestStreakMin: hp(n.longestStreakMin),
-		breaks: Math.round(hp(n.breaks))
+		sittingMinutes: gp(n.sittingMinutes),
+		standingMinutes: gp(n.standingMinutes),
+		longestStreakMin: gp(n.longestStreakMin),
+		breaks: Math.round(gp(n.breaks))
 	};
 }
-function wp(e) {
+function Tp(e) {
 	return {
 		date: e,
 		sittingMinutes: 0,
@@ -17985,25 +18024,25 @@ function wp(e) {
 		breaks: 0
 	};
 }
-function Tp(e, t) {
-	return e[t] || (e[t] = wp(t)), e[t];
+function Ep(e, t) {
+	return e[t] || (e[t] = Tp(t)), e[t];
 }
-function Ep() {
-	let e = fp(Kf, null), t = Array.isArray(e) ? e.reduce((e, t) => {
+function Dp() {
+	let e = pp(qf, null), t = Array.isArray(e) ? e.reduce((e, t) => {
 		let n = t && typeof t.date == "string" ? t.date : null;
 		return n && (e[n] = t), e;
 	}, {}) : e && typeof e == "object" ? e : {}, n = {};
-	for (let [e, r] of Object.entries(t)) ap.test(e) && (n[e] = Cp(e, r));
+	for (let [e, r] of Object.entries(t)) op.test(e) && (n[e] = wp(e, r));
 	return n;
 }
-function Dp(e) {
-	pp(Kf, e);
+function Op(e) {
+	mp(qf, e);
 }
-function Op() {
-	let e = fp(qf, null), t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = typeof t.sittingSince == "string" ? t.sittingSince : null, r = t.posture === "sitting" || t.posture === "standing" ? t.posture : n ? "sitting" : null, i = typeof t.postureSince == "string" ? t.postureSince : r === "sitting" ? n : null;
+function kp() {
+	let e = pp(Jf, null), t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = typeof t.sittingSince == "string" ? t.sittingSince : null, r = t.posture === "sitting" || t.posture === "standing" ? t.posture : n ? "sitting" : null, i = typeof t.postureSince == "string" ? t.postureSince : r === "sitting" ? n : null;
 	return {
 		posture: r,
-		postureSince: up(i) ? i : null,
+		postureSince: dp(i) ? i : null,
 		lastRemindAt: typeof t.lastRemindAt == "string" ? t.lastRemindAt : null,
 		lastRemindMinute: typeof t.lastRemindMinute == "string" ? t.lastRemindMinute : null,
 		snoozedUntil: typeof t.snoozedUntil == "string" ? t.snoozedUntil : null,
@@ -18012,152 +18051,152 @@ function Op() {
 		commandId: typeof t.commandId == "string" ? t.commandId : null
 	};
 }
-function kp(e) {
-	pp(qf, e);
-}
 function Ap(e) {
+	mp(Jf, e);
+}
+function jp(e) {
 	let t = Object.keys(e).sort();
-	if (t.length <= Qf) return e;
+	if (t.length <= $f) return e;
 	let n = new Set(t.slice(-400)), r = {};
 	for (let i of t) n.has(i) && (r[i] = e[i]);
 	return r;
 }
-function jp(e, t, n, r) {
+function Mp(e, t, n, r) {
 	if (!(t instanceof Date) || !(n instanceof Date) || n.getTime() <= t.getTime()) return;
 	let i = t;
 	for (; i.getTime() < n.getTime();) {
-		let t = sp(i), a = new Date(i.getFullYear(), i.getMonth(), i.getDate() + 1), o = a.getTime() < n.getTime() ? a : n, s = (o.getTime() - i.getTime()) / 6e4;
+		let t = cp(i), a = new Date(i.getFullYear(), i.getMonth(), i.getDate() + 1), o = a.getTime() < n.getTime() ? a : n, s = (o.getTime() - i.getTime()) / 6e4;
 		if (s > 0) {
-			let n = Tp(e, t);
+			let n = Ep(e, t);
 			r === "sitting" ? n.sittingMinutes += s : r === "standing" && (n.standingMinutes += s);
 		}
 		i = o;
 	}
 }
-function Mp(e, t, n, r) {
+function Np(e, t, n, r) {
 	if (t !== "sitting" || !(n instanceof Date)) return;
 	let i = Math.max(0, (r.getTime() - n.getTime()) / 6e4);
 	if (i <= 0) return;
-	let a = Tp(e, sp(r));
+	let a = Ep(e, cp(r));
 	i > a.longestStreakMin && (a.longestStreakMin = Math.round(i));
 }
-function Np(e, t = Date.now()) {
-	let n = up(e.postureSince);
+function Pp(e, t = Date.now()) {
+	let n = dp(e.postureSince);
 	return !n || !e.posture ? 0 : Math.max(0, (t - n.getTime()) / 6e4);
 }
-function Pp(e, t = Date.now()) {
-	return e.posture === "sitting" ? Np(e, t) : 0;
+function Fp(e, t = Date.now()) {
+	return e.posture === "sitting" ? Pp(e, t) : 0;
 }
-function Fp(e = /* @__PURE__ */ new Date()) {
-	let t = sp(e);
-	return Ep()[t] ?? wp(t);
+function Ip(e = /* @__PURE__ */ new Date()) {
+	let t = cp(e);
+	return Dp()[t] ?? Tp(t);
 }
-function Ip(e, t, n = /* @__PURE__ */ new Date()) {
+function Lp(e, t, n = /* @__PURE__ */ new Date()) {
 	if (!e.enabled) return "off";
 	if (t.posture === "standing") return "resting";
-	let r = Pp(t, n.getTime());
+	let r = Fp(t, n.getTime());
 	return r >= e.thresholdMin ? "danger" : r >= e.thresholdMin * .6 ? "warning" : "success";
 }
-function Lp(e) {
-	return rp[e] ?? rp.success;
-}
-function Rp(e, t, n = /* @__PURE__ */ new Date()) {
-	let r = Ip(e, t, n);
-	if (r === "off") return "久坐提醒已关闭";
-	if (r === "resting") return "";
-	let i = up(t.snoozedUntil);
-	if (i && i > n) return `提醒已推迟到 ${lp(i)}`;
-	if (!t.posture) return "";
-	let a = e.thresholdMin - Pp(t, n.getTime());
-	return a <= 0 ? "该起身了" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
+function Rp(e) {
+	return ip[e] ?? ip.success;
 }
 function zp(e, t, n = /* @__PURE__ */ new Date()) {
-	if (!e.enabled || t.posture !== "sitting") return !1;
-	let r = up(t.snoozedUntil);
-	return r && r > n ? !1 : Pp(t, n.getTime()) >= e.thresholdMin;
+	let r = Lp(e, t, n);
+	if (r === "off") return "久坐提醒已关闭";
+	if (r === "resting") return "";
+	let i = dp(t.snoozedUntil);
+	if (i && i > n) return `提醒已推迟到 ${up(i)}`;
+	if (!t.posture) return "";
+	let a = e.thresholdMin - Fp(t, n.getTime());
+	return a <= 0 ? "该起身了" : `距提醒还有 ${Math.max(1, Math.ceil(a))} 分钟`;
 }
-function Bp(e, t) {
+function Bp(e, t, n = /* @__PURE__ */ new Date()) {
+	if (!e.enabled || t.posture !== "sitting") return !1;
+	let r = dp(t.snoozedUntil);
+	return r && r > n ? !1 : Fp(t, n.getTime()) >= e.thresholdMin;
+}
+function Vp(e, t) {
 	if (t === 0) return "今天";
 	if (t === 1) return "昨天";
 	let n = "日一二三四五六"[e.getDay()];
 	return `${e.getMonth() + 1}月${e.getDate()}日 周${n}`;
 }
-function Vp(e = Ep(), t = /* @__PURE__ */ new Date()) {
+function Hp(e = Dp(), t = /* @__PURE__ */ new Date()) {
 	let n = [];
-	for (let r = 0; r < $f; r += 1) {
-		let i = new Date(t.getFullYear(), t.getMonth(), t.getDate() - r), a = sp(i), o = e[a] ?? wp(a);
+	for (let r = 0; r < ep; r += 1) {
+		let i = new Date(t.getFullYear(), t.getMonth(), t.getDate() - r), a = cp(i), o = e[a] ?? Tp(a);
 		n.push({
 			...o,
-			label: Bp(i, r)
+			label: Vp(i, r)
 		});
 	}
 	return n;
 }
-function Hp(e, t, n = /* @__PURE__ */ new Date()) {
-	return Np(e, n.getTime()) > 0 || t.sittingMinutes > 0 || t.standingMinutes > 0 || t.breaks > 0 || !!up(e.lastBreakAt);
+function Up(e, t, n = /* @__PURE__ */ new Date()) {
+	return Pp(e, n.getTime()) > 0 || t.sittingMinutes > 0 || t.standingMinutes > 0 || t.breaks > 0 || !!dp(e.lastBreakAt);
 }
-function Up(e, t = /* @__PURE__ */ new Date()) {
-	let n = Op(), r = Ep(), i = r[sp(t)] ?? wp(sp(t)), a = Ip(e, n, t), o = e.enabled ? n.posture : null, s = o ? Np(n, t.getTime()) : 0, c = Pp(n, t.getTime()), l = up(n.lastBreakAt);
+function Wp(e, t = /* @__PURE__ */ new Date()) {
+	let n = kp(), r = Dp(), i = r[cp(t)] ?? Tp(cp(t)), a = Lp(e, n, t), o = e.enabled ? n.posture : null, s = o ? Pp(n, t.getTime()) : 0, c = Fp(n, t.getTime()), l = dp(n.lastBreakAt);
 	return {
 		runtime: n,
 		today: i,
 		posture: o,
-		postureLabel: o ? ip[o] : "",
+		postureLabel: o ? ap[o] : "",
 		status: a,
-		statusLabel: Lp(a),
+		statusLabel: Rp(a),
 		currentMin: Math.floor(s),
 		stateMinutes: s,
 		nextReminderMin: e.enabled && o === "sitting" ? Math.max(0, e.thresholdMin - Math.round(c)) : null,
-		hint: Rp(e, n, t),
-		lastBreakText: l ? lp(l) : "—",
-		snoozable: zp(e, n, t),
-		hasData: Hp(n, i, t),
-		recentDays: Vp(r, t)
+		hint: zp(e, n, t),
+		lastBreakText: l ? up(l) : "—",
+		snoozable: Bp(e, n, t),
+		hasData: Up(n, i, t),
+		recentDays: Hp(r, t)
 	};
 }
-function Wp(e, t = /* @__PURE__ */ new Date()) {
-	let n = Op(), r = Fp(t), i = e.enabled ? n.posture : null, a = i ? Np(n, t.getTime()) : 0, o = Pp(n, t.getTime());
+function Gp(e, t = /* @__PURE__ */ new Date()) {
+	let n = kp(), r = Ip(t), i = e.enabled ? n.posture : null, a = i ? Pp(n, t.getTime()) : 0, o = Fp(n, t.getTime());
 	return {
 		enabled: e.enabled,
 		posture: i,
-		postureLabel: i ? ip[i] : "未开始",
-		status: Ip(e, n, t),
-		statusLabel: Lp(Ip(e, n, t)),
+		postureLabel: i ? ap[i] : "未开始",
+		status: Lp(e, n, t),
+		statusLabel: Rp(Lp(e, n, t)),
 		currentStateMin: Math.round(a),
 		currentStreakMin: Math.round(o),
-		sittingMinutesToday: gp(r.sittingMinutes),
-		standingMinutesToday: gp(r.standingMinutes),
+		sittingMinutesToday: _p(r.sittingMinutes),
+		standingMinutesToday: _p(r.standingMinutes),
 		breaksToday: r.breaks,
 		thresholdMin: e.thresholdMin,
 		nextReminderMin: e.enabled && i === "sitting" ? Math.max(0, e.thresholdMin - Math.round(o)) : null,
-		snoozable: zp(e, n, t),
+		snoozable: Bp(e, n, t),
 		snoozedUntil: n.snoozedUntil,
 		lastBreakAt: n.lastBreakAt,
-		hint: Rp(e, n, t)
+		hint: zp(e, n, t)
 	};
 }
-function Gp(e = /* @__PURE__ */ new Date()) {
-	let t = Ep(), n = Op(), r = t[sp(e)] ?? wp(sp(e));
+function Kp(e = /* @__PURE__ */ new Date()) {
+	let t = Dp(), n = kp(), r = t[cp(e)] ?? Tp(cp(e));
 	return {
 		...r,
-		sittingMinutes: gp(r.sittingMinutes),
-		standingMinutes: gp(r.standingMinutes),
+		sittingMinutes: _p(r.sittingMinutes),
+		standingMinutes: _p(r.standingMinutes),
 		lastBreakAt: n.lastBreakAt,
-		recentDays: Vp(t, e)
+		recentDays: Hp(t, e)
 	};
 }
-function Kp(e = Ep(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
-	let a = up(i) ?? n, o = up(r);
+function qp(e = Dp(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
+	let a = dp(i) ?? n, o = dp(r);
 	if (!o) {
 		if (t === "week") {
-			let e = dp(n), t = (e.getDay() + 6) % 7;
+			let e = fp(n), t = (e.getDay() + 6) % 7;
 			e.setDate(e.getDate() - t), o = e;
-		} else o = t === "month" ? new Date(n.getFullYear(), n.getMonth(), 1) : dp(n);
+		} else o = t === "month" ? new Date(n.getFullYear(), n.getMonth(), 1) : fp(n);
 	}
-	let s = sp(o), c = sp(a), l = 0, u = 0, d = 0, f = 0, p = {};
+	let s = cp(o), c = cp(a), l = 0, u = 0, d = 0, f = 0, p = {};
 	for (let [t, n] of Object.entries(e)) {
 		if (t < s || t > c) continue;
-		let e = Cp(t, n);
+		let e = wp(t, n);
 		l += e.sittingMinutes, u += e.standingMinutes, d += e.breaks, e.longestStreakMin > f && (f = e.longestStreakMin), e.breaks > 0 && (p[t] = e.breaks);
 	}
 	return {
@@ -18166,45 +18205,45 @@ function Kp(e = Ep(), t = "today", n = /* @__PURE__ */ new Date(), r, i) {
 		to: a.toISOString(),
 		completed: d,
 		breaks: d,
-		sittingMinutes: gp(l),
-		standingMinutes: gp(u),
+		sittingMinutes: _p(l),
+		standingMinutes: _p(u),
 		longestStreakMin: Math.round(f),
 		byDay: p
 	};
 }
-function qp(e, t = {}) {
+function Jp(e, t = {}) {
 	let n = {
 		id: `cmd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
 		type: e,
 		at: (/* @__PURE__ */ new Date()).toISOString(),
 		...t
 	};
-	return pp(Jf, n), window.dispatchEvent(new CustomEvent($, { detail: n })), n;
-}
-function Jp() {
-	return qp("stand");
+	return mp(Yf, n), window.dispatchEvent(new CustomEvent(tp, { detail: n })), n;
 }
 function Yp() {
-	return qp("sit");
+	return Jp("stand");
 }
-function Xp(e = 5) {
-	return qp("snooze", { minutes: e });
+function Xp() {
+	return Jp("sit");
 }
-function Zp(e) {
+function Zp(e = 5) {
+	return Jp("snooze", { minutes: e });
+}
+function Qp(e) {
 	let t = (t) => e(t.detail);
-	return window.addEventListener($, t), () => window.removeEventListener($, t);
+	return window.addEventListener(tp, t), () => window.removeEventListener(tp, t);
 }
-function Qp() {
+function $p() {
 	if (typeof navigator > "u") return null;
 	let e = navigator.locks;
 	return e && typeof e.request == "function" ? e : null;
 }
-async function $p(e) {
-	let t = Qp();
+async function em(e) {
+	let t = $p();
 	if (!t) return e();
 	let n = !1;
 	try {
-		return await t.request(ep, { ifAvailable: !0 }, async (t) => {
+		return await t.request($, { ifAvailable: !0 }, async (t) => {
 			if (t) return n = !0, e();
 		});
 	} catch (t) {
@@ -18212,23 +18251,23 @@ async function $p(e) {
 		return e();
 	}
 }
-async function em(e) {
-	let t = Qp();
+async function tm(e) {
+	let t = $p();
 	if (!t) return e();
 	let n = !1;
 	try {
-		return await t.request(ep, async () => (n = !0, e()));
+		return await t.request($, async () => (n = !0, e()));
 	} catch (t) {
 		if (n) throw t;
 		return e();
 	}
 }
-var tm = class {
+var nm = class {
 	constructor() {
 		this.running = !1, this.ticking = !1, this.timer = 0, this.firstTimer = 0, this.disposers = [];
 	}
 	start() {
-		this.running || (this.running = !0, this.disposers.push(this.#e()), this.firstTimer = window.setTimeout(() => void this.tick(), Xf), this.timer = window.setInterval(() => void this.tick(), Yf));
+		this.running || (this.running = !0, this.disposers.push(this.#e()), this.firstTimer = window.setTimeout(() => void this.tick(), Zf), this.timer = window.setInterval(() => void this.tick(), Xf));
 	}
 	stop() {
 		this.running = !1, window.clearTimeout(this.firstTimer), window.clearInterval(this.timer);
@@ -18237,11 +18276,11 @@ var tm = class {
 	#e() {
 		let e = (e) => {
 			if (e.key !== "sedentary.command") return;
-			let t = fp(Jf, null);
+			let t = pp(Yf, null);
 			t && this.handleCommand(t);
 		};
 		window.addEventListener("storage", e);
-		let t = Zp((e) => void this.handleCommand(e));
+		let t = Qp((e) => void this.handleCommand(e));
 		return () => {
 			window.removeEventListener("storage", e), t();
 		};
@@ -18250,7 +18289,7 @@ var tm = class {
 		if (!e) return;
 		let t = e.type === "break" ? "stand" : e.type;
 		if (t === "stand" || t === "sit" || t === "snooze") try {
-			await em(() => this.#t({
+			await tm(() => this.#t({
 				...e,
 				type: t
 			}));
@@ -18259,21 +18298,21 @@ var tm = class {
 		}
 	}
 	#t(e) {
-		let t = Op();
-		t.commandId !== e.id && (t.commandId = e.id, kp(t), e.type === "snooze" ? this.#n(e.minutes) : e.type === "sit" ? this.#s("manual") : this.#o("manual"));
+		let t = kp();
+		t.commandId !== e.id && (t.commandId = e.id, Ap(t), e.type === "snooze" ? this.#n(e.minutes) : e.type === "sit" ? this.#s("manual") : this.#o("manual"));
 	}
 	async standUp(e = "manual") {
-		return em(() => this.#o(e));
+		return tm(() => this.#o(e));
 	}
 	async sitDown(e = "manual") {
-		return em(() => this.#s(e));
+		return tm(() => this.#s(e));
 	}
 	async snooze(e = 5) {
-		return em(() => this.#n(e));
+		return tm(() => this.#n(e));
 	}
 	#n(e) {
-		let t = mp(e, [1, 60], 5), n = Op();
-		return n.posture === "sitting" ? (n.snoozedUntil = new Date(Date.now() + t * 6e4).toISOString(), n.lastRemindAt = null, n.lastRemindMinute = null, kp(n), {
+		let t = hp(e, [1, 60], 5), n = kp();
+		return n.posture === "sitting" ? (n.snoozedUntil = new Date(Date.now() + t * 6e4).toISOString(), n.lastRemindAt = null, n.lastRemindMinute = null, Ap(n), {
 			minutes: t,
 			snoozedUntil: n.snoozedUntil
 		}) : null;
@@ -18282,7 +18321,7 @@ var tm = class {
 		if (this.running && !this.ticking) {
 			this.ticking = !0;
 			try {
-				let e = await $p(() => this.#r());
+				let e = await em(() => this.#r());
 				e?.remind && await this.#a(e.minutes, e.settings);
 			} catch (e) {
 				console.warn("[sedentary] tick 失败", e);
@@ -18292,32 +18331,32 @@ var tm = class {
 		}
 	}
 	#r() {
-		let e = /* @__PURE__ */ new Date(), t = Op(), n = Ep();
-		return vp().then((r) => {
-			if (!r.enabled) return t.posture = null, t.postureSince = null, t.lastRemindAt = null, t.lastRemindMinute = null, t.snoozedUntil = null, t.lastTickAt = e.toISOString(), kp(t), Dp(Ap(n)), null;
-			let i = up(t.lastTickAt), a = i ? Math.max(0, (e - i) / 6e4) : 0;
-			if (i && a > Zf) {
-				let r = up(t.postureSince);
-				return r && (t.postureSince = new Date(r.getTime() + (e.getTime() - i.getTime())).toISOString()), t.lastTickAt = e.toISOString(), kp(t), Dp(Ap(n)), null;
+		let e = /* @__PURE__ */ new Date(), t = kp(), n = Dp();
+		return yp().then((r) => {
+			if (!r.enabled) return t.posture = null, t.postureSince = null, t.lastRemindAt = null, t.lastRemindMinute = null, t.snoozedUntil = null, t.lastTickAt = e.toISOString(), Ap(t), Op(jp(n)), null;
+			let i = dp(t.lastTickAt), a = i ? Math.max(0, (e - i) / 6e4) : 0;
+			if (i && a > Qf) {
+				let r = dp(t.postureSince);
+				return r && (t.postureSince = new Date(r.getTime() + (e.getTime() - i.getTime())).toISOString()), t.lastTickAt = e.toISOString(), Ap(t), Op(jp(n)), null;
 			}
 			t.posture || (t.posture = "sitting", t.postureSince = e.toISOString());
-			let o = up(t.postureSince);
-			jp(n, i ?? o ?? e, e, t.posture), Mp(n, t.posture, o, e), t.lastTickAt = e.toISOString();
+			let o = dp(t.postureSince);
+			Mp(n, i ?? o ?? e, e, t.posture), Np(n, t.posture, o, e), t.lastTickAt = e.toISOString();
 			let s = null;
 			if (t.posture === "sitting") {
-				let n = Pp(t, e.getTime());
+				let n = Fp(t, e.getTime());
 				s = this.#i(e, n, r, t);
 			}
-			return kp(t), Dp(Ap(n)), s;
+			return Ap(t), Op(jp(n)), s;
 		});
 	}
 	#i(e, t, n, r) {
 		if (t < n.thresholdMin) return null;
-		let i = up(r.snoozedUntil);
+		let i = dp(r.snoozedUntil);
 		if (i && i > e) return null;
-		let a = cp(e);
+		let a = lp(e);
 		if (r.lastRemindMinute === a) return null;
-		let o = up(r.lastRemindAt), s = Math.max(1, n.remindEveryMin) * 6e4;
+		let o = dp(r.lastRemindAt), s = Math.max(1, n.remindEveryMin) * 6e4;
 		return !o || e.getTime() - o.getTime() >= s ? (r.lastRemindAt = e.toISOString(), r.lastRemindMinute = a, r.snoozedUntil = null, {
 			remind: !0,
 			minutes: Math.round(t),
@@ -18351,48 +18390,48 @@ var tm = class {
 		i === "stand" ? await this.standUp("reminder") : i === "snooze" && await this.snooze(5);
 	}
 	#o(e) {
-		let t = /* @__PURE__ */ new Date(), n = sp(t), r = Ep(), i = Op(), a = Tp(r, n);
-		if (i.posture !== "sitting") return Dp(Ap(r)), {
+		let t = /* @__PURE__ */ new Date(), n = cp(t), r = Dp(), i = kp(), a = Ep(r, n);
+		if (i.posture !== "sitting") return Op(jp(r)), {
 			changed: !1,
 			day: a,
 			source: e
 		};
-		let o = up(i.postureSince), s = up(i.lastTickAt);
-		return jp(r, s && o && s > o ? s : o ?? s ?? t, t, "sitting"), Mp(r, "sitting", o, t), a.breaks += 1, i.posture = "standing", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastBreakAt = t.toISOString(), i.lastTickAt = t.toISOString(), kp(i), Dp(Ap(r)), {
+		let o = dp(i.postureSince), s = dp(i.lastTickAt);
+		return Mp(r, s && o && s > o ? s : o ?? s ?? t, t, "sitting"), Np(r, "sitting", o, t), a.breaks += 1, i.posture = "standing", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastBreakAt = t.toISOString(), i.lastTickAt = t.toISOString(), Ap(i), Op(jp(r)), {
 			changed: !0,
 			day: a,
 			source: e
 		};
 	}
 	#s(e) {
-		let t = /* @__PURE__ */ new Date(), n = sp(t), r = Ep(), i = Op(), a = Tp(r, n);
-		if (i.posture !== "standing") return Dp(Ap(r)), {
+		let t = /* @__PURE__ */ new Date(), n = cp(t), r = Dp(), i = kp(), a = Ep(r, n);
+		if (i.posture !== "standing") return Op(jp(r)), {
 			changed: !1,
 			day: a,
 			source: e
 		};
-		let o = up(i.postureSince), s = up(i.lastTickAt);
-		return jp(r, s && o && s > o ? s : o ?? s ?? t, t, "standing"), i.posture = "sitting", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastTickAt = t.toISOString(), kp(i), Dp(Ap(r)), {
+		let o = dp(i.postureSince), s = dp(i.lastTickAt);
+		return Mp(r, s && o && s > o ? s : o ?? s ?? t, t, "standing"), i.posture = "sitting", i.postureSince = t.toISOString(), i.lastRemindAt = null, i.lastRemindMinute = null, i.snoozedUntil = null, i.lastTickAt = t.toISOString(), Ap(i), Op(jp(r)), {
 			changed: !0,
 			day: a,
 			source: e
 		};
 	}
 };
-async function nm() {
-	let t = /* @__PURE__ */ new Date(), n = fp(Kf, null);
+async function rm() {
+	let t = /* @__PURE__ */ new Date(), n = pp(qf, null);
 	if (!n || Object.keys(n).length === 0) {
 		let e = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
-		Dp({
-			[sp(t)]: {
-				date: sp(t),
+		Op({
+			[cp(t)]: {
+				date: cp(t),
 				sittingMinutes: 187,
 				standingMinutes: 24,
 				longestStreakMin: 52,
 				breaks: 3
 			},
-			[sp(e)]: {
-				date: sp(e),
+			[cp(e)]: {
+				date: cp(e),
 				sittingMinutes: 312,
 				standingMinutes: 41,
 				longestStreakMin: 96,
@@ -18400,7 +18439,7 @@ async function nm() {
 			}
 		});
 	}
-	if (kp({
+	if (Ap({
 		posture: "sitting",
 		postureSince: (/* @__PURE__ */ new Date(t.getTime() - 72e4)).toISOString(),
 		lastRemindAt: null,
@@ -18410,57 +18449,57 @@ async function nm() {
 		lastBreakAt: (/* @__PURE__ */ new Date(t.getTime() - 576e4)).toISOString(),
 		commandId: null
 	}), !e.inHost) {
-		let t = `plugin.${e.pluginId}.${Gf}`;
-		fp(t, null) ?? pp(t, { ...tp });
+		let t = `plugin.${e.pluginId}.${Kf}`;
+		pp(t, null) ?? mp(t, { ...np });
 	}
 }
-var rm = null;
-function im() {
-	return rm ??= new tm(), rm;
+var im = null;
+function am() {
+	return im ??= new nm(), im;
 }
 //#endregion
 //#region public/plugins/sedentary/src/useSedentaryState.js
-function am(e) {
-	let t = Wf(1e3), [, n] = (0, M.useReducer)((e) => e + 1, 0);
+function om(e) {
+	let t = Gf(1e3), [, n] = (0, M.useReducer)((e) => e + 1, 0);
 	return (0, M.useEffect)(() => {
 		let e = (e) => {
 			(e.key === null || e.key === "sedentary.days" || e.key === "sedentary.runtime") && n();
 		};
 		return window.addEventListener("storage", e), () => window.removeEventListener("storage", e);
-	}, []), (0, M.useMemo)(() => Up(e, new Date(t)), [e, t]);
+	}, []), (0, M.useMemo)(() => Wp(e, new Date(t)), [e, t]);
 }
 //#endregion
 //#region public/plugins/sedentary/src/sizes.js
-var om = {
+var sm = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2]
 };
-function sm(e) {
+function cm(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return om[t] ? t : "2x1";
+	return sm[t] ? t : "2x1";
 }
-function cm() {
+function lm() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return om[n] ? n : null;
+	return sm[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryApp.jsx
-var lm = {
+var um = {
 	success: "subtle",
 	warning: "warning",
 	danger: "danger",
 	resting: "informative",
 	off: "subtle"
 };
-function um(e) {
+function dm(e) {
 	return e === "warning" ? "warning" : e === "danger" ? "danger" : null;
 }
-var dm = Jn({
+var fm = Jn({
 	root: {
 		minWidth: 0,
 		minHeight: 0,
@@ -18472,6 +18511,16 @@ var dm = Jn({
 		justifyContent: "flex-start"
 	},
 	identityStart: { alignSelf: "flex-start" },
+	compactBody: {
+		display: "flex",
+		flex: "1 1 auto",
+		flexDirection: "column",
+		alignItems: "flex-start",
+		justifyContent: "center",
+		minHeight: 0,
+		minWidth: 0,
+		paddingBlockEnd: V.spacingVerticalS
+	},
 	rootStack: { alignItems: "stretch" },
 	rowBody: {
 		display: "flex",
@@ -18598,8 +18647,8 @@ var dm = Jn({
 		minWidth: 0
 	}
 });
-function fm({ status: e, minutes: t, className: n }) {
-	let r = dm(), i = um(e), a = Number(t) > 0, o = a ? `距提醒还有 ${t} 分钟` : "该起身了";
+function pm({ status: e, minutes: t, className: n }) {
+	let r = fm(), i = dm(e), a = Number(t) > 0, o = a ? `距提醒还有 ${t} 分钟` : "该起身了";
 	return /* @__PURE__ */ (0, N.jsx)(td, {
 		content: o,
 		relationship: "description",
@@ -18609,7 +18658,7 @@ function fm({ status: e, minutes: t, className: n }) {
 			"aria-label": o,
 			"data-sedentary-reminder": "true",
 			children: [
-				i ? /* @__PURE__ */ (0, N.jsx)(Mf, { tone: i }) : null,
+				i ? /* @__PURE__ */ (0, N.jsx)(Nf, { tone: i }) : null,
 				a ? /* @__PURE__ */ (0, N.jsx)(fs, { "aria-hidden": "true" }) : /* @__PURE__ */ (0, N.jsx)(us, { "aria-hidden": "true" }),
 				a ? /* @__PURE__ */ (0, N.jsxs)(X, {
 					size: 200,
@@ -18620,7 +18669,7 @@ function fm({ status: e, minutes: t, className: n }) {
 		})
 	});
 }
-function pm({ styles: e, days: t, showDates: n = !1, tall: r = !1 }) {
+function mm({ styles: e, days: t, showDates: n = !1, tall: r = !1 }) {
 	let i = t.slice().reverse(), a = Math.max(1, ...i.map((e) => Math.round(e.sittingMinutes))), o = i[i.length - 1];
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: e.week,
@@ -18648,22 +18697,22 @@ function pm({ styles: e, days: t, showDates: n = !1, tall: r = !1 }) {
 		})
 	});
 }
-function mm({ fallbackSizeKey: t }) {
-	let n = dm(), r = Id(sm, t || "2x1"), [i] = Rd(Gf, tp, _p), a = am(i), o = r === "1x1", s = r === "2x1", c = r === "3x2";
+function hm({ fallbackSizeKey: t }) {
+	let n = fm(), r = Id(cm, t || "2x1"), [i] = Rd(Kf, np, vp), a = om(i), o = r === "1x1", s = r === "2x1", c = r === "3x2";
 	(0, M.useEffect)(() => {
 		if (e.inHost) return;
-		let t = im();
+		let t = am();
 		return t.start(), () => t.stop();
 	}, []);
 	let l = (0, M.useCallback)(() => Bd("detail", "久坐详情"), []), u = (0, M.useCallback)((e) => {
 		e.stopPropagation(), Vd();
 	}, []), d = a.posture === "standing", f = a.posture !== null, p = (0, M.useCallback)((e) => {
-		e.stopPropagation(), i.enabled && (d ? Yp() : Jp());
+		e.stopPropagation(), i.enabled && (d ? Xp() : Yp());
 	}, [i.enabled, d]), m = (0, M.useCallback)((e) => {
-		e.stopPropagation(), i.enabled && Yp();
+		e.stopPropagation(), i.enabled && Xp();
 	}, [i.enabled]), h = a.postureLabel || "久坐提醒", g = i.enabled ? f ? `${a.statusLabel}，${h} ${a.currentMin} 分钟；点击打开详情` : "还没开始计时；点击打开详情" : "久坐提醒已关闭；点击打开详情", _ = /* @__PURE__ */ (0, N.jsx)(Qs, {
 		appearance: "tint",
-		color: lm[a.status] ?? "subtle",
+		color: um[a.status] ?? "subtle",
 		size: "large",
 		"aria-label": `状态：${a.statusLabel}`,
 		children: a.statusLabel
@@ -18708,7 +18757,7 @@ function mm({ fallbackSizeKey: t }) {
 		})]
 	}, e.key), b = /* @__PURE__ */ (0, N.jsx)("div", {
 		className: n.actions,
-		children: /* @__PURE__ */ (0, N.jsx)(Pf, {
+		children: /* @__PURE__ */ (0, N.jsx)(Ff, {
 			appearance: "secondary",
 			icon: d ? /* @__PURE__ */ (0, N.jsx)(as, {}) : /* @__PURE__ */ (0, N.jsx)(os, {}),
 			onClick: p,
@@ -18717,39 +18766,42 @@ function mm({ fallbackSizeKey: t }) {
 			"data-sedentary-action": "posture",
 			children: d ? "我坐下了" : "我站起来了"
 		})
-	}), x = (e) => /* @__PURE__ */ (0, N.jsx)(Tf, {
+	}), x = (e) => /* @__PURE__ */ (0, N.jsx)(Ef, {
 		value: a.currentMin,
 		unit: "分钟",
 		label: e ? d ? "连续站立" : "连续久坐" : void 0,
 		reserveCaption: !1
-	}), S = f && !d && a.nextReminderMin != null ? /* @__PURE__ */ (0, N.jsx)(fm, {
+	}), S = f && !d && a.nextReminderMin != null ? /* @__PURE__ */ (0, N.jsx)(pm, {
 		status: a.status,
 		minutes: a.nextReminderMin
 	}) : null;
-	return i.enabled ? f ? o ? /* @__PURE__ */ (0, N.jsxs)(vf, {
+	return i.enabled ? f ? o ? /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStart),
 		"data-sedentary-size": r,
-		children: [/* @__PURE__ */ (0, N.jsx)(xf, {
+		children: [/* @__PURE__ */ (0, N.jsx)(Sf, {
 			className: n.identityStart,
 			icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 			compact: !0,
 			trailing: _
-		}), x(!1)]
-	}) : s ? /* @__PURE__ */ (0, N.jsxs)(vf, {
+		}), /* @__PURE__ */ (0, N.jsx)("div", {
+			className: n.compactBody,
+			children: x(!1)
+		})]
+	}) : s ? /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStack),
 		"data-sedentary-size": r,
-		children: [/* @__PURE__ */ (0, N.jsx)(xf, {
+		children: [/* @__PURE__ */ (0, N.jsx)(Sf, {
 			icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 			label: "久坐",
 			disclosure: !0,
 			trailing: S
 		}), /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: n.rowBody,
-			children: [x(!1), /* @__PURE__ */ (0, N.jsx)(Pf, {
+			children: [x(!1), /* @__PURE__ */ (0, N.jsx)(Ff, {
 				appearance: "secondary",
 				icon: d ? /* @__PURE__ */ (0, N.jsx)(as, {}) : /* @__PURE__ */ (0, N.jsx)(os, {}),
 				onClick: p,
@@ -18758,13 +18810,13 @@ function mm({ fallbackSizeKey: t }) {
 				children: d ? "我坐下了" : "我站起来了"
 			})]
 		})]
-	}) : c ? /* @__PURE__ */ (0, N.jsxs)(vf, {
+	}) : c ? /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStack),
 		"data-sedentary-size": r,
 		children: [
-			/* @__PURE__ */ (0, N.jsx)(xf, {
+			/* @__PURE__ */ (0, N.jsx)(Sf, {
 				icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 				label: "久坐",
 				disclosure: !0,
@@ -18788,7 +18840,7 @@ function mm({ fallbackSizeKey: t }) {
 					size: 200,
 					className: n.weekLabel,
 					children: "最近 7 天"
-				}), /* @__PURE__ */ (0, N.jsx)(pm, {
+				}), /* @__PURE__ */ (0, N.jsx)(mm, {
 					styles: n,
 					days: a.recentDays,
 					showDates: !0,
@@ -18797,13 +18849,13 @@ function mm({ fallbackSizeKey: t }) {
 			}),
 			b
 		]
-	}) : /* @__PURE__ */ (0, N.jsxs)(vf, {
+	}) : /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStack),
 		"data-sedentary-size": r,
 		children: [
-			/* @__PURE__ */ (0, N.jsx)(xf, {
+			/* @__PURE__ */ (0, N.jsx)(Sf, {
 				icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 				label: "久坐",
 				disclosure: !0,
@@ -18817,27 +18869,27 @@ function mm({ fallbackSizeKey: t }) {
 				className: n.statsRow,
 				children: v.map(y)
 			}),
-			/* @__PURE__ */ (0, N.jsx)(pm, {
+			/* @__PURE__ */ (0, N.jsx)(mm, {
 				styles: n,
 				days: a.recentDays
 			}),
 			b
 		]
-	}) : /* @__PURE__ */ (0, N.jsxs)(vf, {
+	}) : /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStack),
-		children: [o || s ? null : /* @__PURE__ */ (0, N.jsx)(xf, {
+		children: [o || s ? null : /* @__PURE__ */ (0, N.jsx)(Sf, {
 			icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 			label: "久坐",
 			disclosure: !0
 		}), /* @__PURE__ */ (0, N.jsx)("div", {
 			className: n.emptyBlock,
-			children: /* @__PURE__ */ (0, N.jsx)(Af, {
+			children: /* @__PURE__ */ (0, N.jsx)(jf, {
 				icon: /* @__PURE__ */ (0, N.jsx)(ls, {}),
 				title: "还没开始计时",
 				compact: o || s,
-				action: /* @__PURE__ */ (0, N.jsx)(Pf, {
+				action: /* @__PURE__ */ (0, N.jsx)(Ff, {
 					appearance: "secondary",
 					icon: /* @__PURE__ */ (0, N.jsx)(as, {}),
 					onClick: m,
@@ -18847,21 +18899,21 @@ function mm({ fallbackSizeKey: t }) {
 				align: "start"
 			})
 		})]
-	}) : /* @__PURE__ */ (0, N.jsxs)(vf, {
+	}) : /* @__PURE__ */ (0, N.jsxs)(yf, {
 		ariaLabel: g,
 		onActivate: l,
 		className: D(n.root, n.rootStack),
-		children: [o || s ? null : /* @__PURE__ */ (0, N.jsx)(xf, {
+		children: [o || s ? null : /* @__PURE__ */ (0, N.jsx)(Sf, {
 			icon: /* @__PURE__ */ (0, N.jsx)(cs, {}),
 			label: "久坐",
 			disclosure: !0
 		}), /* @__PURE__ */ (0, N.jsx)("div", {
 			className: n.emptyBlock,
-			children: /* @__PURE__ */ (0, N.jsx)(Af, {
+			children: /* @__PURE__ */ (0, N.jsx)(jf, {
 				icon: /* @__PURE__ */ (0, N.jsx)(ls, {}),
 				title: "提醒已关闭",
 				compact: o || s,
-				action: /* @__PURE__ */ (0, N.jsx)(Pf, {
+				action: /* @__PURE__ */ (0, N.jsx)(Ff, {
 					appearance: "secondary",
 					icon: /* @__PURE__ */ (0, N.jsx)(ss, {}),
 					onClick: u,
@@ -18874,7 +18926,7 @@ function mm({ fallbackSizeKey: t }) {
 }
 //#endregion
 //#region public/plugins/sedentary/src/SedentaryDetail.jsx
-var hm = Jn({
+var gm = Jn({
 	headerText: {
 		display: "flex",
 		flexDirection: "column",
@@ -18925,8 +18977,8 @@ var hm = Jn({
 	dayLabel: { color: V.colorNeutralForeground2 },
 	emptyWrap: { minWidth: 0 }
 });
-function gm({ label: e, value: t, unit: n }) {
-	let r = hm();
+function _m({ label: e, value: t, unit: n }) {
+	let r = gm();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.stat,
 		children: [/* @__PURE__ */ (0, N.jsx)(X, {
@@ -18948,12 +19000,12 @@ function gm({ label: e, value: t, unit: n }) {
 		})]
 	});
 }
-function _m() {
-	let e = hm(), [t] = Rd(Gf, tp, _p), n = am(t), r = n.posture === "standing", i = n.posture === "sitting", a = (0, M.useCallback)((e) => {
-		e?.stopPropagation?.(), t.enabled && (r ? Yp() : Jp());
+function vm() {
+	let e = gm(), [t] = Rd(Kf, np, vp), n = om(t), r = n.posture === "standing", i = n.posture === "sitting", a = (0, M.useCallback)((e) => {
+		e?.stopPropagation?.(), t.enabled && (r ? Xp() : Yp());
 	}, [t.enabled, r]), o = (0, M.useCallback)((e) => {
-		e?.stopPropagation?.(), Xp();
-	}, []), s = t.enabled ? i ? `连续久坐 ${n.currentMin} 分钟` : r ? `站立休息 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", c = t.enabled && i ? n.hint : "", l = /* @__PURE__ */ (0, N.jsx)(Ff, {
+		e?.stopPropagation?.(), Zp();
+	}, []), s = t.enabled ? i ? `连续久坐 ${n.currentMin} 分钟` : r ? `站立休息 ${n.currentMin} 分钟` : "久坐计时未开始" : "久坐提醒已关闭", c = t.enabled && i ? n.hint : "", l = /* @__PURE__ */ (0, N.jsx)(If, {
 		appearance: "secondary",
 		icon: r ? /* @__PURE__ */ (0, N.jsx)(as, {}) : /* @__PURE__ */ (0, N.jsx)(os, {}),
 		onClick: a,
@@ -18961,9 +19013,9 @@ function _m() {
 		"aria-label": r ? "我坐下了" : "我站起来了",
 		children: r ? "我坐下了" : "我站起来了"
 	});
-	return /* @__PURE__ */ (0, N.jsxs)(Lf, { children: [
-		/* @__PURE__ */ (0, N.jsx)(zf, {
-			trailing: /* @__PURE__ */ (0, N.jsx)(Ff, {
+	return /* @__PURE__ */ (0, N.jsxs)(Rf, { children: [
+		/* @__PURE__ */ (0, N.jsx)(Bf, {
+			trailing: /* @__PURE__ */ (0, N.jsx)(If, {
 				onClick: () => Vd(),
 				"aria-label": "打开久坐设置",
 				children: "设置…"
@@ -18981,11 +19033,11 @@ function _m() {
 				}) : null]
 			})
 		}),
-		n.hasData ? /* @__PURE__ */ (0, N.jsxs)(Vf, { children: [l, n.snoozable ? /* @__PURE__ */ (0, N.jsx)(Ff, {
+		n.hasData ? /* @__PURE__ */ (0, N.jsxs)(Q, { children: [l, n.snoozable ? /* @__PURE__ */ (0, N.jsx)(If, {
 			onClick: o,
 			children: "稍后 5 分钟"
 		}) : null] }) : null,
-		/* @__PURE__ */ (0, N.jsx)(Uf, { children: /* @__PURE__ */ (0, N.jsx)(nf, {
+		/* @__PURE__ */ (0, N.jsx)(Wf, { children: /* @__PURE__ */ (0, N.jsx)(nf, {
 			value: n.hasData ? "data" : "empty",
 			children: n.hasData ? /* @__PURE__ */ (0, N.jsxs)("div", {
 				className: e.content,
@@ -18999,22 +19051,22 @@ function _m() {
 					}), /* @__PURE__ */ (0, N.jsxs)("div", {
 						className: e.statGrid,
 						children: [
-							/* @__PURE__ */ (0, N.jsx)(gm, {
+							/* @__PURE__ */ (0, N.jsx)(_m, {
 								label: "今日久坐",
 								value: Math.round(n.today.sittingMinutes),
 								unit: "分钟"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(gm, {
+							/* @__PURE__ */ (0, N.jsx)(_m, {
 								label: "今日站立",
 								value: Math.round(n.today.standingMinutes),
 								unit: "分钟"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(gm, {
+							/* @__PURE__ */ (0, N.jsx)(_m, {
 								label: "起身次数",
 								value: n.today.breaks,
 								unit: "次"
 							}),
-							/* @__PURE__ */ (0, N.jsx)(gm, {
+							/* @__PURE__ */ (0, N.jsx)(_m, {
 								label: "最长连续坐",
 								value: Math.round(n.today.longestStreakMin),
 								unit: "分钟"
@@ -19030,7 +19082,7 @@ function _m() {
 						children: "最近 7 天"
 					}), /* @__PURE__ */ (0, N.jsx)("div", {
 						className: e.days,
-						children: n.recentDays.map((t) => /* @__PURE__ */ (0, N.jsx)(Df, {
+						children: n.recentDays.map((t) => /* @__PURE__ */ (0, N.jsx)(Of, {
 							title: /* @__PURE__ */ (0, N.jsx)("span", {
 								className: e.dayLabel,
 								children: t.label
@@ -19048,7 +19100,7 @@ function _m() {
 				})]
 			}) : /* @__PURE__ */ (0, N.jsx)("div", {
 				className: e.emptyWrap,
-				children: /* @__PURE__ */ (0, N.jsx)(Af, {
+				children: /* @__PURE__ */ (0, N.jsx)(jf, {
 					icon: /* @__PURE__ */ (0, N.jsx)(ps, {}),
 					title: "还没有今天的记录",
 					action: l
@@ -19060,7 +19112,7 @@ function _m() {
 //#endregion
 //#region public/plugins/sedentary/src/main.jsx
 kd();
-var vm = new URLSearchParams(location.search), ym = zd(), bm = vm.get("background") === "1", xm = cm(), Sm = [
+var ym = new URLSearchParams(location.search), bm = zd(), xm = ym.get("background") === "1", Sm = lm(), Cm = [
 	{
 		name: "sedentary.status",
 		description: "读取久坐状态：当前姿态、当前状态持续分钟、今日久坐/站立分钟、起身次数、距离下次提醒时间",
@@ -19185,23 +19237,23 @@ var vm = new URLSearchParams(location.search), ym = zd(), bm = vm.get("backgroun
 		}
 	}
 ];
-function Cm(t = 2500) {
+function wm(t = 2500) {
 	return !e.inHost || Ad() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(Ad() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function wm() {
+function Tm() {
 	return (0, M.useEffect)(() => {
-		let e = im();
-		return e.start(), xp(), () => e.stop();
-	}, []), qd(Sm, {
-		"sedentary.status": async () => Wp(await vp()),
-		"sedentary.today": () => Gp(),
+		let e = am();
+		return e.start(), Sp(), () => e.stop();
+	}, []), qd(Cm, {
+		"sedentary.status": async () => Gp(await yp()),
+		"sedentary.today": () => Kp(),
 		"sedentary.standUp": async () => {
-			if (!(await vp()).enabled) throw Error("久坐提醒已关闭");
-			let e = await im().standUp("agent");
+			if (!(await yp()).enabled) throw Error("久坐提醒已关闭");
+			let e = await am().standUp("agent");
 			if (!e.changed) throw Error("当前已经是站立状态");
 			return {
 				posture: "standing",
@@ -19209,8 +19261,8 @@ function wm() {
 			};
 		},
 		"sedentary.sitDown": async () => {
-			if (!(await vp()).enabled) throw Error("久坐提醒已关闭");
-			let e = await im().sitDown("agent");
+			if (!(await yp()).enabled) throw Error("久坐提醒已关闭");
+			let e = await am().sitDown("agent");
 			if (!e.changed) throw Error("当前已经是坐着状态");
 			return {
 				posture: "sitting",
@@ -19219,24 +19271,24 @@ function wm() {
 			};
 		},
 		"sedentary.snooze": async () => {
-			let e = await vp();
+			let e = await yp();
 			if (!e.enabled) throw Error("久坐提醒已关闭");
-			if (!Up(e).snoozable) throw Error("当前没有可推迟的提醒");
-			let t = await im().snooze();
+			if (!Wp(e).snoozable) throw Error("当前没有可推迟的提醒");
+			let t = await am().snooze();
 			if (!t) throw Error("当前不在久坐计时中");
 			return {
 				snoozedUntil: t.snoozedUntil,
-				status: Wp(e)
+				status: Gp(e)
 			};
 		},
-		"sedentary.stats": async (e = {}) => Kp(Ep(), e.range, /* @__PURE__ */ new Date(), e.from, e.to),
-		"sedentary.settings.get": async () => ({ settings: await vp() }),
-		"sedentary.settings.set": async (e) => ({ settings: await Sp(e) })
+		"sedentary.stats": async (e = {}) => qp(Dp(), e.range, /* @__PURE__ */ new Date(), e.from, e.to),
+		"sedentary.settings.get": async () => ({ settings: await yp() }),
+		"sedentary.settings.set": async (e) => ({ settings: await Cp(e) })
 	}), null;
 }
-function Tm() {
-	let { theme: t } = Fd(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, N.jsx)(mm, { fallbackSizeKey: xm });
-	return bm ? r = /* @__PURE__ */ (0, N.jsx)(wm, {}) : ym === "detail" && (r = /* @__PURE__ */ (0, N.jsx)(_m, {})), /* @__PURE__ */ (0, N.jsx)(Uo, {
+function Em() {
+	let { theme: t } = Fd(), n = e.inHost ? "transparent" : t.colorNeutralBackground1, r = /* @__PURE__ */ (0, N.jsx)(hm, { fallbackSizeKey: Sm });
+	return xm ? r = /* @__PURE__ */ (0, N.jsx)(Tm, {}) : bm === "detail" && (r = /* @__PURE__ */ (0, N.jsx)(vm, {})), /* @__PURE__ */ (0, N.jsx)(Uo, {
 		theme: t,
 		style: {
 			width: "100%",
@@ -19247,9 +19299,9 @@ function Tm() {
 		children: r
 	});
 }
-async function Em() {
+async function Dm() {
 	let e = document.getElementById("root");
-	e && (await Cm(), vm.get("demo") === "1" && await nm(), (0, Cd.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(Tm, {})));
+	e && (await wm(), ym.get("demo") === "1" && await rm(), (0, Cd.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(Em, {})));
 }
-Em();
+Dm();
 //#endregion

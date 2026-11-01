@@ -22,7 +22,12 @@ import {
   type CSSProperties,
 } from 'react';
 
-import { makeStyles } from '@fluentui/react-components';
+import {
+  SkeletonItem,
+  Text,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 
 import { PROTOCOL_VERSION } from '../bridge/types';
 import type {
@@ -48,6 +53,12 @@ export type OverlaySize = 'default' | 'large';
 function normalizeOverlaySize(value: unknown): OverlaySize {
   return value === 'large' ? 'large' : 'default';
 }
+
+/**
+ * 加载占位的出现阈值（FLUENT2 §12：<1s 不显示任何加载动画；1–3s 才需要状态提示）。
+ * 它不是超时：插件 `plugin:ready` 之前占位一直保留，只是前 1s 不显示，避免闪一下。
+ */
+const LOADING_PLACEHOLDER_DELAY_MS = 1000;
 
 export interface PluginWidgetFrameProps {
   /** iframe 地址（用 PluginManager.widgetFrameSrc / backgroundFrameSrc 生成） */
@@ -124,6 +135,14 @@ export interface PluginWidgetFrameHandle {
   readonly contentWindow: Window | null;
 }
 
+/**
+ * 后台 iframe（`background:true`，1×1、离屏、opacity 0）。
+ *
+ * `visibility: hidden` 不是纯装饰：`tabindex=-1` 只把元素移出 Tab 序，但桌面从
+ * body 起按第一下 Tab 时 Chromium 仍会进入第一个 iframe（P1-6 复现：焦点落进
+ * 离屏 1×1 后“消失”一次）。visibility:hidden 让 iframe 内容不可聚焦，第一下 Tab
+ * 直接落到第一张卡片；它只影响绘制/命中，不影响插件定时器（提醒/计时仍照常跑）。
+ */
 const HIDDEN_FRAME_STYLE: CSSProperties = {
   position: 'fixed',
   left: -10000,
@@ -131,6 +150,7 @@ const HIDDEN_FRAME_STYLE: CSSProperties = {
   width: 1,
   height: 1,
   opacity: 0,
+  visibility: 'hidden',
   pointerEvents: 'none',
   border: 0,
 };
@@ -155,6 +175,54 @@ const useSettingsStyles = makeStyles({
     height: '100%',
     border: 0,
     background: 'transparent',
+  },
+});
+
+/**
+ * 可见 iframe 的宿主壳：只为加载占位提供定位上下文，宽高都交给 iframe 原本的 100% 语义
+ * （卡片的 contentLayer 与浮层的 DialogContent 都是 100% 高）。后台 iframe 不进这层。
+ */
+const useFrameStyles = makeStyles({
+  frameHost: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    minWidth: 0,
+    minHeight: 0,
+  },
+  /**
+   * 加载占位（P0-1）：卡片材质已由宿主 Card 画好，这里只补骨架，不画底色、不挡指针。
+   * 用 Skeleton 而不是 Spinner：桌面同时加载多张卡时会出现多个 spinner（FLUENT2 §12 禁止）。
+   */
+  loadingOverlay: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalS,
+    pointerEvents: 'none',
+  },
+  loadingSkeleton: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalS,
+    /** 条宽的百分比要相对卡片宽度算，这里必须是整宽而不是 shrink-to-fit */
+    width: '100%',
+  },
+  /** 尺寸由外层给：SkeletonItem 的 size 档放不下任意宽度，这里用 100% 填满 */
+  loadingBarWide: {
+    width: 'min(160px, 56%)',
+    height: tokens.spacingVerticalL,
+  },
+  loadingBarNarrow: {
+    width: 'min(96px, 34%)',
+    height: tokens.spacingVerticalM,
+  },
+  loadingLabel: {
+    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -207,6 +275,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       instanceUid?.trim() || (widgetId ? `${pluginId}:${widgetId}` : `${pluginId}:background`);
 
     const settingsStyles = useSettingsStyles();
+    const frameStyles = useFrameStyles();
     const frameRef = useRef<HTMLIFrameElement>(null);
     const [loadedAt, setLoadedAt] = useState(0);
     /**
@@ -223,6 +292,15 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       },
     );
     const readyRef = useRef(false);
+    /** 是否收到过 `plugin:ready`（iframe load ≠ 插件初始化完成） */
+    const [ready, setReady] = useState(false);
+    /** 超过阈值仍未就绪才显示骨架；后台 iframe 永不显示 */
+    const [loadingVisible, setLoadingVisible] = useState(false);
+    /**
+     * 真实文档是否已可显示：`load` 完成或插件已 `ready`（ready 先到也先显示，
+     * 不让图片等子资源把 `load` 拖住）。在此之前 iframe 的初始 about:blank 是白底，必须遮住。
+     */
+    const frameVisible = loadedAt > 0 || ready;
     const lastSize = useRef<WidgetSize | null>(null);
     const lastTheme = useRef<ThemePayload | undefined>(theme);
     /** 浮层关闭后把焦点还给来源卡片（卸载后再聚焦，见下面的 effect） */
@@ -266,6 +344,31 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       // 等浮层 DOM 真正卸载后再聚焦：聚焦会触发卡片的 onFocus，桌面层据此更新 focusedUid
       if (element?.isConnected) element.focus({ preventScroll: true });
     }, [overlay]);
+
+    /**
+     * 加载骨架：1s 阈值后才显示（FLUENT2 §12），文档 load / 插件 ready 一到立即撤掉。
+     * `loadedAt` 进依赖：重新 load 后计时重来；保持“不闪烁”的 <1s 静默。
+     */
+    useEffect(() => {
+      if (hidden || frameVisible) {
+        setLoadingVisible(false);
+        return;
+      }
+      const timer = window.setTimeout(() => setLoadingVisible(true), LOADING_PLACEHOLDER_DELAY_MS);
+      return () => window.clearTimeout(timer);
+    }, [hidden, frameVisible, loadedAt]);
+
+    /**
+     * 换 src = 换了一个文档，重新进入未就绪态。
+     * 不在 iframe onLoad 里重置：`plugin:ready` 可能先于 load 到达，按 load 重置会误判未就绪。
+     */
+    const prevSrcRef = useRef(src);
+    useEffect(() => {
+      if (prevSrcRef.current === src) return;
+      prevSrcRef.current = src;
+      readyRef.current = false;
+      setReady(false);
+    }, [src]);
 
     // 浮层视图的地址：同一插件页面加 `?view=<view>`（D-02b）
     const overlaySrc = useMemo(() => {
@@ -397,6 +500,7 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
 
         if (data.type === 'plugin:ready') {
           readyRef.current = true;
+          setReady(true);
           // 插件可能比主题状态更晚完成初始化：就绪时补发一次当前主题，避免停在回退主题
           const currentTheme = latest.current.theme;
           if (currentTheme) post({ type: 'host:theme', payload: { theme: currentTheme } });
@@ -443,6 +547,9 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
         openSettings: () => openOverlay('settings', '设置'),
         reply: (id, ok, result, error) => post({ type: 'host:reply', id, ok, result, error }),
         reload: () => {
+          // 手动重载 = 换了个文档：先回到未就绪态，加载骨架的 1s 阈值重新计
+          readyRef.current = false;
+          setReady(false);
           const frame = frameRef.current;
           if (frame) frame.src = frame.src;
         },
@@ -453,25 +560,80 @@ export const PluginWidgetFrame = forwardRef<PluginWidgetFrameHandle, PluginWidge
       [post, frameUid, openOverlay],
     );
 
+    const frameNode = (
+      <iframe
+        ref={frameRef}
+        src={src}
+        // 用 aria-label 提供可访问名称；不要用 title，否则 WebView 会在指针停留时
+        // 弹出覆盖卡片内容的原生 tooltip（实机被误读成第二个 tab）。
+        aria-label={title ?? `${pluginId}/${widgetId}`}
+        className={className}
+        allow="autoplay; clipboard-write; fullscreen"
+        tabIndex={hidden ? -1 : undefined}
+        aria-hidden={hidden || undefined}
+        style={{
+          ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE),
+          // 首帧遮罩（P0-1）：真实文档提交前，iframe 的初始 about:blank 是白底；
+          // 先 opacity 0 挡住，等 load / ready 再显示，白闪在整个启动路径上消失。
+          ...(hidden || frameVisible ? {} : { opacity: 0, pointerEvents: 'none' as const }),
+          ...style,
+        }}
+        onLoad={() => {
+          lastSize.current = null;
+          setLoadedAt((value) => value + 1);
+        }}
+      />
+    );
+
     return (
       <>
-        <iframe
-          ref={frameRef}
-          src={src}
-          // 用 aria-label 提供可访问名称；不要用 title，否则 WebView 会在指针停留时
-          // 弹出覆盖卡片内容的原生 tooltip（实机被误读成第二个 tab）。
-          aria-label={title ?? `${pluginId}/${widgetId}`}
-          className={className}
-          style={{ ...(hidden ? HIDDEN_FRAME_STYLE : VISIBLE_FRAME_STYLE), ...style }}
-          allow="autoplay; clipboard-write; fullscreen"
-          tabIndex={hidden ? -1 : undefined}
-          aria-hidden={hidden || undefined}
-          onLoad={() => {
-            lastSize.current = null;
-            readyRef.current = false;
-            setLoadedAt((value) => value + 1);
-          }}
-        />
+        {/* 后台 iframe 保持原样（1×1、离屏、无占位）；可见 iframe 加一层定位壳放加载骨架 */}
+        {hidden ? (
+          frameNode
+        ) : (
+          <div
+            className={frameStyles.frameHost}
+            data-plugin-frame-host="true"
+            data-plugin-frame-ready={ready ? 'true' : 'false'}
+          >
+            {frameNode}
+            {loadingVisible ? (
+              <div
+                className={frameStyles.loadingOverlay}
+                data-plugin-frame-loading="true"
+                aria-hidden="true"
+              >
+                <div className={frameStyles.loadingSkeleton}>
+                  <div className={frameStyles.loadingBarWide}>
+                    <SkeletonItem
+                      shape="rectangle"
+                      appearance="translucent"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: tokens.borderRadiusMedium,
+                      }}
+                    />
+                  </div>
+                  <div className={frameStyles.loadingBarNarrow}>
+                    <SkeletonItem
+                      shape="rectangle"
+                      appearance="translucent"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: tokens.borderRadiusMedium,
+                      }}
+                    />
+                  </div>
+                </div>
+                <Text size={200} className={frameStyles.loadingLabel}>
+                  正在加载…
+                </Text>
+              </div>
+            ) : null}
+          </div>
+        )}
         {overlay && overlaySrc && (
           <PluginOverlay
             key={`${overlay.view}:${overlay.size}`}

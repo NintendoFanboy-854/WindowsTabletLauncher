@@ -22,6 +22,8 @@ export interface BackgroundFrame {
   pluginId: string;
   /** 用 PluginManager.backgroundFrameSrc(pluginId) 生成 */
   src: string;
+  /** 插件显示名（中文界面下 iframe 的可访问名称用它，不用英文 pluginId） */
+  title?: string;
 }
 
 /** 后台 iframe 句柄集合（按插件 id 取） */
@@ -90,7 +92,7 @@ function BackgroundFrameItem({
       size={[1, 1]}
       theme={theme}
       hidden
-      title={`${frame.pluginId} (background)`}
+      title={`${frame.title ?? frame.pluginId}（后台）`}
       // 后台 iframe 常驻：init 也现取配置快照，别让它用空配置先跑一帧；
       // 之后的配置变更由 host:config 推送（见 configBus）。
       configSnapshot={bridge ? () => bridge.configSnapshot(frame.pluginId) : undefined}

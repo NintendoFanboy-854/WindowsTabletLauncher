@@ -120,25 +120,25 @@ interface MorphSpec {
 }
 
 /**
- * 三段 morph 的时长/曲线（全部来自 motionTokens）：
- * 进入 `durationNormal` + `curveDecelerateMid`，离开 `durationNormal` + `curveAccelerateMid`；
- * 只变宽高，右下锚点与内容层的排版尺寸不变。
+ * 三段 morph 的时长/曲线（`docs/MOTION.md §5.1` 的登记表）：
+ * 几何时长按登记值——进入 300/300ms、回到半高 250ms、收回按钮 200/250ms；
+ * 内容/入口淡入淡出仍用 100/150ms 档。只变宽高，右下锚点与内容层排版尺寸不变。
  */
 const MORPH: Record<MorphKind, MorphSpec> = {
   'open-voice': {
-    geometry: { duration: motionTokens.durationNormal, curve: motionTokens.curveDecelerateMid },
+    geometry: { duration: motionTokens.durationSlow, curve: motionTokens.curveDecelerateMid },
     content: { duration: motionTokens.durationFast, delay: ENTRY_FADE_OUT_DELAY, curve: motionTokens.curveDecelerateMid },
     entry: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveDecelerateMid },
     paneExit: 0,
   },
   'open-chat': {
-    geometry: { duration: motionTokens.durationNormal, curve: motionTokens.curveDecelerateMid },
+    geometry: { duration: motionTokens.durationSlow, curve: motionTokens.curveDecelerateMid },
     content: { duration: motionTokens.durationFast, delay: 0, curve: motionTokens.curveDecelerateMid },
     entry: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveDecelerateMid },
     paneExit: 0,
   },
   'back-voice': {
-    geometry: { duration: motionTokens.durationNormal, curve: motionTokens.curveAccelerateMid },
+    geometry: { duration: motionTokens.durationGentle, curve: motionTokens.curveAccelerateMid },
     content: { duration: motionTokens.durationFast, delay: 0, curve: motionTokens.curveAccelerateMid },
     entry: { duration: 0, delay: 0, curve: motionTokens.curveLinear },
     paneExit: motionTokens.durationFaster,
@@ -150,7 +150,7 @@ const MORPH: Record<MorphKind, MorphSpec> = {
     paneExit: motionTokens.durationFaster,
   },
   'close-chat': {
-    geometry: { duration: motionTokens.durationNormal, curve: motionTokens.curveAccelerateMid },
+    geometry: { duration: motionTokens.durationGentle, curve: motionTokens.curveAccelerateMid },
     content: { duration: motionTokens.durationFaster, delay: 0, curve: motionTokens.curveAccelerateMid },
     entry: { duration: motionTokens.durationFast, delay: motionTokens.durationFaster, curve: motionTokens.curveDecelerateMid },
     paneExit: motionTokens.durationFaster,

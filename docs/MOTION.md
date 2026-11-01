@@ -232,7 +232,7 @@ rest ──hover(鼠标/笔)──▶ hover ──pointerdown──▶ pressed �
 ## 9. 验收
 
 1. `grep` 检查：宿主与插件 `src` 中无非 token 的 duration/easing/ms 字面量（`_shared` 除外）。
-2. 卡片：hover 1.015、press 0.985、长按 500ms 过程中 scale 从 0.985 线性到 0.97、到点进编辑；松手回弹；**缩放只作用 Card 本体，iframe 内容与 contentLayer 不发生 transform**。
+2. 卡片：hover 1.02、press 0.98、长按 500ms 过程中 scale 从 0.98 线性到 0.97、到点进编辑；松手回弹；**缩放只作用 Card 本体，iframe 内容与 contentLayer 不发生 transform**。
 3. 浮层：打开第一帧 surface rect ≈ 来源卡片 rect（CDP 采样 ±2px），结束时为目标 rect；关闭回到同一卡片；点遮罩关闭。
 4. 页面切换、编辑模式、翻页无布局跳动；动画期间可交互。
 5. 插件：Tab 内容切换、列表增删、内联展开、勾选、进度更新按第 6 节；控制台 0 error。

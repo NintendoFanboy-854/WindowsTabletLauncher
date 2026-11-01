@@ -23252,13 +23252,14 @@ function ob() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function sb(e, t) {
-	window.parent.postMessage({
+function sb(e, t, n) {
+	let r = {
+		view: e,
+		title: t
+	};
+	(n?.size === "default" || n?.size === "large") && (r.size = n.size), window.parent.postMessage({
 		type: "plugin:request-overlay",
-		payload: {
-			view: e,
-			title: t
-		}
+		payload: r
 	}, "*");
 }
 function cb() {
@@ -23547,10 +23548,18 @@ var Ab = Ob(ol.spacingHorizontalSNudge) + Ob(ol.spacingHorizontalL), jb = Object
 jb.S;
 var Mb = jb.M;
 ol.strokeWidthThickest;
-var Nb = 56, Pb = 48, Fb = 44, Ib = 56, Lb = {
+var Nb = Object.freeze({
+	XS: 48,
+	S: 96,
+	M: 160,
+	L: 240,
+	XL: 320
+});
+Object.freeze(Object.values(Nb)), Nb.XL;
+var Pb = 56, Fb = 48, Ib = 44, Lb = 56, Rb = {
 	minWidth: 44,
 	minHeight: 44
-}, Rb = [
+}, zb = [
 	"button",
 	"input",
 	"textarea",
@@ -23564,12 +23573,12 @@ var Nb = 56, Pb = 48, Fb = 44, Ib = 56, Lb = {
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function zb(e, t) {
+function Bb(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(Rb);
+	let n = t.closest(zb);
 	return !!(n && n !== e && e.contains(n));
 }
-var Bb = Kn({ root: {
+var Vb = Kn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -23587,8 +23596,8 @@ var Bb = Kn({ root: {
 	color: q.colorNeutralForeground1,
 	fontFamily: q.fontFamilyBase
 } });
-function Vb({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = Bb(), s = pb(), c = {
+function Hb({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = Vb(), s = pb(), c = {
 		...r,
 		paddingTop: q.spacingVerticalL,
 		paddingBottom: q.spacingVerticalL,
@@ -23596,9 +23605,9 @@ function Vb({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, 
 		paddingRight: q.spacingHorizontalL,
 		gap: q.spacingVerticalS
 	}, l = (0, P.useCallback)((t) => {
-		zb(t.currentTarget, t.target) || e?.(t);
+		Bb(t.currentTarget, t.target) || e?.(t);
 	}, [e]), u = (0, P.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (zb(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (Bb(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		...a,
@@ -23637,7 +23646,7 @@ Kn({
 		gap: q.spacingHorizontalXS
 	}
 });
-var Hb = Kn({
+var Ub = Kn({
 	root: {
 		display: "flex",
 		flexShrink: 0,
@@ -23681,8 +23690,8 @@ var Hb = Kn({
 		color: q.colorNeutralForeground3
 	}
 });
-function Ub({ className: e, style: t }) {
-	let n = Hb();
+function Wb({ className: e, style: t }) {
+	let n = Ub();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		className: A(n.disclosure, e),
 		style: t,
@@ -23691,8 +23700,8 @@ function Ub({ className: e, style: t }) {
 		children: /* @__PURE__ */ (0, F.jsx)(Hu, {})
 	});
 }
-function Wb({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
-	let l = Hb(), u = !i && !!e;
+function Gb({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
+	let l = Ub(), u = !i && !!e;
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		...c,
 		className: A(l.root, o),
@@ -23720,19 +23729,49 @@ function Wb({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = 
 				className: l.trailing,
 				children: n
 			}) : null,
-			a ? /* @__PURE__ */ (0, F.jsx)(Ub, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
+			a ? /* @__PURE__ */ (0, F.jsx)(Wb, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
 		]
 	});
 }
-var Gb = Kn({ hero: {
+Kn({
+	root: {
+		position: "relative",
+		display: "inline-flex",
+		flexShrink: 0,
+		alignItems: "center",
+		justifyContent: "center",
+		overflow: "hidden",
+		boxSizing: "border-box",
+		borderRadius: q.borderRadius2XLarge,
+		backgroundColor: q.colorNeutralBackground3
+	},
+	image: {
+		display: "block",
+		width: "100%",
+		height: "100%",
+		objectFit: "cover",
+		objectPosition: "center",
+		borderRadius: q.borderRadius2XLarge
+	},
+	placeholder: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		height: "100%",
+		backgroundColor: q.colorNeutralBackground3,
+		color: q.colorNeutralForeground3
+	}
+});
+var Kb = Kn({ hero: {
 	...Db,
 	...Tb,
 	fontWeight: Eb,
 	color: q.colorNeutralForeground1,
 	whiteSpace: "nowrap"
 } });
-function Kb({ children: e, className: t, ...n }) {
-	let r = Gb();
+function qb({ children: e, className: t, ...n }) {
+	let r = Kb();
 	return /* @__PURE__ */ (0, F.jsx)("span", {
 		...n,
 		className: A(r.hero, t),
@@ -23740,7 +23779,7 @@ function Kb({ children: e, className: t, ...n }) {
 		children: e
 	});
 }
-var qb = Kn({
+var Jb = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -23765,8 +23804,8 @@ var qb = Kn({
 	label: { color: q.colorNeutralForeground2 },
 	caption: { color: q.colorNeutralForeground3 }
 });
-function Jb({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, className: a, style: o, ...s }) {
-	let c = qb(), l = !!(n || r), u = i && !!n;
+function Yb({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, className: a, style: o, ...s }) {
+	let c = Jb(), l = !!(n || r), u = i && !!n;
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		...s,
 		className: A(c.root, a),
@@ -23775,7 +23814,7 @@ function Jb({ value: e, unit: t, label: n, caption: r, reserveCaption: i = !0, c
 		"data-metric-reserve-caption": u ? "true" : void 0,
 		children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 			className: c.valueRow,
-			children: [/* @__PURE__ */ (0, F.jsx)(Kb, { children: e }), t ? /* @__PURE__ */ (0, F.jsx)($, {
+			children: [/* @__PURE__ */ (0, F.jsx)(qb, { children: e }), t ? /* @__PURE__ */ (0, F.jsx)($, {
 				size: 300,
 				className: c.unit,
 				children: t
@@ -23837,7 +23876,7 @@ Kn({
 	},
 	inset: { paddingBlock: q.spacingVerticalL }
 });
-var Yb = Kn({
+var Xb = Kn({
 	row: {
 		display: "flex",
 		alignItems: "center",
@@ -23887,8 +23926,8 @@ var Yb = Kn({
 		gap: q.spacingHorizontalXS
 	}
 });
-function Xb({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = Yb(), d = (e) => {
+function Zb({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = Xb(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
@@ -23931,7 +23970,7 @@ function Xb({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var Zb = Object.freeze({
+var Qb = Object.freeze({
 	[jb.XS]: {
 		width: q.spacingHorizontalL,
 		height: q.spacingVerticalL
@@ -23956,7 +23995,7 @@ var Zb = Object.freeze({
 		width: `calc(${q.spacingHorizontalXXXL} + ${q.spacingHorizontalL})`,
 		height: `calc(${q.spacingVerticalXXXL} + ${q.spacingVerticalL})`
 	}
-}), Qb = Kn({
+}), $b = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -23985,8 +24024,8 @@ var Zb = Object.freeze({
 	title: { color: q.colorNeutralForeground1 },
 	action: { marginTop: 0 }
 });
-function $b({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = Mb, className: o, style: s, ...c }) {
-	let l = Qb(), u = rb(gb, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = Zb[f] || Zb[Mb];
+function ex({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = Mb, className: o, style: s, ...c }) {
+	let l = $b(), u = rb(gb, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = Qb[f] || Qb[Mb];
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		...c,
 		className: A(l.root, r === "start" && l.start, i && l.compact, o),
@@ -24095,11 +24134,11 @@ Kn({
 		backgroundColor: q.colorBrandBackground
 	}
 });
-var ex = Kn({ button: {
+var tx = Kn({ button: {
 	minWidth: "44px",
 	minHeight: "44px"
-} }), tx = (0, P.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = ex();
+} }), nx = (0, P.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = tx();
 	return /* @__PURE__ */ (0, F.jsx)(Qh, {
 		...i,
 		ref: a,
@@ -24110,7 +24149,7 @@ var ex = Kn({ button: {
 		style: n,
 		children: r
 	});
-}), nx = tx, rx = Kn({ root: {
+}), rx = nx, ix = Kn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -24124,8 +24163,8 @@ var ex = Kn({ button: {
 	color: q.colorNeutralForeground1,
 	fontFamily: q.fontFamilyBase
 } });
-function ix({ children: e, className: t, style: n }) {
-	let r = rx();
+function ax({ children: e, className: t, style: n }) {
+	let r = ix();
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: A(r.root, t),
 		style: n,
@@ -24133,14 +24172,14 @@ function ix({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var ax = Kn({
+var ox = Kn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: q.spacingHorizontalM,
-		minHeight: `${Nb}px`,
+		minHeight: `${Pb}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -24158,8 +24197,8 @@ var ax = Kn({
 		gap: q.spacingHorizontalS
 	}
 });
-function ox({ children: e, trailing: t, className: n, style: r }) {
-	let i = ax();
+function sx({ children: e, trailing: t, className: n, style: r }) {
+	let i = ox();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(i.header, n),
 		style: r,
@@ -24178,28 +24217,28 @@ Kn({ toolbar: {
 	flexShrink: 0,
 	alignItems: "center",
 	gap: q.spacingHorizontalS,
-	minHeight: `${Pb}px`,
+	minHeight: `${Fb}px`,
 	paddingInline: 0,
 	boxSizing: "border-box"
 } });
-var sx = Kn({
+var cx = Kn({
 	tabs: {
 		flexShrink: 0,
-		height: `${Fb}px`,
-		minHeight: `${Fb}px`,
+		height: `${Ib}px`,
+		minHeight: `${Ib}px`,
 		paddingInline: 0,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${Fb}px`,
-		minHeight: `${Fb}px`,
+		height: `${Ib}px`,
+		minHeight: `${Ib}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: q.spacingHorizontalXS }
 });
-function cx({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style: a }) {
-	let o = sx();
+function lx({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style: a }) {
+	let o = cx();
 	return !e || e.length === 0 ? null : /* @__PURE__ */ (0, F.jsx)(jv, {
 		size: "medium",
 		selectedValue: t,
@@ -24222,7 +24261,7 @@ function cx({ items: e, value: t, onChange: n, ariaLabel: r, className: i, style
 		}, e.value))
 	});
 }
-var lx = Kn({
+var ux = Kn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -24253,7 +24292,7 @@ var lx = Kn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function ux(e) {
+function dx(e) {
 	let [t, n] = (0, P.useState)(!1);
 	return (0, P.useEffect)(() => {
 		let t = e.current;
@@ -24277,8 +24316,8 @@ function ux(e) {
 		};
 	}, [e]), t;
 }
-function dx({ children: e, className: t, style: n }) {
-	let r = lx(), i = (0, P.useRef)(null), a = ux(i);
+function fx({ children: e, className: t, style: n }) {
+	let r = ux(), i = (0, P.useRef)(null), a = dx(i);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -24295,11 +24334,11 @@ function dx({ children: e, className: t, style: n }) {
 		})]
 	});
 }
-var fx = (0, P.createContext)(null);
-function px() {
-	return (0, P.useContext)(fx);
+var px = (0, P.createContext)(null);
+function mx() {
+	return (0, P.useContext)(px);
 }
-var mx = Kn({
+var hx = Kn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -24319,7 +24358,7 @@ var mx = Kn({
 		flexShrink: 0,
 		alignItems: "center",
 		gap: q.spacingHorizontalS,
-		minHeight: `${Ib}px`,
+		minHeight: `${Lb}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -24374,15 +24413,15 @@ var mx = Kn({
 		boxSizing: "border-box"
 	}
 });
-function hx({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = mx(), l = (0, P.useRef)(null), u = ux(l), [d, f] = (0, P.useState)(!0), [p, m] = (0, P.useState)("forward"), [h, g] = (0, P.useState)(!0), _ = (0, P.useRef)(!1), v = (0, P.useCallback)(() => {
+function gx({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = hx(), l = (0, P.useRef)(null), u = dx(l), [d, f] = (0, P.useState)(!0), [p, m] = (0, P.useState)("forward"), [h, g] = (0, P.useState)(!0), _ = (0, P.useRef)(!1), v = (0, P.useCallback)(() => {
 		_.current || (_.current = !0, m("back"), f(!1));
 	}, []), y = (0, P.useCallback)((e, t) => {
 		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
 	if (!h) return null;
 	let b = typeof n == "function" ? n(v) : n;
-	return /* @__PURE__ */ (0, F.jsx)(fx.Provider, {
+	return /* @__PURE__ */ (0, F.jsx)(px.Provider, {
 		value: v,
 		children: /* @__PURE__ */ (0, F.jsx)(wb, {
 			visible: d,
@@ -24406,7 +24445,7 @@ function hx({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								"aria-label": a,
 								title: a,
 								onClick: v,
-								style: Lb
+								style: Rb
 							}),
 							/* @__PURE__ */ (0, F.jsx)($, {
 								size: 400,
@@ -24444,7 +24483,7 @@ function hx({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 		})
 	});
 }
-function gx(e = 1e3) {
+function _x(e = 1e3) {
 	let [t, n] = (0, P.useState)(() => Date.now()), [r, i] = (0, P.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, P.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -24459,12 +24498,12 @@ function gx(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/weather/src/data/icons.js
-var _x = {
+var vx = {
 	100: "150",
 	101: "151",
 	102: "152",
 	103: "153"
-}, vx = new Set([
+}, yx = new Set([
 	100,
 	101,
 	102,
@@ -24534,7 +24573,7 @@ var _x = {
 	900,
 	901,
 	999
-].map(String)), yx = {
+].map(String)), bx = {
 	200: "302",
 	201: "302",
 	202: "303",
@@ -24550,7 +24589,7 @@ var _x = {
 	212: "303",
 	213: "303",
 	800: "999"
-}, bx = {
+}, xx = {
 	100: "晴",
 	101: "多云",
 	102: "少云",
@@ -24610,24 +24649,24 @@ var _x = {
 	901: "冷",
 	999: "未知"
 };
-function xx(e, t) {
+function Sx(e, t) {
 	let n = String(e ?? "").trim();
 	if (!n) return "999";
-	if (t && _x[n] && (n = _x[n]), vx.has(n)) return n;
-	if (yx[n]) return yx[n];
+	if (t && vx[n] && (n = vx[n]), yx.has(n)) return n;
+	if (bx[n]) return bx[n];
 	let r = n.slice(0, 1);
 	return r === "2" ? "302" : r === "3" ? "399" : r === "4" ? "499" : r === "5" ? "502" : "999";
 }
-function Sx(e, { night: t = !1, scheme: n = "dark" } = {}) {
-	let r = xx(e, t);
+function Cx(e, { night: t = !1, scheme: n = "dark" } = {}) {
+	let r = Sx(e, t);
 	return `icons/${n === "light" ? "light" : "dark"}/${r}.svg`;
 }
-function Cx(e, t) {
-	return t || bx[String(e)] || "未知";
+function wx(e, t) {
+	return t || xx[String(e)] || "未知";
 }
 //#endregion
 //#region public/plugins/weather/src/data/format.js
-var wx = [
+var Tx = [
 	"周日",
 	"周一",
 	"周二",
@@ -24635,51 +24674,51 @@ var wx = [
 	"周四",
 	"周五",
 	"周六"
-], Tx = (e) => String(e).padStart(2, "0");
-function Ex(e) {
+], Ex = (e) => String(e).padStart(2, "0");
+function Dx(e) {
 	if (!e) return null;
 	let t = new Date(e);
 	return Number.isNaN(t.getTime()) ? null : t;
 }
-function Dx(e) {
-	let t = Ex(e);
-	return t ? `${Tx(t.getHours())}:00` : "--:--";
+function Ox(e) {
+	let t = Dx(e);
+	return t ? `${Ex(t.getHours())}:00` : "--:--";
 }
-function Ox(e, t = -1) {
-	let n = jx(e);
+function kx(e, t = -1) {
+	let n = Mx(e);
 	if (!n) return e || "--";
-	let r = Nx(), i = Math.round((Mx(n) - r) / 864e5);
-	return i === 0 || t === 0 ? "今天" : i === 1 || t === 1 ? "明天" : wx[n.getDay()];
-}
-function kx(e) {
-	let t = jx(e);
-	return t ? `${t.getMonth() + 1}/${t.getDate()}` : "";
+	let r = Px(), i = Math.round((Nx(n) - r) / 864e5);
+	return i === 0 || t === 0 ? "今天" : i === 1 || t === 1 ? "明天" : Tx[n.getDay()];
 }
 function Ax(e) {
+	let t = Mx(e);
+	return t ? `${t.getMonth() + 1}/${t.getDate()}` : "";
+}
+function jx(e) {
 	if (!e) return "";
 	let t = /^(\d{4}-\d{2}-\d{2})/.exec(e);
 	return t ? t[1] : e;
 }
-function jx(e) {
+function Mx(e) {
 	let t = /^(\d{4})-(\d{2})-(\d{2})/.exec(e || "");
 	return t ? new Date(Number(t[1]), Number(t[2]) - 1, Number(t[3])) : null;
 }
-function Mx(e) {
+function Nx(e) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime();
 }
-function Nx() {
-	return Mx(/* @__PURE__ */ new Date());
+function Px() {
+	return Nx(/* @__PURE__ */ new Date());
 }
-function Px(e, t) {
+function Fx(e, t) {
 	if (e == null || Number.isNaN(Number(e))) return null;
 	let n = Number(e);
 	return t === "f" ? n * 1.8 + 32 : n;
 }
-function Fx(e, t, n = {}) {
-	let r = Px(e, t);
+function Ix(e, t, n = {}) {
+	let r = Fx(e, t);
 	return r == null ? "--°" : `${Math.round(r)}°`;
 }
-function Ix(e, t = Date.now()) {
+function Lx(e, t = Date.now()) {
 	if (!e) return "尚未更新";
 	let n = Math.max(0, Math.round((t - e) / 6e4));
 	if (n < 1) return "刚刚更新";
@@ -24687,10 +24726,10 @@ function Ix(e, t = Date.now()) {
 	let r = Math.round(n / 60);
 	return r < 24 ? `${r} 小时前更新` : `${Math.round(r / 24)} 天前更新`;
 }
-function Lx(e, t = Date.now()) {
+function Rx(e, t = Date.now()) {
 	return e ? Math.max(0, Math.round((t - e) / 6e4)) : null;
 }
-var Rx = {
+var zx = {
 	n: "北风",
 	nne: "东北偏北风",
 	ne: "东北风",
@@ -24710,35 +24749,35 @@ var Rx = {
 	none: "无持续风向",
 	vrb: "风向不定"
 };
-function zx(e) {
-	return e ? Rx[String(e).toLowerCase()] || String(e) : "";
+function Bx(e) {
+	return e ? zx[String(e).toLowerCase()] || String(e) : "";
 }
-function Bx(e, t, n) {
+function Vx(e, t, n) {
 	let r = e || "";
 	return t != null && t !== "" ? `${r}${t}级` : n == null ? r || "—" : `${r}${Math.round(n * 3.6)}km/h`;
 }
-function Vx(e) {
+function Hx(e) {
 	return e == null || Number.isNaN(Number(e)) ? "—" : `${Math.round(Number(e))}%`;
 }
-function Hx(e) {
+function Ux(e) {
 	return e == null || Number.isNaN(Number(e)) ? "" : `${Math.round(Number(e))}%`;
 }
-function Ux(e) {
-	let t = Hx(e);
+function Wx(e) {
+	let t = Ux(e);
 	return t ? `降水 ${t}` : "";
 }
-function Wx(e) {
+function Gx(e) {
 	if (e == null || Number.isNaN(Number(e))) return "—";
 	let t = Number(e);
 	return t >= 1e3 ? `${(t / 1e3).toFixed(t >= 1e4 ? 0 : 1)} km` : `${Math.round(t)} m`;
 }
-function Gx(e) {
+function Kx(e) {
 	return e == null || Number.isNaN(Number(e)) ? "—" : `${Math.round(Number(e))} hPa`;
 }
-function Kx(e) {
+function qx(e) {
 	return e == null || Number.isNaN(Number(e)) ? "—" : String(Math.round(Number(e)));
 }
-var qx = {
+var Jx = {
 	Excellent: "优",
 	Good: "良",
 	Fair: "良",
@@ -24752,21 +24791,21 @@ var qx = {
 	Hazardous: "严重污染",
 	Severe: "严重污染"
 };
-function Jx(e, t) {
-	return e ? qx[e] || e : t ? `${t}级` : "—";
+function Yx(e, t) {
+	return e ? Jx[e] || e : t ? `${t}级` : "—";
 }
-var Yx = {
+var Xx = {
 	unknown: "未知",
 	minor: "一般",
 	moderate: "较重",
 	severe: "严重",
 	extreme: "特别严重"
 };
-function Xx(e) {
+function Zx(e) {
 	let t = Number(e);
 	return Number.isFinite(t) ? t <= 50 ? "success" : t <= 100 ? "warning" : "danger" : "neutral";
 }
-var Zx = {
+var Qx = {
 	white: "neutral",
 	gray: "neutral",
 	green: "success",
@@ -24777,7 +24816,7 @@ var Zx = {
 	red: "danger",
 	purple: "danger",
 	black: "danger"
-}, Qx = {
+}, $x = {
 	白色: "neutral",
 	蓝色: "info",
 	黄色: "warning",
@@ -24785,10 +24824,10 @@ var Zx = {
 	红色: "danger",
 	黑色: "danger"
 };
-function $x(e) {
-	return e && (Qx[e] || Zx[String(e).toLowerCase()]) || "warning";
+function eS(e) {
+	return e && ($x[e] || Qx[String(e).toLowerCase()]) || "warning";
 }
-var eS = {
+var tS = {
 	pm2p5: "PM2.5",
 	pm10: "PM10",
 	no2: "NO₂",
@@ -24797,7 +24836,7 @@ var eS = {
 	o3: "O₃",
 	no: "NO",
 	nmhc: "NMHC"
-}, tS = {
+}, nS = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"1x2": [1, 2],
@@ -24805,33 +24844,33 @@ var eS = {
 	"3x2": [3, 2],
 	"3x3": [3, 3]
 };
-function nS(e) {
+function rS(e) {
 	if (!Array.isArray(e) || e.length < 2) return "3x2";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return tS[t] ? t : "3x2";
+	return nS[t] ? t : "3x2";
 }
-function rS(e) {
+function iS(e) {
 	if (!e) return null;
 	let t = /^(\d+)\s*[x×]\s*(\d+)$/i.exec(String(e).trim());
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return tS[n] ? tS[n] : null;
+	return nS[n] ? nS[n] : null;
 }
-function iS(e, t, n = Date.now()) {
+function aS(e, t, n = Date.now()) {
 	if (!e) return !1;
 	let r = Math.max(2, Number(t) || 30) * 2 * 60 * 1e3;
 	return n - e > r;
 }
-function aS() {
+function oS() {
 	let e = new URLSearchParams(location.search);
 	return e.get("mock") === "1" || e.get("demo") === "1";
 }
-function oS() {
-	return rS(new URLSearchParams(location.search).get("size"));
+function sS() {
+	return iS(new URLSearchParams(location.search).get("size"));
 }
 //#endregion
 //#region public/plugins/weather/src/components/atoms.jsx
-var sS = Kn({
+var cS = Kn({
 	icon: {
 		display: "block",
 		objectFit: "contain",
@@ -24861,7 +24900,7 @@ var sS = Kn({
 	offline: { color: q.colorStatusWarningForeground1 },
 	warningBadge: { flexShrink: 0 }
 });
-function cS(e) {
+function lS(e) {
 	switch (e) {
 		case "success": return q.colorStatusSuccessForeground1;
 		case "danger": return q.colorStatusDangerForeground1;
@@ -24870,54 +24909,54 @@ function cS(e) {
 		default: return q.colorNeutralForeground3;
 	}
 }
-function lS({ code: e, night: t = !1, scheme: n = "dark", size: r = 48, title: i }) {
-	let a = sS(), o = typeof r == "number" ? `${r}px` : r;
+function uS({ code: e, night: t = !1, scheme: n = "dark", size: r = 48, title: i }) {
+	let a = cS(), o = typeof r == "number" ? `${r}px` : r;
 	return /* @__PURE__ */ (0, F.jsx)("img", {
 		className: a.icon,
 		style: {
 			width: o,
 			height: o
 		},
-		src: Sx(e, {
+		src: Cx(e, {
 			night: t,
 			scheme: n
 		}),
-		alt: i || Cx(e),
+		alt: i || wx(e),
 		draggable: !1
 	});
 }
-function uS({ code: e, text: t, size: n = 400, className: r }) {
-	let i = sS();
+function dS({ code: e, text: t, size: n = 400, className: r }) {
+	let i = cS();
 	return /* @__PURE__ */ (0, F.jsx)($, {
 		size: n,
 		className: A(i.condition, r),
-		children: Cx(e, t)
+		children: wx(e, t)
 	});
 }
-function dS({ max: e, min: t, unit: n, className: r, size: i = 300 }) {
-	let a = sS();
+function fS({ max: e, min: t, unit: n, className: r, size: i = 300 }) {
+	let a = cS();
 	return /* @__PURE__ */ (0, F.jsxs)($, {
 		size: i,
 		className: A(a.hilo, r),
 		children: [
-			Fx(e, n),
+			Ix(e, n),
 			" / ",
-			Fx(t, n)
+			Ix(t, n)
 		]
 	});
 }
-function fS({ offline: e, fetchedAt: t, refreshMin: n, className: r, now: i = Date.now() }) {
-	let a = sS();
+function pS({ offline: e, fetchedAt: t, refreshMin: n, className: r, now: i = Date.now() }) {
+	let a = cS();
 	if (!t) return null;
-	let o = Lx(t, i), s = iS(t, n, i), c = `${e ? "离线 · " : ""}${o <= 0 ? "刚刚更新" : `${o} 分钟前更新`}${s ? " · 数据可能过期" : ""}`;
+	let o = Rx(t, i), s = aS(t, n, i), c = `${e ? "离线 · " : ""}${o <= 0 ? "刚刚更新" : `${o} 分钟前更新`}${s ? " · 数据可能过期" : ""}`;
 	return /* @__PURE__ */ (0, F.jsx)($, {
 		size: 200,
 		className: A(a.status, e && a.offline, r),
 		children: c
 	});
 }
-function pS({ count: e, className: t }) {
-	let n = sS();
+function mS({ count: e, className: t }) {
+	let n = cS();
 	return e ? /* @__PURE__ */ (0, F.jsx)(rf, {
 		appearance: "tint",
 		color: "danger",
@@ -24930,7 +24969,7 @@ function pS({ count: e, className: t }) {
 }
 //#endregion
 //#region public/plugins/weather/src/components/forecast.jsx
-var mS = (e) => `repeat(${e}, minmax(0, 1fr))`, hS = Kn({
+var hS = (e) => `repeat(${e}, minmax(0, 1fr))`, gS = Kn({
 	columns: {
 		display: "grid",
 		gridAutoFlow: "row",
@@ -25014,8 +25053,8 @@ var mS = (e) => `repeat(${e}, minmax(0, 1fr))`, hS = Kn({
 		color: q.colorNeutralForeground2
 	}
 });
-function gS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 }) {
-	let o = hS(), s = (e || []).slice(0, a);
+function _S({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 }) {
+	let o = gS(), s = (e || []).slice(0, a);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: o.rows,
 		"data-hourly-strip": "true",
@@ -25028,11 +25067,11 @@ function gS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: o.muted,
-					children: a === 0 ? "现在" : Dx(e.fxTime)
+					children: a === 0 ? "现在" : Ox(e.fxTime)
 				}),
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: e.icon,
-					night: xS(e.fxTime, r, i),
+					night: SS(e.fxTime, r, i),
 					scheme: n,
 					size: 20,
 					title: e.text
@@ -25041,17 +25080,17 @@ function gS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 
 					size: 300,
 					weight: "semibold",
 					className: o.temp,
-					children: Fx(e.temp, t)
+					children: Ix(e.temp, t)
 				})
 			]
 		}, e.fxTime || a))
 	});
 }
-function _S({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 }) {
-	let o = hS(), s = (e || []).slice(0, a);
+function vS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 }) {
+	let o = gS(), s = (e || []).slice(0, a);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: o.columns,
-		style: { gridTemplateColumns: mS(a) },
+		style: { gridTemplateColumns: hS(a) },
 		"data-hourly-strip": "true",
 		"data-hourly-layout": "columns",
 		"data-hourly-columns": s.length,
@@ -25063,11 +25102,11 @@ function _S({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: o.muted,
-					children: a === 0 ? "现在" : Dx(e.fxTime)
+					children: a === 0 ? "现在" : Ox(e.fxTime)
 				}),
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: e.icon,
-					night: xS(e.fxTime, r, i),
+					night: SS(e.fxTime, r, i),
 					scheme: n,
 					size: 20,
 					title: e.text
@@ -25076,17 +25115,17 @@ function _S({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 4 
 					size: 300,
 					weight: "semibold",
 					className: o.temp,
-					children: Fx(e.temp, t)
+					children: Ix(e.temp, t)
 				})
 			]
 		}, e.fxTime || a))
 	});
 }
-function vS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 6 }) {
-	let o = hS(), s = (e || []).slice(0, a);
+function yS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 6 }) {
+	let o = gS(), s = (e || []).slice(0, a);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: o.columns,
-		style: { gridTemplateColumns: mS(a) },
+		style: { gridTemplateColumns: hS(a) },
 		"data-hourly-strip": "true",
 		"data-hourly-layout": "columns",
 		"data-hourly-columns": s.length,
@@ -25098,11 +25137,11 @@ function vS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 6 
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: o.muted,
-					children: a === 0 ? "现在" : Dx(e.fxTime)
+					children: a === 0 ? "现在" : Ox(e.fxTime)
 				}),
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: e.icon,
-					night: xS(e.fxTime, r, i),
+					night: SS(e.fxTime, r, i),
 					scheme: n,
 					size: 24,
 					title: e.text
@@ -25111,22 +25150,22 @@ function vS({ items: e, unit: t, scheme: n, sunrise: r, sunset: i, count: a = 6 
 					size: 400,
 					weight: "semibold",
 					className: o.temp,
-					children: Fx(e.temp, t)
+					children: Ix(e.temp, t)
 				}),
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: o.muted,
-					children: Ux(e.pop)
+					children: Wx(e.pop)
 				})
 			]
 		}, e.fxTime || a))
 	});
 }
-function yS({ items: e, unit: t, scheme: n, count: r = 7 }) {
-	let i = hS(), a = (e || []).slice(0, r);
+function bS({ items: e, unit: t, scheme: n, count: r = 7 }) {
+	let i = gS(), a = (e || []).slice(0, r);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: i.columns,
-		style: { gridTemplateColumns: mS(r) },
+		style: { gridTemplateColumns: hS(r) },
 		"data-daily-columns": "true",
 		"data-daily-columns-count": a.length,
 		"data-daily-grid-columns": r,
@@ -25136,9 +25175,9 @@ function yS({ items: e, unit: t, scheme: n, count: r = 7 }) {
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: i.muted,
-					children: Ox(e.fxDate, r)
+					children: kx(e.fxDate, r)
 				}),
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: e.icon,
 					scheme: n,
 					size: 20,
@@ -25148,21 +25187,21 @@ function yS({ items: e, unit: t, scheme: n, count: r = 7 }) {
 					size: 400,
 					weight: "semibold",
 					className: i.temp,
-					children: Fx(e.tempMax, t)
+					children: Ix(e.tempMax, t)
 				}),
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: i.muted,
-					children: Fx(e.tempMin, t)
+					children: Ix(e.tempMin, t)
 				})
 			]
 		}, e.fxDate || r))
 	});
 }
-function bS({ air: e, size: t = 88, className: n }) {
-	let r = hS();
+function xS({ air: e, size: t = 88, className: n }) {
+	let r = gS();
 	if (!e || e.aqi == null) return null;
-	let i = Number(e.aqi), a = 2 * Math.PI * 44, o = a * Math.max(.02, Math.min(1, i / 300)), s = cS(e.tone);
+	let i = Number(e.aqi), a = 2 * Math.PI * 44, o = a * Math.max(.02, Math.min(1, i / 300)), s = lS(e.tone);
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(r.ring, n),
 		children: [/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -25213,7 +25252,7 @@ function bS({ air: e, size: t = 88, className: n }) {
 		})]
 	});
 }
-function xS(e, t, n) {
+function SS(e, t, n) {
 	if (!e) return !1;
 	if (t && n) {
 		let r = new Date(e).getTime(), i = new Date(t).getTime(), a = new Date(n).getTime();
@@ -25226,7 +25265,7 @@ function xS(e, t, n) {
 }
 //#endregion
 //#region public/plugins/weather/src/components/todayMetrics.jsx
-var SS = "minmax(0, 40%) minmax(0, 1fr)", CS = Kn({
+var CS = "minmax(0, 40%) minmax(0, 1fr)", wS = Kn({
 	list: {
 		display: "grid",
 		gridAutoFlow: "row",
@@ -25236,7 +25275,7 @@ var SS = "minmax(0, 40%) minmax(0, 1fr)", CS = Kn({
 	},
 	row: {
 		display: "grid",
-		gridTemplateColumns: SS,
+		gridTemplateColumns: CS,
 		columnGap: q.spacingHorizontalS,
 		alignItems: "center",
 		minHeight: `calc(${q.spacingVerticalXXXL} + ${q.spacingVerticalXS})`,
@@ -25256,8 +25295,8 @@ var SS = "minmax(0, 40%) minmax(0, 1fr)", CS = Kn({
 		minWidth: 0
 	}
 });
-function wS(e, t, n, r = null) {
-	let i = e?.feelsLike == null ? "" : Fx(e.feelsLike, n), a = Hx(t?.[0]?.pop), o = e ? Bx(e.windDir, e.windScale) : "", s = r && r.aqi != null ? `${Jx(r.category, r.level)} ${Math.round(Number(r.aqi))}` : "";
+function TS(e, t, n, r = null) {
+	let i = e?.feelsLike == null ? "" : Ix(e.feelsLike, n), a = Ux(t?.[0]?.pop), o = e ? Vx(e.windDir, e.windScale) : "", s = r && r.aqi != null ? `${Yx(r.category, r.level)} ${Math.round(Number(r.aqi))}` : "";
 	return {
 		feelsLike: i,
 		pop: a,
@@ -25265,8 +25304,8 @@ function wS(e, t, n, r = null) {
 		air: s
 	};
 }
-function TS({ current: e, hourly: t, unit: n, air: r = null, className: i }) {
-	let a = CS(), o = wS(e, t, n, r), s = [];
+function ES({ current: e, hourly: t, unit: n, air: r = null, className: i }) {
+	let a = wS(), o = TS(e, t, n, r), s = [];
 	return o.feelsLike && s.push({
 		key: "feelsLike",
 		label: "体感",
@@ -25287,7 +25326,7 @@ function TS({ current: e, hourly: t, unit: n, air: r = null, className: i }) {
 		className: A(a.list, i),
 		"data-content-block": "metrics",
 		"data-secondary-block": "metrics",
-		"data-metric-columns": SS,
+		"data-metric-columns": CS,
 		children: s.map((e) => /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: a.row,
 			"data-metric-item": e.key,
@@ -25308,7 +25347,7 @@ function TS({ current: e, hourly: t, unit: n, air: r = null, className: i }) {
 }
 //#endregion
 //#region public/plugins/weather/src/components/Card.jsx
-var ES = 1e3, DS = Kn({
+var DS = 1e3, OS = Kn({
 	identityRow: {
 		alignSelf: "stretch",
 		minWidth: 0
@@ -25427,7 +25466,7 @@ var ES = 1e3, DS = Kn({
 		color: q.colorNeutralForeground3
 	}
 });
-function OS(e, t = ES) {
+function kS(e, t = DS) {
 	let [n, r] = (0, P.useState)(!1);
 	return (0, P.useEffect)(() => {
 		if (!e) {
@@ -25438,8 +25477,8 @@ function OS(e, t = ES) {
 		return () => window.clearTimeout(n);
 	}, [e, t]), n;
 }
-function kS({ place: e, offline: t, warnings: n, showWarningBadge: r }) {
-	let i = DS();
+function AS({ place: e, offline: t, warnings: n, showWarningBadge: r }) {
+	let i = OS();
 	if (!e) return null;
 	let a = r && n.length > 0;
 	return /* @__PURE__ */ (0, F.jsxs)(F.Fragment, { children: [
@@ -25449,7 +25488,7 @@ function kS({ place: e, offline: t, warnings: n, showWarningBadge: r }) {
 			title: e.name,
 			children: e.name
 		}),
-		a ? /* @__PURE__ */ (0, F.jsx)(pS, { count: n.length }) : null,
+		a ? /* @__PURE__ */ (0, F.jsx)(mS, { count: n.length }) : null,
 		!a && t ? /* @__PURE__ */ (0, F.jsx)($, {
 			size: 200,
 			className: i.offline,
@@ -25457,30 +25496,30 @@ function kS({ place: e, offline: t, warnings: n, showWarningBadge: r }) {
 		}) : null
 	] });
 }
-function AS({ current: e, night: t, scheme: n, iconSize: r, unit: i }) {
-	let a = DS();
+function jS({ current: e, night: t, scheme: n, iconSize: r, unit: i }) {
+	let a = OS();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: a.heroRow,
 		children: [/* @__PURE__ */ (0, F.jsx)("span", {
 			className: a.heroIcon,
-			children: /* @__PURE__ */ (0, F.jsx)(lS, {
+			children: /* @__PURE__ */ (0, F.jsx)(uS, {
 				code: e.icon,
 				night: t,
 				scheme: n,
 				size: r,
 				title: e.text
 			})
-		}), /* @__PURE__ */ (0, F.jsx)(Kb, {
+		}), /* @__PURE__ */ (0, F.jsx)(qb, {
 			"data-weather-temp": "true",
-			children: Fx(e.temp, i)
+			children: Ix(e.temp, i)
 		})]
 	});
 }
-function jS({ variant: e, size: t, onOpenDetail: n }) {
-	let r = DS(), i = t === "1x1" || t === "2x1", a = e === "key" ? {
+function MS({ variant: e, size: t, onOpenDetail: n }) {
+	let r = OS(), i = t === "1x1" || t === "2x1", a = e === "key" ? {
 		icon: /* @__PURE__ */ (0, F.jsx)(zu, {}),
 		title: "未配置 Key",
-		action: /* @__PURE__ */ (0, F.jsx)(tx, {
+		action: /* @__PURE__ */ (0, F.jsx)(nx, {
 			appearance: "secondary",
 			icon: /* @__PURE__ */ (0, F.jsx)(ku, {}),
 			onClick: () => cb(),
@@ -25489,7 +25528,7 @@ function jS({ variant: e, size: t, onOpenDetail: n }) {
 	} : e === "city" ? {
 		icon: /* @__PURE__ */ (0, F.jsx)(Iu, {}),
 		title: "还没有城市",
-		action: /* @__PURE__ */ (0, F.jsx)(tx, {
+		action: /* @__PURE__ */ (0, F.jsx)(nx, {
 			appearance: "secondary",
 			icon: /* @__PURE__ */ (0, F.jsx)(Nu, {}),
 			onClick: n,
@@ -25498,7 +25537,7 @@ function jS({ variant: e, size: t, onOpenDetail: n }) {
 	} : {
 		icon: /* @__PURE__ */ (0, F.jsx)(Au, {}),
 		title: "天气不可用",
-		action: /* @__PURE__ */ (0, F.jsx)(tx, {
+		action: /* @__PURE__ */ (0, F.jsx)(nx, {
 			appearance: "secondary",
 			icon: /* @__PURE__ */ (0, F.jsx)(Uu, {}),
 			onClick: n,
@@ -25507,7 +25546,7 @@ function jS({ variant: e, size: t, onOpenDetail: n }) {
 	};
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.stateBlock,
-		children: /* @__PURE__ */ (0, F.jsx)($b, {
+		children: /* @__PURE__ */ (0, F.jsx)(ex, {
 			align: "start",
 			compact: i,
 			icon: a.icon,
@@ -25516,8 +25555,8 @@ function jS({ variant: e, size: t, onOpenDetail: n }) {
 		})
 	});
 }
-function MS({ label: e = "正在获取天气…" }) {
-	let t = DS(), n = OS(!0);
+function NS({ label: e = "正在获取天气…" }) {
+	let t = OS(), n = kS(!0);
 	return /* @__PURE__ */ (0, F.jsx)("div", {
 		className: t.stateBlock,
 		children: n ? /* @__PURE__ */ (0, F.jsxs)("div", {
@@ -25529,30 +25568,30 @@ function MS({ label: e = "正在获取天气…" }) {
 		}) : null
 	});
 }
-function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, locating: o, onOpenDetail: s }) {
-	let c = DS(), l = e || "3x2", u = l === "1x1", d = u || l === "2x1", f = i?.current || null, p = i?.daily?.[0] || null, m = f ? xS(f.obsTime || (/* @__PURE__ */ new Date()).toISOString(), p?.sunrise, p?.sunset) : !1, h = n.showWarnings && i?.warnings || [], g = n.showAir ? i?.air : null, _ = !!(a.offline && i), v = "filled";
+function PS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, locating: o, onOpenDetail: s }) {
+	let c = OS(), l = e || "3x2", u = l === "1x1", d = u || l === "2x1", f = i?.current || null, p = i?.daily?.[0] || null, m = f ? SS(f.obsTime || (/* @__PURE__ */ new Date()).toISOString(), p?.sunrise, p?.sunset) : !1, h = n.showWarnings && i?.warnings || [], g = n.showAir ? i?.air : null, _ = !!(a.offline && i), v = "filled";
 	!n.apiKey && !n.mock ? v = "key" : r ? f || (v = a.error ? "error" : "loading") : v = o ? "locating" : "city";
-	let y = v === "key" || v === "city" || v === "error", b = v === "loading" || v === "locating", x = !((y || b) && d), S = /* @__PURE__ */ (0, F.jsx)(kS, {
+	let y = v === "key" || v === "city" || v === "error", b = v === "loading" || v === "locating", x = !((y || b) && d), S = /* @__PURE__ */ (0, F.jsx)(AS, {
 		place: r,
 		offline: _,
 		warnings: h,
 		showWarningBadge: l === "3x2" || l === "3x3"
 	}), C = null;
-	C = y ? /* @__PURE__ */ (0, F.jsx)(jS, {
+	C = y ? /* @__PURE__ */ (0, F.jsx)(MS, {
 		variant: v,
 		size: l,
 		onOpenDetail: s
-	}) : b ? /* @__PURE__ */ (0, F.jsx)(MS, { label: v === "locating" ? "正在定位…" : "正在获取天气…" }) : l === "1x1" ? /* @__PURE__ */ (0, F.jsxs)("div", {
+	}) : b ? /* @__PURE__ */ (0, F.jsx)(NS, { label: v === "locating" ? "正在定位…" : "正在获取天气…" }) : l === "1x1" ? /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: A(c.centerBlock, c.centerBlockCompact),
-		children: [/* @__PURE__ */ (0, F.jsx)(lS, {
+		children: [/* @__PURE__ */ (0, F.jsx)(uS, {
 			code: f.icon,
 			night: m,
 			scheme: t,
 			size: 24,
 			title: f.text
-		}), /* @__PURE__ */ (0, F.jsx)(Kb, {
+		}), /* @__PURE__ */ (0, F.jsx)(qb, {
 			"data-weather-temp": "true",
-			children: Fx(f.temp, n.unit)
+			children: Ix(f.temp, n.unit)
 		})]
 	}) : l === "2x1" ? /* @__PURE__ */ (0, F.jsx)("div", {
 		className: A(c.centerBlock, c.centerBlockRow),
@@ -25560,7 +25599,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			className: c.row21,
 			children: [/* @__PURE__ */ (0, F.jsx)("span", {
 				className: c.heroIcon,
-				children: /* @__PURE__ */ (0, F.jsx)(lS, {
+				children: /* @__PURE__ */ (0, F.jsx)(uS, {
 					code: f.icon,
 					night: m,
 					scheme: t,
@@ -25569,16 +25608,16 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				})
 			}), /* @__PURE__ */ (0, F.jsxs)("div", {
 				className: c.cluster21,
-				children: [/* @__PURE__ */ (0, F.jsx)(Kb, {
+				children: [/* @__PURE__ */ (0, F.jsx)(qb, {
 					"data-weather-temp": "true",
-					children: Fx(f.temp, n.unit)
+					children: Ix(f.temp, n.unit)
 				}), /* @__PURE__ */ (0, F.jsxs)("div", {
 					className: c.metaRow,
-					children: [/* @__PURE__ */ (0, F.jsx)(uS, {
+					children: [/* @__PURE__ */ (0, F.jsx)(dS, {
 						code: f.icon,
 						text: f.text,
 						size: 400
-					}), /* @__PURE__ */ (0, F.jsx)(dS, {
+					}), /* @__PURE__ */ (0, F.jsx)(fS, {
 						max: p?.tempMax,
 						min: p?.tempMin,
 						unit: n.unit,
@@ -25592,7 +25631,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 		children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 			className: c.currentBlock,
 			"data-content-block": "current",
-			children: [/* @__PURE__ */ (0, F.jsx)(AS, {
+			children: [/* @__PURE__ */ (0, F.jsx)(jS, {
 				current: f,
 				night: m,
 				scheme: t,
@@ -25600,11 +25639,11 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				unit: n.unit
 			}), /* @__PURE__ */ (0, F.jsxs)("div", {
 				className: c.metaRow,
-				children: [/* @__PURE__ */ (0, F.jsx)(uS, {
+				children: [/* @__PURE__ */ (0, F.jsx)(dS, {
 					code: f.icon,
 					text: f.text,
 					size: 300
-				}), /* @__PURE__ */ (0, F.jsx)(dS, {
+				}), /* @__PURE__ */ (0, F.jsx)(fS, {
 					max: p?.tempMax,
 					min: p?.tempMin,
 					unit: n.unit,
@@ -25615,7 +25654,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			className: c.fixedSlot,
 			"data-content-band": "hourly",
 			"data-secondary-block": "hourly",
-			children: /* @__PURE__ */ (0, F.jsx)(gS, {
+			children: /* @__PURE__ */ (0, F.jsx)(_S, {
 				items: i.hourly,
 				unit: n.unit,
 				scheme: t,
@@ -25634,7 +25673,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 				className: c.currentBlock,
 				"data-content-block": "current",
-				children: [/* @__PURE__ */ (0, F.jsx)(AS, {
+				children: [/* @__PURE__ */ (0, F.jsx)(jS, {
 					current: f,
 					night: m,
 					scheme: t,
@@ -25642,11 +25681,11 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 					unit: n.unit
 				}), /* @__PURE__ */ (0, F.jsxs)("div", {
 					className: c.metaRow,
-					children: [/* @__PURE__ */ (0, F.jsx)(uS, {
+					children: [/* @__PURE__ */ (0, F.jsx)(dS, {
 						code: f.icon,
 						text: f.text,
 						size: 400
-					}), /* @__PURE__ */ (0, F.jsx)(dS, {
+					}), /* @__PURE__ */ (0, F.jsx)(fS, {
 						max: p?.tempMax,
 						min: p?.tempMin,
 						unit: n.unit,
@@ -25655,7 +25694,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				})]
 			}), /* @__PURE__ */ (0, F.jsx)("div", {
 				className: c.metricsSlot,
-				children: /* @__PURE__ */ (0, F.jsx)(TS, {
+				children: /* @__PURE__ */ (0, F.jsx)(ES, {
 					current: f,
 					hourly: i.hourly,
 					unit: n.unit
@@ -25666,7 +25705,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			"data-content-band": "hourly",
 			"data-content-block": "hourly",
 			"data-secondary-block": "hourly",
-			children: /* @__PURE__ */ (0, F.jsx)(_S, {
+			children: /* @__PURE__ */ (0, F.jsx)(vS, {
 				items: i.hourly,
 				unit: n.unit,
 				scheme: t,
@@ -25685,7 +25724,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 				className: c.currentBlock,
 				"data-content-block": "current",
-				children: [/* @__PURE__ */ (0, F.jsx)(AS, {
+				children: [/* @__PURE__ */ (0, F.jsx)(jS, {
 					current: f,
 					night: m,
 					scheme: t,
@@ -25693,12 +25732,12 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 					unit: n.unit
 				}), /* @__PURE__ */ (0, F.jsxs)("div", {
 					className: c.metaRow,
-					children: [/* @__PURE__ */ (0, F.jsx)(uS, {
+					children: [/* @__PURE__ */ (0, F.jsx)(dS, {
 						code: f.icon,
 						text: f.text,
 						size: 300,
 						className: c.condition32
-					}), /* @__PURE__ */ (0, F.jsx)(dS, {
+					}), /* @__PURE__ */ (0, F.jsx)(fS, {
 						max: p?.tempMax,
 						min: p?.tempMin,
 						unit: n.unit,
@@ -25707,7 +25746,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				})]
 			}), /* @__PURE__ */ (0, F.jsx)("div", {
 				className: c.metricsSlot,
-				children: /* @__PURE__ */ (0, F.jsx)(TS, {
+				children: /* @__PURE__ */ (0, F.jsx)(ES, {
 					current: f,
 					hourly: i.hourly,
 					unit: n.unit
@@ -25718,7 +25757,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			"data-content-band": "hourly",
 			"data-content-block": "hourly",
 			"data-secondary-block": "hourly",
-			children: /* @__PURE__ */ (0, F.jsx)(vS, {
+			children: /* @__PURE__ */ (0, F.jsx)(yS, {
 				items: i.hourly,
 				unit: n.unit,
 				scheme: t,
@@ -25738,7 +25777,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 					className: c.currentBlock,
 					"data-content-block": "current",
-					children: [/* @__PURE__ */ (0, F.jsx)(AS, {
+					children: [/* @__PURE__ */ (0, F.jsx)(jS, {
 						current: f,
 						night: m,
 						scheme: t,
@@ -25746,12 +25785,12 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 						unit: n.unit
 					}), /* @__PURE__ */ (0, F.jsxs)("div", {
 						className: c.metaRow,
-						children: [/* @__PURE__ */ (0, F.jsx)(uS, {
+						children: [/* @__PURE__ */ (0, F.jsx)(dS, {
 							code: f.icon,
 							text: f.text,
 							size: 300,
 							className: c.condition32
-						}), /* @__PURE__ */ (0, F.jsx)(dS, {
+						}), /* @__PURE__ */ (0, F.jsx)(fS, {
 							max: p?.tempMax,
 							min: p?.tempMin,
 							unit: n.unit,
@@ -25760,7 +25799,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 					})]
 				}), /* @__PURE__ */ (0, F.jsx)("div", {
 					className: c.metricsSlot,
-					children: /* @__PURE__ */ (0, F.jsx)(TS, {
+					children: /* @__PURE__ */ (0, F.jsx)(ES, {
 						current: f,
 						hourly: i.hourly,
 						unit: n.unit,
@@ -25773,7 +25812,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				"data-content-band": "hourly",
 				"data-content-block": "hourly",
 				"data-secondary-block": "hourly",
-				children: /* @__PURE__ */ (0, F.jsx)(vS, {
+				children: /* @__PURE__ */ (0, F.jsx)(yS, {
 					items: i.hourly,
 					unit: n.unit,
 					scheme: t,
@@ -25786,7 +25825,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 				className: c.stretchSlot,
 				"data-content-band": "daily",
 				"data-secondary-block": "daily",
-				children: /* @__PURE__ */ (0, F.jsx)(yS, {
+				children: /* @__PURE__ */ (0, F.jsx)(bS, {
 					items: i.daily,
 					unit: n.unit,
 					scheme: t
@@ -25794,8 +25833,8 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			})
 		]
 	});
-	let w = !n.apiKey && !n.mock ? "天气：尚未配置和风天气 API Key，点击打开详情" : r ? f ? `天气：${r.name}，${Fx(f.temp, n.unit)}，${Cx(f.icon, f.text)}${h.length > 0 ? `，${h.length} 条天气预警` : ""}，点击打开详情` : "天气：正在加载，点击打开详情" : `天气：还没有城市${o ? "，正在定位" : ""}，点击打开详情`;
-	return /* @__PURE__ */ (0, F.jsxs)(Vb, {
+	let w = !n.apiKey && !n.mock ? "天气：尚未配置和风天气 API Key，点击打开详情" : r ? f ? `天气：${r.name}，${Ix(f.temp, n.unit)}，${wx(f.icon, f.text)}${h.length > 0 ? `，${h.length} 条天气预警` : ""}，点击打开详情` : "天气：正在加载，点击打开详情" : `天气：还没有城市${o ? "，正在定位" : ""}，点击打开详情`;
+	return /* @__PURE__ */ (0, F.jsxs)(Hb, {
 		ariaLabel: w,
 		onActivate: s,
 		"data-size": l,
@@ -25803,7 +25842,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 			className: c.identitySpacer,
 			"data-card-identity": "true",
 			"data-card-identity-empty": "true"
-		}) : /* @__PURE__ */ (0, F.jsx)(Wb, {
+		}) : /* @__PURE__ */ (0, F.jsx)(Gb, {
 			icon: /* @__PURE__ */ (0, F.jsx)("span", {
 				className: c.identityIconBox,
 				"data-weather-identity-icon": "true",
@@ -25818,7 +25857,7 @@ function NS({ sizeKey: e, scheme: t, settings: n, place: r, data: i, status: a, 
 }
 //#endregion
 //#region public/plugins/weather/src/data/store.js
-var PS = "settings", FS = "places", IS = "cache", LS = "location", RS = {
+var FS = "settings", IS = "places", LS = "cache", RS = "location", zS = {
 	unit: "c",
 	refreshMin: 30,
 	autoLocate: !1,
@@ -25827,16 +25866,16 @@ var PS = "settings", FS = "places", IS = "cache", LS = "location", RS = {
 	showMinutely: !1,
 	apiKey: "",
 	apiHost: ""
-}, zS = [
+}, BS = [
 	15,
 	30,
 	60
-], BS = "Asia/Shanghai";
-function VS(e) {
+], VS = "Asia/Shanghai";
+function HS(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {}, n = Number(t.refreshMin);
 	return {
 		unit: t.unit === "f" ? "f" : "c",
-		refreshMin: zS.includes(n) ? n : RS.refreshMin,
+		refreshMin: BS.includes(n) ? n : zS.refreshMin,
 		autoLocate: t.autoLocate === !0,
 		showAir: t.showAir !== !1,
 		showWarnings: t.showWarnings !== !1,
@@ -25845,7 +25884,7 @@ function VS(e) {
 		apiHost: typeof t.apiHost == "string" ? t.apiHost.trim() : ""
 	};
 }
-function HS(e) {
+function US(e) {
 	if (!e || typeof e != "object") return null;
 	let t = String(e.id || "").trim(), n = String(e.name || "").trim();
 	if (!t || !n) return null;
@@ -25856,27 +25895,27 @@ function HS(e) {
 		adm1: e.adm1 || "",
 		adm2: e.adm2 || "",
 		country: e.country || "",
-		tz: e.tz || BS,
+		tz: e.tz || VS,
 		lat: Number.isFinite(r) ? r : 0,
 		lon: Number.isFinite(i) ? i : 0,
 		isCurrent: e.isCurrent === !0
 	};
 }
-function US(e) {
+function WS(e) {
 	if (!Array.isArray(e)) return [];
-	let t = e.map(HS).filter(Boolean), n = !1;
+	let t = e.map(US).filter(Boolean), n = !1;
 	for (let e of t) e.isCurrent && !n ? n = !0 : e.isCurrent &&= !1;
 	return t.length > 0 && !n && (t[0].isCurrent = !0), t;
 }
-function WS(e) {
+function GS(e) {
 	if (!e || typeof e != "object" || Array.isArray(e)) return {};
 	let t = {};
 	for (let [n, r] of Object.entries(e)) r && typeof r == "object" && !Array.isArray(r) && (t[n] = r);
 	return t;
 }
-function GS(e) {
+function KS(e) {
 	if (!e || typeof e != "object") return null;
-	let t = HS(e.place);
+	let t = US(e.place);
 	if (!t) return null;
 	let n = Number(e.at);
 	return {
@@ -25886,30 +25925,30 @@ function GS(e) {
 		applied: e.applied === !0
 	};
 }
-function KS(e) {
+function qS(e) {
 	return !Array.isArray(e) || e.length === 0 ? null : e.find((e) => e.isCurrent) || e[0];
 }
-function qS(e, t) {
+function JS(e, t) {
 	return !Array.isArray(e) || !t ? null : e.find((e) => e.id === String(t)) || null;
 }
-var JS = (e) => String(e || "").replace(/省$|市$|自治区$|特别行政区$/, "");
-function YS(e) {
+var YS = (e) => String(e || "").replace(/省$|市$|自治区$|特别行政区$/, "");
+function XS(e) {
 	if (!e) return "";
-	let t = JS(e.name) || e.name, n = [JS(e.adm2), JS(e.adm1)].filter((e) => e && e !== t && !t.includes(e));
+	let t = YS(e.name) || e.name, n = [YS(e.adm2), YS(e.adm1)].filter((e) => e && e !== t && !t.includes(e));
 	return n.length > 0 ? `${e.name} ${n[0]}` : e.name;
 }
-function XS(e, t) {
+function ZS(e, t) {
 	let n = String(t || "");
 	return (e || []).map((e) => ({
 		...e,
 		isCurrent: e.id === n
 	}));
 }
-function ZS(e, t) {
-	let n = HS(t);
+function QS(e, t) {
+	let n = US(t);
 	if (!n) return e || [];
-	let r = qS(e, n.id);
-	return r ? XS(e, r.id) : [...(e || []).map((e) => ({
+	let r = JS(e, n.id);
+	return r ? ZS(e, r.id) : [...(e || []).map((e) => ({
 		...e,
 		isCurrent: !1
 	})), {
@@ -25917,41 +25956,41 @@ function ZS(e, t) {
 		isCurrent: !0
 	}];
 }
-function QS(e, t) {
-	let n = Array.isArray(e) ? e : [], r = HS(t);
-	return !r || qS(n, r.id)?.isCurrent ? n : ZS(n, r);
-}
 function $S(e, t) {
+	let n = Array.isArray(e) ? e : [], r = US(t);
+	return !r || JS(n, r.id)?.isCurrent ? n : QS(n, r);
+}
+function eC(e, t) {
 	let n = String(t || ""), r = (e || []).filter((e) => e.id !== n);
 	return r.length > 0 && !r.some((e) => e.isCurrent) && (r[0] = {
 		...r[0],
 		isCurrent: !0
 	}), r;
 }
-async function eC(e) {
-	let t = await e.getConfig(FS).catch(() => null);
+async function tC(e) {
+	let t = await e.getConfig(IS).catch(() => null);
 	if (Array.isArray(t) && t.length > 0) return null;
-	let n = await e.getConfig(PS).catch(() => null);
+	let n = await e.getConfig(FS).catch(() => null);
 	if (!n || typeof n != "object" || Array.isArray(n)) return null;
-	let r = US(n.places), i = "places" in n || "mock" in n;
-	return r.length > 0 ? (await e.setConfig(FS, r).catch(() => {}), i && await e.setConfig(PS, VS(n)).catch(() => {}), r) : (i && await e.setConfig(PS, VS(n)).catch(() => {}), null);
+	let r = WS(n.places), i = "places" in n || "mock" in n;
+	return r.length > 0 ? (await e.setConfig(IS, r).catch(() => {}), i && await e.setConfig(FS, HS(n)).catch(() => {}), r) : (i && await e.setConfig(FS, HS(n)).catch(() => {}), null);
 }
 //#endregion
 //#region public/plugins/weather/src/data/api.js
-var tC = /* @__PURE__ */ new Set([
+var nC = /* @__PURE__ */ new Set([
 	"devapi.qweather.com",
 	"api.qweather.com",
 	"geoapi.qweather.com"
-]), nC = 12e3, rC = class extends Error {
+]), rC = 12e3, iC = class extends Error {
 	constructor(e, { status: t = 0, code: n = "" } = {}) {
 		super(e), this.name = "WeatherApiError", this.status = t, this.code = n;
 	}
 };
-function iC(e) {
+function aC(e) {
 	return !!(e && String(e.apiKey || "").trim());
 }
-function aC(e) {
-	let t = String(e?.apiHost || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, ""), n = t || "devapi.qweather.com", r = tC.has(n.toLowerCase());
+function oC(e) {
+	let t = String(e?.apiHost || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, ""), n = t || "devapi.qweather.com", r = nC.has(n.toLowerCase());
 	return {
 		host: n,
 		configured: !!t,
@@ -25961,18 +26000,18 @@ function aC(e) {
 		geoPath: r ? "/v2/city/lookup" : "/geo/v2/city/lookup"
 	};
 }
-function oC(e) {
+function sC(e) {
 	return /^eyJ[\w-]*\.[\w-]+\.[\w-]+$/.test(e);
 }
-function sC(e) {
+function cC(e) {
 	let t = String(e?.apiKey || "").trim();
-	if (!t) throw new rC("未配置和风天气 API Key", {
+	if (!t) throw new iC("未配置和风天气 API Key", {
 		status: 401,
 		code: "NO_KEY"
 	});
-	return oC(t) ? { Authorization: `Bearer ${t}` } : { "X-QW-Api-Key": t };
+	return sC(t) ? { Authorization: `Bearer ${t}` } : { "X-QW-Api-Key": t };
 }
-var cC = {
+var lC = {
 	204: "该地区没有天气数据",
 	400: "请求有误",
 	401: "天气服务认证失败",
@@ -25982,7 +26021,7 @@ var cC = {
 	429: "请求过于频繁",
 	500: "天气服务暂时不可用"
 };
-function lC(e, t) {
+function uC(e, t) {
 	switch (e) {
 		case 400: return t ? `请求有误：${t}` : "请求有误";
 		case 401: return "天气服务认证失败";
@@ -25992,20 +26031,20 @@ function lC(e, t) {
 		default: return e >= 500 ? "天气服务暂时不可用" : `请求失败（${e}）`;
 	}
 }
-function uC(e, t, n) {
+function dC(e, t, n) {
 	let r = new URL(t, e);
 	for (let [e, t] of Object.entries(n || {})) t != null && t !== "" && r.searchParams.set(e, String(t));
 	return r.toString();
 }
-async function dC(e, t, n, r) {
-	let i = sC(e);
-	if (!aC(e).configured) throw new rC("天气数据地址未设置", {
+async function fC(e, t, n, r) {
+	let i = cC(e);
+	if (!oC(e).configured) throw new iC("天气数据地址未设置", {
 		status: 401,
 		code: "NO_HOST"
 	});
-	let a = new AbortController(), o = setTimeout(() => a.abort(), nC), s;
+	let a = new AbortController(), o = setTimeout(() => a.abort(), rC), s;
 	try {
-		s = await fetch(uC(t, n, r), {
+		s = await fetch(dC(t, n, r), {
 			method: "GET",
 			headers: {
 				Accept: "application/json",
@@ -26015,10 +26054,10 @@ async function dC(e, t, n, r) {
 			cache: "no-store"
 		});
 	} catch (e) {
-		throw clearTimeout(o), e?.name === "AbortError" ? new rC("请求超时，暂时显示已缓存的数据", {
+		throw clearTimeout(o), e?.name === "AbortError" ? new iC("请求超时，暂时显示已缓存的数据", {
 			status: 0,
 			code: "TIMEOUT"
-		}) : new rC("网络连接失败，暂时显示已缓存的数据", {
+		}) : new iC("网络连接失败，暂时显示已缓存的数据", {
 			status: 0,
 			code: "NETWORK"
 		});
@@ -26031,22 +26070,22 @@ async function dC(e, t, n, r) {
 		c = null;
 	}
 	if (!s.ok) {
-		let e = c?.error?.type || "", t = c?.error?.detail || c?.error?.title || "", n = lC(s.status, t);
-		throw e.includes("invalid-host") ? n = "天气数据地址无效" : e.includes("unauthorized") ? n = "天气服务认证失败" : (e.includes("no-credit") || e.includes("overdue")) && (n = "天气帐号额度不足"), new rC(n, {
+		let e = c?.error?.type || "", t = c?.error?.detail || c?.error?.title || "", n = uC(s.status, t);
+		throw e.includes("invalid-host") ? n = "天气数据地址无效" : e.includes("unauthorized") ? n = "天气服务认证失败" : (e.includes("no-credit") || e.includes("overdue")) && (n = "天气帐号额度不足"), new iC(n, {
 			status: s.status,
 			code: e || String(s.status)
 		});
 	}
 	if (c && typeof c.code == "string" && c.code !== "200") {
 		let e = Number(c.code) || 0;
-		throw new rC(cC[c.code] || `和风天气返回错误码 ${c.code}`, {
+		throw new iC(lC[c.code] || `和风天气返回错误码 ${c.code}`, {
 			status: e,
 			code: c.code
 		});
 	}
 	return c;
 }
-function fC(e) {
+function pC(e) {
 	return (e?.location || []).map((e) => ({
 		id: String(e.id),
 		name: e.name || "",
@@ -26058,20 +26097,20 @@ function fC(e) {
 		tz: e.tz || "Asia/Shanghai"
 	}));
 }
-async function pC(e, t) {
-	let { geoBaseUrl: n, geoPath: r } = aC(e), i = fC(await dC(e, n, r, {
+async function mC(e, t) {
+	let { geoBaseUrl: n, geoPath: r } = oC(e), i = pC(await fC(e, n, r, {
 		location: t,
 		number: 10,
 		lang: "zh"
 	}));
-	if (i.length === 0) throw new rC(`没有找到“${t}”对应的城市`, { code: "NO_LOCATION" });
+	if (i.length === 0) throw new iC(`没有找到“${t}”对应的城市`, { code: "NO_LOCATION" });
 	return i;
 }
-async function mC(e, t, n) {
-	return pC(e, `${Number(n).toFixed(2)},${Number(t).toFixed(2)}`);
+async function hC(e, t, n) {
+	return mC(e, `${Number(n).toFixed(2)},${Number(t).toFixed(2)}`);
 }
-var hC = (e) => zx(e).replace(/风$/, "");
-function gC(e) {
+var gC = (e) => Bx(e).replace(/风$/, "");
+function _C(e) {
 	return {
 		obsTime: null,
 		temp: e?.temperature?.value ?? null,
@@ -26079,7 +26118,7 @@ function gC(e) {
 		icon: e?.condition?.code ?? "999",
 		text: e?.condition?.text ?? "",
 		humidity: e?.humidity == null ? null : Math.round(e.humidity * 100),
-		windDir: hC(e?.wind?.direction?.compass) || "",
+		windDir: gC(e?.wind?.direction?.compass) || "",
 		windScale: e?.wind?.scale ?? null,
 		windSpeed: e?.wind?.speed?.value ?? null,
 		precip: e?.precipitation?.amount?.value ?? 0,
@@ -26090,7 +26129,7 @@ function gC(e) {
 		uvIndex: e?.uvIndex ?? null
 	};
 }
-function _C(e) {
+function vC(e) {
 	let t = e?.now || {};
 	return {
 		obsTime: t.obsTime || null,
@@ -26110,7 +26149,7 @@ function _C(e) {
 		uvIndex: t.uvIndex == null ? null : Number(t.uvIndex)
 	};
 }
-function vC(e) {
+function yC(e) {
 	return (e?.hours || []).map((e) => ({
 		fxTime: e.forecastTime,
 		temp: e.temperature?.value ?? null,
@@ -26119,7 +26158,7 @@ function vC(e) {
 		pop: e.precipitation?.probability == null ? null : Math.round(e.precipitation.probability * 100),
 		precip: e.precipitation?.amount?.value ?? 0,
 		humidity: e.humidity == null ? null : Math.round(e.humidity * 100),
-		windDir: hC(e.wind?.direction?.compass) || "",
+		windDir: gC(e.wind?.direction?.compass) || "",
 		windScale: e.wind?.scale ?? null,
 		windSpeed: e.wind?.speed?.value ?? null,
 		pressure: e.pressure?.value ?? null,
@@ -26127,7 +26166,7 @@ function vC(e) {
 		cloud: e.cloudCover == null ? null : Math.round(e.cloudCover * 100)
 	}));
 }
-function yC(e) {
+function bC(e) {
 	return (e?.hourly || []).map((e) => ({
 		fxTime: e.fxTime,
 		temp: Number(e.temp),
@@ -26144,9 +26183,9 @@ function yC(e) {
 		cloud: e.cloud == null ? null : Number(e.cloud)
 	}));
 }
-function bC(e) {
+function xC(e) {
 	return (e?.days || []).map((e) => ({
-		fxDate: Ax(e.forecastStartTime),
+		fxDate: jx(e.forecastStartTime),
 		icon: e.daytime?.condition?.code ?? "999",
 		text: e.daytime?.condition?.text ?? "",
 		iconNight: e.nighttime?.condition?.code ?? null,
@@ -26155,7 +26194,7 @@ function bC(e) {
 		tempMin: e.temperatureMin?.value ?? null,
 		sunrise: e.astro?.sunrise ?? null,
 		sunset: e.astro?.sunset ?? null,
-		windDir: hC(e.daytime?.wind?.direction?.compass) || "",
+		windDir: gC(e.daytime?.wind?.direction?.compass) || "",
 		windScale: e.daytime?.wind?.scale ?? null,
 		pop: e.daytime?.precipitation?.probability == null ? null : Math.round(e.daytime.precipitation.probability * 100),
 		uvIndex: e.uvIndexMax ?? null,
@@ -26164,9 +26203,9 @@ function bC(e) {
 		pressure: null
 	}));
 }
-function xC(e) {
+function SC(e) {
 	return (e?.daily || []).map((e) => ({
-		fxDate: Ax(e.fxDate),
+		fxDate: jx(e.fxDate),
 		icon: e.iconDay || "999",
 		text: e.textDay || "",
 		iconNight: e.iconNight || null,
@@ -26184,28 +26223,28 @@ function xC(e) {
 		pressure: e.pressure == null ? null : Number(e.pressure)
 	}));
 }
-function SC(e) {
+function CC(e) {
 	return {
 		code: e?.code || "",
 		name: e?.name || "",
 		aqi: e?.aqi ?? null,
 		aqiDisplay: e?.aqiDisplay ?? (e?.aqi == null ? "—" : String(e.aqi)),
 		level: e?.level || "",
-		category: Jx(e?.category, e?.level),
-		tone: Xx(e?.aqi),
+		category: Yx(e?.category, e?.level),
+		tone: Zx(e?.aqi),
 		primary: e?.primaryPollutant?.name || ""
 	};
 }
-function CC(e) {
-	let t = (e?.indexes || []).map(SC);
-	if (t.length === 0) throw new rC("该地区暂无空气质量数据", { code: "NO_DATA" });
+function wC(e) {
+	let t = (e?.indexes || []).map(CC);
+	if (t.length === 0) throw new iC("该地区暂无空气质量数据", { code: "NO_DATA" });
 	let n = t.find((e) => e.code === "cn-mee") || t.find((e) => e.code === "us-epa") || t[0], r = {};
 	for (let t of e?.pollutants || []) r[t.code] = {
 		value: t?.concentration?.value ?? null,
 		unit: t?.concentration?.unit || "μg/m³",
-		name: eS[t.code] || t.name || t.code
+		name: tS[t.code] || t.name || t.code
 	};
-	let i = wC(e, t, n), a = e?.indexes?.find((e) => e.code === n.code) || e?.indexes?.[0];
+	let i = TC(e, t, n), a = e?.indexes?.find((e) => e.code === n.code) || e?.indexes?.[0];
 	return {
 		aqi: n.aqi,
 		aqiDisplay: n.aqiDisplay,
@@ -26226,7 +26265,7 @@ function CC(e) {
 		rawIndex: a
 	};
 }
-function wC(e, t, n) {
+function TC(e, t, n) {
 	let r = e?.indexes?.find((e) => e.code === n.code), i = r?.health?.advice || {};
 	return {
 		effect: r?.health?.effect || "",
@@ -26234,14 +26273,14 @@ function wC(e, t, n) {
 		sensitive: i.sensitivePopulation || ""
 	};
 }
-function TC(e) {
+function EC(e) {
 	let t = e?.now || {}, n = t.aqi == null ? null : Number(t.aqi);
 	return {
 		aqi: n,
 		aqiDisplay: n == null ? "—" : String(n),
 		level: t.level || "",
 		category: t.category || "",
-		tone: Xx(n),
+		tone: Zx(n),
 		primary: t.primary || "",
 		pollutants: {
 			pm2p5: {
@@ -26287,15 +26326,15 @@ function TC(e) {
 		pubTime: t.pubTime || null
 	};
 }
-function EC(e) {
+function DC(e) {
 	return (e?.alerts || []).map((e) => ({
 		id: e.id || `${e.issuedTime}:${e.headline}`,
 		title: e.headline || e.description || "天气预警",
 		typeName: e.eventType?.name || "",
 		severity: e.severity || "unknown",
-		severityText: Yx[e.severity] || e.severity || "未知",
+		severityText: Xx[e.severity] || e.severity || "未知",
 		colorCode: e.color?.code || "",
-		tone: $x(e.color?.code),
+		tone: eS(e.color?.code),
 		startTime: e.effectiveTime || e.onsetTime || e.issuedTime || null,
 		endTime: e.expireTime || null,
 		issuedTime: e.issuedTime || null,
@@ -26304,15 +26343,15 @@ function EC(e) {
 		guide: e.instruction || ""
 	}));
 }
-function DC(e) {
+function OC(e) {
 	return (e?.warning || []).map((e) => ({
 		id: e.id || `${e.pubTime}:${e.title}`,
 		title: e.title || e.typeName || "天气预警",
 		typeName: e.typeName || e.type || "",
 		severity: String(e.severity || "").toLowerCase(),
-		severityText: e.level || Yx[String(e.severity || "").toLowerCase()] || "未知",
+		severityText: e.level || Xx[String(e.severity || "").toLowerCase()] || "未知",
 		colorCode: e.severityColor || "",
-		tone: $x(e.level || e.severityColor),
+		tone: eS(e.level || e.severityColor),
 		startTime: e.startTime || null,
 		endTime: e.endTime || null,
 		issuedTime: e.pubTime || null,
@@ -26321,9 +26360,9 @@ function DC(e) {
 		guide: ""
 	}));
 }
-function OC(e) {
+function kC(e) {
 	return (e?.daily || []).map((e) => ({
-		date: Ax(e.date),
+		date: jx(e.date),
 		type: e.type,
 		name: e.name || `指数 ${e.type}`,
 		level: e.level || "",
@@ -26331,7 +26370,7 @@ function OC(e) {
 		text: e.text || ""
 	}));
 }
-function kC(e) {
+function AC(e) {
 	let t = (e?.minutely || []).map((e) => ({
 		time: e.fxTime,
 		precip: Number(e.precip || 0),
@@ -26342,87 +26381,87 @@ function kC(e) {
 		items: t
 	};
 }
-function AC(e) {
+function jC(e) {
 	return e?.id ? e.id : `${Number(e.lon).toFixed(2)},${Number(e.lat).toFixed(2)}`;
 }
-function jC(e) {
+function MC(e) {
 	return `${Number(e.lat).toFixed(2)}/${Number(e.lon).toFixed(2)}`;
 }
-async function MC(e, t) {
-	let n = aC(e);
-	return n.legacy ? _C(await dC(e, n.baseUrl, "/v7/weather/now", {
-		location: AC(t),
+async function NC(e, t) {
+	let n = oC(e);
+	return n.legacy ? vC(await fC(e, n.baseUrl, "/v7/weather/now", {
+		location: jC(t),
 		lang: "zh"
-	})) : gC(await dC(e, n.baseUrl, `/weather/v1/current/${jC(t)}`, {
+	})) : _C(await fC(e, n.baseUrl, `/weather/v1/current/${MC(t)}`, {
 		localTime: "true",
 		lang: "zh"
 	}));
 }
-async function NC(e, t, n = 24) {
-	let r = aC(e);
-	return r.legacy ? yC(await dC(e, r.baseUrl, "/v7/weather/24h", {
-		location: AC(t),
+async function PC(e, t, n = 24) {
+	let r = oC(e);
+	return r.legacy ? bC(await fC(e, r.baseUrl, "/v7/weather/24h", {
+		location: jC(t),
 		lang: "zh"
-	})) : vC(await dC(e, r.baseUrl, `/weather/v1/hourly/${jC(t)}`, {
+	})) : yC(await fC(e, r.baseUrl, `/weather/v1/hourly/${MC(t)}`, {
 		hours: n,
 		localTime: "true",
 		lang: "zh"
 	}));
 }
-async function PC(e, t, n = 7) {
-	let r = aC(e);
-	return r.legacy ? xC(await dC(e, r.baseUrl, "/v7/weather/7d", {
-		location: AC(t),
+async function FC(e, t, n = 7) {
+	let r = oC(e);
+	return r.legacy ? SC(await fC(e, r.baseUrl, "/v7/weather/7d", {
+		location: jC(t),
 		lang: "zh"
-	})) : bC(await dC(e, r.baseUrl, `/weather/v1/daily/${jC(t)}`, {
+	})) : xC(await fC(e, r.baseUrl, `/weather/v1/daily/${MC(t)}`, {
 		days: n,
 		localTime: "true",
 		lang: "zh"
 	}));
 }
-async function FC(e, t) {
-	let n = aC(e);
-	if (!n.legacy) try {
-		return CC(await dC(e, n.baseUrl, `/airquality/v1/current/${jC(t)}`, { lang: "zh" }));
-	} catch (e) {
-		if (!(e instanceof rC) || e.status === 401 || e.status === 429) throw e;
-	}
-	return TC(await dC(e, n.baseUrl, "/v7/air/now", {
-		location: AC(t),
-		lang: "zh"
-	}));
-}
 async function IC(e, t) {
-	let n = aC(e);
+	let n = oC(e);
 	if (!n.legacy) try {
-		return EC(await dC(e, n.baseUrl, `/weatheralert/v1/current/${jC(t)}`, {
-			localTime: "true",
-			lang: "zh"
-		}));
+		return wC(await fC(e, n.baseUrl, `/airquality/v1/current/${MC(t)}`, { lang: "zh" }));
 	} catch (e) {
-		if (!(e instanceof rC) || e.status === 401 || e.status === 429) throw e;
+		if (!(e instanceof iC) || e.status === 401 || e.status === 429) throw e;
 	}
-	return DC(await dC(e, n.baseUrl, "/v7/warning/now", {
-		location: AC(t),
+	return EC(await fC(e, n.baseUrl, "/v7/air/now", {
+		location: jC(t),
 		lang: "zh"
 	}));
 }
 async function LC(e, t) {
-	return OC(await dC(e, aC(e).baseUrl, "/v7/indices/1d", {
-		type: "0",
-		location: AC(t),
+	let n = oC(e);
+	if (!n.legacy) try {
+		return DC(await fC(e, n.baseUrl, `/weatheralert/v1/current/${MC(t)}`, {
+			localTime: "true",
+			lang: "zh"
+		}));
+	} catch (e) {
+		if (!(e instanceof iC) || e.status === 401 || e.status === 429) throw e;
+	}
+	return OC(await fC(e, n.baseUrl, "/v7/warning/now", {
+		location: jC(t),
 		lang: "zh"
 	}));
 }
 async function RC(e, t) {
-	return kC(await dC(e, aC(e).baseUrl, "/v7/minutely/5m", {
+	return kC(await fC(e, oC(e).baseUrl, "/v7/indices/1d", {
+		type: "0",
+		location: jC(t),
+		lang: "zh"
+	}));
+}
+async function zC(e, t) {
+	return AC(await fC(e, oC(e).baseUrl, "/v7/minutely/5m", {
 		location: `${Number(t.lon).toFixed(2)},${Number(t.lat).toFixed(2)}`,
 		lang: "zh"
 	}));
 }
 //#endregion
 //#region public/plugins/weather/src/data/mock.js
-var zC = [
+var BC = [
 	{
 		id: "101010100",
 		name: "北京",
@@ -26483,7 +26522,7 @@ var zC = [
 		country: "中国",
 		tz: "Asia/Shanghai"
 	}
-], BC = {
+], VC = {
 	101010100: 23,
 	101020100: 25,
 	101210101: 24,
@@ -26491,12 +26530,12 @@ var zC = [
 	101280601: 29,
 	101270101: 20
 };
-function VC(e) {
+function HC(e) {
 	let t = 2166136261;
 	for (let n = 0; n < e.length; n++) t ^= e.charCodeAt(n), t = Math.imul(t, 16777619);
 	return t >>> 0;
 }
-function HC(e) {
+function UC(e) {
 	let t = e >>> 0;
 	return () => {
 		t += 1831565813;
@@ -26504,17 +26543,17 @@ function HC(e) {
 		return e = Math.imul(e ^ e >>> 15, e | 1), e ^= e + Math.imul(e ^ e >>> 7, e | 61), ((e ^ e >>> 14) >>> 0) / 4294967296;
 	};
 }
-function UC(e) {
+function WC(e) {
 	return String(e).padStart(2, "0");
 }
-function WC(e) {
-	let t = -e.getTimezoneOffset(), n = t >= 0 ? "+" : "-", r = Math.abs(t);
-	return `${e.getFullYear()}-${UC(e.getMonth() + 1)}-${UC(e.getDate())}T${UC(e.getHours())}:${UC(e.getMinutes())}${n}${UC(Math.floor(r / 60))}:${UC(r % 60)}`;
-}
 function GC(e) {
-	return `${e.getFullYear()}-${UC(e.getMonth() + 1)}-${UC(e.getDate())}`;
+	let t = -e.getTimezoneOffset(), n = t >= 0 ? "+" : "-", r = Math.abs(t);
+	return `${e.getFullYear()}-${WC(e.getMonth() + 1)}-${WC(e.getDate())}T${WC(e.getHours())}:${WC(e.getMinutes())}${n}${WC(Math.floor(r / 60))}:${WC(r % 60)}`;
 }
-var KC = [
+function KC(e) {
+	return `${e.getFullYear()}-${WC(e.getMonth() + 1)}-${WC(e.getDate())}`;
+}
+var qC = [
 	{
 		code: "100",
 		text: "晴"
@@ -26547,7 +26586,7 @@ var KC = [
 		code: "302",
 		text: "雷阵雨"
 	}
-], qC = [
+], JC = [
 	{
 		code: "150",
 		text: "晴"
@@ -26565,11 +26604,11 @@ var KC = [
 		text: "少云"
 	}
 ];
-function JC(e) {
-	let t = String(e || "").trim().toLowerCase();
-	return zC.filter((e) => !t || e.name.includes(t) || t.includes(e.name.toLowerCase()) || e.adm1.includes(t) || `${e.lat},${e.lon}`.includes(t)).map((e) => ({ ...e }));
-}
 function YC(e) {
+	let t = String(e || "").trim().toLowerCase();
+	return BC.filter((e) => !t || e.name.includes(t) || t.includes(e.name.toLowerCase()) || e.adm1.includes(t) || `${e.lat},${e.lon}`.includes(t)).map((e) => ({ ...e }));
+}
+function XC(e) {
 	if (e.id !== "101010100") return [];
 	let t = Date.now();
 	return [{
@@ -26580,8 +26619,8 @@ function YC(e) {
 		severityText: "一般",
 		colorCode: "blue",
 		tone: "info",
-		startTime: WC(/* @__PURE__ */ new Date(t - 24e5)),
-		endTime: WC(new Date(t + 432e5)),
+		startTime: GC(/* @__PURE__ */ new Date(t - 24e5)),
+		endTime: GC(new Date(t + 432e5)),
 		text: "预计未来 12 小时内北京大部分地区将出现 6 级左右偏北风，阵风可达 7 到 8 级，请注意防范。",
 		guide: "1. 关好门窗，加固围板、棚架、广告牌等易被风吹动的搭建物。\n2. 行人尽量少骑自行车，刮风时不要在广告牌、临时搭建物下面逗留。\n3. 相关水域水上作业和过往船舶采取积极的应对措施。"
 	}, {
@@ -26592,20 +26631,20 @@ function YC(e) {
 		severityText: "较重",
 		colorCode: "yellow",
 		tone: "warning",
-		startTime: WC(/* @__PURE__ */ new Date(t - 18e6)),
-		endTime: WC(new Date(t + 108e6)),
+		startTime: GC(/* @__PURE__ */ new Date(t - 18e6)),
+		endTime: GC(new Date(t + 108e6)),
 		text: "预计未来 3 天北京市最高气温将持续在 35℃ 以上，请注意防暑降温。",
 		guide: "1. 尽量避免午后高温时段的户外活动。\n2. 注意补水，户外作业人员做好防晒措施。\n3. 注意防范用电高峰引发的火灾。"
 	}];
 }
-function XC(e) {
+function ZC(e) {
 	let t = 42 + Math.round(e() * 70), n = t <= 50 ? "优" : t <= 100 ? "良" : t <= 150 ? "轻度污染" : "中度污染", r = Math.round(t * .55), i = Math.round(t * .8), a = 18 + Math.round(e() * 20), o = 3 + Math.round(e() * 5), s = .4, c = 40 + Math.round(e() * 60);
 	return {
 		aqi: t,
 		aqiDisplay: String(t),
 		level: t <= 50 ? "1" : t <= 100 ? "2" : t <= 150 ? "3" : "4",
 		category: n,
-		tone: Xx(t),
+		tone: Zx(t),
 		primary: "PM2.5",
 		pollutants: {
 			pm2p5: {
@@ -26657,7 +26696,7 @@ function XC(e) {
 			aqiDisplay: String(t),
 			level: t <= 50 ? "1" : t <= 100 ? "2" : "3",
 			category: n,
-			tone: Xx(t),
+			tone: Zx(t),
 			primary: "PM2.5"
 		}, {
 			code: "us-epa",
@@ -26666,12 +26705,12 @@ function XC(e) {
 			aqiDisplay: String(Math.round(t * .7)),
 			level: t <= 50 ? "1" : "2",
 			category: t <= 50 ? "Good" : "Moderate",
-			tone: Xx(Math.round(t * .7)),
+			tone: Zx(Math.round(t * .7)),
 			primary: "PM2.5"
 		}]
 	};
 }
-function ZC(e) {
+function QC(e) {
 	return [
 		{
 			type: "1",
@@ -26731,15 +26770,15 @@ function ZC(e) {
 		}
 	].map((e) => ({
 		...e,
-		date: GC(/* @__PURE__ */ new Date())
+		date: KC(/* @__PURE__ */ new Date())
 	}));
 }
-function QC() {
+function $C() {
 	let e = /* @__PURE__ */ new Date(), t = [], n = Math.floor(e.getTime() / 3e5) * 3e5;
 	for (let e = 0; e < 24; e++) {
 		let r = new Date(n + e * 3e5), i = Math.max(0, Math.sin((e - 3) / 24 * Math.PI * 2) * .6 + Math.sin(e / 3) * .15);
 		t.push({
-			time: WC(r),
+			time: GC(r),
 			precip: Number(i.toFixed(2)),
 			type: "rain"
 		});
@@ -26749,12 +26788,12 @@ function QC() {
 		items: t
 	};
 }
-function $C(e) {
-	let t = HC(VC(`${e.id}:${GC(/* @__PURE__ */ new Date())}`)), n = /* @__PURE__ */ new Date(), r = BC[e.id] ?? 24, i = Math.floor(t() * KC.length), a = KC[i], o = n.getHours() < 6 || n.getHours() >= 19, s = {
-		obsTime: WC(n),
+function ew(e) {
+	let t = UC(HC(`${e.id}:${KC(/* @__PURE__ */ new Date())}`)), n = /* @__PURE__ */ new Date(), r = VC[e.id] ?? 24, i = Math.floor(t() * qC.length), a = qC[i], o = n.getHours() < 6 || n.getHours() >= 19, s = {
+		obsTime: GC(n),
 		temp: r + Math.round((t() - .5) * 3),
 		feelsLike: r + 1 + Math.round((t() - .5) * 3),
-		icon: o ? qC[i % qC.length].code : a.code,
+		icon: o ? JC[i % JC.length].code : a.code,
 		text: a.text,
 		humidity: 42 + Math.round(t() * 40),
 		windDir: t() > .5 ? "东南风" : "北风",
@@ -26768,9 +26807,9 @@ function $C(e) {
 		uvIndex: o ? 0 : 1 + Math.round(t() * 5)
 	}, c = [];
 	for (let e = 0; e < 24; e++) {
-		let i = new Date(n.getTime() + e * 36e5), a = i.getHours(), o = a < 6 || a >= 19, l = o ? qC[(Math.floor(t() * qC.length) + e) % qC.length] : KC[(e * 3 + Math.floor(t() * 3)) % KC.length], u = Math.sin((a - 9) / 24 * Math.PI * 2) * 4;
+		let i = new Date(n.getTime() + e * 36e5), a = i.getHours(), o = a < 6 || a >= 19, l = o ? JC[(Math.floor(t() * JC.length) + e) % JC.length] : qC[(e * 3 + Math.floor(t() * 3)) % qC.length], u = Math.sin((a - 9) / 24 * Math.PI * 2) * 4;
 		c.push({
-			fxTime: WC(i),
+			fxTime: GC(i),
 			temp: Math.round(r + u + (t() - .5) * 2),
 			icon: l.code,
 			text: l.text,
@@ -26787,17 +26826,17 @@ function $C(e) {
 	}
 	let l = [];
 	for (let e = 0; e < 7; e++) {
-		let a = new Date(n.getTime() + e * 864e5), o = KC[(i + e * 2) % KC.length], c = qC[(i + e) % qC.length], u = r + 3 + Math.round(t() * 4), d = r - 8 + Math.round(t() * 3);
+		let a = new Date(n.getTime() + e * 864e5), o = qC[(i + e * 2) % qC.length], c = JC[(i + e) % JC.length], u = r + 3 + Math.round(t() * 4), d = r - 8 + Math.round(t() * 3);
 		l.push({
-			fxDate: GC(a),
+			fxDate: KC(a),
 			icon: o.code,
 			text: o.text,
 			iconNight: c.code,
 			textNight: c.text,
 			tempMax: u,
 			tempMin: d,
-			sunrise: `${GC(a)}T05:${UC(20 + Math.round(t() * 15))}`,
-			sunset: `${GC(a)}T18:${UC(10 + Math.round(t() * 20))}`,
+			sunrise: `${KC(a)}T05:${WC(20 + Math.round(t() * 15))}`,
+			sunset: `${KC(a)}T18:${WC(10 + Math.round(t() * 20))}`,
 			windDir: s.windDir,
 			windScale: s.windScale,
 			pop: Math.round(t() * 40),
@@ -26812,22 +26851,22 @@ function $C(e) {
 		current: s,
 		hourly: c,
 		daily: l,
-		air: XC(HC(VC(`${e.id}:air`))),
-		warnings: YC(e),
-		indices: ZC(e),
-		minutely: QC()
+		air: ZC(UC(HC(`${e.id}:air`))),
+		warnings: XC(e),
+		indices: QC(e),
+		minutely: $C()
 	};
 }
 //#endregion
 //#region public/plugins/weather/src/data/locate.js
-var ew = 18e5, tw = 8e3, nw = 2500, rw = 4e3, iw = 2500;
-function aw(e) {
-	return !!e?.mock || iC(e);
+var tw = 18e5, nw = 8e3, rw = 2500, iw = 4e3, aw = 2500;
+function ow(e) {
+	return !!e?.mock || aC(e);
 }
-function ow(e, t = Date.now()) {
-	return !e || !e.at ? !1 : t - e.at < ew;
+function sw(e, t = Date.now()) {
+	return !e || !e.at ? !1 : t - e.at < tw;
 }
-async function sw(e, t) {
+async function cw(e, t) {
 	let n = 0;
 	try {
 		let r = new Promise((e) => {
@@ -26838,7 +26877,7 @@ async function sw(e, t) {
 		n && clearTimeout(n);
 	}
 }
-function cw(e) {
+function lw(e) {
 	if (!e || typeof e != "object") return "";
 	for (let t of [
 		e.city,
@@ -26847,24 +26886,24 @@ function cw(e) {
 	]) if (typeof t == "string" && t.trim()) return t.trim();
 	return "";
 }
-async function lw(t, { budgetMs: n = tw } = {}) {
-	if (!aw(t)) return null;
+async function uw(t, { budgetMs: n = nw } = {}) {
+	if (!ow(t)) return null;
 	if (t.mock) return {
-		place: { ...zC[0] },
+		place: { ...BC[0] },
 		source: "mock"
 	};
-	let r = Date.now() + Math.max(1e3, n), i = (e) => Math.min(e, Math.max(0, r - Date.now())), a = await sw(() => e.getLocation(), i(nw));
+	let r = Date.now() + Math.max(1e3, n), i = (e) => Math.min(e, Math.max(0, r - Date.now())), a = await cw(() => e.getLocation(), i(rw));
 	if (a && Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lon))) {
-		let e = await sw(() => mC(t, a.lat, a.lon), i(iw));
+		let e = await cw(() => hC(t, a.lat, a.lon), i(aw));
 		if (e && e[0]) return {
 			place: e[0],
 			source: "system"
 		};
 	}
 	if (i(1) <= 0) return null;
-	let o = cw(await sw(() => e.ipLocate(), i(rw)));
+	let o = lw(await cw(() => e.ipLocate(), i(iw)));
 	if (!o) return null;
-	let s = await sw(() => pC(t, o), i(iw));
+	let s = await cw(() => mC(t, o), i(aw));
 	return s && s[0] ? {
 		place: s[0],
 		source: "ip"
@@ -26872,39 +26911,39 @@ async function lw(t, { budgetMs: n = tw } = {}) {
 }
 //#endregion
 //#region public/plugins/weather/src/data/service.js
-var uw = [
+var dw = [
 	"current",
 	"hourly",
 	"daily"
 ];
-function dw(e) {
+function fw(e) {
 	return !!e?.mock;
 }
-function fw(e, t) {
+function pw(e, t) {
 	return t ? {
 		...e,
 		mock: !0
 	} : e;
 }
-function pw(e) {
-	return dw(e) || iC(e);
+function mw(e) {
+	return fw(e) || aC(e);
 }
-async function mw(e, t) {
+async function hw(e, t) {
 	let n = String(t || "").trim();
-	return n ? dw(e) ? JC(n) : pC(e, n) : [];
+	return n ? fw(e) ? YC(n) : mC(e, n) : [];
 }
-function hw(e) {
+function gw(e) {
 	let t = {
-		current: (t) => MC(e, t),
-		hourly: (t) => NC(e, t),
-		daily: (t) => PC(e, t)
+		current: (t) => NC(e, t),
+		hourly: (t) => PC(e, t),
+		daily: (t) => FC(e, t)
 	};
-	return e.showAir && (t.air = (t) => FC(e, t)), e.showWarnings && (t.warnings = (t) => IC(e, t)), t;
+	return e.showAir && (t.air = (t) => IC(e, t)), e.showWarnings && (t.warnings = (t) => LC(e, t)), t;
 }
-async function gw(e, t, n) {
-	if (!t) throw new rC("还没有选择城市", { code: "NO_PLACE" });
-	if (dw(e)) {
-		let e = $C(t);
+async function _w(e, t, n) {
+	if (!t) throw new iC("还没有选择城市", { code: "NO_PLACE" });
+	if (fw(e)) {
+		let e = ew(t);
 		return {
 			data: e,
 			offline: !1,
@@ -26912,11 +26951,11 @@ async function gw(e, t, n) {
 			fetchedAt: e.fetchedAt
 		};
 	}
-	if (!iC(e)) throw new rC("未配置和风天气 API Key", {
+	if (!aC(e)) throw new iC("未配置和风天气 API Key", {
 		status: 401,
 		code: "NO_KEY"
 	});
-	let r = hw(e), i = Object.keys(r), a = await Promise.allSettled(i.map((e) => r[e](t))), o = { ...n || {} }, s = [], c = 0;
+	let r = gw(e), i = Object.keys(r), a = await Promise.allSettled(i.map((e) => r[e](t))), o = { ...n || {} }, s = [], c = 0;
 	a.forEach((e, t) => {
 		let n = i[t];
 		if (e.status === "fulfilled") o[n] = e.value, c += 1;
@@ -26930,12 +26969,12 @@ async function gw(e, t, n) {
 			});
 		}
 	});
-	let l = s.some((e) => uw.includes(e.section)), u = o.current && o.hourly && o.daily;
+	let l = s.some((e) => dw.includes(e.section)), u = o.current && o.hourly && o.daily;
 	c > 0 && (o.fetchedAt = Date.now());
 	let d = l || !u;
 	if (d && !n) {
-		let e = s.find((e) => uw.includes(e.section)) || s[0];
-		throw new rC(e?.message || "天气数据加载失败", {
+		let e = s.find((e) => dw.includes(e.section)) || s[0];
+		throw new iC(e?.message || "天气数据加载失败", {
 			status: e?.status || 0,
 			code: e?.code || ""
 		});
@@ -26948,24 +26987,24 @@ async function gw(e, t, n) {
 		fromCache: l
 	};
 }
-async function _w(e, t, n) {
-	if (!t) throw new rC("还没有选择城市", { code: "NO_PLACE" });
-	if (dw(e)) return $C(t)[n] ?? null;
-	if (!iC(e)) throw new rC("未配置和风天气 API Key", {
+async function vw(e, t, n) {
+	if (!t) throw new iC("还没有选择城市", { code: "NO_PLACE" });
+	if (fw(e)) return ew(t)[n] ?? null;
+	if (!aC(e)) throw new iC("未配置和风天气 API Key", {
 		status: 401,
 		code: "NO_KEY"
 	});
 	switch (n) {
-		case "air": return FC(e, t);
-		case "warnings": return IC(e, t);
-		case "indices": return LC(e, t);
-		case "minutely": return RC(e, t);
+		case "air": return IC(e, t);
+		case "warnings": return LC(e, t);
+		case "indices": return RC(e, t);
+		case "minutely": return zC(e, t);
 		default: return null;
 	}
 }
 //#endregion
 //#region public/plugins/weather/src/data/useWeather.js
-function vw() {
+function yw() {
 	return {
 		loading: !0,
 		refreshing: !1,
@@ -26975,7 +27014,7 @@ function vw() {
 		failures: []
 	};
 }
-function yw(e, t, n) {
+function bw(e, t, n) {
 	return JSON.stringify([
 		n?.id || "",
 		!!e.mock,
@@ -26988,11 +27027,11 @@ function yw(e, t, n) {
 		t.map((e) => `${e.id}:${+!!e.isCurrent}`).join(",")
 	]);
 }
-function bw({ mock: t = !1 } = {}) {
-	let [n, r, i] = ab(PS, RS, VS), [a, o, s] = ab(FS, [], US), [c, l, u] = ab(IS, {}, WS), [d, f] = ab(LS, null, GS), p = (0, P.useMemo)(() => t ? {
+function xw({ mock: t = !1 } = {}) {
+	let [n, r, i] = ab(FS, zS, HS), [a, o, s] = ab(IS, [], WS), [c, l, u] = ab(LS, {}, GS), [d, f] = ab(RS, null, KS), p = (0, P.useMemo)(() => t ? {
 		...n,
 		mock: !0
-	} : n, [n, t]), m = a, h = KS(m), g = h && c[h.id] || null, [_, v] = (0, P.useState)(vw), [y, b] = (0, P.useState)(!1), [x, S] = (0, P.useState)({}), C = (0, P.useRef)(p), w = (0, P.useRef)(m), T = (0, P.useRef)(c), E = (0, P.useRef)(d), D = (0, P.useRef)(x), ee = (0, P.useRef)(0);
+	} : n, [n, t]), m = a, h = qS(m), g = h && c[h.id] || null, [_, v] = (0, P.useState)(yw), [y, b] = (0, P.useState)(!1), [x, S] = (0, P.useState)({}), C = (0, P.useRef)(p), w = (0, P.useRef)(m), T = (0, P.useRef)(c), E = (0, P.useRef)(d), D = (0, P.useRef)(x), ee = (0, P.useRef)(0);
 	(0, P.useEffect)(() => {
 		C.current = p;
 	}, [p]), (0, P.useEffect)(() => {
@@ -27017,21 +27056,21 @@ function bw({ mock: t = !1 } = {}) {
 	(0, P.useEffect)(() => {
 		if (!s) return;
 		let t = !0;
-		return eC(e).then((e) => {
+		return tC(e).then((e) => {
 			t && e && e.length !== 0 && o((t) => t.length > 0 ? t : e);
 		}).catch(() => {}), () => {
 			t = !1;
 		};
 	}, [s, o]);
 	let k = (0, P.useCallback)(async ({ silent: e = !1 } = {}) => {
-		let t = C.current, n = KS(w.current);
+		let t = C.current, n = qS(w.current);
 		if (!n) return v((e) => ({
 			...e,
 			loading: !1,
 			refreshing: !1,
-			noKey: !pw(t)
+			noKey: !mw(t)
 		})), null;
-		if (!pw(t)) return v((e) => ({
+		if (!mw(t)) return v((e) => ({
 			...e,
 			loading: !1,
 			refreshing: !1,
@@ -27047,7 +27086,7 @@ function bw({ mock: t = !1 } = {}) {
 			error: ""
 		}));
 		try {
-			let e = await gw(t, n, i);
+			let e = await _w(t, n, i);
 			if (r !== ee.current) return null;
 			let a = {
 				...e.data,
@@ -27079,7 +27118,7 @@ function bw({ mock: t = !1 } = {}) {
 	}, [te]);
 	(0, P.useEffect)(() => {
 		t && s && (w.current.length > 0 || O([{
-			...zC[0],
+			...BC[0],
 			isCurrent: !0
 		}]));
 	}, [
@@ -27087,9 +27126,9 @@ function bw({ mock: t = !1 } = {}) {
 		s,
 		O
 	]), (0, P.useEffect)(() => {
-		if (!t || !s || E.current?.place?.id === zC[0].id) return;
+		if (!t || !s || E.current?.place?.id === BC[0].id) return;
 		let e = {
-			place: { ...zC[0] },
+			place: { ...BC[0] },
 			source: "mock",
 			at: Date.now()
 		};
@@ -27099,12 +27138,12 @@ function bw({ mock: t = !1 } = {}) {
 		s,
 		f
 	]), (0, P.useEffect)(() => {
-		if (t || !i || !s || !p.autoLocate || !aw(p)) return;
+		if (t || !i || !s || !p.autoLocate || !ow(p)) return;
 		let e = (e) => {
-			let t = QS(w.current, e);
+			let t = $S(w.current, e);
 			t !== w.current && O(t);
 		}, n = E.current;
-		if (ow(n) && n.place) {
+		if (sw(n) && n.place) {
 			if (n.applied !== !0) {
 				e(n.place);
 				let t = {
@@ -27116,7 +27155,7 @@ function bw({ mock: t = !1 } = {}) {
 			return;
 		}
 		let r = !1;
-		return b(!0), lw(p).then((t) => {
+		return b(!0), uw(p).then((t) => {
 			if (r || !t?.place) return;
 			let n = {
 				place: t.place,
@@ -27141,7 +27180,7 @@ function bw({ mock: t = !1 } = {}) {
 		f,
 		O
 	]);
-	let ne = (0, P.useMemo)(() => yw(p, m, h), [
+	let ne = (0, P.useMemo)(() => bw(p, m, h), [
 		p,
 		m,
 		h
@@ -27154,7 +27193,7 @@ function bw({ mock: t = !1 } = {}) {
 			...e,
 			loading: !1,
 			refreshing: !1,
-			noKey: !pw(C.current)
+			noKey: !mw(C.current)
 		})));
 	}, [
 		ne,
@@ -27174,8 +27213,8 @@ function bw({ mock: t = !1 } = {}) {
 		};
 	}, [p.refreshMin, k]);
 	let A = (0, P.useCallback)(async (e, { force: t = !1 } = {}) => {
-		let n = C.current, r = KS(w.current);
-		if (!e || !r || !pw(n)) return null;
+		let n = C.current, r = qS(w.current);
+		if (!e || !r || !mw(n)) return null;
 		let i = D.current[e];
 		if (!t && i?.loading || !t && i?.error) return null;
 		let a = T.current[r.id]?.[e];
@@ -27188,7 +27227,7 @@ function bw({ mock: t = !1 } = {}) {
 			}
 		}));
 		try {
-			let t = await _w(n, r, e), i = {
+			let t = await vw(n, r, e), i = {
 				...T.current[r.id] || {},
 				[e]: t,
 				placeId: r.id
@@ -27209,7 +27248,7 @@ function bw({ mock: t = !1 } = {}) {
 				}
 			})), null;
 		}
-	}, [te]), re = (0, P.useCallback)((e) => O(XS(w.current, e)), [O]), ie = (0, P.useCallback)((e) => O(ZS(w.current, e)), [O]), ae = (0, P.useCallback)((e) => O($S(w.current, e)), [O]);
+	}, [te]), re = (0, P.useCallback)((e) => O(ZS(w.current, e)), [O]), ie = (0, P.useCallback)((e) => O(QS(w.current, e)), [O]), ae = (0, P.useCallback)((e) => O(eC(w.current, e)), [O]);
 	return {
 		mock: t,
 		settings: p,
@@ -27236,15 +27275,15 @@ function bw({ mock: t = !1 } = {}) {
 		setLocation: f,
 		cacheLoaded: u,
 		placesLoaded: s,
-		configured: pw(p)
+		configured: mw(p)
 	};
 }
 //#endregion
 //#region public/plugins/weather/src/data/tools.js
-var xw = {
+var Sw = {
 	type: "string",
 	description: "城市名、和风 LocationID 或 \"current\"（默认当前城市）"
-}, Sw = [
+}, Cw = [
 	"unit",
 	"refreshMin",
 	"autoLocate",
@@ -27253,13 +27292,13 @@ var xw = {
 	"showMinutely",
 	"apiKey",
 	"apiHost"
-], Cw = [
+], ww = [
 	{
 		name: "weather.current",
 		description: "获取指定城市的实时天气（温度、体感、天气现象、湿度、风、气压、能见度等）。不传 place 时用当前城市。",
 		parameters: {
 			type: "object",
-			properties: { place: xw }
+			properties: { place: Sw }
 		}
 	},
 	{
@@ -27268,7 +27307,7 @@ var xw = {
 		parameters: {
 			type: "object",
 			properties: {
-				place: xw,
+				place: Sw,
 				hours: {
 					type: "number",
 					description: "返回多少小时，默认 12，范围 1-24"
@@ -27282,7 +27321,7 @@ var xw = {
 		parameters: {
 			type: "object",
 			properties: {
-				place: xw,
+				place: Sw,
 				days: {
 					type: "number",
 					description: "返回多少天，默认 7，范围 1-7"
@@ -27295,7 +27334,7 @@ var xw = {
 		description: "获取指定城市的实时空气质量（AQI、等级、首要污染物、PM2.5 等浓度）。",
 		parameters: {
 			type: "object",
-			properties: { place: xw }
+			properties: { place: Sw }
 		}
 	},
 	{
@@ -27303,7 +27342,7 @@ var xw = {
 		description: "获取指定城市当前生效的天气预警列表（标题、类型、严重程度、生效时间、防御指南）。",
 		parameters: {
 			type: "object",
-			properties: { place: xw }
+			properties: { place: Sw }
 		}
 	},
 	{
@@ -27367,7 +27406,7 @@ var xw = {
 		description: "立即刷新天气数据（默认当前城市），忽略缓存。",
 		parameters: {
 			type: "object",
-			properties: { place: xw }
+			properties: { place: Sw }
 		}
 	},
 	{
@@ -27433,13 +27472,13 @@ var xw = {
 			}
 		}
 	}
-], ww = 3e5;
-function Tw(e, t = 0) {
+], Tw = 3e5;
+function Ew(e, t = 0) {
 	if (e == null || Number.isNaN(Number(e))) return null;
 	let n = 10 ** t;
 	return Math.round(Number(e) * n) / n;
 }
-function Ew(e) {
+function Dw(e) {
 	return {
 		id: e.id,
 		name: e.name,
@@ -27448,7 +27487,7 @@ function Ew(e) {
 		lon: e.lon
 	};
 }
-function Dw(e) {
+function Ow(e) {
 	return {
 		unit: e.unit,
 		refreshMin: e.refreshMin,
@@ -27460,130 +27499,130 @@ function Dw(e) {
 		hasApiKey: !!e.apiKey
 	};
 }
-function Ow(e, t, n) {
-	let r = e || Rx.none;
+function kw(e, t, n) {
+	let r = e || zx.none;
 	return t == null ? n == null ? r : `${r}${Math.round(Number(n) * 3.6)}km/h` : `${r}${t}级`;
 }
-function kw(e, t) {
+function Aw(e, t) {
 	let n = t.current || {};
 	return {
-		place: Ew(e),
-		updated: Ix(t.fetchedAt),
+		place: Dw(e),
+		updated: Lx(t.fetchedAt),
 		current: {
 			text: n.text || "",
-			temperatureC: Tw(n.temp, 1),
-			feelsLikeC: Tw(n.feelsLike, 1),
+			temperatureC: Ew(n.temp, 1),
+			feelsLikeC: Ew(n.feelsLike, 1),
 			humidityPercent: n.humidity,
-			wind: Ow(n.windDir, n.windScale, n.windSpeed),
-			pressureHpa: Tw(n.pressure),
-			visibilityKm: n.vis == null ? null : Tw(n.vis / 1e3, 1),
-			precipitationMm: Tw(n.precip, 1),
+			wind: kw(n.windDir, n.windScale, n.windSpeed),
+			pressureHpa: Ew(n.pressure),
+			visibilityKm: n.vis == null ? null : Ew(n.vis / 1e3, 1),
+			precipitationMm: Ew(n.precip, 1),
 			uvIndex: n.uvIndex,
 			observedAt: n.obsTime
 		},
 		today: t.daily?.[0] ? {
 			text: t.daily[0].text,
-			highC: Tw(t.daily[0].tempMax, 1),
-			lowC: Tw(t.daily[0].tempMin, 1),
+			highC: Ew(t.daily[0].tempMax, 1),
+			lowC: Ew(t.daily[0].tempMin, 1),
 			precipitationProbabilityPercent: t.daily[0].pop,
 			sunrise: t.daily[0].sunrise,
 			sunset: t.daily[0].sunset
 		} : null
 	};
 }
-function Aw(e) {
-	if (!pw(e)) throw new rC("天气插件未配置和风天气 API Key", {
+function jw(e) {
+	if (!mw(e)) throw new iC("天气插件未配置和风天气 API Key", {
 		status: 401,
 		code: "NO_KEY"
 	});
 }
-async function jw(t) {
+async function Mw(t) {
 	let [n, r, i] = await Promise.all([
-		e.getConfig(PS).catch(() => null),
 		e.getConfig(FS).catch(() => null),
-		e.getConfig(IS).catch(() => null)
-	]), a = fw(VS(n), t.mock), o = US(r);
-	return o.length === 0 && n && typeof n == "object" && (o = US(n.places)), {
+		e.getConfig(IS).catch(() => null),
+		e.getConfig(LS).catch(() => null)
+	]), a = pw(HS(n), t.mock), o = WS(r);
+	return o.length === 0 && n && typeof n == "object" && (o = WS(n.places)), {
 		settings: a,
 		places: o,
-		cache: WS(i)
+		cache: GS(i)
 	};
 }
-async function Mw(e, t) {
+async function Nw(e, t) {
 	let n = typeof t == "string" ? t.trim() : "";
 	if (!n || n === "current" || n === "当前" || n === "当前城市") {
-		let t = KS(e.places);
-		if (!t) throw new rC("天气插件还没有任何城市", { code: "NO_PLACE" });
+		let t = qS(e.places);
+		if (!t) throw new iC("天气插件还没有任何城市", { code: "NO_PLACE" });
 		return t;
 	}
-	let r = qS(e.places, n);
+	let r = JS(e.places, n);
 	if (r) return r;
 	let i = e.places.find((e) => e.name === n || e.name.includes(n));
 	if (i) return i;
-	let a = await mw(e.settings, n);
-	if (a.length === 0) throw new rC(`没有找到城市“${n}”`, { code: "NO_LOCATION" });
+	let a = await hw(e.settings, n);
+	if (a.length === 0) throw new iC(`没有找到城市“${n}”`, { code: "NO_LOCATION" });
 	return a[0];
 }
-async function Nw(e, t, { force: n = !1 } = {}) {
-	let r = await jw(e), i = r.cache[t.id] || null;
-	if (!n && i && i.fetchedAt && Date.now() - i.fetchedAt < ww) return i;
+async function Pw(e, t, { force: n = !1 } = {}) {
+	let r = await Mw(e), i = r.cache[t.id] || null;
+	if (!n && i && i.fetchedAt && Date.now() - i.fetchedAt < Tw) return i;
 	let a = {
-		...(await gw(r.settings, t, i)).data,
+		...(await _w(r.settings, t, i)).data,
 		placeId: t.id
 	};
 	return e.weather.putCache(t.id, a), a;
 }
-function Pw(e, t) {
-	let n = qS(e.places, t);
-	if (!n) throw new rC(`城市列表里没有 id 为 ${t} 的城市`, { code: "NO_PLACE" });
+function Fw(e, t) {
+	let n = JS(e.places, t);
+	if (!n) throw new iC(`城市列表里没有 id 为 ${t} 的城市`, { code: "NO_PLACE" });
 	return n;
 }
-function Fw({ added: e, switched: t, name: n }) {
+function Iw({ added: e, switched: t, name: n }) {
 	return e ? `定位城市 ${n} 已加入并设为当前` : t ? `已切换当前城市为 ${n}` : `当前城市已是 ${n}`;
 }
-function Iw(e) {
+function Lw(e) {
 	return {
 		"weather.current": async (t = {}) => {
-			let n = await Mw(await jw(e), t.place);
-			return kw(n, await Nw(e, n));
+			let n = await Nw(await Mw(e), t.place);
+			return Aw(n, await Pw(e, n));
 		},
 		"weather.hourly": async (t = {}) => {
-			let n = await Mw(await jw(e), t.place), r = await Nw(e, n), i = Math.min(24, Math.max(1, Number(t.hours) || 12));
+			let n = await Nw(await Mw(e), t.place), r = await Pw(e, n), i = Math.min(24, Math.max(1, Number(t.hours) || 12));
 			return {
-				place: Ew(n),
+				place: Dw(n),
 				hours: (r.hourly || []).slice(0, i).map((e) => ({
 					time: e.fxTime,
 					text: e.text,
-					temperatureC: Tw(e.temp, 1),
+					temperatureC: Ew(e.temp, 1),
 					precipitationProbabilityPercent: e.pop,
-					wind: Ow(e.windDir, e.windScale, e.windSpeed),
+					wind: kw(e.windDir, e.windScale, e.windSpeed),
 					humidityPercent: e.humidity,
 					uvIndex: e.uvIndex
 				}))
 			};
 		},
 		"weather.daily": async (t = {}) => {
-			let n = await Mw(await jw(e), t.place), r = await Nw(e, n), i = Math.min(7, Math.max(1, Number(t.days) || 7));
+			let n = await Nw(await Mw(e), t.place), r = await Pw(e, n), i = Math.min(7, Math.max(1, Number(t.days) || 7));
 			return {
-				place: Ew(n),
+				place: Dw(n),
 				days: (r.daily || []).slice(0, i).map((e) => ({
 					date: e.fxDate,
 					text: e.text,
 					textNight: e.textNight,
-					highC: Tw(e.tempMax, 1),
-					lowC: Tw(e.tempMin, 1),
+					highC: Ew(e.tempMax, 1),
+					lowC: Ew(e.tempMin, 1),
 					precipitationProbabilityPercent: e.pop,
 					uvIndex: e.uvIndex,
 					sunrise: e.sunrise,
 					sunset: e.sunset,
-					wind: Ow(e.windDir, e.windScale)
+					wind: kw(e.windDir, e.windScale)
 				}))
 			};
 		},
 		"weather.air": async (t = {}) => {
-			let n = await jw(e), r = await Mw(n, t.place), i = await Nw(e, r), a = i.air || await _w(n.settings, r, "air");
+			let n = await Mw(e), r = await Nw(n, t.place), i = await Pw(e, r), a = i.air || await vw(n.settings, r, "air");
 			return {
-				place: Ew(r),
+				place: Dw(r),
 				aqi: a.aqi,
 				category: a.category,
 				level: a.level,
@@ -27597,13 +27636,13 @@ function Iw(e) {
 					co: a.co,
 					o3: a.o3
 				},
-				updated: Ix(i.fetchedAt)
+				updated: Lx(i.fetchedAt)
 			};
 		},
 		"weather.warning": async (t = {}) => {
-			let n = await jw(e), r = await Mw(n, t.place), i = (await Nw(e, r)).warnings || await _w(n.settings, r, "warnings") || [];
+			let n = await Mw(e), r = await Nw(n, t.place), i = (await Pw(e, r)).warnings || await vw(n.settings, r, "warnings") || [];
 			return {
-				place: Ew(r),
+				place: Dw(r),
 				count: i.length,
 				warnings: i.map((e) => ({
 					title: e.title,
@@ -27619,14 +27658,14 @@ function Iw(e) {
 		},
 		"weather.queryPlace": async (t = {}) => {
 			let n = String(t.city || "").trim();
-			if (!n) throw new rC("queryPlace 需要 city 参数");
-			let r = await jw(e);
-			Aw(r.settings);
-			let i = await mw(r.settings, n);
-			if (i.length === 0) throw new rC(`没有找到城市“${n}”`);
+			if (!n) throw new iC("queryPlace 需要 city 参数");
+			let r = await Mw(e);
+			jw(r.settings);
+			let i = await hw(r.settings, n);
+			if (i.length === 0) throw new iC(`没有找到城市“${n}”`);
 			let a = i[0];
 			return {
-				...kw(a, await Nw(e, a)),
+				...Aw(a, await Pw(e, a)),
 				matchedLocation: {
 					id: a.id,
 					name: a.name,
@@ -27637,9 +27676,9 @@ function Iw(e) {
 			};
 		},
 		"weather.places": async () => {
-			let t = await jw(e);
+			let t = await Mw(e);
 			return {
-				currentPlaceId: KS(t.places)?.id || null,
+				currentPlaceId: qS(t.places)?.id || null,
 				places: t.places.map((e) => ({
 					id: e.id,
 					name: e.name,
@@ -27650,14 +27689,14 @@ function Iw(e) {
 		},
 		"weather.addPlace": async (t = {}) => {
 			let n = String(t.city || "").trim();
-			if (!n) throw new rC("addPlace 需要 city 参数");
-			let r = await jw(e);
-			Aw(r.settings);
-			let i = await mw(r.settings, n);
-			if (i.length === 0) throw new rC(`没有找到城市“${n}”`);
-			let a = i[0], o = ZS(r.places, a);
+			if (!n) throw new iC("addPlace 需要 city 参数");
+			let r = await Mw(e);
+			jw(r.settings);
+			let i = await hw(r.settings, n);
+			if (i.length === 0) throw new iC(`没有找到城市“${n}”`);
+			let a = i[0], o = QS(r.places, a);
 			return e.weather.updatePlaces(o), {
-				added: Ew(a),
+				added: Dw(a),
 				currentPlaceId: a.id,
 				places: o.map((e) => ({
 					id: e.id,
@@ -27668,13 +27707,13 @@ function Iw(e) {
 		},
 		"weather.removePlace": async (t = {}) => {
 			let n = String(t.id || "").trim();
-			if (!n) throw new rC("removePlace 需要 id 参数");
-			let r = await jw(e);
-			Pw(r, n);
-			let i = $S(r.places, n);
+			if (!n) throw new iC("removePlace 需要 id 参数");
+			let r = await Mw(e);
+			Fw(r, n);
+			let i = eC(r.places, n);
 			return e.weather.updatePlaces(i), {
 				removed: n,
-				currentPlaceId: KS(i)?.id || null,
+				currentPlaceId: qS(i)?.id || null,
 				places: i.map((e) => ({
 					id: e.id,
 					name: e.name,
@@ -27684,31 +27723,31 @@ function Iw(e) {
 		},
 		"weather.setCurrentPlace": async (t = {}) => {
 			let n = String(t.id || "").trim();
-			if (!n) throw new rC("setCurrentPlace 需要 id 参数");
-			let r = await jw(e);
-			Pw(r, n);
-			let i = XS(r.places, n);
+			if (!n) throw new iC("setCurrentPlace 需要 id 参数");
+			let r = await Mw(e);
+			Fw(r, n);
+			let i = ZS(r.places, n);
 			return e.weather.updatePlaces(i), {
 				currentPlaceId: n,
-				current: Ew(qS(i, n))
+				current: Dw(JS(i, n))
 			};
 		},
 		"weather.refresh": async (t = {}) => {
-			let n = await jw(e);
-			Aw(n.settings);
-			let r = await Mw(n, t.place), i = KS(n.places);
+			let n = await Mw(e);
+			jw(n.settings);
+			let r = await Nw(n, t.place), i = qS(n.places);
 			if (i && i.id === r.id) {
 				let t = await e.weather.refresh();
-				if (!t) throw new rC("刷新失败，暂时保留已缓存的数据");
-				return kw(r, t);
+				if (!t) throw new iC("刷新失败，暂时保留已缓存的数据");
+				return Aw(r, t);
 			}
-			return kw(r, await Nw(e, r, { force: !0 }));
+			return Aw(r, await Pw(e, r, { force: !0 }));
 		},
 		"weather.locate": async () => {
-			let t = await jw(e);
-			if (Aw(t.settings), !t.settings.autoLocate) throw new rC("自动定位已关闭", { code: "LOCATE_OFF" });
-			let n = await lw(t.settings);
-			if (!n?.place) throw new rC("定位失败：系统定位与 ip.cn 网络归属地都没有返回可用城市", { code: "LOCATE_FAILED" });
+			let t = await Mw(e);
+			if (jw(t.settings), !t.settings.autoLocate) throw new iC("自动定位已关闭", { code: "LOCATE_OFF" });
+			let n = await uw(t.settings);
+			if (!n?.place) throw new iC("定位失败：系统定位与 ip.cn 网络归属地都没有返回可用城市", { code: "LOCATE_FAILED" });
 			let r = { ...n.place }, i = {
 				place: r,
 				source: n.source,
@@ -27716,15 +27755,15 @@ function Iw(e) {
 				applied: !0
 			};
 			e.weather.setLocation(i);
-			let a = qS(t.places, r.id), o = QS(t.places, r), s = !a, c = o !== t.places;
+			let a = JS(t.places, r.id), o = $S(t.places, r), s = !a, c = o !== t.places;
 			return c && e.weather.updatePlaces(o), {
-				located: Ew(r),
+				located: Dw(r),
 				source: n.source,
 				added: s,
 				switched: c,
 				alreadyCurrent: !!a?.isCurrent,
-				currentPlaceId: KS(o)?.id || null,
-				message: Fw({
+				currentPlaceId: qS(o)?.id || null,
+				message: Iw({
 					added: s,
 					switched: c,
 					name: r.name
@@ -27732,17 +27771,17 @@ function Iw(e) {
 			};
 		},
 		"weather.settings.get": async () => {
-			let t = await jw(e);
+			let t = await Mw(e);
 			return {
-				settings: Dw(t.settings),
+				settings: Ow(t.settings),
 				placesCount: t.places.length,
-				currentPlaceId: KS(t.places)?.id || null
+				currentPlaceId: qS(t.places)?.id || null
 			};
 		},
 		"weather.settings.set": async (t = {}) => {
-			let n = await jw(e), r = {};
+			let n = await Mw(e), r = {};
 			if ("unit" in t) {
-				if (t.unit !== "c" && t.unit !== "f") throw new rC("unit 只能是 c 或 f");
+				if (t.unit !== "c" && t.unit !== "f") throw new iC("unit 只能是 c 或 f");
 				r.unit = t.unit;
 			}
 			if ("refreshMin" in t) {
@@ -27751,7 +27790,7 @@ function Iw(e) {
 					15,
 					30,
 					60
-				].includes(e)) throw new rC("refreshMin 只能是 15 / 30 / 60");
+				].includes(e)) throw new iC("refreshMin 只能是 15 / 30 / 60");
 				r.refreshMin = e;
 			}
 			for (let e of [
@@ -27760,17 +27799,17 @@ function Iw(e) {
 				"showWarnings",
 				"showMinutely"
 			]) if (e in t) {
-				if (typeof t[e] != "boolean") throw new rC(`${e} 需要是布尔值`);
+				if (typeof t[e] != "boolean") throw new iC(`${e} 需要是布尔值`);
 				r[e] = t[e];
 			}
 			for (let e of ["apiKey", "apiHost"]) e in t && (r[e] = String(t[e] ?? ""));
-			if (Object.keys(r).length === 0) throw new rC(`settings.set 至少需要一个字段：${Sw.join(" / ")}`);
-			let i = VS({
+			if (Object.keys(r).length === 0) throw new iC(`settings.set 至少需要一个字段：${Cw.join(" / ")}`);
+			let i = HS({
 				...n.settings,
 				...r
 			});
 			return e.weather.setSettings(i), {
-				settings: Dw(i),
+				settings: Ow(i),
 				changed: Object.keys(r)
 			};
 		}
@@ -27778,9 +27817,9 @@ function Iw(e) {
 }
 //#endregion
 //#region public/plugins/weather/src/WeatherApp.jsx
-function Lw() {
-	let { scheme: t } = nb(), n = (0, P.useMemo)(() => aS(), []), r = (0, P.useMemo)(() => oS(), []), i = rb(nS, r ? nS(r) : "3x2"), a = bw({ mock: n }), o = (0, P.useCallback)(() => sb("detail", "天气详情"), []);
-	return mb(Cw, (0, P.useMemo)(() => Iw({
+function Rw() {
+	let { scheme: t } = nb(), n = (0, P.useMemo)(() => oS(), []), r = (0, P.useMemo)(() => sS(), []), i = rb(rS, r ? rS(r) : "3x2"), a = xw({ mock: n }), o = (0, P.useCallback)(() => sb("detail", "天气详情"), []);
+	return mb(ww, (0, P.useMemo)(() => Lw({
 		mock: n,
 		weather: a
 	}), [n, a])), (0, P.useEffect)(() => {
@@ -27793,7 +27832,7 @@ function Lw() {
 			t.key === "Escape" && e.exitFocus?.();
 		};
 		return window.addEventListener("keydown", t), () => window.removeEventListener("keydown", t);
-	}, []), /* @__PURE__ */ (0, F.jsx)(NS, {
+	}, []), /* @__PURE__ */ (0, F.jsx)(PS, {
 		sizeKey: i,
 		scheme: t,
 		settings: a.settings,
@@ -27806,7 +27845,7 @@ function Lw() {
 }
 //#endregion
 //#region public/plugins/weather/src/components/CityMenu.jsx
-var Rw = Kn({
+var zw = Kn({
 	trigger: {
 		minWidth: 0,
 		maxWidth: "100%",
@@ -27834,8 +27873,8 @@ var Rw = Kn({
 		flexShrink: 0
 	}
 });
-function zw({ places: e, currentPlace: t, located: n, onSelectPlace: r, onAddPlace: i, onManageCities: a, className: o }) {
-	let s = Rw(), c = Array.isArray(e) ? e : [], l = !!(n && c.some((e) => e.id === n.id)), u = !(!n || n.isCurrent);
+function Bw({ places: e, currentPlace: t, located: n, onSelectPlace: r, onAddPlace: i, onManageCities: a, className: o }) {
+	let s = zw(), c = Array.isArray(e) ? e : [], l = !!(n && c.some((e) => e.id === n.id)), u = !(!n || n.isCurrent);
 	return /* @__PURE__ */ (0, F.jsxs)(d_, { children: [/* @__PURE__ */ (0, F.jsx)(rv, {
 		disableButtonEnhancement: !0,
 		children: /* @__PURE__ */ (0, F.jsxs)(Qh, {
@@ -27857,7 +27896,7 @@ function zw({ places: e, currentPlace: t, located: n, onSelectPlace: r, onAddPla
 			onClick: () => r(e.id),
 			children: /* @__PURE__ */ (0, F.jsx)("span", {
 				className: s.itemText,
-				children: YS(e)
+				children: XS(e)
 			})
 		}, e.id)),
 		u ? /* @__PURE__ */ (0, F.jsxs)(j_, {
@@ -27865,7 +27904,7 @@ function zw({ places: e, currentPlace: t, located: n, onSelectPlace: r, onAddPla
 			onClick: () => l ? r(n.id) : i(n),
 			children: [/* @__PURE__ */ (0, F.jsxs)("span", {
 				className: s.itemText,
-				children: ["当前位置 · ", YS(n)]
+				children: ["当前位置 · ", XS(n)]
 			}), /* @__PURE__ */ (0, F.jsx)($, {
 				size: 200,
 				className: s.itemHint,
@@ -27882,7 +27921,7 @@ function zw({ places: e, currentPlace: t, located: n, onSelectPlace: r, onAddPla
 }
 //#endregion
 //#region public/plugins/weather/src/views/panels.jsx
-var Bw = Kn({
+var Vw = Kn({
 	stack: {
 		display: "flex",
 		flexDirection: "column",
@@ -28083,8 +28122,8 @@ var Bw = Kn({
 		paddingBlock: q.spacingVerticalS
 	}
 });
-function Vw({ label: e }) {
-	let t = Bw();
+function Hw({ label: e }) {
+	let t = Vw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: t.loading,
 		children: [/* @__PURE__ */ (0, F.jsx)(vv, { size: "tiny" }), /* @__PURE__ */ (0, F.jsx)($, {
@@ -28093,21 +28132,21 @@ function Vw({ label: e }) {
 		})]
 	});
 }
-function Hw({ message: e, onRetry: t }) {
-	let n = Bw();
+function Uw({ message: e, onRetry: t }) {
+	let n = Vw();
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: n.error,
 		children: [/* @__PURE__ */ (0, F.jsx)($, {
 			size: 300,
 			children: e
-		}), t ? /* @__PURE__ */ (0, F.jsx)(nx, {
+		}), t ? /* @__PURE__ */ (0, F.jsx)(rx, {
 			onClick: t,
 			children: "重试"
 		}) : null]
 	});
 }
-function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
-	let a = Bw(), o = e.daily?.[0], s = e.minutely, c = e.hourly || [];
+function Ww({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
+	let a = Vw(), o = e.daily?.[0], s = e.minutely, c = e.hourly || [];
 	return /* @__PURE__ */ (0, F.jsxs)("div", {
 		className: a.stack,
 		children: [
@@ -28135,14 +28174,14 @@ function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
 							return /* @__PURE__ */ (0, F.jsx)("span", {
 								className: a.minutelyBar,
 								style: { height: `${Math.max(4, e.precip / n * 100)}%` },
-								title: `${Dx(e.time)} ${e.precip}mm`
+								title: `${Ox(e.time)} ${e.precip}mm`
 							}, e.time || t);
 						})
 					})
 				]
 			}) : null,
-			t.showMinutely && !s && r?.loading ? /* @__PURE__ */ (0, F.jsx)(Vw, { label: "正在获取分钟级降水…" }) : null,
-			c.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Hw, {
+			t.showMinutely && !s && r?.loading ? /* @__PURE__ */ (0, F.jsx)(Hw, { label: "正在获取分钟级降水…" }) : null,
+			c.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Uw, {
 				message: "暂时没有逐时预报",
 				onRetry: i
 			}) : /* @__PURE__ */ (0, F.jsx)("div", {
@@ -28154,11 +28193,11 @@ function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
 						/* @__PURE__ */ (0, F.jsx)($, {
 							size: 300,
 							className: a.time,
-							children: r === 0 ? "现在" : Dx(e.fxTime)
+							children: r === 0 ? "现在" : Ox(e.fxTime)
 						}),
-						/* @__PURE__ */ (0, F.jsx)(lS, {
+						/* @__PURE__ */ (0, F.jsx)(uS, {
 							code: e.icon,
-							night: xS(e.fxTime, o?.sunrise, o?.sunset),
+							night: SS(e.fxTime, o?.sunrise, o?.sunset),
 							scheme: n,
 							size: 24,
 							title: e.text
@@ -28167,7 +28206,7 @@ function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
 							size: 400,
 							weight: "semibold",
 							className: a.temp,
-							children: Fx(e.temp, t.unit)
+							children: Ix(e.temp, t.unit)
 						}),
 						/* @__PURE__ */ (0, F.jsx)($, {
 							size: 300,
@@ -28177,12 +28216,12 @@ function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
 						/* @__PURE__ */ (0, F.jsx)($, {
 							size: 200,
 							className: A(a.muted, a.right),
-							children: Bx(e.windDir, e.windScale)
+							children: Vx(e.windDir, e.windScale)
 						}),
 						/* @__PURE__ */ (0, F.jsx)($, {
 							size: 200,
 							className: A(a.muted, a.right),
-							children: e.pop > 0 ? Ux(e.pop) : ""
+							children: e.pop > 0 ? Wx(e.pop) : ""
 						})
 					]
 				}, e.fxTime || r))
@@ -28190,9 +28229,9 @@ function Uw({ data: e, settings: t, scheme: n, minutelyState: r, onRetry: i }) {
 		]
 	});
 }
-function Ww({ data: e, settings: t, scheme: n }) {
-	let r = Bw(), i = (e.daily || []).slice(0, 7);
-	return i.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Hw, { message: "暂时没有 7 天预报" }) : /* @__PURE__ */ (0, F.jsx)("div", {
+function Gw({ data: e, settings: t, scheme: n }) {
+	let r = Vw(), i = (e.daily || []).slice(0, 7);
+	return i.length === 0 ? /* @__PURE__ */ (0, F.jsx)(Uw, { message: "暂时没有 7 天预报" }) : /* @__PURE__ */ (0, F.jsx)("div", {
 		className: r.list,
 		children: i.map((e, i) => /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: r.dailyRow,
@@ -28202,14 +28241,14 @@ function Ww({ data: e, settings: t, scheme: n }) {
 					className: r.dayCell,
 					children: [/* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
-						children: Ox(e.fxDate, i)
+						children: kx(e.fxDate, i)
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 200,
 						className: r.muted,
-						children: kx(e.fxDate)
+						children: Ax(e.fxDate)
 					})]
 				}),
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: e.icon,
 					scheme: n,
 					size: 24,
@@ -28226,42 +28265,42 @@ function Ww({ data: e, settings: t, scheme: n }) {
 						size: 500,
 						weight: "semibold",
 						className: r.high,
-						children: Fx(e.tempMax, t.unit)
+						children: Ix(e.tempMax, t.unit)
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: r.low,
-						children: Fx(e.tempMin, t.unit)
+						children: Ix(e.tempMin, t.unit)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsx)($, {
 					size: 200,
 					className: A(r.muted, r.right),
-					children: Bx(e.windDir, e.windScale)
+					children: Vx(e.windDir, e.windScale)
 				})
 			]
 		}, e.fxDate || i))
 	});
 }
-function Gw({ data: e, state: t, onRetry: n, showAir: r = !0 }) {
-	let i = Bw(), a = e.air;
-	if (!r) return /* @__PURE__ */ (0, F.jsx)($b, {
+function Kw({ data: e, state: t, onRetry: n, showAir: r = !0 }) {
+	let i = Vw(), a = e.air;
+	if (!r) return /* @__PURE__ */ (0, F.jsx)(ex, {
 		icon: /* @__PURE__ */ (0, F.jsx)(Mu, {}),
 		title: "空气质量已关闭",
-		action: /* @__PURE__ */ (0, F.jsx)(nx, {
+		action: /* @__PURE__ */ (0, F.jsx)(rx, {
 			icon: /* @__PURE__ */ (0, F.jsx)(ku, {}),
 			onClick: cb,
 			children: "去设置"
 		})
 	});
-	if (!a && t?.loading) return /* @__PURE__ */ (0, F.jsx)(Vw, { label: "正在获取空气质量…" });
-	if (!a && t?.error) return /* @__PURE__ */ (0, F.jsx)(Hw, {
+	if (!a && t?.loading) return /* @__PURE__ */ (0, F.jsx)(Hw, { label: "正在获取空气质量…" });
+	if (!a && t?.error) return /* @__PURE__ */ (0, F.jsx)(Uw, {
 		message: t.error,
 		onRetry: n
 	});
-	if (!a) return /* @__PURE__ */ (0, F.jsx)($b, {
+	if (!a) return /* @__PURE__ */ (0, F.jsx)(ex, {
 		icon: /* @__PURE__ */ (0, F.jsx)(Mu, {}),
 		title: "暂无空气质量数据",
-		action: /* @__PURE__ */ (0, F.jsx)(nx, {
+		action: /* @__PURE__ */ (0, F.jsx)(rx, {
 			icon: /* @__PURE__ */ (0, F.jsx)(Lu, {}),
 			onClick: n,
 			children: "重新获取"
@@ -28272,7 +28311,7 @@ function Gw({ data: e, state: t, onRetry: n, showAir: r = !0 }) {
 		className: i.stack,
 		children: [/* @__PURE__ */ (0, F.jsxs)("div", {
 			className: i.airTop,
-			children: [/* @__PURE__ */ (0, F.jsx)(bS, {
+			children: [/* @__PURE__ */ (0, F.jsx)(xS, {
 				air: a,
 				size: 88
 			}), /* @__PURE__ */ (0, F.jsxs)("div", {
@@ -28313,15 +28352,15 @@ function Gw({ data: e, state: t, onRetry: n, showAir: r = !0 }) {
 		})]
 	});
 }
-function Kw({ data: e, state: t, onRetry: n }) {
-	let r = Bw(), i = e.indices;
-	return !i && t?.loading ? /* @__PURE__ */ (0, F.jsx)(Vw, { label: "正在获取生活指数…" }) : !i && t?.error ? /* @__PURE__ */ (0, F.jsx)(Hw, {
+function qw({ data: e, state: t, onRetry: n }) {
+	let r = Vw(), i = e.indices;
+	return !i && t?.loading ? /* @__PURE__ */ (0, F.jsx)(Hw, { label: "正在获取生活指数…" }) : !i && t?.error ? /* @__PURE__ */ (0, F.jsx)(Uw, {
 		message: t.error,
 		onRetry: n
-	}) : !i || i.length === 0 ? /* @__PURE__ */ (0, F.jsx)($b, {
+	}) : !i || i.length === 0 ? /* @__PURE__ */ (0, F.jsx)(ex, {
 		icon: /* @__PURE__ */ (0, F.jsx)(Mu, {}),
 		title: "暂无生活指数",
-		action: /* @__PURE__ */ (0, F.jsx)(nx, {
+		action: /* @__PURE__ */ (0, F.jsx)(rx, {
 			icon: /* @__PURE__ */ (0, F.jsx)(Lu, {}),
 			onClick: n,
 			children: "重新获取"
@@ -28350,7 +28389,7 @@ function Kw({ data: e, state: t, onRetry: n }) {
 		}, `${e.type}-${e.date}`))
 	});
 }
-function qw(e) {
+function Jw(e) {
 	let t = (e) => {
 		if (!e) return "";
 		let t = new Date(e);
@@ -28358,15 +28397,15 @@ function qw(e) {
 	}, n = t(e.startTime), r = t(e.endTime);
 	return n && r ? `生效 ${n} → ${r}` : n || r || "";
 }
-function Jw({ data: e, state: t, onRetry: n }) {
-	let r = Bw(), i = e.warnings;
-	return !i && t?.loading ? /* @__PURE__ */ (0, F.jsx)(Vw, { label: "正在获取天气预警…" }) : !i && t?.error ? /* @__PURE__ */ (0, F.jsx)(Hw, {
+function Yw({ data: e, state: t, onRetry: n }) {
+	let r = Vw(), i = e.warnings;
+	return !i && t?.loading ? /* @__PURE__ */ (0, F.jsx)(Hw, { label: "正在获取天气预警…" }) : !i && t?.error ? /* @__PURE__ */ (0, F.jsx)(Uw, {
 		message: t.error,
 		onRetry: n
-	}) : !i || i.length === 0 ? /* @__PURE__ */ (0, F.jsx)($b, {
+	}) : !i || i.length === 0 ? /* @__PURE__ */ (0, F.jsx)(ex, {
 		icon: /* @__PURE__ */ (0, F.jsx)(Mu, {}),
 		title: "暂无天气预警",
-		action: /* @__PURE__ */ (0, F.jsx)(nx, {
+		action: /* @__PURE__ */ (0, F.jsx)(rx, {
 			icon: /* @__PURE__ */ (0, F.jsx)(Lu, {}),
 			onClick: n,
 			children: "重新获取"
@@ -28384,7 +28423,7 @@ function Jw({ data: e, state: t, onRetry: n }) {
 					children: [
 						/* @__PURE__ */ (0, F.jsx)("span", {
 							className: r.warningDot,
-							style: { backgroundColor: cS(e.tone) }
+							style: { backgroundColor: lS(e.tone) }
 						}),
 						/* @__PURE__ */ (0, F.jsx)($, {
 							size: 300,
@@ -28405,7 +28444,7 @@ function Jw({ data: e, state: t, onRetry: n }) {
 					/* @__PURE__ */ (0, F.jsx)($, {
 						size: 200,
 						className: r.warningTime,
-						children: qw(e)
+						children: Jw(e)
 					}),
 					/* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
@@ -28424,7 +28463,7 @@ function Jw({ data: e, state: t, onRetry: n }) {
 }
 //#endregion
 //#region public/plugins/weather/src/views/ManageCities.jsx
-var Yw = Kn({
+var Xw = Kn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -28461,16 +28500,16 @@ var Yw = Kn({
 		color: q.colorStatusDangerForeground1,
 		whiteSpace: "nowrap"
 	}
-}), Xw = {
+}), Zw = {
 	system: "系统定位",
 	ip: "网络定位（ip.cn）",
 	mock: "演示定位"
 };
-function Zw(e) {
-	return Xw[e] || "定位结果";
+function Qw(e) {
+	return Zw[e] || "定位结果";
 }
-function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource: i, configured: a, onAdd: o, onRemove: s, onSelect: c }) {
-	let l = Yw(), u = px(), [d, f] = (0, P.useState)(""), [p, m] = (0, P.useState)([]), [h, g] = (0, P.useState)(!1), [_, v] = (0, P.useState)(""), [y, b] = (0, P.useState)(null), x = (0, P.useMemo)(() => new Set(t.map((e) => e.id)), [t]);
+function $w({ settings: e, places: t, currentPlace: n, located: r, locatedSource: i, configured: a, onAdd: o, onRemove: s, onSelect: c }) {
+	let l = Xw(), u = mx(), [d, f] = (0, P.useState)(""), [p, m] = (0, P.useState)([]), [h, g] = (0, P.useState)(!1), [_, v] = (0, P.useState)(""), [y, b] = (0, P.useState)(null), x = (0, P.useMemo)(() => new Set(t.map((e) => e.id)), [t]);
 	(0, P.useEffect)(() => {
 		let t = d.trim();
 		if (!t) {
@@ -28480,7 +28519,7 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 		let n = !0;
 		g(!0), v("");
 		let r = window.setTimeout(() => {
-			mw(e, t).then((e) => {
+			hw(e, t).then((e) => {
 				n && m(e.slice(0, 6));
 			}).catch((e) => {
 				n && (m([]), v(e?.message || "搜索失败"));
@@ -28519,18 +28558,18 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 200,
 						className: l.hint,
-						children: Zw(i)
+						children: Qw(i)
 					})]
-				}), /* @__PURE__ */ (0, F.jsx)(Xb, {
+				}), /* @__PURE__ */ (0, F.jsx)(Zb, {
 					leading: /* @__PURE__ */ (0, F.jsx)(Fu, {}),
-					title: `当前位置 · ${YS(r)}`,
+					title: `当前位置 · ${XS(r)}`,
 					subtitle: r.adm1 || r.country || "",
 					trailing: D ? /* @__PURE__ */ (0, F.jsx)(rf, {
 						appearance: "tint",
 						color: "brand",
 						size: "medium",
 						children: "当前"
-					}) : /* @__PURE__ */ (0, F.jsx)(nx, {
+					}) : /* @__PURE__ */ (0, F.jsx)(rx, {
 						onClick: () => E ? w(r.id) : C(r),
 						children: E ? "设为当前" : "添加"
 					})
@@ -28574,7 +28613,7 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 					}) : null,
 					p.map((e) => {
 						let t = x.has(e.id);
-						return /* @__PURE__ */ (0, F.jsx)(Xb, {
+						return /* @__PURE__ */ (0, F.jsx)(Zb, {
 							leading: /* @__PURE__ */ (0, F.jsx)(Fu, {}),
 							title: e.name,
 							subtitle: [
@@ -28586,7 +28625,7 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 								size: 200,
 								className: l.hint,
 								children: "已添加"
-							}) : /* @__PURE__ */ (0, F.jsx)(nx, {
+							}) : /* @__PURE__ */ (0, F.jsx)(rx, {
 								appearance: "secondary",
 								onClick: () => C(e),
 								children: "添加"
@@ -28618,10 +28657,10 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 					}) : null,
 					t.map((e) => {
 						let t = y === e.id;
-						return /* @__PURE__ */ (0, F.jsx)(Xb, {
+						return /* @__PURE__ */ (0, F.jsx)(Zb, {
 							leading: /* @__PURE__ */ (0, F.jsx)(Fu, {}),
 							title: e.name,
-							subtitle: YS(e),
+							subtitle: XS(e),
 							trailing: t ? /* @__PURE__ */ (0, F.jsxs)("span", {
 								className: l.rowActions,
 								children: [
@@ -28630,12 +28669,12 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 										className: l.confirmText,
 										children: "删除这个城市？"
 									}),
-									/* @__PURE__ */ (0, F.jsx)(nx, {
+									/* @__PURE__ */ (0, F.jsx)(rx, {
 										icon: /* @__PURE__ */ (0, F.jsx)(Wu, {}),
 										onClick: () => T(e.id),
 										children: "删除"
 									}),
-									/* @__PURE__ */ (0, F.jsx)(nx, {
+									/* @__PURE__ */ (0, F.jsx)(rx, {
 										onClick: () => b(null),
 										children: "取消"
 									})
@@ -28647,10 +28686,10 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 									color: "brand",
 									size: "medium",
 									children: "当前"
-								}) : /* @__PURE__ */ (0, F.jsx)(nx, {
+								}) : /* @__PURE__ */ (0, F.jsx)(rx, {
 									onClick: () => w(e.id),
 									children: "设为当前"
-								}), /* @__PURE__ */ (0, F.jsx)(nx, {
+								}), /* @__PURE__ */ (0, F.jsx)(rx, {
 									onClick: () => b(e.id),
 									children: "删除"
 								})]
@@ -28664,7 +28703,7 @@ function Qw({ settings: e, places: t, currentPlace: n, located: r, locatedSource
 }
 //#endregion
 //#region public/plugins/weather/src/views/DetailView.jsx
-var $w = Kn({
+var eT = Kn({
 	headerLeading: {
 		display: "flex",
 		flexDirection: "column",
@@ -28757,7 +28796,7 @@ var $w = Kn({
 	},
 	notice: { maxWidth: "640px" }
 });
-function eT(e, t = 1e3) {
+function tT(e, t = 1e3) {
 	let [n, r] = (0, P.useState)(!1);
 	return (0, P.useEffect)(() => {
 		if (!e) {
@@ -28768,8 +28807,8 @@ function eT(e, t = 1e3) {
 		return () => window.clearTimeout(n);
 	}, [e, t]), n;
 }
-function tT({ air: e }) {
-	let t = $w();
+function nT({ air: e }) {
+	let t = eT();
 	return !e || e.aqi == null ? null : /* @__PURE__ */ (0, F.jsx)("div", {
 		className: t.aqiBadge,
 		children: /* @__PURE__ */ (0, F.jsx)(rf, {
@@ -28781,7 +28820,7 @@ function tT({ air: e }) {
 				children: [
 					/* @__PURE__ */ (0, F.jsx)("span", {
 						className: t.aqiDot,
-						style: { backgroundColor: cS(e.tone) }
+						style: { backgroundColor: lS(e.tone) }
 					}),
 					/* @__PURE__ */ (0, F.jsx)($, {
 						size: 400,
@@ -28797,8 +28836,8 @@ function tT({ air: e }) {
 		})
 	});
 }
-function nT() {
-	let e = $w(), { scheme: t } = nb(), n = gx(3e4), { settings: r, places: i, place: a, data: o, status: s, sectionState: c, located: l, locatedSource: u, locating: d, refresh: f, ensureSection: p, addPlace: m, removePlace: h, selectPlace: g, configured: _ } = bw({ mock: (0, P.useMemo)(() => aS(), []) }), [v, y] = (0, P.useState)(null), [b, x] = (0, P.useState)(!1), S = (0, P.useRef)(!1), C = eT(!o && s.loading, 1e3), w = r.showWarnings && o?.warnings || [], T = (0, P.useMemo)(() => {
+function rT() {
+	let e = eT(), { scheme: t } = nb(), n = _x(3e4), { settings: r, places: i, place: a, data: o, status: s, sectionState: c, located: l, locatedSource: u, locating: d, refresh: f, ensureSection: p, addPlace: m, removePlace: h, selectPlace: g, configured: _ } = xw({ mock: (0, P.useMemo)(() => oS(), []) }), [v, y] = (0, P.useState)(null), [b, x] = (0, P.useState)(!1), S = (0, P.useRef)(!1), C = tT(!o && s.loading, 1e3), w = r.showWarnings && o?.warnings || [], T = (0, P.useMemo)(() => {
 		let e = [{
 			value: "hourly",
 			label: "逐时"
@@ -28841,13 +28880,13 @@ function nT() {
 	]);
 	let ee = (0, P.useCallback)(() => {
 		f();
-	}, [f]), te = (0, P.useCallback)(() => cb(), []), O = o?.current || null, k = o?.daily?.[0] || null, ne = O ? xS(O.obsTime || (/* @__PURE__ */ new Date()).toISOString(), k?.sunrise, k?.sunset) : !1, A = o?.fetchedAt ? null : s.loading ? "正在加载…" : s.error ? "加载失败" : _ ? "尚未更新" : "未配置数据源", re = /* @__PURE__ */ (0, F.jsx)(ox, {
+	}, [f]), te = (0, P.useCallback)(() => cb(), []), O = o?.current || null, k = o?.daily?.[0] || null, ne = O ? SS(O.obsTime || (/* @__PURE__ */ new Date()).toISOString(), k?.sunrise, k?.sunset) : !1, A = o?.fetchedAt ? null : s.loading ? "正在加载…" : s.error ? "加载失败" : _ ? "尚未更新" : "未配置数据源", re = /* @__PURE__ */ (0, F.jsx)(sx, {
 		trailing: /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: e.actions,
 			children: [/* @__PURE__ */ (0, F.jsx)(Fh, {
 				content: "刷新天气",
 				relationship: "label",
-				children: /* @__PURE__ */ (0, F.jsx)(tx, {
+				children: /* @__PURE__ */ (0, F.jsx)(nx, {
 					appearance: "subtle",
 					size: "large",
 					"aria-label": "刷新天气",
@@ -28855,7 +28894,7 @@ function nT() {
 					disabled: s.refreshing || !a,
 					onClick: ee
 				})
-			}), /* @__PURE__ */ (0, F.jsx)(nx, {
+			}), /* @__PURE__ */ (0, F.jsx)(rx, {
 				icon: /* @__PURE__ */ (0, F.jsx)(ku, {}),
 				onClick: te,
 				children: "设置…"
@@ -28863,14 +28902,14 @@ function nT() {
 		}),
 		children: /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: e.headerLeading,
-			children: [/* @__PURE__ */ (0, F.jsx)(zw, {
+			children: [/* @__PURE__ */ (0, F.jsx)(Bw, {
 				places: i,
 				currentPlace: a,
 				located: l,
 				onSelectPlace: g,
 				onAddPlace: m,
 				onManageCities: () => x(!0)
-			}), o?.fetchedAt ? /* @__PURE__ */ (0, F.jsx)(fS, {
+			}), o?.fetchedAt ? /* @__PURE__ */ (0, F.jsx)(pS, {
 				offline: s.offline,
 				fetchedAt: o.fetchedAt,
 				refreshMin: r.refreshMin,
@@ -28881,10 +28920,10 @@ function nT() {
 				children: A
 			})]
 		})
-	}), ie = b ? /* @__PURE__ */ (0, F.jsx)(hx, {
+	}), ie = b ? /* @__PURE__ */ (0, F.jsx)(gx, {
 		title: "管理城市",
 		onClosed: () => x(!1),
-		children: /* @__PURE__ */ (0, F.jsx)(Qw, {
+		children: /* @__PURE__ */ (0, F.jsx)($w, {
 			settings: r,
 			places: i,
 			currentPlace: a,
@@ -28896,27 +28935,27 @@ function nT() {
 			onSelect: g
 		})
 	}) : null;
-	return _ ? a ? /* @__PURE__ */ (0, F.jsxs)(ix, { children: [
+	return _ ? a ? /* @__PURE__ */ (0, F.jsxs)(ax, { children: [
 		re,
 		O ? /* @__PURE__ */ (0, F.jsxs)("section", {
 			className: e.summary,
 			"aria-label": "当前天气",
 			"data-weather-summary": !0,
 			children: [
-				/* @__PURE__ */ (0, F.jsx)(lS, {
+				/* @__PURE__ */ (0, F.jsx)(uS, {
 					code: O.icon,
 					night: ne,
 					scheme: t,
 					size: 56,
 					title: O.text
 				}),
-				/* @__PURE__ */ (0, F.jsx)(Jb, { value: Fx(O.temp, r.unit) }),
+				/* @__PURE__ */ (0, F.jsx)(Yb, { value: Ix(O.temp, r.unit) }),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
 					className: e.summaryMeta,
 					children: [/* @__PURE__ */ (0, F.jsx)($, {
 						size: 400,
 						children: O.text
-					}), /* @__PURE__ */ (0, F.jsx)(dS, {
+					}), /* @__PURE__ */ (0, F.jsx)(fS, {
 						max: k?.tempMax,
 						min: k?.tempMin,
 						unit: r.unit,
@@ -28924,7 +28963,7 @@ function nT() {
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsx)("div", { className: e.summarySpacer }),
-				r.showAir ? /* @__PURE__ */ (0, F.jsx)(tT, { air: o.air }) : null
+				r.showAir ? /* @__PURE__ */ (0, F.jsx)(nT, { air: o.air }) : null
 			]
 		}) : null,
 		O ? /* @__PURE__ */ (0, F.jsxs)("section", {
@@ -28941,7 +28980,7 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Fx(O.feelsLike, r.unit)
+						children: Ix(O.feelsLike, r.unit)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -28953,7 +28992,7 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Vx(O.humidity)
+						children: Hx(O.humidity)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -28965,7 +29004,7 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Bx(O.windDir, O.windScale)
+						children: Vx(O.windDir, O.windScale)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -28977,7 +29016,7 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Gx(O.pressure)
+						children: Kx(O.pressure)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -28989,7 +29028,7 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Wx(O.vis)
+						children: Gx(O.vis)
 					})]
 				}),
 				/* @__PURE__ */ (0, F.jsxs)("div", {
@@ -29001,39 +29040,39 @@ function nT() {
 					}), /* @__PURE__ */ (0, F.jsx)($, {
 						size: 300,
 						className: e.envValue,
-						children: Kx(O.uvIndex)
+						children: qx(O.uvIndex)
 					})]
 				})
 			]
 		}) : null,
-		/* @__PURE__ */ (0, F.jsx)(cx, {
+		/* @__PURE__ */ (0, F.jsx)(lx, {
 			items: T,
 			value: E,
 			onChange: D,
 			ariaLabel: "天气详情内容"
 		}),
-		/* @__PURE__ */ (0, F.jsx)(dx, { children: o ? /* @__PURE__ */ (0, F.jsx)(Cb, {
+		/* @__PURE__ */ (0, F.jsx)(fx, { children: o ? /* @__PURE__ */ (0, F.jsx)(Cb, {
 			value: E,
-			children: E === "hourly" ? /* @__PURE__ */ (0, F.jsx)(Uw, {
+			children: E === "hourly" ? /* @__PURE__ */ (0, F.jsx)(Ww, {
 				data: o,
 				settings: r,
 				scheme: t,
 				minutelyState: c.minutely,
 				onRetry: () => p("minutely", { force: !0 })
-			}) : E === "daily" ? /* @__PURE__ */ (0, F.jsx)(Ww, {
+			}) : E === "daily" ? /* @__PURE__ */ (0, F.jsx)(Gw, {
 				data: o,
 				settings: r,
 				scheme: t
-			}) : E === "air" ? /* @__PURE__ */ (0, F.jsx)(Gw, {
+			}) : E === "air" ? /* @__PURE__ */ (0, F.jsx)(Kw, {
 				data: o,
 				state: c.air,
 				showAir: r.showAir,
 				onRetry: () => p("air", { force: !0 })
-			}) : E === "indices" ? /* @__PURE__ */ (0, F.jsx)(Kw, {
+			}) : E === "indices" ? /* @__PURE__ */ (0, F.jsx)(qw, {
 				data: o,
 				state: c.indices,
 				onRetry: () => p("indices", { force: !0 })
-			}) : /* @__PURE__ */ (0, F.jsx)(Jw, {
+			}) : /* @__PURE__ */ (0, F.jsx)(Yw, {
 				data: o,
 				state: c.warnings,
 				onRetry: () => p("warnings", { force: !0 })
@@ -29041,7 +29080,7 @@ function nT() {
 		}) : s.error ? /* @__PURE__ */ (0, F.jsxs)(Oy, {
 			intent: "error",
 			className: e.notice,
-			children: [/* @__PURE__ */ (0, F.jsx)(Wy, { children: s.error }), /* @__PURE__ */ (0, F.jsx)(Ly, { children: /* @__PURE__ */ (0, F.jsx)(nx, {
+			children: [/* @__PURE__ */ (0, F.jsx)(Wy, { children: s.error }), /* @__PURE__ */ (0, F.jsx)(Ly, { children: /* @__PURE__ */ (0, F.jsx)(rx, {
 				onClick: ee,
 				children: "重试"
 			}) })]
@@ -29053,18 +29092,18 @@ function nT() {
 			})]
 		}) : /* @__PURE__ */ (0, F.jsx)("div", { className: e.contentEmpty }) }),
 		ie
-	] }) : /* @__PURE__ */ (0, F.jsxs)(ix, { children: [
+	] }) : /* @__PURE__ */ (0, F.jsxs)(ax, { children: [
 		re,
-		/* @__PURE__ */ (0, F.jsx)(dx, { children: d ? /* @__PURE__ */ (0, F.jsxs)("div", {
+		/* @__PURE__ */ (0, F.jsx)(fx, { children: d ? /* @__PURE__ */ (0, F.jsxs)("div", {
 			className: e.contentEmpty,
 			children: [/* @__PURE__ */ (0, F.jsx)(vv, { size: "small" }), /* @__PURE__ */ (0, F.jsx)($, {
 				size: 300,
 				children: "正在定位…"
 			})]
-		}) : /* @__PURE__ */ (0, F.jsx)($b, {
+		}) : /* @__PURE__ */ (0, F.jsx)(ex, {
 			icon: /* @__PURE__ */ (0, F.jsx)(Iu, {}),
 			title: "还没有城市",
-			action: /* @__PURE__ */ (0, F.jsx)(nx, {
+			action: /* @__PURE__ */ (0, F.jsx)(rx, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, F.jsx)(Nu, {}),
 				onClick: () => x(!0),
@@ -29072,12 +29111,12 @@ function nT() {
 			})
 		}) }),
 		ie
-	] }) : /* @__PURE__ */ (0, F.jsxs)(ix, { children: [
+	] }) : /* @__PURE__ */ (0, F.jsxs)(ax, { children: [
 		re,
-		/* @__PURE__ */ (0, F.jsx)(dx, { children: /* @__PURE__ */ (0, F.jsx)($b, {
+		/* @__PURE__ */ (0, F.jsx)(fx, { children: /* @__PURE__ */ (0, F.jsx)(ex, {
 			icon: /* @__PURE__ */ (0, F.jsx)(zu, {}),
 			title: "未配置 Key",
-			action: /* @__PURE__ */ (0, F.jsx)(nx, {
+			action: /* @__PURE__ */ (0, F.jsx)(rx, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, F.jsx)(ku, {}),
 				onClick: te,
@@ -29090,7 +29129,7 @@ function nT() {
 //#endregion
 //#region public/plugins/weather/src/main.jsx
 Zy();
-function rT() {
+function iT() {
 	let { theme: e } = nb(), t = ob();
 	return /* @__PURE__ */ (0, F.jsx)(Cl, {
 		theme: e,
@@ -29100,9 +29139,9 @@ function rT() {
 			background: "transparent",
 			colorScheme: "normal"
 		},
-		children: t === "detail" ? /* @__PURE__ */ (0, F.jsx)(nT, {}) : /* @__PURE__ */ (0, F.jsx)(Lw, {})
+		children: t === "detail" ? /* @__PURE__ */ (0, F.jsx)(rT, {}) : /* @__PURE__ */ (0, F.jsx)(Rw, {})
 	});
 }
-var iT = document.getElementById("root");
-iT && (0, Gy.createRoot)(iT).render(/* @__PURE__ */ (0, F.jsx)(rT, {}));
+var aT = document.getElementById("root");
+aT && (0, Gy.createRoot)(aT).render(/* @__PURE__ */ (0, F.jsx)(iT, {}));
 //#endregion

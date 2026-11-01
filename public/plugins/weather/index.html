@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>天气 · Weather</title>
     <link rel="icon" href="data:," />
+    <!--
+      首帧占位（P0-1）：base.css 到达前 iframe 画布是浏览器默认白底，
+      会让卡片在启动瞬间闪白。先内联声明透明，宿主卡片材质直接透出来；
+      版式/色板仍由 base.css 与宿主主题决定。
+    -->
+    <style>
+      html,
+      body {
+        background: transparent;
+      }
+    </style>
     <link rel="stylesheet" href="../_shared/base.css" />
   </head>
   <body>

@@ -161,6 +161,10 @@ const useStyles = makeStyles({
     maxWidth: '100%',
     color: tokens.colorNeutralForeground2,
   },
+  /**
+   * 2×1 featured 横排：填满 identity 之后的剩余高度并让「标题 + 天数」在剩余空间里居中，
+   * 把底部空带从 52px（34.2%）压到 16+18=34px（22.4%，与 pomodoro 2×1 同一边界档）。
+   */
   row21: {
     display: 'flex',
     alignItems: 'center',
@@ -169,6 +173,9 @@ const useStyles = makeStyles({
     width: '100%',
     minWidth: 0,
     minHeight: tokens.lineHeightHero900,
+    flex: 1,
+    // 下移 2px 把底缘从 34 推到 33（22.4% → 21.7%），与 clock 2×1 的 2px 修法同源
+    paddingBlockStart: tokens.spacingVerticalXXS,
   },
   featured: {
     display: 'flex',

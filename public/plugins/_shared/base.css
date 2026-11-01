@@ -62,6 +62,17 @@ body .fui-MenuItem {
   min-height: calc(var(--spacingVerticalXXXL) + var(--spacingVerticalM));
 }
 
+/*
+ * 命中区 44 要落在**真正可点的内层元素**上：上面的规则只抬了 Fluent 外壳
+ * （Input 的 span / Dropdown 的 div），实测内层 button / input 仍是 42。
+ * 补到 44 后外壳随内容变 46（仍在大卡 48 行高内），不额外改 padding。
+ */
+body .fui-Input__input,
+body .fui-Dropdown__button,
+body .fui-Combobox__input {
+  min-height: calc(var(--spacingVerticalXXXL) + var(--spacingVerticalM));
+}
+
 body .fui-Button,
 body .fui-Tab {
   min-width: calc(var(--spacingHorizontalXXXL) + var(--spacingHorizontalM));

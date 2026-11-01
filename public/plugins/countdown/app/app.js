@@ -21124,13 +21124,14 @@ function dv() {
 	let e = new URLSearchParams(location.search);
 	return e.get("view") || (e.get("settings") === "1" ? "settings" : null);
 }
-function fv(e, t) {
-	window.parent.postMessage({
+function fv(e, t, n) {
+	let r = {
+		view: e,
+		title: t
+	};
+	(n?.size === "default" || n?.size === "large") && (r.size = n.size), window.parent.postMessage({
 		type: "plugin:request-overlay",
-		payload: {
-			view: e,
-			title: t
-		}
+		payload: r
 	}, "*");
 }
 function pv() {
@@ -21400,10 +21401,18 @@ var Lv = Nv(sl.spacingHorizontalSNudge) + Nv(sl.spacingHorizontalL), Rv = Object
 Rv.S;
 var zv = Rv.M;
 sl.strokeWidthThickest;
-var Bv = 56, Vv = 48, Hv = 44, Uv = 56, Wv = {
+var Bv = Object.freeze({
+	XS: 48,
+	S: 96,
+	M: 160,
+	L: 240,
+	XL: 320
+});
+Object.freeze(Object.values(Bv)), Bv.XL;
+var Vv = 56, Hv = 48, Uv = 44, Wv = 56, Gv = {
 	minWidth: 44,
 	minHeight: 44
-}, Gv = [
+}, Kv = [
 	"button",
 	"input",
 	"textarea",
@@ -21417,12 +21426,12 @@ var Bv = 56, Vv = 48, Hv = 44, Uv = 56, Wv = {
 	"[role=\"slider\"]",
 	"[contenteditable]"
 ].join(",");
-function Kv(e, t) {
+function qv(e, t) {
 	if (!(t instanceof Element)) return !1;
-	let n = t.closest(Gv);
+	let n = t.closest(Kv);
 	return !!(n && n !== e && e.contains(n));
 }
-var qv = Jn({ root: {
+var Jv = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -21440,8 +21449,8 @@ var qv = Jn({ root: {
 	color: W.colorNeutralForeground1,
 	fontFamily: W.fontFamilyBase
 } });
-function Jv({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
-	let o = qv(), s = vv(), c = {
+function Yv({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, ...a }) {
+	let o = Jv(), s = vv(), c = {
 		...r,
 		paddingTop: W.spacingVerticalL,
 		paddingBottom: W.spacingVerticalL,
@@ -21449,9 +21458,9 @@ function Jv({ onActivate: e, ariaLabel: t, className: n, style: r, children: i, 
 		paddingRight: W.spacingHorizontalL,
 		gap: W.spacingVerticalS
 	}, l = (0, M.useCallback)((t) => {
-		Kv(t.currentTarget, t.target) || e?.(t);
+		qv(t.currentTarget, t.target) || e?.(t);
 	}, [e]), u = (0, M.useCallback)((t) => {
-		(t.key === "Enter" || t.key === " ") && (Kv(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
+		(t.key === "Enter" || t.key === " ") && (qv(t.currentTarget, t.target) || (t.preventDefault(), e?.(t)));
 	}, [e]);
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		...a,
@@ -21490,7 +21499,7 @@ Jn({
 		gap: W.spacingHorizontalXS
 	}
 });
-var Yv = Jn({
+var Xv = Jn({
 	root: {
 		display: "flex",
 		flexShrink: 0,
@@ -21534,8 +21543,8 @@ var Yv = Jn({
 		color: W.colorNeutralForeground3
 	}
 });
-function Xv({ className: e, style: t }) {
-	let n = Yv();
+function Zv({ className: e, style: t }) {
+	let n = Xv();
 	return /* @__PURE__ */ (0, N.jsx)("span", {
 		className: D(n.disclosure, e),
 		style: t,
@@ -21544,8 +21553,8 @@ function Xv({ className: e, style: t }) {
 		children: /* @__PURE__ */ (0, N.jsx)(fu, {})
 	});
 }
-function Zv({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
-	let l = Yv(), u = !i && !!e;
+function Qv({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = !1, disclosure: a = !1, className: o, style: s, ...c }) {
+	let l = Xv(), u = !i && !!e;
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		...c,
 		className: D(l.root, o),
@@ -21573,19 +21582,49 @@ function Zv({ icon: e, label: t, trailing: n, compact: r = !1, placeholder: i = 
 				className: l.trailing,
 				children: n
 			}) : null,
-			a ? /* @__PURE__ */ (0, N.jsx)(Xv, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
+			a ? /* @__PURE__ */ (0, N.jsx)(Zv, { style: n ? void 0 : { marginInlineStart: "auto" } }) : null
 		]
 	});
 }
-var Qv = Jn({ hero: {
+Jn({
+	root: {
+		position: "relative",
+		display: "inline-flex",
+		flexShrink: 0,
+		alignItems: "center",
+		justifyContent: "center",
+		overflow: "hidden",
+		boxSizing: "border-box",
+		borderRadius: W.borderRadius2XLarge,
+		backgroundColor: W.colorNeutralBackground3
+	},
+	image: {
+		display: "block",
+		width: "100%",
+		height: "100%",
+		objectFit: "cover",
+		objectPosition: "center",
+		borderRadius: W.borderRadius2XLarge
+	},
+	placeholder: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: "100%",
+		height: "100%",
+		backgroundColor: W.colorNeutralBackground3,
+		color: W.colorNeutralForeground3
+	}
+});
+var $v = Jn({ hero: {
 	...Mv,
 	...Av,
 	fontWeight: jv,
 	color: W.colorNeutralForeground1,
 	whiteSpace: "nowrap"
 } });
-function $v({ children: e, className: t, ...n }) {
-	let r = Qv();
+function ey({ children: e, className: t, ...n }) {
+	let r = $v();
 	return /* @__PURE__ */ (0, N.jsx)("span", {
 		...n,
 		className: D(r.hero, t),
@@ -21652,7 +21691,7 @@ Jn({
 		whiteSpace: "nowrap"
 	}
 });
-var ey = Jn({
+var ty = Jn({
 	root: {
 		display: "grid",
 		gap: W.spacingVerticalXS,
@@ -21661,8 +21700,8 @@ var ey = Jn({
 	},
 	inset: { paddingBlock: W.spacingVerticalL }
 });
-function ty({ inset: e = !1, className: t, style: n, children: r, ...i }) {
-	let a = ey();
+function ny({ inset: e = !1, className: t, style: n, children: r, ...i }) {
+	let a = ty();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		...i,
 		className: D(a.root, e && a.inset, t),
@@ -21671,7 +21710,7 @@ function ty({ inset: e = !1, className: t, style: n, children: r, ...i }) {
 		children: r
 	});
 }
-var ny = Jn({
+var ry = Jn({
 	row: {
 		display: "flex",
 		alignItems: "center",
@@ -21721,8 +21760,8 @@ var ny = Jn({
 		gap: W.spacingHorizontalXS
 	}
 });
-function ry({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
-	let u = ny(), d = (e) => {
+function iy({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, selected: a = !1, titleSize: o = 300, className: s, style: c, ...l }) {
+	let u = ry(), d = (e) => {
 		i && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), i(e));
 	};
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -21765,7 +21804,7 @@ function ry({ leading: e, title: t, subtitle: n, trailing: r, onClick: i, select
 		]
 	});
 }
-var iy = Object.freeze({
+var ay = Object.freeze({
 	[Rv.XS]: {
 		width: W.spacingHorizontalL,
 		height: W.spacingVerticalL
@@ -21790,7 +21829,7 @@ var iy = Object.freeze({
 		width: `calc(${W.spacingHorizontalXXXL} + ${W.spacingHorizontalL})`,
 		height: `calc(${W.spacingVerticalXXXL} + ${W.spacingVerticalL})`
 	}
-}), ay = Jn({
+}), oy = Jn({
 	root: {
 		display: "flex",
 		flexDirection: "column",
@@ -21819,8 +21858,8 @@ var iy = Object.freeze({
 	title: { color: W.colorNeutralForeground1 },
 	action: { marginTop: 0 }
 });
-function oy({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = zv, className: o, style: s, ...c }) {
-	let l = ay(), u = uv(xv, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = iy[f] || iy[zv];
+function sy({ icon: e, title: t, action: n, align: r = "center", compact: i = !1, iconSize: a = zv, className: o, style: s, ...c }) {
+	let l = oy(), u = uv(xv, "2x1"), d = !i && u === "3x3", f = d ? 40 : a, p = ay[f] || ay[zv];
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		...c,
 		className: D(l.root, r === "start" && l.start, i && l.compact, o),
@@ -21871,13 +21910,13 @@ Jn({
 		color: W.colorNeutralForeground3
 	}
 });
-var sy = Jn({ count: {
+var cy = Jn({ count: {
 	...Mv,
 	color: W.colorNeutralForeground3,
 	whiteSpace: "nowrap"
 } });
-function cy({ total: e, shown: t, className: n, style: r, ...i }) {
-	let a = sy(), o = typeof t == "number" && t < e, s = o ? `共 ${e} · 显示 ${t}` : `共 ${e}`;
+function ly({ total: e, shown: t, className: n, style: r, ...i }) {
+	let a = cy(), o = typeof t == "number" && t < e, s = o ? `共 ${e} · 显示 ${t}` : `共 ${e}`;
 	return /* @__PURE__ */ (0, N.jsx)(f_, {
 		...i,
 		size: 200,
@@ -21943,11 +21982,11 @@ Jn({
 		backgroundColor: W.colorBrandBackground
 	}
 });
-var ly = Jn({ button: {
+var uy = Jn({ button: {
 	minWidth: "44px",
 	minHeight: "44px"
-} }), uy = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
-	let o = ly();
+} }), dy = (0, M.forwardRef)(function({ appearance: e = "secondary", className: t, style: n, children: r, ...i }, a) {
+	let o = uy();
 	return /* @__PURE__ */ (0, N.jsx)(Pm, {
 		...i,
 		ref: a,
@@ -21958,7 +21997,7 @@ var ly = Jn({ button: {
 		style: n,
 		children: r
 	});
-}), dy = uy, fy = Jn({ root: {
+}), fy = dy, py = Jn({ root: {
 	position: "relative",
 	display: "flex",
 	flexDirection: "column",
@@ -21972,8 +22011,8 @@ var ly = Jn({ button: {
 	color: W.colorNeutralForeground1,
 	fontFamily: W.fontFamilyBase
 } });
-function py({ children: e, className: t, style: n }) {
-	let r = fy();
+function my({ children: e, className: t, style: n }) {
+	let r = py();
 	return /* @__PURE__ */ (0, N.jsx)("div", {
 		className: D(r.root, t),
 		style: n,
@@ -21981,14 +22020,14 @@ function py({ children: e, className: t, style: n }) {
 		children: e
 	});
 }
-var my = Jn({
+var hy = Jn({
 	header: {
 		display: "flex",
 		flexShrink: 0,
 		alignItems: "center",
 		justifyContent: "space-between",
 		gap: W.spacingHorizontalM,
-		minHeight: `${Bv}px`,
+		minHeight: `${Vv}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -22006,8 +22045,8 @@ var my = Jn({
 		gap: W.spacingHorizontalS
 	}
 });
-function hy({ children: e, trailing: t, className: n, style: r }) {
-	let i = my();
+function gy({ children: e, trailing: t, className: n, style: r }) {
+	let i = hy();
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: D(i.header, n),
 		style: r,
@@ -22026,26 +22065,26 @@ Jn({ toolbar: {
 	flexShrink: 0,
 	alignItems: "center",
 	gap: W.spacingHorizontalS,
-	minHeight: `${Vv}px`,
+	minHeight: `${Hv}px`,
 	paddingInline: 0,
 	boxSizing: "border-box"
 } }), Jn({
 	tabs: {
 		flexShrink: 0,
-		height: `${Hv}px`,
-		minHeight: `${Hv}px`,
+		height: `${Uv}px`,
+		minHeight: `${Uv}px`,
 		paddingInline: 0,
 		boxSizing: "border-box",
 		overflowX: "auto"
 	},
 	tab: {
-		height: `${Hv}px`,
-		minHeight: `${Hv}px`,
+		height: `${Uv}px`,
+		minHeight: `${Uv}px`,
 		paddingBlock: 0
 	},
 	badge: { marginInlineStart: W.spacingHorizontalXS }
 });
-var gy = Jn({
+var _y = Jn({
 	wrap: {
 		position: "relative",
 		display: "flex",
@@ -22076,7 +22115,7 @@ var gy = Jn({
 	},
 	scrollShadowVisible: { opacity: 1 }
 });
-function _y(e) {
+function vy(e) {
 	let [t, n] = (0, M.useState)(!1);
 	return (0, M.useEffect)(() => {
 		let t = e.current;
@@ -22100,8 +22139,8 @@ function _y(e) {
 		};
 	}, [e]), t;
 }
-function vy({ children: e, className: t, style: n }) {
-	let r = gy(), i = (0, M.useRef)(null), a = _y(i);
+function yy({ children: e, className: t, style: n }) {
+	let r = _y(), i = (0, M.useRef)(null), a = vy(i);
 	return /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: r.wrap,
 		"data-scroll-more": a ? "true" : "false",
@@ -22118,7 +22157,7 @@ function vy({ children: e, className: t, style: n }) {
 		})]
 	});
 }
-var yy = (0, M.createContext)(null), by = Jn({
+var by = (0, M.createContext)(null), xy = Jn({
 	root: {
 		position: "absolute",
 		inset: 0,
@@ -22138,7 +22177,7 @@ var yy = (0, M.createContext)(null), by = Jn({
 		flexShrink: 0,
 		alignItems: "center",
 		gap: W.spacingHorizontalS,
-		minHeight: `${Uv}px`,
+		minHeight: `${Wv}px`,
 		paddingInline: 0,
 		boxSizing: "border-box"
 	},
@@ -22193,15 +22232,15 @@ var yy = (0, M.createContext)(null), by = Jn({
 		boxSizing: "border-box"
 	}
 });
-function xy({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
-	let c = by(), l = (0, M.useRef)(null), u = _y(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
+function Sy({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLabel: a = "返回", className: o, style: s }) {
+	let c = xy(), l = (0, M.useRef)(null), u = vy(l), [d, f] = (0, M.useState)(!0), [p, m] = (0, M.useState)("forward"), [h, g] = (0, M.useState)(!0), _ = (0, M.useRef)(!1), v = (0, M.useCallback)(() => {
 		_.current || (_.current = !0, m("back"), f(!1));
 	}, []), y = (0, M.useCallback)((e, t) => {
 		t?.direction === "exit" && (g(!1), i?.());
 	}, [i]);
 	if (!h) return null;
 	let b = typeof n == "function" ? n(v) : n;
-	return /* @__PURE__ */ (0, N.jsx)(yy.Provider, {
+	return /* @__PURE__ */ (0, N.jsx)(by.Provider, {
 		value: v,
 		children: /* @__PURE__ */ (0, N.jsx)(kv, {
 			visible: d,
@@ -22225,7 +22264,7 @@ function xy({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 								"aria-label": a,
 								title: a,
 								onClick: v,
-								style: Wv
+								style: Gv
 							}),
 							/* @__PURE__ */ (0, N.jsx)(f_, {
 								size: 400,
@@ -22263,7 +22302,7 @@ function xy({ title: e, trailing: t, footer: n, children: r, onClosed: i, backLa
 		})
 	});
 }
-function Sy(e = 1e3) {
+function Cy(e = 1e3) {
 	let [t, n] = (0, M.useState)(() => Date.now()), [r, i] = (0, M.useState)(() => typeof document > "u" || !document.hidden);
 	return (0, M.useEffect)(() => {
 		if (typeof document > "u") return;
@@ -22278,27 +22317,27 @@ function Sy(e = 1e3) {
 }
 //#endregion
 //#region public/plugins/countdown/src/sizes.js
-var Cy = {
+var wy = {
 	"1x1": [1, 1],
 	"2x1": [2, 1],
 	"2x2": [2, 2],
 	"3x2": [3, 2],
 	"3x3": [3, 3]
 };
-function wy(e) {
+function Ty(e) {
 	if (!Array.isArray(e) || e.length < 2) return "2x1";
 	let t = `${Number(e[0])}x${Number(e[1])}`;
-	return Cy[t] ? t : "2x1";
+	return wy[t] ? t : "2x1";
 }
-function Ty() {
+function Ey() {
 	let e = new URLSearchParams(location.search).get("size"), t = /^(\d+)x(\d+)$/.exec(e || "");
 	if (!t) return null;
 	let n = `${Number(t[1])}x${Number(t[2])}`;
-	return Cy[n] ? n : null;
+	return wy[n] ? n : null;
 }
 //#endregion
 //#region public/plugins/countdown/src/data/config.js
-function Ey(t, n, r) {
+function Dy(t, n, r) {
 	let i = (0, M.useRef)(r);
 	i.current = r;
 	let a = (0, M.useRef)(n);
@@ -22344,18 +22383,18 @@ function Ey(t, n, r) {
 }
 //#endregion
 //#region public/plugins/countdown/src/data/items.js
-var Dy = "items", Oy = "settings", ky = Object.freeze({
+var Oy = "items", ky = "settings", Ay = Object.freeze({
 	showPast: !0,
 	highlightSoon: !0
-}), Ay = (e) => String(e).padStart(2, "0");
-function jy(e) {
+}), jy = (e) => String(e).padStart(2, "0");
+function My(e) {
 	let t = e && typeof e == "object" && !Array.isArray(e) ? e : {};
 	return {
-		showPast: typeof t.showPast == "boolean" ? t.showPast : ky.showPast,
-		highlightSoon: typeof t.highlightSoon == "boolean" ? t.highlightSoon : ky.highlightSoon
+		showPast: typeof t.showPast == "boolean" ? t.showPast : Ay.showPast,
+		highlightSoon: typeof t.highlightSoon == "boolean" ? t.highlightSoon : Ay.highlightSoon
 	};
 }
-function My(e) {
+function Ny(e) {
 	return Array.isArray(e) ? e.filter((e) => e && typeof e.id == "string" && typeof e.title == "string" && typeof e.targetDate == "string").map((e) => ({
 		id: e.id,
 		title: e.title,
@@ -22364,51 +22403,51 @@ function My(e) {
 		createdAt: typeof e.createdAt == "string" ? e.createdAt : ""
 	})) : [];
 }
-function Ny(e) {
+function Py(e) {
 	return new Date(e.getFullYear(), e.getMonth(), e.getDate());
 }
-function Py(e) {
+function Fy(e) {
 	if (typeof e != "string") return null;
 	let t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e);
 	if (!t) return null;
 	let n = Number(t[1]), r = Number(t[2]), i = Number(t[3]), a = new Date(n, r - 1, i);
 	return a.getFullYear() !== n || a.getMonth() !== r - 1 || a.getDate() !== i ? null : a;
 }
-function Fy(e) {
-	return `${e.getFullYear()}-${Ay(e.getMonth() + 1)}-${Ay(e.getDate())}`;
+function Iy(e) {
+	return `${e.getFullYear()}-${jy(e.getMonth() + 1)}-${jy(e.getDate())}`;
 }
-function Iy(e, t) {
+function Ly(e, t) {
 	let n = new Date(t, e.getMonth() + 1, 0).getDate();
 	return new Date(t, e.getMonth(), Math.min(e.getDate(), n));
 }
-function Ly(e, t) {
-	return Math.round((Ny(t) - Ny(e)) / 864e5);
+function Ry(e, t) {
+	return Math.round((Py(t) - Py(e)) / 864e5);
 }
-var Ry = new Intl.DateTimeFormat("zh-CN", {
+var zy = new Intl.DateTimeFormat("zh-CN", {
 	month: "long",
 	day: "numeric"
-}), zy = new Intl.DateTimeFormat("zh-CN", { weekday: "short" });
-function By(e) {
-	return Ry.format(e);
-}
+}), By = new Intl.DateTimeFormat("zh-CN", { weekday: "short" });
 function Vy(e) {
 	return zy.format(e);
 }
-function Hy(e, t = /* @__PURE__ */ new Date()) {
-	let n = Py(e.targetDate);
+function Hy(e) {
+	return By.format(e);
+}
+function Uy(e, t = /* @__PURE__ */ new Date()) {
+	let n = Fy(e.targetDate);
 	if (!n) return null;
-	let r = Ny(t), i = n;
+	let r = Py(t), i = n;
 	if (e.repeatYearly) {
-		let e = Iy(n, r.getFullYear());
-		i = e >= r ? e : Iy(n, r.getFullYear() + 1);
+		let e = Ly(n, r.getFullYear());
+		i = e >= r ? e : Ly(n, r.getFullYear() + 1);
 	}
-	let a = Ly(r, i), o = "future";
+	let a = Ry(r, i), o = "future";
 	a === 0 ? o = "today" : a < 0 && (o = "past");
-	let s = By(i), c = Vy(i), l = e.repeatYearly ? `每年 ${s} · ${c}` : `${s} · ${c}`;
+	let s = Vy(i), c = Hy(i), l = e.repeatYearly ? `每年 ${s} · ${c}` : `${s} · ${c}`;
 	return {
 		item: e,
 		target: i,
-		targetDate: Fy(i),
+		targetDate: Iy(i),
 		days: a,
 		status: o,
 		dateLabel: s,
@@ -22416,10 +22455,10 @@ function Hy(e, t = /* @__PURE__ */ new Date()) {
 		subtitle: l
 	};
 }
-function Uy(e) {
+function Wy(e) {
 	return e.days === 0 ? "就是今天" : e.days > 0 ? `还有 ${e.days} 天` : `已过 ${Math.abs(e.days)} 天`;
 }
-function Wy(e) {
+function Gy(e) {
 	return e.sort((e, t) => {
 		let n = e.days < 0;
 		if (n !== t.days < 0) return n ? 1 : -1;
@@ -22428,20 +22467,20 @@ function Wy(e) {
 		return r === i ? 0 : r < i ? -1 : 1;
 	}), e;
 }
-function Gy(e, t = /* @__PURE__ */ new Date()) {
+function Ky(e, t = /* @__PURE__ */ new Date()) {
 	let n = [];
 	for (let r of e) {
-		let e = Hy(r, t);
+		let e = Uy(r, t);
 		e && n.push(e);
 	}
-	return Wy(n);
+	return Gy(n);
 }
-function Ky() {
+function qy() {
 	return `cd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
-function qy(e) {
+function Jy(e) {
 	let t = typeof e?.title == "string" ? e.title.trim() : "";
-	return t ? Py(e?.targetDate) ? {
+	return t ? Fy(e?.targetDate) ? {
 		ok: !0,
 		title: t
 	} : {
@@ -22452,12 +22491,12 @@ function qy(e) {
 		error: "标题为空"
 	};
 }
-function Jy(e, t) {
-	let n = qy(t);
+function Yy(e, t) {
+	let n = Jy(t);
 	if (!n.ok) throw Error(n.error);
 	if (e.length >= 50) throw Error("最多 50 条倒数日");
 	let r = {
-		id: Ky(),
+		id: qy(),
 		title: n.title,
 		targetDate: t.targetDate,
 		repeatYearly: !!t.repeatYearly,
@@ -22468,13 +22507,13 @@ function Jy(e, t) {
 		item: r
 	};
 }
-function Yy(e, t) {
+function Xy(e, t) {
 	let n = typeof t?.id == "string" ? t.id : "", r = e.findIndex((e) => e.id === n);
 	if (r < 0) throw Error(`找不到 id 为 ${n} 的倒数日`);
 	let i = e[r], a = t.title === void 0 ? i.title : typeof t.title == "string" ? t.title.trim() : "";
 	if (!a) throw Error("标题为空");
 	let o = t.targetDate === void 0 ? i.targetDate : t.targetDate;
-	if (!Py(o)) throw Error("日期无效");
+	if (!Fy(o)) throw Error("日期无效");
 	let s = {
 		...i,
 		title: a,
@@ -22486,7 +22525,7 @@ function Yy(e, t) {
 		item: s
 	};
 }
-function Xy(e, t) {
+function Zy(e, t) {
 	let n = e.find((e) => e.id === t);
 	if (!n) throw Error(`找不到 id 为 ${t} 的倒数日`);
 	return {
@@ -22494,19 +22533,19 @@ function Xy(e, t) {
 		item: n
 	};
 }
-function Zy(e, t) {
+function Qy(e, t) {
 	let n = t && typeof t == "object" && !Array.isArray(t) ? t : {}, r = Object.prototype.hasOwnProperty.call(n, "showPast"), i = Object.prototype.hasOwnProperty.call(n, "highlightSoon");
 	if (!r && !i) throw Error("至少提供 showPast 或 highlightSoon");
 	if (r && typeof n.showPast != "boolean") throw Error("showPast 必须是布尔值");
 	if (i && typeof n.highlightSoon != "boolean") throw Error("highlightSoon 必须是布尔值");
-	return jy({
+	return My({
 		...e,
 		...r ? { showPast: n.showPast } : null,
 		...i ? { highlightSoon: n.highlightSoon } : null
 	});
 }
-function Qy(e, t = /* @__PURE__ */ new Date()) {
-	let n = Hy(e, t);
+function $y(e, t = /* @__PURE__ */ new Date()) {
+	let n = Uy(e, t);
 	return {
 		id: e.id,
 		title: e.title,
@@ -22514,35 +22553,35 @@ function Qy(e, t = /* @__PURE__ */ new Date()) {
 		repeatYearly: e.repeatYearly,
 		days: n ? n.days : null,
 		status: n ? n.status : "future",
-		display: n ? Uy(n) : ""
-	};
-}
-function $y(e, t) {
-	let n = t?.includePast !== !1, r = /* @__PURE__ */ new Date(), i = Gy(e, r).filter((e) => n || e.days >= 0);
-	return {
-		today: Fy(r),
-		count: i.length,
-		items: i.map((e) => Qy(e.item, r))
+		display: n ? Wy(n) : ""
 	};
 }
 function eb(e, t) {
-	let { items: n, item: r } = Jy(e, t);
+	let n = t?.includePast !== !1, r = /* @__PURE__ */ new Date(), i = Ky(e, r).filter((e) => n || e.days >= 0);
 	return {
-		nextItems: n,
-		result: Qy(r)
+		today: Iy(r),
+		count: i.length,
+		items: i.map((e) => $y(e.item, r))
 	};
 }
 function tb(e, t) {
 	let { items: n, item: r } = Yy(e, t);
 	return {
 		nextItems: n,
-		result: Qy(r)
+		result: $y(r)
 	};
 }
 function nb(e, t) {
+	let { items: n, item: r } = Xy(e, t);
+	return {
+		nextItems: n,
+		result: $y(r)
+	};
+}
+function rb(e, t) {
 	let n = typeof t?.id == "string" ? t.id : "";
 	if (!n) throw Error("id 不能为空");
-	let { items: r, item: i } = Xy(e, n);
+	let { items: r, item: i } = Zy(e, n);
 	return {
 		nextItems: r,
 		result: {
@@ -22552,22 +22591,22 @@ function nb(e, t) {
 		}
 	};
 }
-function rb(e) {
-	return { ...jy(e) };
+function ib(e) {
+	return { ...My(e) };
 }
-function ib(e, t) {
-	let n = Zy(e, t);
+function ab(e, t) {
+	let n = Qy(e, t);
 	return {
 		nextSettings: n,
 		result: { ...n }
 	};
 }
-async function ab() {
-	let t = await e.getConfig(Dy).catch(() => null);
+async function ob() {
+	let t = await e.getConfig(Oy).catch(() => null);
 	if (Array.isArray(t) && t.length > 0) return;
 	let n = (e) => {
 		let t = /* @__PURE__ */ new Date();
-		return t.setDate(t.getDate() + e), Fy(t);
+		return t.setDate(t.getDate() + e), Iy(t);
 	}, r = (/* @__PURE__ */ new Date()).toISOString(), i = (/* @__PURE__ */ new Date()).getFullYear(), a = [
 		{
 			id: "demo-today",
@@ -22619,15 +22658,15 @@ async function ab() {
 			createdAt: r
 		}
 	];
-	await e.setConfig(Dy, a).catch(() => {});
+	await e.setConfig(Oy, a).catch(() => {});
 }
 //#endregion
 //#region public/plugins/countdown/src/Card.jsx
-var ob = Number.parseFloat(sl.spacingVerticalXXL), sb = {
+var sb = Number.parseFloat(sl.spacingVerticalXXL), cb = {
 	"2x2": 4,
 	"3x2": 4,
 	"3x3": 8
-}, cb = [
+}, lb = [
 	{
 		name: "countdown.list",
 		description: "列出倒数日事件（含剩余天数、目标日期与状态）",
@@ -22730,7 +22769,7 @@ var ob = Number.parseFloat(sl.spacingVerticalXXL), sb = {
 			additionalProperties: !1
 		}
 	}
-], lb = Jn({
+], ub = Jn({
 	root: {
 		boxSizing: "border-box",
 		color: W.colorNeutralForeground1
@@ -22758,7 +22797,9 @@ var ob = Number.parseFloat(sl.spacingVerticalXXL), sb = {
 		gap: W.spacingHorizontalS,
 		width: "100%",
 		minWidth: 0,
-		minHeight: W.lineHeightHero900
+		minHeight: W.lineHeightHero900,
+		flex: 1,
+		paddingBlockStart: W.spacingVerticalXXS
 	},
 	featured: {
 		display: "flex",
@@ -22821,19 +22862,19 @@ var ob = Number.parseFloat(sl.spacingVerticalXXL), sb = {
 		fontWeight: W.fontWeightSemibold
 	}
 });
-function ub() {
+function db() {
 	let [e, t] = (0, M.useState)(() => typeof window > "u" ? 0 : window.innerHeight);
 	return (0, M.useEffect)(() => {
 		let e = () => t(window.innerHeight);
 		return e(), window.addEventListener("resize", e), () => window.removeEventListener("resize", e);
 	}, []), e;
 }
-function db(e, t) {
-	let n = Math.max(0, e - Pv * 2), r = Math.max(0, n - ob - Fv - (Iv + Fv));
+function fb(e, t) {
+	let n = Math.max(0, e - Pv * 2), r = Math.max(0, n - sb - Fv - (Iv + Fv));
 	return Math.max(0, Math.min(t, Math.floor((r + 4) / 48)));
 }
-function fb({ entry: e }) {
-	let t = lb(), n = e.status === "today", r = e.status === "past";
+function pb({ entry: e }) {
+	let t = ub(), n = e.status === "today", r = e.status === "past";
 	return /* @__PURE__ */ (0, N.jsxs)("span", {
 		className: t.featuredDays,
 		children: [
@@ -22842,7 +22883,7 @@ function fb({ entry: e }) {
 				className: t.daysMuted,
 				children: r ? "已过" : "还有"
 			}),
-			/* @__PURE__ */ (0, N.jsx)($v, {
+			/* @__PURE__ */ (0, N.jsx)(ey, {
 				className: n ? t.daysToday : r ? t.daysMuted : void 0,
 				children: n ? "今天" : Math.abs(e.days)
 			}),
@@ -22854,8 +22895,8 @@ function fb({ entry: e }) {
 		]
 	});
 }
-function pb({ entry: e }) {
-	let t = lb();
+function mb({ entry: e }) {
+	let t = ub();
 	if (e.status === "today") return /* @__PURE__ */ (0, N.jsx)(f_, {
 		size: 400,
 		weight: "semibold",
@@ -22885,8 +22926,8 @@ function pb({ entry: e }) {
 		]
 	});
 }
-function mb({ fallbackSizeKey: t }) {
-	let n = lb(), r = uv(wy, t || "2x1"), i = ub(), a = Sy(6e4), o = (0, M.useMemo)(() => new Date(a), [a]), [s, c, l] = Ey(Dy, [], My), [u, d] = Ey(Oy, ky, jy), f = (0, M.useRef)(s);
+function hb({ fallbackSizeKey: t }) {
+	let n = ub(), r = uv(Ty, t || "2x1"), i = db(), a = Cy(6e4), o = (0, M.useMemo)(() => new Date(a), [a]), [s, c, l] = Dy(Oy, [], Ny), [u, d] = Dy(ky, Ay, My), f = (0, M.useRef)(s);
 	f.current = s;
 	let p = (0, M.useRef)(u);
 	p.current = u;
@@ -22894,29 +22935,29 @@ function mb({ fallbackSizeKey: t }) {
 		f.current = e, c(e);
 	}, [c]), h = (0, M.useCallback)((e) => {
 		p.current = e, d(e);
-	}, [d]), g = (0, M.useMemo)(() => Gy(s, o), [s, o]), _ = (0, M.useMemo)(() => u.showPast ? g : g.filter((e) => e.days >= 0), [g, u.showPast]);
-	yv(cb, {
-		"countdown.list": (e) => $y(f.current, e),
+	}, [d]), g = (0, M.useMemo)(() => Ky(s, o), [s, o]), _ = (0, M.useMemo)(() => u.showPast ? g : g.filter((e) => e.days >= 0), [g, u.showPast]);
+	yv(lb, {
+		"countdown.list": (e) => eb(f.current, e),
 		"countdown.add": (e) => {
-			let { nextItems: t, result: n } = eb(f.current, e);
-			return m(t), n;
-		},
-		"countdown.update": (e) => {
 			let { nextItems: t, result: n } = tb(f.current, e);
 			return m(t), n;
 		},
-		"countdown.remove": (e) => {
+		"countdown.update": (e) => {
 			let { nextItems: t, result: n } = nb(f.current, e);
 			return m(t), n;
 		},
-		"countdown.settings.get": () => rb(p.current),
+		"countdown.remove": (e) => {
+			let { nextItems: t, result: n } = rb(f.current, e);
+			return m(t), n;
+		},
+		"countdown.settings.get": () => ib(p.current),
 		"countdown.settings.set": (e) => {
-			let { nextSettings: t, result: n } = ib(p.current, e);
+			let { nextSettings: t, result: n } = ab(p.current, e);
 			return h(t), n;
 		}
 	}), (0, M.useEffect)(() => {
 		if (!l) return;
-		let t = Fy(new Date(a));
+		let t = Iy(new Date(a));
 		for (let n of _) {
 			if (n.status !== "today") continue;
 			let r = `countdown.reminded:${n.item.id}:${t}`;
@@ -22932,28 +22973,28 @@ function mb({ fallbackSizeKey: t }) {
 		a
 	]);
 	let v = (0, M.useCallback)(() => fv("detail", "全部事件"), []), y = _[0], b = r === "1x1", x = r === "2x1", S = r === "3x2" || r === "3x3";
-	if (!l) return /* @__PURE__ */ (0, N.jsx)(Jv, {
+	if (!l) return /* @__PURE__ */ (0, N.jsx)(Yv, {
 		ariaLabel: "倒数日，正在加载",
 		onActivate: v,
 		className: n.root
 	});
 	if (!_.length) {
 		let e = s.length === 0, t = b || x, r = e ? "还没有倒数日" : "没有未来事件";
-		return /* @__PURE__ */ (0, N.jsxs)(Jv, {
+		return /* @__PURE__ */ (0, N.jsxs)(Yv, {
 			ariaLabel: `倒数日：${r}，点击打开详情`,
 			onActivate: v,
 			className: n.root,
-			children: [t ? null : /* @__PURE__ */ (0, N.jsx)(Zv, {
+			children: [t ? null : /* @__PURE__ */ (0, N.jsx)(Qv, {
 				icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
 				label: "倒数日",
 				className: n.identityRow,
 				disclosure: !0
-			}), /* @__PURE__ */ (0, N.jsx)(oy, {
+			}), /* @__PURE__ */ (0, N.jsx)(sy, {
 				align: t ? "center" : "start",
 				compact: t,
 				icon: /* @__PURE__ */ (0, N.jsx)(G, {}),
 				title: r,
-				action: /* @__PURE__ */ (0, N.jsx)(uy, {
+				action: /* @__PURE__ */ (0, N.jsx)(dy, {
 					appearance: "secondary",
 					icon: e ? /* @__PURE__ */ (0, N.jsx)(su, {}) : /* @__PURE__ */ (0, N.jsx)(pu, {}),
 					onClick: v,
@@ -22963,19 +23004,19 @@ function mb({ fallbackSizeKey: t }) {
 			})]
 		});
 	}
-	let C = `倒数日：${y.item.title}，${Uy(y)}；点击打开详情`;
-	if (b) return /* @__PURE__ */ (0, N.jsxs)(Jv, {
+	let C = `倒数日：${y.item.title}，${Wy(y)}；点击打开详情`;
+	if (b) return /* @__PURE__ */ (0, N.jsxs)(Yv, {
 		ariaLabel: C,
 		onActivate: v,
 		className: n.root,
-		children: [/* @__PURE__ */ (0, N.jsx)(Zv, {
+		children: [/* @__PURE__ */ (0, N.jsx)(Qv, {
 			icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
 			label: "倒数日",
 			compact: !0,
 			className: n.identityRow
 		}), /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: n.singleContent,
-			children: [/* @__PURE__ */ (0, N.jsx)(fb, { entry: y }), /* @__PURE__ */ (0, N.jsx)(f_, {
+			children: [/* @__PURE__ */ (0, N.jsx)(pb, { entry: y }), /* @__PURE__ */ (0, N.jsx)(f_, {
 				size: 400,
 				truncate: !0,
 				className: n.singleTitle,
@@ -22983,11 +23024,11 @@ function mb({ fallbackSizeKey: t }) {
 			})]
 		})]
 	});
-	if (x) return /* @__PURE__ */ (0, N.jsxs)(Jv, {
+	if (x) return /* @__PURE__ */ (0, N.jsxs)(Yv, {
 		ariaLabel: C,
 		onActivate: v,
 		className: n.root,
-		children: [/* @__PURE__ */ (0, N.jsx)(Zv, {
+		children: [/* @__PURE__ */ (0, N.jsx)(Qv, {
 			icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
 			label: "倒数日",
 			className: n.identityRow,
@@ -23005,21 +23046,21 @@ function mb({ fallbackSizeKey: t }) {
 				truncate: !0,
 				className: n.featuredTitle,
 				children: y.item.title
-			}), /* @__PURE__ */ (0, N.jsx)(fb, { entry: y })]
+			}), /* @__PURE__ */ (0, N.jsx)(pb, { entry: y })]
 		})]
 	});
-	let w = db(i, sb[r] ?? 4), T = _.slice(0, w + 1), ee = T.slice(1), E = `倒数日：共 ${_.length} 项，显示 ${T.length} 项，最近 ${y.item.title}，${Uy(y)}；点击打开详情`;
-	return /* @__PURE__ */ (0, N.jsxs)(Jv, {
+	let w = fb(i, cb[r] ?? 4), T = _.slice(0, w + 1), ee = T.slice(1), E = `倒数日：共 ${_.length} 项，显示 ${T.length} 项，最近 ${y.item.title}，${Wy(y)}；点击打开详情`;
+	return /* @__PURE__ */ (0, N.jsxs)(Yv, {
 		ariaLabel: E,
 		onActivate: v,
 		className: n.root,
 		children: [
-			/* @__PURE__ */ (0, N.jsx)(Zv, {
+			/* @__PURE__ */ (0, N.jsx)(Qv, {
 				icon: /* @__PURE__ */ (0, N.jsx)(iu, {}),
 				label: "倒数日",
 				className: n.identityRow,
 				disclosure: !0,
-				trailing: /* @__PURE__ */ (0, N.jsx)(cy, {
+				trailing: /* @__PURE__ */ (0, N.jsx)(ly, {
 					total: _.length,
 					shown: T.length
 				})
@@ -23032,9 +23073,9 @@ function mb({ fallbackSizeKey: t }) {
 					truncate: !0,
 					className: n.featuredTitle,
 					children: y.item.title
-				}), /* @__PURE__ */ (0, N.jsx)(fb, { entry: y })]
+				}), /* @__PURE__ */ (0, N.jsx)(pb, { entry: y })]
 			}),
-			/* @__PURE__ */ (0, N.jsx)(ty, { children: ee.map((e) => /* @__PURE__ */ (0, N.jsx)(ry, {
+			/* @__PURE__ */ (0, N.jsx)(ny, { children: ee.map((e) => /* @__PURE__ */ (0, N.jsx)(iy, {
 				title: e.item.title,
 				titleSize: 400,
 				trailing: /* @__PURE__ */ (0, N.jsxs)("span", {
@@ -23047,7 +23088,7 @@ function mb({ fallbackSizeKey: t }) {
 							" · ",
 							e.weekdayLabel
 						]
-					}) : null, /* @__PURE__ */ (0, N.jsx)(pb, { entry: e })]
+					}) : null, /* @__PURE__ */ (0, N.jsx)(mb, { entry: e })]
 				})
 			}, e.item.id)) })
 		]
@@ -23055,7 +23096,7 @@ function mb({ fallbackSizeKey: t }) {
 }
 //#endregion
 //#region public/plugins/countdown/src/Detail.jsx
-var hb = Jn({
+var gb = Jn({
 	headerCount: { color: W.colorNeutralForeground3 },
 	sections: {
 		display: "flex",
@@ -23185,8 +23226,8 @@ var hb = Jn({
 		gap: W.spacingHorizontalS
 	}
 });
-function gb({ title: e, onEdit: t, onDelete: n }) {
-	let r = hb();
+function _b({ title: e, onEdit: t, onDelete: n }) {
+	let r = gb();
 	return /* @__PURE__ */ (0, N.jsxs)(sg, { children: [/* @__PURE__ */ (0, N.jsx)(qg, {
 		disableButtonEnhancement: !0,
 		children: /* @__PURE__ */ (0, N.jsx)(Pm, {
@@ -23206,8 +23247,8 @@ function gb({ title: e, onEdit: t, onDelete: n }) {
 		children: "删除"
 	})] }) })] });
 }
-function _b({ entry: e }) {
-	let t = hb();
+function vb({ entry: e }) {
+	let t = gb();
 	return e.status === "past" ? /* @__PURE__ */ (0, N.jsxs)(f_, {
 		size: 300,
 		className: t.pastDays,
@@ -23250,8 +23291,8 @@ function _b({ entry: e }) {
 		]
 	});
 }
-function vb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequest: i, onCancelConfirm: a, onConfirmDelete: o }) {
-	let s = hb(), c = t && e.status === "future" && e.days > 0 && e.days <= 7;
+function yb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequest: i, onCancelConfirm: a, onConfirmDelete: o }) {
+	let s = gb(), c = t && e.status === "future" && e.days > 0 && e.days <= 7;
 	return n ? /* @__PURE__ */ (0, N.jsxs)("div", {
 		className: s.confirmRow,
 		role: "group",
@@ -23267,12 +23308,12 @@ function vb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequ
 			]
 		}), /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: s.confirmActions,
-			children: [/* @__PURE__ */ (0, N.jsx)(dy, {
+			children: [/* @__PURE__ */ (0, N.jsx)(fy, {
 				appearance: "secondary",
 				"aria-label": "取消删除",
 				onClick: a,
 				children: "取消"
-			}), /* @__PURE__ */ (0, N.jsx)(dy, {
+			}), /* @__PURE__ */ (0, N.jsx)(fy, {
 				appearance: "secondary",
 				className: s.danger,
 				"aria-label": "确认删除",
@@ -23280,7 +23321,7 @@ function vb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequ
 				children: "删除"
 			})]
 		})]
-	}) : /* @__PURE__ */ (0, N.jsx)(ry, {
+	}) : /* @__PURE__ */ (0, N.jsx)(iy, {
 		style: { minHeight: `calc(${W.spacingVerticalXXXL} + ${W.spacingVerticalL})` },
 		title: e.item.title,
 		subtitle: e.subtitle,
@@ -23302,8 +23343,8 @@ function vb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequ
 						children: "7 天内"
 					}) : null]
 				}),
-				/* @__PURE__ */ (0, N.jsx)(_b, { entry: e }),
-				/* @__PURE__ */ (0, N.jsx)(gb, {
+				/* @__PURE__ */ (0, N.jsx)(vb, { entry: e }),
+				/* @__PURE__ */ (0, N.jsx)(_b, {
 					title: e.item.title,
 					onEdit: r,
 					onDelete: i
@@ -23312,9 +23353,9 @@ function vb({ entry: e, highlightSoon: t, confirming: n, onEdit: r, onDeleteRequ
 		})
 	});
 }
-function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
-	let a = hb(), o = !!t, [s, c] = (0, M.useState)(t?.title ?? ""), [l, u] = (0, M.useState)(t?.targetDate ?? Fy(/* @__PURE__ */ new Date())), [d, f] = (0, M.useState)(!!t?.repeatYearly), [p, m] = (0, M.useState)(""), [h, g] = (0, M.useState)(!1), _ = (e) => {
-		let i = qy({
+function bb({ item: t, items: n, writeItems: r, onClosed: i }) {
+	let a = gb(), o = !!t, [s, c] = (0, M.useState)(t?.title ?? ""), [l, u] = (0, M.useState)(t?.targetDate ?? Iy(/* @__PURE__ */ new Date())), [d, f] = (0, M.useState)(!!t?.repeatYearly), [p, m] = (0, M.useState)(""), [h, g] = (0, M.useState)(!1), _ = (e) => {
+		let i = Jy({
 			title: s,
 			targetDate: l
 		});
@@ -23322,12 +23363,12 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 		else {
 			m("");
 			try {
-				r((o ? Yy(n, {
+				r((o ? Xy(n, {
 					id: t.id,
 					title: i.title,
 					targetDate: l,
 					repeatYearly: d
-				}) : Jy(n, {
+				}) : Yy(n, {
 					title: i.title,
 					targetDate: l,
 					repeatYearly: d
@@ -23338,13 +23379,13 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 		}
 	}, v = (i) => {
 		if (o) try {
-			let a = Xy(n, t.id);
+			let a = Zy(n, t.id);
 			r(a.items), e.notify(`已删除「${a.item.title}」`), i();
 		} catch (e) {
 			m(e instanceof Error ? e.message : String(e));
 		}
 	};
-	return /* @__PURE__ */ (0, N.jsx)(xy, {
+	return /* @__PURE__ */ (0, N.jsx)(Sy, {
 		title: o ? "编辑倒数日" : "新增倒数日",
 		onClosed: i,
 		footer: (e) => /* @__PURE__ */ (0, N.jsxs)("div", {
@@ -23355,12 +23396,12 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 					"将删除「",
 					t?.title ?? "",
 					"」，删除后无法恢复。"
-				] }), /* @__PURE__ */ (0, N.jsxs)(U_, { children: [/* @__PURE__ */ (0, N.jsx)(dy, {
+				] }), /* @__PURE__ */ (0, N.jsxs)(U_, { children: [/* @__PURE__ */ (0, N.jsx)(fy, {
 					appearance: "secondary",
 					"aria-label": "取消删除",
 					onClick: () => g(!1),
 					children: "取消"
-				}), /* @__PURE__ */ (0, N.jsx)(dy, {
+				}), /* @__PURE__ */ (0, N.jsx)(fy, {
 					appearance: "secondary",
 					className: a.danger,
 					"aria-label": "确认删除倒数日",
@@ -23369,7 +23410,7 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 				})] })]
 			}) : null, /* @__PURE__ */ (0, N.jsxs)("div", {
 				className: a.footerRow,
-				children: [o ? /* @__PURE__ */ (0, N.jsx)(dy, {
+				children: [o ? /* @__PURE__ */ (0, N.jsx)(fy, {
 					appearance: "subtle",
 					className: a.danger,
 					icon: /* @__PURE__ */ (0, N.jsx)(hu, {}),
@@ -23377,11 +23418,11 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 					children: "删除"
 				}) : /* @__PURE__ */ (0, N.jsx)("span", {}), /* @__PURE__ */ (0, N.jsxs)("div", {
 					className: a.footerActions,
-					children: [/* @__PURE__ */ (0, N.jsx)(dy, {
+					children: [/* @__PURE__ */ (0, N.jsx)(fy, {
 						appearance: "secondary",
 						onClick: e,
 						children: "取消"
-					}), /* @__PURE__ */ (0, N.jsx)(dy, {
+					}), /* @__PURE__ */ (0, N.jsx)(fy, {
 						appearance: "secondary",
 						onClick: () => _(e),
 						children: "保存"
@@ -23451,16 +23492,16 @@ function yb({ item: t, items: n, writeItems: r, onClosed: i }) {
 		})
 	});
 }
-function bb() {
-	let e = hb(), t = Sy(6e4), n = (0, M.useMemo)(() => new Date(t), [t]), [r, i, a] = Ey(Dy, [], My), [o] = Ey(Oy, ky, jy), s = (0, M.useRef)(r);
+function xb() {
+	let e = gb(), t = Cy(6e4), n = (0, M.useMemo)(() => new Date(t), [t]), [r, i, a] = Dy(Oy, [], Ny), [o] = Dy(ky, Ay, My), s = (0, M.useRef)(r);
 	s.current = r;
 	let [c, l] = (0, M.useState)(!1), [u, d] = (0, M.useState)(null), [f, p] = (0, M.useState)(null), [m, h] = (0, M.useState)(null), g = (e) => {
 		s.current = e, i(e);
-	}, _ = (0, M.useMemo)(() => Gy(r, n), [r, n]), v = _.filter((e) => e.days >= 0), y = _.filter((e) => e.days < 0), b = v.length + y.length, x = (e) => (t, n) => {
+	}, _ = (0, M.useMemo)(() => Ky(r, n), [r, n]), v = _.filter((e) => e.days >= 0), y = _.filter((e) => e.days < 0), b = v.length + y.length, x = (e) => (t, n) => {
 		if (n?.direction === "exit") {
 			p(null), d(null);
 			try {
-				let t = Xy(s.current, e);
+				let t = Zy(s.current, e);
 				g(t.items);
 			} catch {}
 		}
@@ -23471,7 +23512,7 @@ function bb() {
 		onMotionFinish: x(t.item.id),
 		children: /* @__PURE__ */ (0, N.jsx)("div", {
 			className: e.rowWrap,
-			children: /* @__PURE__ */ (0, N.jsx)(vb, {
+			children: /* @__PURE__ */ (0, N.jsx)(yb, {
 				entry: t,
 				highlightSoon: o.highlightSoon,
 				confirming: u === t.item.id,
@@ -23484,14 +23525,14 @@ function bb() {
 			})
 		})
 	}, t.item.id);
-	if (!a) return /* @__PURE__ */ (0, N.jsx)(py, {});
+	if (!a) return /* @__PURE__ */ (0, N.jsx)(my, {});
 	let C = m?.id ? r.find((e) => e.id === m.id) ?? null : null, w = !!m && (!m.id || !!C);
-	return /* @__PURE__ */ (0, N.jsxs)(py, { children: [
-		/* @__PURE__ */ (0, N.jsx)(hy, {
-			trailing: /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)(dy, {
+	return /* @__PURE__ */ (0, N.jsxs)(my, { children: [
+		/* @__PURE__ */ (0, N.jsx)(gy, {
+			trailing: /* @__PURE__ */ (0, N.jsxs)(N.Fragment, { children: [/* @__PURE__ */ (0, N.jsx)(fy, {
 				onClick: pv,
 				children: "设置…"
-			}), /* @__PURE__ */ (0, N.jsx)(dy, {
+			}), /* @__PURE__ */ (0, N.jsx)(fy, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, N.jsx)(su, {}),
 				onClick: () => h({ id: null }),
@@ -23507,16 +23548,16 @@ function bb() {
 				]
 			})
 		}),
-		b === 0 ? /* @__PURE__ */ (0, N.jsx)(vy, { children: /* @__PURE__ */ (0, N.jsx)(oy, {
+		b === 0 ? /* @__PURE__ */ (0, N.jsx)(yy, { children: /* @__PURE__ */ (0, N.jsx)(sy, {
 			icon: /* @__PURE__ */ (0, N.jsx)(G, {}),
 			title: "还没有倒数日",
-			action: /* @__PURE__ */ (0, N.jsx)(dy, {
+			action: /* @__PURE__ */ (0, N.jsx)(fy, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, N.jsx)(su, {}),
 				onClick: () => h({ id: null }),
 				children: "添加事件"
 			})
-		}) }) : /* @__PURE__ */ (0, N.jsx)(vy, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
+		}) }) : /* @__PURE__ */ (0, N.jsx)(yy, { children: /* @__PURE__ */ (0, N.jsxs)("div", {
 			className: e.sections,
 			children: [/* @__PURE__ */ (0, N.jsxs)("section", {
 				className: e.section,
@@ -23542,7 +23583,7 @@ function bb() {
 						size: 400,
 						weight: "semibold",
 						children: ["已过去 ", y.length]
-					}), /* @__PURE__ */ (0, N.jsx)(dy, {
+					}), /* @__PURE__ */ (0, N.jsx)(fy, {
 						appearance: "subtle",
 						className: e.pastToggleButton,
 						icon: c ? /* @__PURE__ */ (0, N.jsx)(mu, {}) : /* @__PURE__ */ (0, N.jsx)(du, {}),
@@ -23559,7 +23600,7 @@ function bb() {
 				})]
 			}) : null]
 		}) }),
-		w ? /* @__PURE__ */ (0, N.jsx)(yb, {
+		w ? /* @__PURE__ */ (0, N.jsx)(bb, {
 			item: C,
 			items: r,
 			writeItems: g,
@@ -23570,15 +23611,15 @@ function bb() {
 //#endregion
 //#region public/plugins/countdown/src/main.jsx
 rv();
-var xb = dv(), Sb = Ty();
-function Cb(t = 2500) {
+var Sb = dv(), Cb = Ey();
+function wb(t = 2500) {
 	return !e.inHost || iv() ? Promise.resolve() : new Promise((e) => {
 		let n = Date.now(), r = window.setInterval(() => {
 			(iv() || Date.now() - n > t) && (window.clearInterval(r), e());
 		}, 30);
 	});
 }
-function wb() {
+function Tb() {
 	let { theme: t } = lv(), n = e.inHost ? "transparent" : t.colorNeutralBackground1;
 	return /* @__PURE__ */ (0, N.jsx)(wl, {
 		theme: t,
@@ -23588,12 +23629,12 @@ function wb() {
 			background: n,
 			colorScheme: "normal"
 		},
-		children: xb === "detail" ? /* @__PURE__ */ (0, N.jsx)(bb, {}) : /* @__PURE__ */ (0, N.jsx)(mb, { fallbackSizeKey: Sb })
+		children: Sb === "detail" ? /* @__PURE__ */ (0, N.jsx)(xb, {}) : /* @__PURE__ */ (0, N.jsx)(hb, { fallbackSizeKey: Cb })
 	});
 }
-async function Tb() {
+async function Eb() {
 	let e = document.getElementById("root");
-	e && (await Cb(), new URLSearchParams(location.search).get("demo") === "1" && await ab(), (0, Z_.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(wb, {})));
+	e && (await wb(), new URLSearchParams(location.search).get("demo") === "1" && await ob(), (0, Z_.createRoot)(e).render(/* @__PURE__ */ (0, N.jsx)(Tb, {})));
 }
-Tb();
+Eb();
 //#endregion

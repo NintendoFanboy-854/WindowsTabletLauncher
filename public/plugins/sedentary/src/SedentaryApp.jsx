@@ -92,6 +92,17 @@ const useStyles = makeStyles({
   identityStart: {
     alignSelf: 'flex-start',
   },
+  /** 1×1：hero 在 identity 以下剩余空间垂直居中；paddingBlockEnd 8 抵消 CardRoot 的 8 组距 */
+  compactBody: {
+    display: 'flex',
+    flex: '1 1 auto',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 0,
+    minWidth: 0,
+    paddingBlockEnd: tokens.spacingVerticalS,
+  },
   rootStack: {
     alignItems: 'stretch',
   },
@@ -512,7 +523,9 @@ export default function SedentaryApp({ fallbackSizeKey }) {
           compact
           trailing={statusBadge}
         />
-        {metric(false)}
+        {/* 1×1 空带均分（DENSITY §1.1-2）：hero 在 identity 以下的剩余空间垂直居中；
+            下方补 8 抵消 CardRoot 组距 8，实测 22 / 22（与 clock 1×1 同口径） */}
+        <div className={styles.compactBody}>{metric(false)}</div>
       </CardRoot>
     );
   }

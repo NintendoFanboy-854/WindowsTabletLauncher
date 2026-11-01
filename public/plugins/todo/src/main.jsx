@@ -17,13 +17,34 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { plugin } from '/plugin-sdk.js';
-import { getOverlayView, startHostCapture, useHostTheme } from '../../_shared/host.js';
+import { getHostInit, getOverlayView, startHostCapture, useHostTheme } from '../../_shared/host.js';
 import { buildToolHandlers, startTodoData, TOOL_DECLS } from './todoData.js';
 import { buildCardSize, parseSizeParam, sizeKeyOf } from './sizes.js';
 import TodoCard from './TodoCard.jsx';
 import TodoDetail from './TodoDetail.jsx';
 
 startHostCapture();
+
+/**
+ * 宿主内：等 `host:init` 再渲染。
+ *
+ * 之前直接渲染时 `plugin.inHost` 还是 false，会被当成 standalone 画出独立预览的
+ * 不透明页面/卡片底色（浅色主题下是白卡），宿主再切到暗色主题前就闪一下白——
+ * 这是 P0-1 首帧白屏在插件侧的最后来源。独立打开（无宿主）最多等 2500ms，
+ * 之后照常进入开发预览。
+ */
+function waitForHostInit(timeoutMs = 2500) {
+  if (!plugin.inHost || getHostInit()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (getHostInit() || Date.now() - started > timeoutMs) {
+        window.clearInterval(timer);
+        resolve();
+      }
+    }, 30);
+  });
+}
 
 const params = new URLSearchParams(location.search);
 const isBackground =
@@ -85,8 +106,7 @@ function PreviewShell({ overlayView, defaultSizeKey, children }) {
   );
 }
 
-/** 渲染错误态用 Fluent MessageBar（DESIGN §1.2），不整页白屏 */
-class ErrorBoundary extends React.Component {
+/** 渲染错误态用 Fluent MessageBar（DESIGN §1.2），不整页白屏 */class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { error: null };
@@ -163,7 +183,11 @@ if (isBackground) {
 } else {
   // 宿主里的卡片 / 详情视图只读数据，不跑提醒循环（后台 iframe 负责）；
   // 独立打开（无宿主）时由当前实例兜底，提醒照常工作。
-  startTodoData({ startReminders: !plugin.inHost });
-  const rootElement = document.getElementById('root');
-  if (rootElement) createRoot(rootElement).render(<Root />);
+  // 先等宿主 init：否则会误按 standalone 渲染出不透明预览底色（见 waitForHostInit）。
+  void (async () => {
+    await waitForHostInit();
+    startTodoData({ startReminders: !plugin.inHost });
+    const rootElement = document.getElementById('root');
+    if (rootElement) createRoot(rootElement).render(<Root />);
+  })();
 }

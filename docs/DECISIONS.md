@@ -853,3 +853,28 @@
 - 已知限制：极端异常（页面永不 ready、worker 卡死、蓝牙驱动不返回）时，用户侧表现为长时间「正在连接 / 进行中」而不是快速报错；退出兜底 60s 只在某步真的卡死时触发，正常退出仍是数秒。前端等待仍保留「可取消」路径（关闭面板 / Ctrl+Q / 重试按钮）。
 - 文档落点：本节；`README` 已知限制；`browser_window.rs` / `bluetooth_audio.rs` / `audio_focus.rs` / `lib.rs` / `cdp.js` / `library.js` / `bluetoothAudio.ts` / `wallpaper.ts` / `source.ts` / `bingarchive.rs` 注释。
 - 实现/验证：`cargo check --lib` / `npx tsc --noEmit` / 插件构建通过；release 构建（16m35s）+ `/S` 静默安装。真机冷启动抽验（安装版 + 真实登录态 Edge）：打开 AM 面板后 33s 内已显示 21 个播放列表（途中不出现「没有播放列表」误判；连接期显示「正在连接播放器」）；退出 launcher：应用 4.84s 退出（其中 A2DP 服务停用 ~3.3s、BT Close ~0.9s），受管 Edge 在应用退出后 <250ms 内消失。只记录耗时，不作为验收门槛。
+
+## D-57 第三轮 UI/动效审计的落地 + 六处审计口径更正（2026-11-01）
+
+- 背景：第三轮只读审计（`docs/audits/round3-widget-audit/AUDIT.md`）给出 2 P0 / 6 P1 / 8 P2；实施时逐条对源码、组件规范与证据 JSON 复演，发现 6 条结论要更正（已回写 `AUDIT.md §15`）。用户要求：性能不作为目标（慢机器慢是正常现象），信息密度「不要太高也不要太低」，间距按 ramp。
+- 决策 / 改动：
+  1. **首帧白屏（P0）**：根因有三层——① iframe 真实文档提交前，初始 `about:blank` 就是白底；② `base.css` 到达前画布是默认白底；③ todo 插件在 `host:init` 前把 `plugin.inHost` 误判为 false，渲染了 standalone 预览的不透明白卡。修法：7 个插件 `index.html` 内联 `html,body{background:transparent}`；`PluginWidgetFrame` 在 load / ready 前把可见 iframe `opacity:0`（遮住 about:blank 白底、也不拦点击），超过 1s 仍未就绪再出 Fluent **Skeleton** 占位（不用 Spinner：桌面同时加载多卡会出现多个 spinner，FLUENT2 §12 禁止）；todo 等 `host:init` 再渲染。加载占位不设超时，插件就绪/文档 load 即撤。
+  2. **Agent 三段 morph（P0）**：五条 `geometry` 时长按 `MOTION.md §5.1` 改回 300/300/250/200/250（`durationSlow/Slow/Gentle/Normal/Gentle`），content / entry 参数不动；消费点（舞台完成计时）随 `spec.geometry.duration` 自动跟随。
+  3. **键盘第一下 Tab（P1-6）**：复现确认从 `body` 起的第一下顺序焦点导航会落进离屏后台 iframe——`tabindex=-1` + `aria-hidden` 拦不住（Chromium 会进入文档里第一个 iframe 的浏览上下文）。改 `HIDDEN_FRAME_STYLE` 加 `visibility:hidden`（只影响绘制/命中，不影响插件定时器：实测 1.2s 走 7 tick、`visibilityState` 仍 visible）；后台 iframe 可访问名改「插件名（后台）」。首 Tab 现在直接落第一张卡。
+  4. **44 命中区（P1-1）**：实测外层根已经是 44（host `styles.control`、插件 `base.css`），真正可点的内层 `button/input` 只有 42；修法落在内层元素：设置页根容器加 `.fui-Dropdown__button / .fui-Input__input / .fui-Combobox__input { min-height: 44 }`，插件 `base.css` 加同款规则。外壳随内容变 46，仍在 48 行高内。
+  5. **countdown 2×1（P1-4）**：按 `components/countdown.md:25` 2×1 只放「标题 + 天数」，不新增字段；featured 行 `flex:1` + 2px 下移 → 单块空带 34.2% → **21.7%**（1024 断点 19.7%）。
+  6. **todo 行元信息（P1-2 修正）**：清单名保留（`todo.md:41` 3×2/4×2 每行多清单名是组件规范显式追加）；只删 3×3 行内的「子任务 N/M」（`todo.md:32` 明确不显示）。
+  7. **1×1 均分（P2-1）**：主内容在 identity 以下剩余空间垂直居中、下方补 8 抵消 CardRoot 组距；sedentary 8/36 → **22/22**，todo 62/14 → **11/11**（均为扣除 16 内衬口径）。
+  8. **焦点环（P2-7）**：卡片补 2px `colorStrokeFocus2` 内描边，只在 `:focus-visible` 出现（鼠标点击不点亮），替代原先“焦点只亮 1px 白描边”。
+  9. **pomodoro 2×2@1024 非省略裁切（P2-2）**：2×2 内容在 1024 断点自然高度 290 > 内容框 276，任务标题被 flex 压成 14px（`lineHeight` 22）再裁切。阶段与轮次合并为一行（与 3×2 同一 `subline`），自然高度降到 ~262；`task` 加 `flexShrink:0` 防再被压。
+  10. **文档冲突**：C1 `MOTION §9` 验收 1.015/0.985 → **1.02/0.98**，`DESIGN §1.2` 同步；C2 `PLUGIN-CONTRACT` 的 `HeroProgress` 100ms → **200ms**（以 MOTION §6 为动效唯一权威，代码不改）；C4 `DENSITY §1.1-2` 写明 1×1 均分在「扣除 CardRoot 上下各 16 内衬」的内容盒里判定；`DENSITY §3` 补 todo 清单名例外。C3 随第 2 条代码修复消失；C5 维持原登记取舍。
+- 否掉的方案：
+  - **给后台 iframe 加 `tabindex=-1` / `aria-hidden`**：已有（2026-10-18 起），不解决；`inert` 会把焦点交给 Tabster 的 1×1 焦点哨兵（实测第一个 Tab 落到 `<i>`），也不采用。
+  - **用 Spinner 做卡片加载**：多卡并发会出现多个 spinner（FLUENT2 §12 禁止）；用 Skeleton。
+  - **把卡片视觉高度撑到 44**：组件规范写的是 40 视觉档；命中区靠内层控件补到 44，不改外层视觉节奏。
+  - **改 appleMusic 4×2 字段**：4×2 字段本来就比 3×2 多（封面 240 + 时长行），空态三档同构是「无 SMTC 会话」的状态伪差，不是档位缺陷。
+  - **按报告改 clock 空态**：源码就是共享 `EmptyState`（24 图标 + 44 按钮）；原审计的空态脚本没补发 `host:resize`，量到的是默认档。
+- 已知限制：P2-3 / P2-4 的 appleMusic 空带与 3×3「数据不足」空带依赖真实播放态 / ≥8 条数据，本轮不判缺陷；真机 WebView2 的帧率、状态栏/快速设置面板、Apple Music 六态仍按审计 §9 未验证清单处理。另：`scripts/verify-widgets.mjs` 的门禁仍是 v0.3 旧口径（hero ≥48、主信息占卡高 ≥30% 等），与 DENSITY v2「hero 统一 40、占比旧口径作废」冲突，本轮**未**改该脚本——它的 24 个 FAIL 全是旧门禁，不作为本轮验收依据；本轮验收用审计复验脚本（`.tmp/fix-verify/`）。
+- 文档落点：本节；`AUDIT.md §15`；`MOTION.md §9`；`DESIGN.md §1.2`；`PLUGIN-CONTRACT.md §4.4`（HeroProgress）；`DENSITY.md §1.1-2 / §3`；`PluginWidgetFrame.tsx` / `AgentSurface.tsx` / `WidgetCard.tsx` / `SettingsPage.tsx` / `PluginBackgroundFrames.tsx` / `BackgroundFrames.tsx` / `base.css` / `todo` `countdown` `sedentary` `pomodoro` 插件注释。
+- 实现/验证：`tsc --noEmit` 通过；7 个插件全部重建（`build-plugin.mjs --all`）；headless Edge 复验（`.tmp/fix-verify/`）：首帧 300ms 起 6 卡像素均为卡片材质色（0 张纯白）、慢加载时 6 卡骨架出现且就绪后消失、首 Tab = 天气卡、后台 iframe 定时器 1.2s/7 tick、设置页与 todo 详情/L2 无 <44 真实命中区、countdown 2×1 = 33px/21.7%（1440）与 28px/19.7%（1024）、sedentary 1×1 = 22/22、todo 1×1 = 11/11、pomodoro 2×2@1024 任务行恢复 22px 高（不再被压成 14 裁切）、键盘焦点环 2px `colorStrokeFocus2`、详情浮层 880×680 未变、控制台 0 error。release 构建（6 分钟级）+ NSIS `/S` 静默安装；安装版启动 4s / 9s 截屏均为正常桌面（浅色主题 + 壁纸 + 卡片正常渲染、天气在刷新、无白帧），`WM_CLOSE` 优雅退出，退出后 `app.exe` 与 `msedgewebview2` 进程均为 0。真机 DOM 级复核未做：WebView2 的 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 被 wry 自带的 additional args 覆盖，没开调试端口；P0 的真机验证以截屏为准，登记为限制。
+

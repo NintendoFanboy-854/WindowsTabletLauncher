@@ -41,7 +41,7 @@
   `spacingHorizontalL`）、组间距 8（`spacingVerticalS`）。数字型主信息统一 `tokens.fontSizeHero900` /
   `tokens.lineHeightHero900`（逻辑 40 / 52，200% DPI = 物理 80px），不得再按插件/尺寸选 48/68/80/96/112，
   也不定义项目级字号变量。文本字号只用 Fluent `Text size` / `fontSizeBase*` / `fontSizeHero*`，不做 `lineHeight: 1`。
-- 宿主在卡片与 iframe 之间留 **6px 内衬**（`spacingHorizontalSNudge`，接住 hover 1.015 的放大与描边），
+- 宿主在卡片与 iframe 之间留 **6px 内衬**（`spacingHorizontalSNudge`，接住 hover 1.02 的放大与描边），
   因此屏幕上插件内容的实际边距 = 6 + 16 = 22px；插件侧只负责那 16px。
 - 触控目标不小于 **44×44 CSS px**（Fluent `layout.md:57` 与 HIG §6 同值）；卡片动作按钮统一 44 高。
 - **卡片 identity 行**（Equal Except Hue v2）：内容区第一行是 24px 静态 identity 行——20px 身份色图标 +
