@@ -220,22 +220,28 @@ export const btAudioResumeAuto = () => invokeCommand<BtAudioSnapshot>('bt_audio_
 
 /** 轮询间隔：Agent 工具与需要「等结果」的 UI 共用；不是性能指标 */
 const SETTLE_POLL_INTERVAL_MS = 250;
-/** 默认等待上限：一次连接尝试可能排队在多台设备之后；超时返回最后快照，不假装成功 */
-const SETTLE_DEFAULT_TIMEOUT_MS = 12_000;
+/**
+ * 只做「防挂死日志」的安全阈值，不是功能超时：这台机器慢，连接排队/系统蓝牙响应可能
+ * 远超声称的经验值；等不到终态就继续等，超过 10 分钟只记一条 warn（不假装成功）。
+ */
+const SETTLE_SAFETY_LOG_MS = 10 * 60 * 1000;
 
 /**
- * 轮询快照直到 `operation === null`，返回最后一次快照（含超时后的进行中快照）。
+ * 轮询快照直到 `operation === null`，返回最后一次快照（含用户取消后的进行中快照）。
  *
  * 非阻塞命令（connect / disconnect / set_enabled / set_bluetooth）只保证「已入队」；
  * Agent 工具与「等结果」的调用方必须用这个 helper 看到真实的终态（linkPhase / lastError），
- * 而不是把「已发起」当成「已完成」。
+ * 而不是把「已发起」当成「已完成」。不设截止时间，避免慢机器上把「还在做」误判成失败。
  */
-export async function waitForBluetoothSettled(
-  timeoutMs: number = SETTLE_DEFAULT_TIMEOUT_MS,
-): Promise<BtAudioSnapshot> {
+export async function waitForBluetoothSettled(): Promise<BtAudioSnapshot> {
   let latest = await btAudioSnapshot();
-  const deadline = Date.now() + Math.max(0, timeoutMs);
-  while ((latest.operation ?? null) !== null && Date.now() < deadline) {
+  const startedAt = Date.now();
+  let logged = false;
+  while ((latest.operation ?? null) !== null) {
+    if (!logged && Date.now() - startedAt > SETTLE_SAFETY_LOG_MS) {
+      logged = true;
+      console.warn('[bluetooth] 等待操作终态超过 10 分钟（继续等待，不判失败）');
+    }
     await new Promise<void>((resolve) => {
       setTimeout(resolve, SETTLE_POLL_INTERVAL_MS);
     });

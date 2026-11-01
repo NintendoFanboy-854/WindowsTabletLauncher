@@ -24,11 +24,12 @@ const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (
 const BING_ORIGIN: &str = "https://www.bing.com";
 const ARCHIVE_PATH: &str = "/HPImageArchive.aspx";
 
-/// 与前端 `REQUEST_TIMEOUT_MS`（8000）同语义：8s 拿不到就当失败，让前端走回退。
-const TOTAL_TIMEOUT: Duration = Duration::from_secs(8);
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
+/// 与前端 `REQUEST_TIMEOUT_MS`（30000）同语义：慢机器上网络可能很慢，30s 拿不到才当失败，
+/// 让前端走回退。这是「网络必须有界」的安全阀，不是按经验判定功能的截止时间。
+const TOTAL_TIMEOUT: Duration = Duration::from_secs(30);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// HTTP 客户端只建一次：8s 总超时、4s 连接超时、系统代理（与 `iplocate::client` 同构）。
+/// HTTP 客户端只建一次：30s 总超时、15s 连接超时、系统代理（与 `iplocate::client` 同构）。
 fn client() -> Option<&'static reqwest::Client> {
     static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
     CLIENT

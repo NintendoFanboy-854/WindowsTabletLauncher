@@ -779,16 +779,18 @@ pub fn run() {
 static EXITING: AtomicBool = AtomicBool::new(false);
 
 /// 等蓝牙 worker 关闭 A2DP Sink 连接的上限（Close 是同步释放，worker 忙时也最多等这么久）。
-const EXIT_BT_CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+/// 这台机器慢：驱动卸载实测约 4s，留 15s 只作防挂死上界。
+const EXIT_BT_CLOSE_TIMEOUT: Duration = Duration::from_secs(15);
 /// 内部兜底：某一步卡死时也能退进程。只防挂死，不是性能验收目标（P2 明确不设耗时指标）。
-const EXIT_FALLBACK_TIMEOUT: Duration = Duration::from_secs(10);
+/// 正常退出 2–6s；60s 只是「绝不永久挂着」的上界，不参与任何验收。
+const EXIT_FALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// 统一退出：先隐藏窗口（体感即时关闭），再在后台依次
 /// 恢复音频会话 → 断开 A2DP Sink 连接 → 结束受管浏览器窗口 → `process::exit(0)`。
 ///
 /// 所有清理都发生在 WebView2 拆除之前（hide 之后、进程退出之前），避免在拆除中的 COM 环境里
-/// 调 WinRT。音频焦点 `restore_all` 自己最多等 3s，蓝牙 `close_for_exit` 最多等 2s，
-/// 受管浏览器窗口不等待（尽力结束进程）；内部兜底 6s 只用来防止某一步永久卡住。
+/// 调 WinRT。音频焦点恢复**只投递不等待**（慢机器上不拖退出），蓝牙 `close_for_exit`
+/// 最多等 15s，受管浏览器窗口不等待（立即 TerminateProcess + 后台收尾）。
 fn begin_exit(app: &tauri::AppHandle) {
     if EXITING.swap(true, Ordering::SeqCst) {
         return;
@@ -801,12 +803,11 @@ fn begin_exit(app: &tauri::AppHandle) {
     std::thread::spawn(move || {
         exit_trace("exit-step: audio-focus-restore-all");
         match handle.try_state::<AudioFocusManagerHandle>() {
-            Some(manager) => match manager.restore_all() {
-                Ok(()) => exit_trace("exit-step: audio-focus-restore-all done"),
-                Err(error) => {
-                    exit_trace(format!("exit-step: audio-focus-restore-all failed: {error}"))
-                }
-            },
+            Some(manager) => {
+                // 只投递不等待：慢机器上不让音频 worker 拖住退出；journal 仍兜底强杀。
+                manager.request_restore_all();
+                exit_trace("exit-step: audio-focus-restore-all queued");
+            }
             None => exit_trace("exit-step: audio-focus state missing"),
         }
         exit_trace("exit-step: bt-close-for-exit");

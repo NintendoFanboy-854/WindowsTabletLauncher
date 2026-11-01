@@ -85,14 +85,15 @@ const BACKOFF_SECONDS: [u64; 4] = [5, 15, 30, 60];
 const OPEN_ATTEMPTS: u32 = 3;
 const OPEN_RETRY_DELAY: Duration = Duration::from_millis(500);
 /// 单次 OpenAsync 的等待上限：超时后 Cancel，避免 worker 永久卡住。
-const OPEN_TIMEOUT: Duration = Duration::from_secs(3);
+/// 慢机器上 A2DP 连接握手可能十几秒，这是防挂死上界，不是「按经验失败」的判据。
+const OPEN_TIMEOUT: Duration = Duration::from_secs(30);
 /// 其他 WinRT 异步调用（无线电枚举/开关）的等待上限。
-const OPERATION_TIMEOUT: Duration = Duration::from_secs(6);
-/// A2DP 设备枚举的等待上限：本机冷启动实测 FindAllAsync 约 8s 才返回，
-/// 不能按「普通异步调用」的 6s 掐断，否则首轮会误判 unavailable。
-const DEVICE_ENUM_TIMEOUT: Duration = Duration::from_secs(20);
-/// OpenAsync 成功后再给「进入 Opened」的观察窗口（旧版实测最多 500ms）。
-const OPENED_WATCH: Duration = Duration::from_millis(500);
+const OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
+/// A2DP 设备枚举的等待上限：本机冷启动实测 FindAllAsync 约 8s 才返回，慢机器更久，
+/// 不能按「普通异步调用」掐断，否则首轮会误判 unavailable。
+const DEVICE_ENUM_TIMEOUT: Duration = Duration::from_secs(120);
+/// OpenAsync 成功后再给「进入 Opened」的观察窗口（旧版实测最多 500ms，留宽）。
+const OPENED_WATCH: Duration = Duration::from_secs(5);
 /// 已连接时的状态轮询间隔（StateChanged 是快路径，轮询是兜底）。
 const CONNECTION_POLL_INTERVAL: Duration = Duration::from_millis(300);
 /// 等待态下的最大 tick 间隔（也是命令/事件之外的心跳）。
@@ -103,27 +104,27 @@ const DEVICE_REFRESH_INTERVAL_WATCHER: Duration = Duration::from_secs(120);
 /// watcher 不可用时的兜底轮询间隔。
 const DEVICE_REFRESH_INTERVAL_FALLBACK: Duration = Duration::from_secs(15);
 /// watcher 启动后等 EnumerationCompleted 的宽限；超时就自己做一次慢枚举兜底。
-const ENUMERATION_FALLBACK: Duration = Duration::from_secs(10);
+const ENUMERATION_FALLBACK: Duration = Duration::from_secs(60);
 /// 无线电状态轮询间隔（要尽快反映用户在系统里开关蓝牙 → 停止/恢复寻找）。
 const RADIO_REFRESH_INTERVAL: Duration = Duration::from_secs(5);
 /// 显式 `bt_audio_refresh` 等 worker 回传快照的上限（一轮多设备枚举可能跑几十秒）。
 /// P2 起只有 refresh 还用它；非阻塞命令不等回包。
-const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(60);
+const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(300);
 /// 设置类命令（自动连接 / 首选 / 恢复自动连接）等 worker 回传快照的上限：
 /// 这些命令只改内存与配置，不碰慢速 WinRT 连接流程；上限留够一次设备枚举（本机 5–8s，
 /// 冷启动最多 ~20s），避免慢枚举期间的设置命令被误判超时。
-const SETTING_REPLY_TIMEOUT: Duration = Duration::from_secs(20);
+const SETTING_REPLY_TIMEOUT: Duration = Duration::from_secs(120);
 /// 手动断开 / 关总开关时观察系统蓝牙链路（ACL）是否真正断开的上限。
 ///
 /// 真机实测（v0.8.1，iPhone A2DP Sink）：`AudioPlaybackConnection.Close()` 只释放应用侧，
 /// Windows/iPhone 的 ACL 链路不会因此立刻断开。P2 的退出路径**不等待**（不碰无线电）；
 /// 手动断开与关总开关会在这段有限窗口里观察 `ConnectionStatus`，确认不了就如实标记
 /// `unverifiedDisconnect`（UI 文案「可能仍连接」）。这是行为上限，不是验收指标。
-const DISCONNECT_VERIFY_TIMEOUT: Duration = Duration::from_secs(3);
+const DISCONNECT_VERIFY_TIMEOUT: Duration = Duration::from_secs(60);
 /// 等链路断开时的轮询间隔。
 const TEARDOWN_POLL: Duration = Duration::from_millis(150);
 /// 设备 id 里解析不出蓝牙地址时的固定等待（给传输层留释放时间）。
-const FALLBACK_CLOSE_SETTLE: Duration = Duration::from_secs(2);
+const FALLBACK_CLOSE_SETTLE: Duration = Duration::from_secs(10);
 /// 手机侧 A2DP 音频源服务（Bluetooth AudioSource，0x110A）的 GUID。
 ///
 /// 退出 / 关总开关时在系统层**停用**该服务（不碰蓝牙无线电，也不影响 AVRCP/HFP/PBAP
@@ -963,7 +964,8 @@ impl Worker {
         };
         let _ = watcher.Stop();
         // 等 watcher 真正停下再撤销回调，避免退出时回调还引用着已释放的通道。
-        let deadline = Instant::now() + Duration::from_secs(2);
+        // 慢机器/驱动忙时可能久一点；只在 worker 退出路径执行，不阻塞用户退出。
+        let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             let status = watcher.Status().ok();
             if status.is_none()
@@ -2032,7 +2034,7 @@ fn set_remote_a2dp_service(device_id: &str, enable: bool) -> Result<(), String> 
 /// 查一次系统侧蓝牙链路状态（WinRT `BluetoothDevice.ConnectionStatus`）。
 fn device_acl_connected(address: u64) -> Option<bool> {
     let operation = BluetoothDevice::FromBluetoothAddressAsync(address).ok()?;
-    let device = await_operation(&operation, Duration::from_secs(2)).ok()?;
+    let device = await_operation(&operation, Duration::from_secs(30)).ok()?;
     device
         .ConnectionStatus()
         .ok()

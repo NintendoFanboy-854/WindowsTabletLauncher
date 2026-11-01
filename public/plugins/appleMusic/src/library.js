@@ -44,27 +44,26 @@ const LIBRARY_PATH = '/library/all-playlists';
 const RECONNECT_DELAY_MS = 5000;
 /** 面板不可见时只暂停同步、不永久停摆：WebView2 里的 visibilityState 可能长时间是 hidden。 */
 const HIDDEN_POLL_INTERVAL_MS = 5000;
-/** 首次同步等 Apple 页面 hydration 的上限/间隔：DOM readyState 完成后侧栏播放列表还要再渲一下。
- *  真机冷启动（独立 profile、页面完全隐藏）实测需要 40–60s 才把资料库侧栏渲染出来，
- *  这段时间保持「正在连接播放器」，不要先闪「没有播放列表」。 */
-const FIRST_SYNC_TIMEOUT_MS = 60000;
+/**
+ * 「防挂死日志」阈值，不是功能超时。
+ *
+ * 这台机器很慢：冷启动 hydration 可能 40–60s、DRM 起播可能十几秒、页面偶尔卡顿。
+ * 所以所有这些等待都不按经验秒数判失败，只有在真的异常到 10 分钟时才记一条日志/给出
+ * 一个事实错误，让用户能重试；正常路径不受影响。
+ */
+const SAFETY_TIMEOUT_MS = 10 * 60 * 1000;
+/** 首次同步等 hydration 的轮询间隔：一直保持「正在连接播放器」，直到有数据/登录态/错误。 */
 const FIRST_SYNC_RETRY_MS = 500;
-/** 拉起 Edge 后隐藏窗口的短轮询：窗口句柄可能比进程晚出现，一次 hide 未必打得中。 */
-const HIDE_TIMEOUT_MS = 4000;
+/** 隐藏窗口是「尽力而为」：失败不阻断连接，只重试一段时间后继续。 */
+const HIDE_SAFETY_MS = 2 * 60 * 1000;
 const HIDE_RETRY_MS = 300;
-/** 找 page target 的上限（Edge 冷启动到 DevTools 端口可用）。 */
-const TARGET_TIMEOUT_MS = 12000;
+/** 找 page target 的轮询间隔（Edge 冷启动到 DevTools 端口可用）。 */
 const TARGET_POLL_MS = 300;
-/** 等 `document.readyState` 离开 loading 的上限。 */
-const DOCUMENT_TIMEOUT_MS = 15000;
+/** 等 `document.readyState` 离开 loading 的轮询间隔。 */
 const DOCUMENT_POLL_MS = 400;
-/** SPA 导航完成（URL 变化）的上限。 */
-const NAVIGATION_TIMEOUT_MS = 8000;
+/** SPA 导航完成（URL 变化）的轮询间隔。 */
 const URL_POLL_MS = 300;
-/** 播放列表页灌入曲目行的上限。 */
-const TRACKS_TIMEOUT_MS = 8000;
-/** 点击后等到「真的开始播」的上限：DRM 起播约 5–7s。 */
-const START_TIMEOUT_MS = 15000;
+/** 点击后等到「真的开始播」的轮询间隔（DRM 起播真机可达 5–7s，慢机器更久）。 */
 const START_POLL_MS = 600;
 /** 传输命令后让页面状态先变一拍再同步。 */
 const ACTION_SETTLE_MS = 400;
@@ -670,11 +669,11 @@ export function createLibraryStore() {
   /**
    * 拉起 Edge 后尽快隐藏（默认不让用户看到播放器窗口）。
    *
-   * `open` 只等窗口句柄 600ms，冷启动时窗口可能还没建好，一次 hide 会报“找不到窗口”；
-   * 因此这里短轮询重试，成功隐藏就返回。隐藏失败不阻断连接（页面照样能控制）。
+   * 窗口句柄可能比浏览器进程晚出现，一次 hide 会报“找不到窗口”；因此短轮询重试。
+   * 隐藏是尽力而为：最多重试 2 分钟，失败也不阻断连接（页面照样能控制）。
    */
   const hideWindowWhenReady = async (token) => {
-    const deadline = Date.now() + HIDE_TIMEOUT_MS;
+    const deadline = Date.now() + HIDE_SAFETY_MS;
     while (Date.now() < deadline) {
       checkCurrent(token);
       const next = normalizeWindowState(await controlBrowserWindow('hide').catch(() => null));
@@ -685,12 +684,13 @@ export function createLibraryStore() {
       }
       await sleep(HIDE_RETRY_MS);
     }
+    console.warn('[appleMusic] 隐藏播放器窗口重试超时（继续连接，不阻断）');
     return false;
   };
 
   /** 等一个已经导航到网页的 page target；窗口刚拉起时可能还是 about:blank。 */
   const findPageTarget = async (token) => {
-    const deadline = Date.now() + TARGET_TIMEOUT_MS;
+    const deadline = Date.now() + SAFETY_TIMEOUT_MS;
     let pages = [];
     while (Date.now() < deadline) {
       checkCurrent(token);
@@ -708,17 +708,18 @@ export function createLibraryStore() {
       await sleep(TARGET_POLL_MS);
     }
     checkCurrent(token);
+    console.warn('[appleMusic] 等待调试目标超过 10 分钟（按事实错误处理）');
     // 没有已导航的 target 时按调用方要求退到第一个 page（之后 sync 会自己纠错）。
     return pages[0] || null;
   };
 
-  /** 等页面离开 loading；超时不致命（后续 sync 继续读）。 */
+  /** 等页面离开 loading；超长只记日志（后续 sync 继续读，不判页面失败）。 */
   const waitForDocument = async (client, token) => {
-    const deadline = Date.now() + DOCUMENT_TIMEOUT_MS;
+    const deadline = Date.now() + SAFETY_TIMEOUT_MS;
     while (Date.now() < deadline) {
       checkCurrent(token);
       const status = await client
-        .evaluate(expressionOf(readDocumentStatus), 4000)
+        .evaluate(expressionOf(readDocumentStatus))
         .catch(() => null);
       checkCurrent(token);
       if (!status) {
@@ -730,6 +731,7 @@ export function createLibraryStore() {
       if (ready && ready !== 'loading' && url.indexOf('music.apple.com') >= 0) return status;
       await sleep(DOCUMENT_POLL_MS);
     }
+    console.warn('[appleMusic] 等待页面 readyState 超过 10 分钟（继续尝试同步）');
     return null;
   };
 
@@ -765,7 +767,7 @@ export function createLibraryStore() {
     const client = session;
     if (!client || !client.isOpen()) return;
     const status = await client
-      .evaluate(expressionOf(readDocumentStatus), 4000)
+      .evaluate(expressionOf(readDocumentStatus))
       .catch(() => null);
     checkCurrent(token);
     const url = status && typeof status.url === 'string' ? status.url : '';
@@ -939,40 +941,42 @@ export function createLibraryStore() {
   };
 
   const waitForUrlChange = async (client, token, previousUrl, targetPath) => {
-    const deadline = Date.now() + NAVIGATION_TIMEOUT_MS;
+    const deadline = Date.now() + SAFETY_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await sleep(URL_POLL_MS);
       checkCurrent(token);
       const status = await client
-        .evaluate(expressionOf(readDocumentStatus), 4000)
+        .evaluate(expressionOf(readDocumentStatus))
         .catch(() => null);
       if (!status) continue;
       const url = typeof status.url === 'string' ? status.url : '';
       if (url && url !== previousUrl && pathMatches(url, targetPath)) return true;
     }
+    console.warn('[appleMusic] 等待页面导航超过 10 分钟');
     return false;
   };
 
   const waitForTracks = async (client, token) => {
-    const deadline = Date.now() + TRACKS_TIMEOUT_MS;
+    const deadline = Date.now() + SAFETY_TIMEOUT_MS;
     while (Date.now() < deadline) {
       checkCurrent(token);
-      const count = await client.evaluate(expressionOf(readTrackCount), 4000).catch(() => 0);
+      const count = await client.evaluate(expressionOf(readTrackCount)).catch(() => 0);
       if (typeof count === 'number' && count > 0) return true;
       await sleep(DOCUMENT_POLL_MS);
     }
+    console.warn('[appleMusic] 等待曲目行超过 10 分钟');
     return false;
   };
 
-  /** 起播判定：标题变化 或 `audio.currentTime` 开始走（DRM 起播约 5–7s）。 */
+  /** 起播判定：标题变化 或 `audio.currentTime` 开始走（DRM 起播慢机器可能更久）。 */
   const waitForPlaybackStart = async (client, token, before) => {
     const previousTitle = before && typeof before.title === 'string' ? before.title : '';
-    const deadline = Date.now() + START_TIMEOUT_MS;
+    const deadline = Date.now() + SAFETY_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await sleep(START_POLL_MS);
       checkCurrent(token);
       const status = await client
-        .evaluate(expressionOf(readPlaybackStatus), 4000)
+        .evaluate(expressionOf(readPlaybackStatus))
         .catch(() => null);
       if (!status) continue;
       const title = typeof status.title === 'string' ? status.title : '';
@@ -980,6 +984,7 @@ export function createLibraryStore() {
         status.paused === false && Number(status.currentTime) > 0.5;
       if ((title && title !== previousTitle) || running) return true;
     }
+    console.warn('[appleMusic] 等待起播超过 10 分钟');
     return false;
   };
 
@@ -1061,7 +1066,7 @@ export function createLibraryStore() {
     try {
       const client = await ensureSession(token, false);
       const status = await client
-        .evaluate(expressionOf(readDocumentStatus), 4000)
+        .evaluate(expressionOf(readDocumentStatus))
         .catch(() => null);
       checkCurrent(token);
       if (!pathMatches(status && status.url, href)) {
@@ -1094,7 +1099,7 @@ export function createLibraryStore() {
     try {
       const client = await ensureSession(token, false);
       const status = await client
-        .evaluate(expressionOf(readDocumentStatus), 4000)
+        .evaluate(expressionOf(readDocumentStatus))
         .catch(() => null);
       checkCurrent(token);
       if (!pathMatches(status && status.url, LIBRARY_PATH)) {
@@ -1118,7 +1123,7 @@ export function createLibraryStore() {
     try {
       const client = await ensureSession(token, false);
       const before = await client
-        .evaluate(expressionOf(readPlaybackStatus), 4000)
+        .evaluate(expressionOf(readPlaybackStatus))
         .catch(() => null);
       const center = await client
         .evaluate(expressionOf(trackButtonCenter, index))
@@ -1232,9 +1237,9 @@ export function createLibraryStore() {
         await syncNow(token, { tracks: false });
         checkCurrent(token);
         // 冷启动时 DOM 已 ready 但 Apple 的侧栏还在 hydration：首同步可能是空列表。
-        // 已登录（非登录态）且还没有播放列表时保持「连接中」短轮询补几拍，
-        // 避免先闪一下「没有播放列表」再变成真列表。
-        const firstSyncDeadline = Date.now() + FIRST_SYNC_TIMEOUT_MS;
+        // 已登录（非登录态）且还没有播放列表时保持「连接中」短轮询，直到出现数据/登录态，
+        // 或用满 10 分钟的安全阀（慢机器 hydration 可能 40–60s，不按经验秒数判失败）。
+        const firstSyncDeadline = Date.now() + SAFETY_TIMEOUT_MS;
         while (
           isCurrent(token) &&
           state.playlists.length === 0 &&
@@ -1246,6 +1251,9 @@ export function createLibraryStore() {
           await sleep(FIRST_SYNC_RETRY_MS);
           checkCurrent(token);
           await syncNow(token, { tracks: false });
+        }
+        if (isCurrent(token) && state.playlists.length === 0 && !state.needLogin && !state.error) {
+          console.warn('[appleMusic] 首同步等待播放列表超过 10 分钟（按空列表显示，可刷新重试）');
         }
         checkCurrent(token);
         schedule(POLL_INTERVAL_MS);

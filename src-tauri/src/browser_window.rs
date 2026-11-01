@@ -65,16 +65,9 @@ const PROFILE_DIR_NAME: &str = "browser-window-profile";
 /// app 窗口的默认尺寸（P3 spec 固定 1200×800；屏幕更小时 clamp）。
 const WINDOW_WIDTH: i32 = 1200;
 const WINDOW_HEIGHT: i32 = 800;
-/// 拉起后等窗口句柄出现的上限：只为了让 open 的返回值尽量准确，等不到就返回
-/// `running=true/visible=false`，调用方下一轮 `state` 会拿到真实值。
-const WINDOW_APPEAR_TIMEOUT: Duration = Duration::from_millis(600);
-const WINDOW_POLL_INTERVAL: Duration = Duration::from_millis(100);
-/// 拉起后等「真实浏览器进程」出现（持有调试端口的那个 pid）的上限。
-const BROWSER_PID_TIMEOUT: Duration = Duration::from_secs(3);
-const BROWSER_PID_POLL_INTERVAL: Duration = Duration::from_millis(150);
-/// 启动宽限期：这段时间内「进程还没认出来 / 窗口还没建好」都按 running 处理，
-/// 避免插件在冷启动的几秒里误判为「播放器未打开」。
-const STARTUP_GRACE: Duration = Duration::from_secs(12);
+/// 启动宽限期：这段时间内「进程还没认出来 / 窗口还没建好」都按 running 处理。
+/// 这台机器很慢（冷启动 + 系统负载），10 分钟只是防挂死上界，不是「启动超时判失败」。
+const STARTUP_GRACE: Duration = Duration::from_secs(10 * 60);
 /// Chromium 在 user-data-dir 里写的实际调试端口（第一行端口、第二行 browser ws 路径）。
 /// 注意：显式 `--remote-debugging-port` 模式实测**不会**写这个文件，所以受管窗口身份不依赖它，
 /// 只用它做辅助判断；真正的身份记录见 [`IDENTITY_FILE`]。
@@ -85,9 +78,8 @@ const IDENTITY_FILE: &str = "managed-window.json";
 const STILL_ACTIVE_CODE: u32 = 259;
 /// 监控线程的进程存活检查间隔（进程被用户关掉后状态置未运行）。
 const MONITOR_INTERVAL: Duration = Duration::from_secs(1);
-/// 交互式 close 等 taskkill 结束的上限（退出路径另用更短的 [`EXIT_TASKKILL_TIMEOUT`]）。
-const TASKKILL_TIMEOUT: Duration = Duration::from_millis(1200);
-const EXIT_TASKKILL_TIMEOUT: Duration = Duration::from_millis(300);
+/// 交互式 close 等 taskkill 结束的上限：慢机器上结束 Edge 整棵树可能十几秒；退出路径不等待。
+const TASKKILL_TIMEOUT: Duration = Duration::from_secs(30);
 const TASKKILL_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 /// Edge 的 App Paths 注册表项（默认值 = msedge.exe 全路径）。
@@ -104,8 +96,9 @@ const DEBUG_ADDRESS: &str = "127.0.0.1";
 /// 渲染面 origin，不做任何业务过滤。
 const DEBUG_ALLOWED_ORIGINS: &str =
     "http://wtsl.localhost,http://tauri.localhost,http://localhost:5173";
-/// CDP `/json/list` 的 HTTP 超时（连接 + 读各一份）。
-const DEBUG_HTTP_TIMEOUT: Duration = Duration::from_secs(2);
+/// CDP `/json/list` 的 HTTP 超时（连接 + 读各一份）。本机回环但慢机器可能抖动，
+/// 这是防挂死上界，不是功能截止时间；连不上会由调用方轮询重试。
+const DEBUG_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 /// `/json/list` 响应上限：目标列表只有几 KB，超过按异常响应处理，避免无限读。
 const DEBUG_MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 
@@ -291,12 +284,8 @@ impl BrowserWindowManager {
             });
         }
         self.spawn_monitor(pid);
-        // 等真实浏览器进程出现（Edge 可能中继启动），再短等窗口句柄，让 open 的返回值尽量准确；
-        // 等不到也照常返回 running=true/visible=false，后续 state 会自己收敛。
-        let browser_pid = self.wait_for_browser(BROWSER_PID_TIMEOUT);
-        if let Some(browser_pid) = browser_pid {
-            let _ = wait_for_window(browser_pid, WINDOW_APPEAR_TIMEOUT);
-        }
+        // 不在这里等浏览器 pid / 窗口句柄：这台机器冷启动可能很慢，阻塞只会让「打开播放器」
+        // 看起来卡住。直接返回 running=true/visible=false，插件用状态/调试目标轮询收敛结果。
         Ok(self.state())
     }
 
@@ -458,7 +447,9 @@ impl BrowserWindowManager {
             if terminate_process(pid) {
                 spawn_taskkill_background(pid);
             } else {
-                let _ = taskkill_tree(pid, EXIT_TASKKILL_TIMEOUT);
+                // 连 TerminateProcess 都失败也绝不在退出路径等待 taskkill：投递后台清理后退出。
+                log::warn!("受管浏览器窗口：退出时 TerminateProcess 失败，改为后台 taskkill (pid={pid})");
+                spawn_taskkill_background(pid);
             }
         } else {
             // 还没认出真实浏览器进程：只收掉中继进程（它通常已在退出路上）。
@@ -509,24 +500,6 @@ impl BrowserWindowManager {
         let managed = guard.as_mut()?;
         let pid = resolve_managed_pid(managed)?;
         Some((pid, managed.url.clone()))
-    }
-
-    /// 等真实浏览器进程（持有调试端口的那个）出现；超时返回 None。
-    fn wait_for_browser(&self, timeout: Duration) -> Option<u32> {
-        let deadline = Instant::now() + timeout;
-        loop {
-            let found = {
-                let mut guard = self.lock();
-                guard.as_mut().and_then(resolve_managed_pid)
-            };
-            if let Some(pid) = found {
-                return Some(pid);
-            }
-            if Instant::now() >= deadline {
-                return None;
-            }
-            thread::sleep(BROWSER_PID_POLL_INTERVAL);
-        }
     }
 
     /// 结束上次被强杀/崩溃遗留的受管浏览器。
@@ -995,20 +968,6 @@ fn find_window(pid: u32) -> Option<HWND> {
     // SAFETY: 回调只读写本栈上的 Search，EnumWindows 同步返回后才使用结果。
     let _ = unsafe { EnumWindows(Some(callback), context) };
     search.best.map(|(_, hwnd)| hwnd)
-}
-
-/// 拉起后短等窗口出现（只用于让 open 的返回值准确，不参与正常路径）。
-fn wait_for_window(pid: u32, timeout: Duration) -> Option<HWND> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(hwnd) = find_window(pid) {
-            return Some(hwnd);
-        }
-        if Instant::now() >= deadline {
-            return None;
-        }
-        thread::sleep(WINDOW_POLL_INTERVAL);
-    }
 }
 
 /// 给窗口发 WM_CLOSE（给一次正常退出机会；用户没保存的东西由页面自己处理）。

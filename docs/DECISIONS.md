@@ -836,3 +836,20 @@
   - 隐藏窗口起播依赖 `Emulation.setFocusEmulationEnabled`（Edge 156 真机正常）；若浏览器不支持会退化为需要在窗口可见时起播。
 - 文档落点：本节；D-52 修订；`PLUGIN-CONTRACT §1`（通用 HostApi + D-55 段）；`README`（特性 / 已知限制 / 验证状态）；`V090-AUDIO-MUSIC-SPEC §12.6`；`browser_window.rs` / `lib.rs` / `cdp.js` / `library.js` / `Detail.jsx` / `Card.jsx` 注释。
 - 实现/验证：`cargo check --lib` / `npx tsc --noEmit` 通过；插件离线 E2E（headless Edge + 宿主替身 + 假 CDP）**41 断言 PASS**、采集器 fixture **18 断言 PASS**、状态机 harness **23 断言 PASS**；release NSIS 构建 + `/S` 静默安装。真机（安装版 + 真实登录态 Edge 156，1440×960@200%）已验证：面板列出 21 个播放列表（封面/描述/数量）→ 进 L2 31 首（序号/专辑/时长）→ 点曲目在 Edge 隐藏状态下真实起播（`audio.currentTime` 5.77s、`readyState=4`、mediaSession=Afterwards）→ 面板暂停后 `audio.paused=true` → 「显示播放器」窗口可见 → 「关闭播放器」结束 Edge 进程并回到「播放器未打开」→ 退出 launcher 后受管 Edge 一并结束（修复了旧版「退出 launcher 但 AM 不退」）。
+
+## D-56 超时策略：状态驱动等待 + 宽安全阀（2026-11-01）
+
+- 背景：用户指出项目里大量「按经验给的秒数」在这台性能极差的机器上会把「慢」误判成「坏」——冷启动 hydration 实测 40–60s、DRM 起播十几秒、蓝牙 WinRT 枚举/连接也远超常规经验值。要求：不要按经验给超时，或者起码放得很宽。
+- 决策：
+  1. **三类时间量分离**：① 语义时长/节奏（动画、长按、轮询间隔、淡入淡出）不动；② **用户可见等待**改为「状态驱动等待」——等到明确终态（成功 / 登录态 / 窗口关闭 / 错误 / 用户取消），不再按固定秒数判失败；③ **必须有界的安全阀**（网络请求、WinRT 异步、退出清理）放宽 3–10 倍，只用于防挂死，不作为功能判据。
+  2. **前端 Apple Music（`cdp.js` / `library.js`）**：移除「连接 6s / send 5s / evaluate 8s」「target 12s / document 15s / navigation 8s / tracks 8s / start 15s / first-sync 60s」等截止判失败逻辑；改为等结果或连接断开 / 面板关闭；仅在 10 分钟安全阈值打一条 `warn`（不改变 UI）。首同步一直保持「正在连接播放器」直到出现数据/登录态/错误；`hide` 窗口最多重试 2 分钟且失败不阻断连接。
+  3. **宿主 Rust**：`browser_window.rs` 的 `open` 不再阻塞等待浏览器 pid / 窗口出现（立即返回，插件轮询状态收敛）；`STARTUP_GRACE 12s→10min`（防挂死上界）；`DEBUG_HTTP_TIMEOUT 2s→15s`；交互式 `TASKKILL_TIMEOUT 1.2s→30s`；**退出路径完全不等待 taskkill**（`TerminateProcess` 立即返回 + 后台清理；退出兜底 10s→60s 只防挂死）。`bluetooth_audio.rs`：`OPEN_TIMEOUT 3s→30s`、`OPERATION_TIMEOUT 6s→60s`、`DEVICE_ENUM_TIMEOUT 20s→120s`、`COMMAND_REPLY_TIMEOUT 60s→300s`、`SETTING_REPLY_TIMEOUT 20s→120s`、`DISCONNECT_VERIFY_TIMEOUT 3s→60s`、`OPENED_WATCH 0.5s→5s`、`ENUMERATION_FALLBACK 10s→60s`。`audio_focus.rs`：命令回复 `2s→120s`，新增 `request_restore_all()` 退出只投递不等待（原 `restore_all` 阻塞版保留给显式命令）。
+  4. **网络类保留安全阀但放宽**：壁纸/必应归档 `8s→30s`、连接 `4s→15s`；插件源探活 `2s→15s`；失败仍走回退/重试。
+  5. **前端蓝牙等待**（`waitForBluetoothSettled`）去掉 12s 截止，等到 `operation === null`；10 分钟仅日志。Agent 工具因此仍能拿到真实终态，不把「已发起」当「已完成」。
+- 否掉的方案：
+  - **删除所有时间上界**：网络请求、WinRT 异步、退出清理会真的永久挂住。
+  - **继续按经验秒数判失败**：用户明确反对；慢机器上会把「慢」显示成「坏」。
+  - **把安全阀当性能验收指标**：仍然没有性能验收目标；安全阀只防挂死。
+- 已知限制：极端异常（页面永不 ready、worker 卡死、蓝牙驱动不返回）时，用户侧表现为长时间「正在连接 / 进行中」而不是快速报错；退出兜底 60s 只在某步真的卡死时触发，正常退出仍是数秒。前端等待仍保留「可取消」路径（关闭面板 / Ctrl+Q / 重试按钮）。
+- 文档落点：本节；`README` 已知限制；`browser_window.rs` / `bluetooth_audio.rs` / `audio_focus.rs` / `lib.rs` / `cdp.js` / `library.js` / `bluetoothAudio.ts` / `wallpaper.ts` / `source.ts` / `bingarchive.rs` 注释。
+- 实现/验证：`cargo check --lib` / `npx tsc --noEmit` / 插件构建通过；release 构建（16m35s）+ `/S` 静默安装。真机冷启动抽验（安装版 + 真实登录态 Edge）：打开 AM 面板后 33s 内已显示 21 个播放列表（途中不出现「没有播放列表」误判；连接期显示「正在连接播放器」）；退出 launcher：应用 4.84s 退出（其中 A2DP 服务停用 ~3.3s、BT Close ~0.9s），受管 Edge 在应用退出后 <250ms 内消失。只记录耗时，不作为验收门槛。

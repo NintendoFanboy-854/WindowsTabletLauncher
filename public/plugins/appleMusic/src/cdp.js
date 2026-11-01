@@ -10,12 +10,14 @@
  * 上层 `library.js` 负责「先关旧连接再连新的」。
  */
 
-/** 建连超时：Edge 的 DevTools 端口通常几百毫秒内就绪，留足冷启动余量。 */
-const CONNECT_TIMEOUT_MS = 6000;
-/** 普通命令超时（点击等短命令）。 */
-const SEND_TIMEOUT_MS = 5000;
-/** evaluate 超时：页面忙时（起播/切页）会比点击慢。 */
-const EVALUATE_TIMEOUT_MS = 8000;
+/**
+ * 只做「防挂死日志」的安全阈值，不是功能超时。
+ *
+ * 这台机器很慢，任何「按经验给几秒就判失败」的截止时间都会误伤真实冷启动/DRM 起播。
+ * 因此连接、命令、求值都不设截止时间：等到有结果、连接断开或上层取消。超过这个阈值只在
+ * 控制台打一条 warn（便于诊断），**不改变任何 UI 行为**。
+ */
+const SAFETY_LOG_MS = 10 * 60 * 1000;
 
 /** `setTimeout` 的 Promise 包装（插件里不引入定时器库）。 */
 export function sleep(ms) {
@@ -59,6 +61,7 @@ export class CdpClient {
 
   /**
    * 建连。只解析一次 open/error/close：失败原因统一成中文一句事实，由上层决定怎么显示。
+   * 不设截止时间——浏览器再慢也等到 open 或 error；超长只打一条 warn。
    */
   open() {
     if (this.isOpen()) return Promise.resolve(this);
@@ -83,13 +86,8 @@ export class CdpClient {
       this.ws = socket;
 
       timer = window.setTimeout(() => {
-        try {
-          socket.close();
-        } catch {
-          /* 已关闭 */
-        }
-        finish(new Error('连接播放器超时'));
-      }, CONNECT_TIMEOUT_MS);
+        console.warn(`[appleMusic] CDP 建连已等待 ${Math.round(SAFETY_LOG_MS / 1000)}s（继续等待，不判失败）`);
+      }, SAFETY_LOG_MS);
 
       socket.onopen = () => finish(null);
       socket.onerror = () => finish(new Error('连接播放器失败'));
@@ -105,19 +103,20 @@ export class CdpClient {
   /**
    * 发一条 CDP 命令并等回包。
    *
+   * 不设截止时间：命令结果只能由回包、连接关闭或上层取消来终结。慢机器上页面偶尔
+   * 十几秒不响应是正常的，按时限判失败会把「慢」当「坏」。
+   *
    * @param {string} method 如 `Runtime.evaluate`
    * @param {object} [params]
-   * @param {number} [timeoutMs]
    * @returns {Promise<any>} CDP `result`
    */
-  send(method, params = {}, timeoutMs = SEND_TIMEOUT_MS) {
+  send(method, params = {}) {
     if (!this.isOpen()) return Promise.reject(new Error('播放器连接已断开'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = window.setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error('播放器响应超时'));
-      }, timeoutMs);
+        console.warn(`[appleMusic] CDP ${method} 已等待 ${Math.round(SAFETY_LOG_MS / 1000)}s（继续等待，不判失败）`);
+      }, SAFETY_LOG_MS);
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.ws.send(JSON.stringify({ id, method, params }));
@@ -135,17 +134,13 @@ export class CdpClient {
    * `userGesture: true` 让页面把这次求值当成用户手势，导航类 `.click()` 因此可用；
    * 播放/暂停仍然走真实指针（Input），不依赖这个标志。
    */
-  async evaluate(expression, timeoutMs = EVALUATE_TIMEOUT_MS) {
-    const result = await this.send(
-      'Runtime.evaluate',
-      {
-        expression,
-        returnByValue: true,
-        awaitPromise: true,
-        userGesture: true,
-      },
-      timeoutMs,
-    );
+  async evaluate(expression) {
+    const result = await this.send('Runtime.evaluate', {
+      expression,
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: true,
+    });
     if (result && result.exceptionDetails) {
       throw new Error('播放器页面出错');
     }

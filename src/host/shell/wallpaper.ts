@@ -120,7 +120,8 @@ const ARCHIVE_URL = (idx: number): string =>
 /** 两页拼满 15 天；idx 再往后只是重复。 */
 const ARCHIVE_PAGES: readonly number[] = [0, 7];
 const HISTORY_LIMIT = 15;
-const REQUEST_TIMEOUT_MS = 8000;
+/** 网络请求必须有界（失败走回退），但慢机器上放宽到 30s，不按经验秒数误判。 */
+const REQUEST_TIMEOUT_MS = 30_000;
 /** 跨天检测的轮询间隔：只比字符串，代价可忽略。 */
 const DATE_WATCH_INTERVAL_MS = 60_000;
 const LOCAL_KEY_PREFIX = 'local:';

@@ -19002,13 +19002,13 @@ function Rm() {
 }
 //#endregion
 //#region public/plugins/appleMusic/src/cdp.js
-var zm = 6e3, Bm = 5e3, Vm = 8e3;
-function Hm(e) {
+var zm = 6e5;
+function Bm(e) {
 	return new Promise((t) => {
 		window.setTimeout(t, e);
 	});
 }
-var Um = class {
+var Vm = class {
 	constructor(e) {
 		this.url = e, this.ws = null, this.nextId = 1, this.pending = /* @__PURE__ */ new Map(), this.closeHandlers = [];
 	}
@@ -19032,47 +19032,44 @@ var Um = class {
 				return;
 			}
 			this.ws = a, r = window.setTimeout(() => {
-				try {
-					a.close();
-				} catch {}
-				i(/* @__PURE__ */ Error("连接播放器超时"));
+				console.warn(`[appleMusic] CDP 建连已等待 ${Math.round(zm / 1e3)}s（继续等待，不判失败）`);
 			}, zm), a.onopen = () => i(null), a.onerror = () => i(/* @__PURE__ */ Error("连接播放器失败")), a.onclose = () => {
 				this.#t("播放器连接已断开"), this.#n(), i(/* @__PURE__ */ Error("播放器连接已断开"));
 			}, a.onmessage = (e) => this.#e(e.data);
 		});
 	}
-	send(e, t = {}, n = Bm) {
+	send(e, t = {}) {
 		if (!this.isOpen()) return Promise.reject(/* @__PURE__ */ Error("播放器连接已断开"));
-		let r = this.nextId++;
-		return new Promise((i, a) => {
-			let o = window.setTimeout(() => {
-				this.pending.delete(r), a(/* @__PURE__ */ Error("播放器响应超时"));
-			}, n);
-			this.pending.set(r, {
-				resolve: i,
-				reject: a,
-				timer: o
+		let n = this.nextId++;
+		return new Promise((r, i) => {
+			let a = window.setTimeout(() => {
+				console.warn(`[appleMusic] CDP ${e} 已等待 ${Math.round(zm / 1e3)}s（继续等待，不判失败）`);
+			}, zm);
+			this.pending.set(n, {
+				resolve: r,
+				reject: i,
+				timer: a
 			});
 			try {
 				this.ws.send(JSON.stringify({
-					id: r,
+					id: n,
 					method: e,
 					params: t
 				}));
 			} catch (e) {
-				window.clearTimeout(o), this.pending.delete(r), a(e instanceof Error ? e : /* @__PURE__ */ Error("播放器连接已断开"));
+				window.clearTimeout(a), this.pending.delete(n), i(e instanceof Error ? e : /* @__PURE__ */ Error("播放器连接已断开"));
 			}
 		});
 	}
-	async evaluate(e, t = Vm) {
-		let n = await this.send("Runtime.evaluate", {
+	async evaluate(e) {
+		let t = await this.send("Runtime.evaluate", {
 			expression: e,
 			returnByValue: !0,
 			awaitPromise: !0,
 			userGesture: !0
-		}, t);
-		if (n && n.exceptionDetails) throw Error("播放器页面出错");
-		return n && n.result ? n.result.value : void 0;
+		});
+		if (t && t.exceptionDetails) throw Error("播放器页面出错");
+		return t && t.result ? t.result.value : void 0;
 	}
 	async setActivePage(e = !0) {
 		await this.send("Emulation.setFocusEmulationEnabled", { enabled: e }).catch(() => null);
@@ -19123,8 +19120,8 @@ var Um = class {
 			t();
 		} catch {}
 	}
-}, Wm = "https://music.apple.com/cn/library/all-playlists", Gm = "/library/all-playlists", Km = 5e3, qm = 5e3, Jm = 6e4, Ym = 500, Xm = 4e3, Zm = 300, Qm = 12e3, $m = 300, eh = 15e3, th = 400, nh = 8e3, rh = 300, ih = 8e3, ah = 15e3, oh = 600, sh = 400, ch = "amp-playback-controls-play button.playback-play__play", lh = "amp-playback-controls-play button.playback-play__pause", uh = "amp-playback-controls-item-skip[direction=\"next\"]", dh = "amp-playback-controls-item-skip[direction=\"previous\"]";
-function fh(e) {
+}, Hm = "https://music.apple.com/cn/library/all-playlists", Um = "/library/all-playlists", Wm = 5e3, Gm = 5e3, Km = 6e5, qm = 500, Jm = 12e4, Ym = 300, Xm = 300, Zm = 400, Qm = 300, $m = 600, eh = 400, th = "amp-playback-controls-play button.playback-play__play", nh = "amp-playback-controls-play button.playback-play__pause", rh = "amp-playback-controls-item-skip[direction=\"next\"]", ih = "amp-playback-controls-item-skip[direction=\"previous\"]";
+function ah(e) {
 	let t = (e) => e && typeof e.textContent == "string" ? e.textContent.replace(/\s+/g, " ").trim() : "", n = (e) => {
 		if (!Array.isArray(e) || e.length === 0) return "";
 		let t = (e) => {
@@ -19247,13 +19244,13 @@ function fh(e) {
 		nowPlaying: c
 	};
 }
-function ph() {
+function oh() {
 	return {
 		url: String(location.href || ""),
 		ready: String(document.readyState || "")
 	};
 }
-function mh() {
+function sh() {
 	let e = document.querySelector("audio"), t = navigator.mediaSession ? navigator.mediaSession.metadata : null;
 	return {
 		title: t ? String(t.title || "") : "",
@@ -19261,14 +19258,14 @@ function mh() {
 		currentTime: e && Number.isFinite(e.currentTime) ? e.currentTime : 0
 	};
 }
-function hh() {
+function ch() {
 	let e = document.querySelector("audio");
 	return !e || !!e.paused;
 }
-function gh() {
+function lh() {
 	return document.querySelectorAll("[data-testid=\"track-list-item\"]").length;
 }
-function _h(e) {
+function uh(e) {
 	let t = document.querySelector(e);
 	if (!t) return null;
 	t.scrollIntoView({
@@ -19281,7 +19278,7 @@ function _h(e) {
 		y: n.top + n.height / 2
 	};
 }
-function vh(e) {
+function dh(e) {
 	let t = document.querySelectorAll("[data-testid=\"track-list-item\"]")[e];
 	if (!t) return null;
 	let n = t.querySelector("button[aria-label^=\"播放\"]") || t.querySelector("button");
@@ -19296,7 +19293,7 @@ function vh(e) {
 		y: r.top + r.height / 2
 	};
 }
-function yh(e) {
+function fh(e) {
 	let t = document.querySelectorAll("a[href]");
 	for (let n of t) {
 		if (n.getAttribute("href") !== e) continue;
@@ -19312,29 +19309,29 @@ function yh(e) {
 	}
 	return null;
 }
-function bh(e) {
+function ph(e) {
 	let t = document.querySelectorAll("a[href]");
 	for (let n of t) if (n.getAttribute("href") === e) return n.click(), !0;
 	return !1;
 }
-function xh(e, ...t) {
+function mh(e, ...t) {
 	return `(${e.toString()})(${t.map((e) => JSON.stringify(e)).join(", ")})`;
 }
-function Sh(e) {
+function hh(e) {
 	return typeof e == "string" ? e.replace(/\s+/g, " ").trim() : "";
 }
-function Ch(e) {
+function gh(e) {
 	return typeof e == "string" && /^https?:\/\//i.test(e.trim()) ? e.trim() : "";
 }
-function wh(e) {
+function _h(e) {
 	let t = Number(e);
 	return Number.isFinite(t) && t > 0 ? Math.floor(t) : 0;
 }
-function Th(e) {
+function vh(e) {
 	let t = String(e || "").trim();
-	return t ? (t.indexOf("://") >= 0 ? Ph(t) : t).replace(/^\/cn(?=\/)/, "").replace(/\/+$/, "") : "";
+	return t ? (t.indexOf("://") >= 0 ? Dh(t) : t).replace(/^\/cn(?=\/)/, "").replace(/\/+$/, "") : "";
 }
-function Eh(e) {
+function yh(e) {
 	if (!Array.isArray(e)) return [];
 	let t = /* @__PURE__ */ new Set(), n = [];
 	for (let r of e) {
@@ -19343,25 +19340,25 @@ function Eh(e) {
 		e && i && !t.has(e) && (t.add(e), n.push({
 			href: e,
 			name: i,
-			artworkUrl: Ch(r.artworkUrl),
-			description: Sh(r.description),
-			songCount: wh(r.songCount)
+			artworkUrl: gh(r.artworkUrl),
+			description: hh(r.description),
+			songCount: _h(r.songCount)
 		}));
 	}
 	return n;
 }
-function Dh(e) {
+function bh(e) {
 	if (!e || typeof e != "object") return null;
-	let t = Th(typeof e.href == "string" ? e.href : ""), n = Sh(e.name);
+	let t = vh(typeof e.href == "string" ? e.href : ""), n = hh(e.name);
 	return !t && !n ? null : {
 		key: t,
 		name: n,
-		curator: Sh(e.curator),
-		description: Sh(e.description),
-		songCount: wh(e.songCount)
+		curator: hh(e.curator),
+		description: hh(e.description),
+		songCount: _h(e.songCount)
 	};
 }
-function Oh(e) {
+function xh(e) {
 	if (!Array.isArray(e)) return [];
 	let t = [];
 	return e.forEach((e, n) => {
@@ -19373,17 +19370,17 @@ function Oh(e) {
 			index: Number.isInteger(e.index) ? e.index : n,
 			position: Number.isInteger(a) && a > 0 ? a : n + 1,
 			title: r,
-			artist: Sh(e.artist),
-			album: Sh(e.album),
-			duration: Sh(e.duration),
-			durationMs: wh(e.durationMs),
-			artworkUrl: Ch(e.artworkUrl),
+			artist: hh(e.artist),
+			album: hh(e.album),
+			duration: hh(e.duration),
+			durationMs: _h(e.durationMs),
+			artworkUrl: gh(e.artworkUrl),
 			explicit: e.explicit === !0,
 			playLabel: i
 		});
 	}), t;
 }
-function kh(e) {
+function Sh(e) {
 	if (!e || typeof e != "object") return null;
 	let t = typeof e.title == "string" ? e.title.trim() : "";
 	return t ? {
@@ -19396,23 +19393,23 @@ function kh(e) {
 		durationMs: Number.isFinite(e.durationMs) ? Number(e.durationMs) : null
 	} : null;
 }
-var Ah = class extends Error {}, jh = class extends Error {}, Mh = "播放器连接中断";
-function Nh(e) {
+var Ch = class extends Error {}, wh = class extends Error {}, Th = "播放器连接中断";
+function Eh(e) {
 	let t = e instanceof Error ? e.message : String(e || "");
-	return t && t.length <= 16 && /[\u4e00-\u9fa5]/.test(t) ? t : Mh;
+	return t && t.length <= 16 && /[\u4e00-\u9fa5]/.test(t) ? t : Th;
 }
-function Ph(e) {
+function Dh(e) {
 	try {
 		return new URL(String(e || "")).pathname;
 	} catch {
 		return "";
 	}
 }
-function Fh(e, t) {
-	let n = Ph(e).replace(/\/+$/, ""), r = String(t || ""), i = (r.indexOf("://") >= 0 ? Ph(r) : r).replace(/\/+$/, "");
+function Oh(e, t) {
+	let n = Dh(e).replace(/\/+$/, ""), r = String(t || ""), i = (r.indexOf("://") >= 0 ? Dh(r) : r).replace(/\/+$/, "");
 	return !n || !i ? !1 : n === i || n.endsWith(i);
 }
-var Ih = {
+var kh = {
 	phase: "idle",
 	browser: { ...bm },
 	connected: !1,
@@ -19430,8 +19427,8 @@ var Ih = {
 	transportBusy: !1,
 	error: ""
 };
-function Lh() {
-	let e = /* @__PURE__ */ new Set(), t = { ...Ih }, n = null, r = 0, i = !1, a = 0, o = 0, s = !1, c = !1, l = /* @__PURE__ */ new Map(), u = (n) => {
+function Ah() {
+	let e = /* @__PURE__ */ new Set(), t = { ...kh }, n = null, r = 0, i = !1, a = 0, o = 0, s = !1, c = !1, l = /* @__PURE__ */ new Map(), u = (n) => {
 		t = {
 			...t,
 			...n
@@ -19440,7 +19437,7 @@ function Lh() {
 			n(t);
 		} catch {}
 	}, d = () => t, f = (t) => typeof t == "function" ? (e.add(t), () => e.delete(t)) : () => {}, p = (e) => i && e === a, m = (e) => {
-		if (!p(e)) throw new Ah();
+		if (!p(e)) throw new Ch();
 	}, h = () => {
 		r &&= (window.clearTimeout(r), 0);
 	}, g = () => {
@@ -19452,7 +19449,7 @@ function Lh() {
 		e === n && (n = null, u({ connected: !1 }));
 	}, v = () => {
 		g(), s = !1, c = !1, u({
-			...Ih,
+			...kh,
 			browser: { ...bm },
 			activePlaylist: null,
 			error: ""
@@ -19461,16 +19458,16 @@ function Lh() {
 		let t = Sm(await Yf(e).catch(() => null));
 		return u({ browser: t }), t;
 	}, b = async (e) => {
-		let t = Date.now() + Xm;
+		let t = Date.now() + Jm;
 		for (; Date.now() < t;) {
 			m(e);
 			let t = Sm(await Yf("hide").catch(() => null));
 			if (m(e), t.running && (u({ browser: t }), !t.visible)) return !0;
-			await Hm(Zm);
+			await Bm(Ym);
 		}
-		return !1;
+		return console.warn("[appleMusic] 隐藏播放器窗口重试超时（继续连接，不阻断）"), !1;
 	}, x = async (e) => {
-		let t = Date.now() + Qm, n = [];
+		let t = Date.now() + Km, n = [];
 		for (; Date.now() < t;) {
 			m(e);
 			let t = await Zf().catch(() => null);
@@ -19479,52 +19476,52 @@ function Lh() {
 				let e = n.find((e) => String(e.url || "").indexOf("music.apple.com") >= 0);
 				if (e) return e;
 			}
-			await Hm($m);
+			await Bm(Xm);
 		}
-		return m(e), n[0] || null;
+		return m(e), console.warn("[appleMusic] 等待调试目标超过 10 分钟（按事实错误处理）"), n[0] || null;
 	}, S = async (e, t) => {
-		let n = Date.now() + eh;
+		let n = Date.now() + Km;
 		for (; Date.now() < n;) {
 			m(t);
-			let n = await e.evaluate(xh(ph), 4e3).catch(() => null);
+			let n = await e.evaluate(mh(oh)).catch(() => null);
 			if (m(t), !n) {
-				await Hm(th);
+				await Bm(Zm);
 				continue;
 			}
 			let r = typeof n.ready == "string" ? n.ready : "", i = typeof n.url == "string" ? n.url : "";
 			if (r && r !== "loading" && i.indexOf("music.apple.com") >= 0) return n;
-			await Hm(th);
+			await Bm(Zm);
 		}
-		return null;
+		return console.warn("[appleMusic] 等待页面 readyState 超过 10 分钟（继续尝试同步）"), null;
 	}, C = async (e, t) => {
-		let n = new Um(e);
+		let n = new Vm(e);
 		n.onClose(() => _(n));
 		try {
 			return await n.open(), n;
 		} catch {
-			n.close(), m(t), await Hm(500), m(t);
-			let r = new Um(e);
+			n.close(), m(t), await Bm(500), m(t);
+			let r = new Vm(e);
 			return r.onClose(() => _(r)), await r.open(), r;
 		}
 	}, w = async (e) => {
 		let t = n;
 		if (!t || !t.isOpen()) return;
-		let r = await t.evaluate(xh(ph), 4e3).catch(() => null);
+		let r = await t.evaluate(mh(oh)).catch(() => null);
 		m(e);
 		let i = r && typeof r.url == "string" ? r.url : "";
-		i && !Fh(i, Gm) && (Ph(i).indexOf("/library/playlist/") < 0 || await te(t, Gm).catch(() => !1) && await ne(t, e, i, Gm).catch(() => !1));
+		i && !Oh(i, Um) && (Dh(i).indexOf("/library/playlist/") < 0 || await te(t, Um).catch(() => !1) && await ne(t, e, i, Um).catch(() => !1));
 	}, T = async (e, t) => {
 		if (n && n.isOpen()) return n;
 		g(), m(e);
 		let r = Sm(await Xf().catch(() => null));
 		if (m(e), u({ browser: r }), !r.running) {
-			if (!t) throw new jh();
+			if (!t) throw new wh();
 			u({
 				phase: "connecting",
 				connected: !1,
 				error: ""
 			});
-			let n = Sm(await Jf(Wm).catch(() => null));
+			let n = Sm(await Jf(Hm).catch(() => null));
 			if (m(e), !n.running) throw Error("打不开播放器");
 			u({ browser: n }), await b(e);
 		}
@@ -19538,16 +19535,16 @@ function Lh() {
 	}, E = async (e, r) => {
 		let i = n;
 		if (!i || !i.isOpen()) throw Error("播放器连接已断开");
-		let a = !!(r && r.tracks === !0), [o, d] = await Promise.all([i.evaluate(xh(fh, a)), Xf().catch(() => null)]);
+		let a = !!(r && r.tracks === !0), [o, d] = await Promise.all([i.evaluate(mh(ah, a)), Xf().catch(() => null)]);
 		if (m(e), !o || typeof o != "object") throw Error("播放器页面无响应");
 		let f = typeof o.url == "string" ? o.url : "";
 		if (f.indexOf("https://") !== 0) throw Error("播放器页面未就绪");
 		let p = d && typeof d == "object" ? Sm(d) : null;
-		if (p && !p.running) throw new jh();
-		let h = Eh(o.playlists), g = Dh(o.currentPlaylist), _ = kh(o.nowPlaying);
+		if (p && !p.running) throw new wh();
+		let h = yh(o.playlists), g = bh(o.currentPlaylist), _ = Sh(o.nowPlaying);
 		g && g.key && g.songCount > 0 && l.set(g.key, g.songCount);
 		let v = h.map((e) => {
-			let t = l.get(Th(e.href)) || 0;
+			let t = l.get(vh(e.href)) || 0;
 			return t > e.songCount ? {
 				...e,
 				songCount: t
@@ -19564,20 +19561,20 @@ function Lh() {
 			connected: !0,
 			error: ""
 		};
-		return a && (x.tracks = Oh(o.tracks)), b ? (x.phase = "login", u(x), s || (s = !0, await y("show"))) : (x.phase = "ready", u(x), s ? (s = !1, await y("hide")) : !c && p && p.running && p.visible && await y("hide")), {
+		return a && (x.tracks = xh(o.tracks)), b ? (x.phase = "login", u(x), s || (s = !0, await y("show"))) : (x.phase = "ready", u(x), s ? (s = !1, await y("hide")) : !c && p && p.running && p.visible && await y("hide")), {
 			playlists: v,
 			currentPlaylist: g,
 			nowPlaying: _,
 			tracks: t.tracks
 		};
 	}, D = (e, t) => {
-		if (!p(t) || e instanceof Ah) return;
-		if (e instanceof jh) {
+		if (!p(t) || e instanceof Ch) return;
+		if (e instanceof wh) {
 			v();
 			return;
 		}
-		let r = Nh(e);
-		n && n.isOpen() ? u({ error: r }) : (n = null, o = Date.now() + Km, u({
+		let r = Eh(e);
+		n && n.isOpen() ? u({ error: r }) : (n = null, o = Date.now() + Wm, u({
 			error: r,
 			phase: "error",
 			connected: !1
@@ -19589,37 +19586,37 @@ function Lh() {
 			r = 0, me(t);
 		}, e);
 	}, te = async (e, t) => {
-		let n = await e.evaluate(xh(yh, t)).catch(() => null);
-		return n && Number.isFinite(n.x) && Number.isFinite(n.y) ? (await e.clickPoint(n.x, n.y), !0) : await e.evaluate(xh(bh, t)).catch(() => !1) === !0;
+		let n = await e.evaluate(mh(fh, t)).catch(() => null);
+		return n && Number.isFinite(n.x) && Number.isFinite(n.y) ? (await e.clickPoint(n.x, n.y), !0) : await e.evaluate(mh(ph, t)).catch(() => !1) === !0;
 	}, ne = async (e, t, n, r) => {
-		let i = Date.now() + nh;
+		let i = Date.now() + Km;
 		for (; Date.now() < i;) {
-			await Hm(rh), m(t);
-			let i = await e.evaluate(xh(ph), 4e3).catch(() => null);
+			await Bm(Qm), m(t);
+			let i = await e.evaluate(mh(oh)).catch(() => null);
 			if (!i) continue;
 			let a = typeof i.url == "string" ? i.url : "";
-			if (a && a !== n && Fh(a, r)) return !0;
+			if (a && a !== n && Oh(a, r)) return !0;
 		}
-		return !1;
+		return console.warn("[appleMusic] 等待页面导航超过 10 分钟"), !1;
 	}, re = async (e, t) => {
-		let n = Date.now() + ih;
+		let n = Date.now() + Km;
 		for (; Date.now() < n;) {
 			m(t);
-			let n = await e.evaluate(xh(gh), 4e3).catch(() => 0);
+			let n = await e.evaluate(mh(lh)).catch(() => 0);
 			if (typeof n == "number" && n > 0) return !0;
-			await Hm(th);
+			await Bm(Zm);
 		}
-		return !1;
+		return console.warn("[appleMusic] 等待曲目行超过 10 分钟"), !1;
 	}, ie = async (e, t, n) => {
-		let r = n && typeof n.title == "string" ? n.title : "", i = Date.now() + ah;
+		let r = n && typeof n.title == "string" ? n.title : "", i = Date.now() + Km;
 		for (; Date.now() < i;) {
-			await Hm(oh), m(t);
-			let n = await e.evaluate(xh(mh), 4e3).catch(() => null);
+			await Bm($m), m(t);
+			let n = await e.evaluate(mh(sh)).catch(() => null);
 			if (!n) continue;
 			let i = typeof n.title == "string" ? n.title : "", a = n.paused === !1 && Number(n.currentTime) > .5;
 			if (i && i !== r || a) return !0;
 		}
-		return !1;
+		return console.warn("[appleMusic] 等待起播超过 10 分钟"), !1;
 	}, O = async () => {
 		if (!i) return !1;
 		let e = a;
@@ -19627,7 +19624,7 @@ function Lh() {
 		try {
 			return await T(e, !0), await E(e, { tracks: !!t.activePlaylist }), ee(ym), !0;
 		} catch (t) {
-			return t instanceof jh ? (v(), !1) : (D(t, e), ee(Km), !1);
+			return t instanceof wh ? (v(), !1) : (D(t, e), ee(Wm), !1);
 		}
 	}, ae = async () => {
 		if (!i) return !1;
@@ -19640,7 +19637,7 @@ function Lh() {
 		try {
 			return await T(e, !0), await E(e, { tracks: !1 }), ee(ym), !0;
 		} catch (t) {
-			return t instanceof jh ? (v(), !1) : (D(t, e), ee(Km), !1);
+			return t instanceof wh ? (v(), !1) : (D(t, e), ee(Wm), !1);
 		}
 	}, oe = async () => (h(), g(), s = !1, c = !1, await y("close"), v(), !0), se = () => (c = !0, y("show")), ce = () => (c = !1, y("hide")), le = async (e, t) => {
 		if (!i || !e) return !1;
@@ -19656,8 +19653,8 @@ function Lh() {
 			error: ""
 		});
 		try {
-			let t = await T(n, !1), r = await t.evaluate(xh(ph), 4e3).catch(() => null);
-			if (m(n), !Fh(r && r.url, e)) {
+			let t = await T(n, !1), r = await t.evaluate(mh(oh)).catch(() => null);
+			if (m(n), !Oh(r && r.url, e)) {
 				if (!await te(t, e) || !await ne(t, n, r && r.url, e)) throw Error("打不开播放列表");
 				await re(t, n);
 			}
@@ -19680,10 +19677,10 @@ function Lh() {
 		if (!i) return !1;
 		let e = a;
 		try {
-			let t = await T(e, !1), n = await t.evaluate(xh(ph), 4e3).catch(() => null);
-			if (m(e), !Fh(n && n.url, Gm)) {
-				if (!await te(t, Gm)) throw Error("打不开播放列表");
-				await ne(t, e, n && n.url, Gm);
+			let t = await T(e, !1), n = await t.evaluate(mh(oh)).catch(() => null);
+			if (m(e), !Oh(n && n.url, Um)) {
+				if (!await te(t, Um)) throw Error("打不开播放列表");
+				await ne(t, e, n && n.url, Um);
 			}
 			return m(e), await E(e, { tracks: !1 }), !0;
 		} catch (t) {
@@ -19697,7 +19694,7 @@ function Lh() {
 			error: ""
 		});
 		try {
-			let n = await T(t, !1), r = await n.evaluate(xh(mh), 4e3).catch(() => null), i = await n.evaluate(xh(vh, e)).catch(() => null);
+			let n = await T(t, !1), r = await n.evaluate(mh(sh)).catch(() => null), i = await n.evaluate(mh(dh, e)).catch(() => null);
 			if (m(t), !i || !Number.isFinite(i.x) || !Number.isFinite(i.y)) throw Error("起播失败");
 			await n.clickPoint(i.x, i.y);
 			let a = await ie(n, t, r);
@@ -19716,35 +19713,35 @@ function Lh() {
 			error: ""
 		});
 		try {
-			let n = await T(t, !1), r = uh;
-			if (e === "previous" && (r = dh), e === "toggle") {
-				let e = await n.evaluate(xh(hh)).catch(() => null);
-				m(t), r = e === !0 ? ch : lh;
+			let n = await T(t, !1), r = rh;
+			if (e === "previous" && (r = ih), e === "toggle") {
+				let e = await n.evaluate(mh(ch)).catch(() => null);
+				m(t), r = e === !0 ? th : nh;
 			}
-			let i = await n.evaluate(xh(_h, r)).catch(() => null);
+			let i = await n.evaluate(mh(uh, r)).catch(() => null);
 			if (m(t), !i || !Number.isFinite(i.x) || !Number.isFinite(i.y)) throw Error("播放控制失败");
-			return await n.clickPoint(i.x, i.y), await Hm(sh), await E(t, { tracks: !1 }), u({ transportBusy: !1 }), !0;
+			return await n.clickPoint(i.x, i.y), await Bm(eh), await E(t, { tracks: !1 }), u({ transportBusy: !1 }), !0;
 		} catch (e) {
 			return u({ transportBusy: !1 }), D(e, t), !1;
 		}
 	}, me = async (e) => {
 		if (p(e)) {
-			if (typeof document < "u" && document.visibilityState === "hidden") ee(qm);
+			if (typeof document < "u" && document.visibilityState === "hidden") ee(Gm);
 			else try {
 				if (!n || !n.isOpen()) {
 					if (Date.now() < o) {
-						ee(Km);
+						ee(Wm);
 						return;
 					}
 					await T(e, !1), m(e);
 				}
 				await E(e, { tracks: !1 }), ee(ym);
 			} catch (t) {
-				if (t instanceof jh) {
+				if (t instanceof wh) {
 					v();
 					return;
 				}
-				D(t, e), ee(Km);
+				D(t, e), ee(Wm);
 			}
 		}
 	}, he = () => {
@@ -19755,29 +19752,29 @@ function Lh() {
 		subscribe: f,
 		start: () => {
 			i || (i = !0, a += 1, o = 0, s = !1, c = !1, l = /* @__PURE__ */ new Map(), t = {
-				...Ih,
+				...kh,
 				browser: { ...bm },
 				phase: "connecting"
 			}, typeof document < "u" && document.addEventListener("visibilitychange", he), (async () => {
 				let e = a;
 				try {
 					await T(e, !0), await w(e), await E(e, { tracks: !1 }), m(e);
-					let n = Date.now() + Jm;
-					for (; p(e) && t.playlists.length === 0 && !t.needLogin && !t.error && Date.now() < n;) u({ phase: "connecting" }), await Hm(Ym), m(e), await E(e, { tracks: !1 });
-					m(e), ee(ym);
+					let n = Date.now() + Km;
+					for (; p(e) && t.playlists.length === 0 && !t.needLogin && !t.error && Date.now() < n;) u({ phase: "connecting" }), await Bm(qm), m(e), await E(e, { tracks: !1 });
+					p(e) && t.playlists.length === 0 && !t.needLogin && !t.error && console.warn("[appleMusic] 首同步等待播放列表超过 10 分钟（按空列表显示，可刷新重试）"), m(e), ee(ym);
 				} catch (t) {
-					if (!p(e) || t instanceof Ah) return;
-					if (t instanceof jh) {
+					if (!p(e) || t instanceof Ch) return;
+					if (t instanceof wh) {
 						v();
 						return;
 					}
-					D(t, e), ee(Km);
+					D(t, e), ee(Wm);
 				}
 			})());
 		},
 		stop: () => {
 			i && (i = !1, a += 1, h(), typeof document < "u" && document.removeEventListener("visibilitychange", he), g(), s = !1, c = !1, o = 0, t = {
-				...Ih,
+				...kh,
 				browser: { ...bm }
 			});
 		},
@@ -19792,32 +19789,32 @@ function Lh() {
 		transport: pe
 	};
 }
-var Rh = Lh();
-function zh() {
-	let [e, t] = (0, N.useState)(() => Rh.getState());
+var jh = Ah();
+function Mh() {
+	let [e, t] = (0, N.useState)(() => jh.getState());
 	return (0, N.useEffect)(() => {
-		let e = !0, n = Rh.subscribe((n) => {
+		let e = !0, n = jh.subscribe((n) => {
 			e && t(n);
 		});
-		return Rh.start(), t(Rh.getState()), () => {
-			e = !1, n(), Rh.stop();
+		return jh.start(), t(jh.getState()), () => {
+			e = !1, n(), jh.stop();
 		};
 	}, []), e;
 }
 //#endregion
 //#region public/plugins/appleMusic/src/Detail.jsx
-var Bh = { scrollbarColor: `${V.colorNeutralStroke1} transparent` }, Vh = {
+var Nh = { scrollbarColor: `${V.colorNeutralStroke1} transparent` }, Ph = {
 	gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
 	columnGap: V.spacingHorizontalXXL
 };
-function Hh(e, t) {
+function Fh(e, t) {
 	if (!e || !t) return !1;
 	let n = (e) => String(e || "").replace(/\s+/g, " ").trim().toLowerCase(), r = n(e.title);
 	if (!r || r !== n(t.title)) return !1;
 	let i = n(e.artist), a = n(t.artist);
 	return !i || !a || i === a;
 }
-var Uh = qn({
+var Ih = qn({
 	content: {
 		display: "flex",
 		flexDirection: "column",
@@ -19933,8 +19930,8 @@ var Uh = qn({
 		minHeight: 0
 	}
 });
-function Wh({ message: e }) {
-	let t = Uh();
+function Lh({ message: e }) {
+	let t = Ih();
 	return e ? /* @__PURE__ */ (0, P.jsx)(Df, {
 		intent: "error",
 		className: t.error,
@@ -19942,8 +19939,8 @@ function Wh({ message: e }) {
 		children: /* @__PURE__ */ (0, P.jsx)(Pf, { children: e })
 	}) : null;
 }
-function Gh({ track: e, playing: t, starting: n, onPlay: r }) {
-	let i = Uh(), a = e.durationMs ? Tm(e.durationMs) : e.duration || "--:--", o = [e.artist, e.album].filter(Boolean).join(" · "), s = n ? /* @__PURE__ */ (0, P.jsx)($d, {
+function Rh({ track: e, playing: t, starting: n, onPlay: r }) {
+	let i = Ih(), a = e.durationMs ? Tm(e.durationMs) : e.duration || "--:--", o = [e.artist, e.album].filter(Boolean).join(" · "), s = n ? /* @__PURE__ */ (0, P.jsx)($d, {
 		size: "tiny",
 		"aria-label": "正在起播"
 	}) : t ? /* @__PURE__ */ (0, P.jsx)(hs, { "aria-label": "正在播放" }) : /* @__PURE__ */ (0, P.jsx)(of, {
@@ -19978,8 +19975,8 @@ function Gh({ track: e, playing: t, starting: n, onPlay: r }) {
 		"data-apple-music-track-playing": t ? "true" : "false"
 	});
 }
-function Kh() {
-	let e = Uh(), { phase: t, browser: n, playlists: r, tracks: i, activePlaylist: a, currentPlaylist: o, tracksLoading: s, nowPlaying: c, playingIndex: l, transportBusy: u, error: d } = zh(), f = !!c && c.paused === !1, p = !!c && !u, m = f && !!c?.durationMs, h = (0, N.useMemo)(() => i.findIndex((e) => Hh(e, c)), [i, c]), g = o && o.songCount || a && r.find((e) => e.href === a.href)?.songCount || 0, _ = [o?.curator, o?.description].filter(Boolean).join(" · "), v = t === "connecting" ? /* @__PURE__ */ (0, P.jsx)("div", {
+function zh() {
+	let e = Ih(), { phase: t, browser: n, playlists: r, tracks: i, activePlaylist: a, currentPlaylist: o, tracksLoading: s, nowPlaying: c, playingIndex: l, transportBusy: u, error: d } = Mh(), f = !!c && c.paused === !1, p = !!c && !u, m = f && !!c?.durationMs, h = (0, N.useMemo)(() => i.findIndex((e) => Fh(e, c)), [i, c]), g = o && o.songCount || a && r.find((e) => e.href === a.href)?.songCount || 0, _ = [o?.curator, o?.description].filter(Boolean).join(" · "), v = t === "connecting" ? /* @__PURE__ */ (0, P.jsx)("div", {
 		className: e.placeholder,
 		"data-apple-music-connecting": "true",
 		children: /* @__PURE__ */ (0, P.jsx)($d, {
@@ -19995,10 +19992,10 @@ function Kh() {
 			action: /* @__PURE__ */ (0, P.jsx)(cm, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, P.jsx)(_s, {}),
-				onClick: () => void Rh.showPlayer(),
+				onClick: () => void jh.showPlayer(),
 				children: "显示播放器"
 			})
-		}), /* @__PURE__ */ (0, P.jsx)(Wh, { message: d })]
+		}), /* @__PURE__ */ (0, P.jsx)(Lh, { message: d })]
 	}) : t === "error" ? /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: e.placeholder,
 		"data-apple-music-error-state": "true",
@@ -20008,10 +20005,10 @@ function Kh() {
 			action: /* @__PURE__ */ (0, P.jsx)(cm, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, P.jsx)(Cs, {}),
-				onClick: () => void Rh.refresh(),
+				onClick: () => void jh.refresh(),
 				children: "刷新"
 			})
-		}), /* @__PURE__ */ (0, P.jsx)(Wh, { message: d })]
+		}), /* @__PURE__ */ (0, P.jsx)(Lh, { message: d })]
 	}) : n.running ? /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: e.content,
 		"data-content-band": "true",
@@ -20100,7 +20097,7 @@ function Kh() {
 									icon: /* @__PURE__ */ (0, P.jsx)(Es, {}),
 									"aria-label": "上一曲",
 									disabled: !p,
-									onClick: () => void Rh.transport("previous"),
+									onClick: () => void jh.transport("previous"),
 									"data-apple-music-previous": "true"
 								})
 							}),
@@ -20112,7 +20109,7 @@ function Kh() {
 									icon: f ? /* @__PURE__ */ (0, P.jsx)(Ts, {}) : /* @__PURE__ */ (0, P.jsx)(vs, {}),
 									"aria-label": f ? "暂停" : "播放",
 									disabled: !p,
-									onClick: () => void Rh.transport("toggle"),
+									onClick: () => void jh.transport("toggle"),
 									"data-apple-music-toggle": "true"
 								})
 							}),
@@ -20124,7 +20121,7 @@ function Kh() {
 									icon: /* @__PURE__ */ (0, P.jsx)(gs, {}),
 									"aria-label": "下一曲",
 									disabled: !p,
-									onClick: () => void Rh.transport("next"),
+									onClick: () => void jh.transport("next"),
 									"data-apple-music-next": "true"
 								})
 							})
@@ -20162,14 +20159,14 @@ function Kh() {
 								appearance: "subtle",
 								icon: /* @__PURE__ */ (0, P.jsx)(Cs, {}),
 								"aria-label": "刷新",
-								onClick: () => void Rh.refresh(),
+								onClick: () => void jh.refresh(),
 								"data-apple-music-refresh": "true"
 							})
 						})
 					})]
 				}), r.length > 0 ? /* @__PURE__ */ (0, P.jsx)(Jp, {
 					"data-apple-music-playlist-list": "true",
-					style: Vh,
+					style: Ph,
 					children: r.map((t) => /* @__PURE__ */ (0, P.jsx)(Xp, {
 						leading: /* @__PURE__ */ (0, P.jsx)(Kp, {
 							src: t.artworkUrl,
@@ -20186,7 +20183,7 @@ function Kh() {
 							"data-apple-music-playlist-songs": "true",
 							children: [t.songCount, " 首"]
 						}) : null, /* @__PURE__ */ (0, P.jsx)(Bp, {})] }),
-						onClick: () => void Rh.openPlaylist(t.href, t.name),
+						onClick: () => void jh.openPlaylist(t.href, t.name),
 						"data-apple-music-playlist-row": "true"
 					}, t.href))
 				}) : /* @__PURE__ */ (0, P.jsx)($p, {
@@ -20195,7 +20192,7 @@ function Kh() {
 					title: "没有播放列表"
 				})]
 			}),
-			/* @__PURE__ */ (0, P.jsx)(Wh, { message: d })
+			/* @__PURE__ */ (0, P.jsx)(Lh, { message: d })
 		]
 	}) : /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: e.placeholder,
@@ -20206,10 +20203,10 @@ function Kh() {
 			action: /* @__PURE__ */ (0, P.jsx)(cm, {
 				appearance: "secondary",
 				icon: /* @__PURE__ */ (0, P.jsx)(_s, {}),
-				onClick: () => void Rh.openPlayer(),
+				onClick: () => void jh.openPlayer(),
 				children: "打开播放器"
 			})
-		}), /* @__PURE__ */ (0, P.jsx)(Wh, { message: d })]
+		}), /* @__PURE__ */ (0, P.jsx)(Lh, { message: d })]
 	});
 	return /* @__PURE__ */ (0, P.jsx)(dm, { children: /* @__PURE__ */ (0, P.jsxs)("div", {
 		className: e.root,
@@ -20217,7 +20214,7 @@ function Kh() {
 		"data-apple-music-phase": t,
 		children: [
 			/* @__PURE__ */ (0, P.jsx)(mm, {
-				style: Bh,
+				style: Nh,
 				children: v
 			}),
 			n.running ? /* @__PURE__ */ (0, P.jsxs)("div", {
@@ -20226,13 +20223,13 @@ function Kh() {
 				children: [/* @__PURE__ */ (0, P.jsx)(cm, {
 					appearance: "secondary",
 					icon: n.visible ? /* @__PURE__ */ (0, P.jsx)(bs, {}) : /* @__PURE__ */ (0, P.jsx)(ys, {}),
-					onClick: () => void (n.visible ? Rh.hidePlayer() : Rh.showPlayer()),
+					onClick: () => void (n.visible ? jh.hidePlayer() : jh.showPlayer()),
 					"data-apple-music-window-toggle": "true",
 					children: n.visible ? "隐藏播放器" : "显示播放器"
 				}), /* @__PURE__ */ (0, P.jsx)(cm, {
 					appearance: "secondary",
 					icon: /* @__PURE__ */ (0, P.jsx)(As, {}),
-					onClick: () => void Rh.closePlayer(),
+					onClick: () => void jh.closePlayer(),
 					"data-apple-music-window-close": "true",
 					children: "关闭播放器"
 				})]
@@ -20246,12 +20243,12 @@ function Kh() {
 					"data-apple-music-playlist-songs": "true",
 					children: [g, " 首"]
 				}) : null,
-				onClosed: () => Rh.closePlaylist(),
+				onClosed: () => jh.closePlaylist(),
 				children: /* @__PURE__ */ (0, P.jsxs)("div", {
 					className: e.subpageBody,
 					"data-apple-music-track-pane": "true",
 					children: [
-						/* @__PURE__ */ (0, P.jsx)(Wh, { message: d }),
+						/* @__PURE__ */ (0, P.jsx)(Lh, { message: d }),
 						_ ? /* @__PURE__ */ (0, P.jsx)(of, {
 							size: 200,
 							block: !0,
@@ -20270,11 +20267,11 @@ function Kh() {
 							})
 						}) : i.length > 0 ? /* @__PURE__ */ (0, P.jsx)(Jp, {
 							"data-apple-music-track-list": "true",
-							children: i.map((e) => /* @__PURE__ */ (0, P.jsx)(Gh, {
+							children: i.map((e) => /* @__PURE__ */ (0, P.jsx)(Rh, {
 								track: e,
 								playing: e.index === h,
 								starting: l === e.index,
-								onPlay: (e) => void Rh.playTrack(e)
+								onPlay: (e) => void jh.playTrack(e)
 							}, `${e.index}:${e.title}`))
 						}) : /* @__PURE__ */ (0, P.jsx)($p, {
 							icon: /* @__PURE__ */ (0, P.jsx)(Ss, {}),
@@ -20289,7 +20286,7 @@ function Kh() {
 //#endregion
 //#region public/plugins/appleMusic/src/main.jsx
 Vf();
-function qh() {
+function Bh() {
 	let { theme: e, scheme: t } = Wf(), n = Kf();
 	return /* @__PURE__ */ (0, P.jsx)(Yo, {
 		theme: e,
@@ -20299,9 +20296,9 @@ function qh() {
 			background: "transparent",
 			colorScheme: t
 		},
-		children: n === "detail" ? /* @__PURE__ */ (0, P.jsx)(Kh, {}) : /* @__PURE__ */ (0, P.jsx)(Rm, {})
+		children: n === "detail" ? /* @__PURE__ */ (0, P.jsx)(zh, {}) : /* @__PURE__ */ (0, P.jsx)(Rm, {})
 	});
 }
-var Jh = document.getElementById("root");
-Jh && (0, Ff.createRoot)(Jh).render(/* @__PURE__ */ (0, P.jsx)(qh, {}));
+var Vh = document.getElementById("root");
+Vh && (0, Ff.createRoot)(Vh).render(/* @__PURE__ */ (0, P.jsx)(Bh, {}));
 //#endregion

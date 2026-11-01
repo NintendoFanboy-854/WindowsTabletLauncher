@@ -82,10 +82,10 @@ const MIN_HOLD: Duration = Duration::from_millis(300);
 const SESSION_REFRESH_INTERVAL: Duration = Duration::from_millis(500);
 /// FIFO 仲裁的评估间隔（P3c）：空闲也按这个节奏醒来读两路快照；命令/过渡随时可打断。
 const FIFO_POLL_INTERVAL: Duration = Duration::from_millis(1000);
-/// 等 worker 快照回复的上限（纯内存，正常是毫秒级）。
-const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(2);
-/// 等 restore_all 完成的上限（退出兜底用）。
-const RESTORE_ALL_TIMEOUT: Duration = Duration::from_secs(3);
+/// 等 worker 快照回复的上限（纯内存，正常是毫秒级；慢机器防挂死上界，不是功能截止时间）。
+const COMMAND_REPLY_TIMEOUT: Duration = Duration::from_secs(120);
+/// 等 restore_all 完成的上限（非退出路径的显式命令用；退出路径已改为不等）。
+const RESTORE_ALL_TIMEOUT: Duration = Duration::from_secs(120);
 /// 音量比较的浮点容差。
 const VOLUME_EPSILON: f32 = 0.002;
 /// journal 版本号（后续格式变化时用于迁移）。
@@ -1664,6 +1664,17 @@ impl AudioFocusManager {
             Err(RecvTimeoutError::Disconnected) => {
                 Err("音频焦点服务已停止".to_string())
             }
+        }
+    }
+
+    /// 退出专用：投递「恢复所有会话」但不等待 worker 完成。
+    ///
+    /// 退出路径不能为了等音频 worker 卡住：命令入队后立即返回，worker 在 `process::exit`
+    /// 前会尽量执行；强杀时仍有 journal 在下次启动兜底。失败只记日志。
+    pub fn request_restore_all(&self) {
+        let (reply, _receiver) = mpsc::channel::<()>();
+        if !self.send(AudioFocusCommand::RestoreAll { reply }) {
+            log::warn!("音频焦点：worker 命令通道已关闭，退出时无法恢复会话");
         }
     }
 

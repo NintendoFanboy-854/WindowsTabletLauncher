@@ -25,8 +25,8 @@ export interface PluginSource {
 }
 
 const HTTP_BASE = '/plugins';
-/** 探活超时：等 2s 还连不上就退回 HTTP，不让启动卡死（这是交互等待预算） */
-const PROBE_TIMEOUT_MS = 2000;
+/** 探活超时：慢机器上自起服务可能很久才就绪；放宽到 15s，失败退 HTTP（不让启动卡死）。 */
+const PROBE_TIMEOUT_MS = 15_000;
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
