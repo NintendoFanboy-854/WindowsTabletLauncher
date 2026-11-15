@@ -16,7 +16,7 @@ import { AgentSurface } from './agent';
 import { applySeeds } from './bootstrap/seeds';
 import Desktop from './desktop/Desktop';
 import { StatusBar } from './desktop/StatusBar';
-import { GalleryGlassToggle, WallpaperCredit, WallpaperLayer } from './desktop/WallpaperLayer';
+import { WallpaperCredit, WallpaperLayer } from './desktop/WallpaperLayer';
 import { NotificationsProvider, useHostNotifications } from './notifications';
 import { PluginsPage } from './pages/plugins/PluginsPage';
 import { ReviewPage } from './pages/review/ReviewPage';
@@ -272,8 +272,6 @@ function HostShell({
     <div className="host-root">
       {/* 壁纸层：必应每日壁纸（4K，object-fit: cover），画在所有桌面内容下方 */}
       <WallpaperLayer wallpaper={wallpaper} colorScheme={colorScheme} liquidGlass={liquidGlass} />
-      {/* 欣赏壁纸：右上角的热开关（只在欣赏态出现，不参与布局测量） */}
-      {gallery && page === 'desktop' ? <GalleryGlassToggle /> : null}
       {/*
         桌面层永远挂载：插件 iframe 与 background 运行时是 HostBridge 工具路由的
         接收方，切到设置/复盘/插件页时整棵卸载会让 todo.stats / pomodoro.stats

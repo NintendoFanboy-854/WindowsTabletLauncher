@@ -29,7 +29,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LiquidGlassLayer } from './LiquidGlassLayer';
 import { useWallpaperUi } from '../shell/wallpaperUi';
 import type { CSSProperties, ReactNode } from 'react';
-import { makeStyles, mergeClasses, motionTokens, Spinner, tokens } from '@fluentui/react-components';
+import { makeStyles, mergeClasses, motionTokens, Spinner, Switch, tokens } from '@fluentui/react-components';
 import { ChevronDown20Regular, ChevronUp20Regular } from '@fluentui/react-icons';
 
 import { useWallpaperNote } from '../agent/oneshot/describeWallpaper';
@@ -240,6 +240,10 @@ const useWallpaperStyles = makeStyles({
     lineHeight: tokens.lineHeightBase200,
     textAlign: 'left',
   },
+  /** 详情卡里的开关：与正文同一列，上下留一点呼吸 */
+  noteSwitch: {
+    alignSelf: 'flex-start',
+  },
   noteBody: {
     margin: 0,
     color: tokens.colorNeutralForeground1,
@@ -343,52 +347,6 @@ const useWallpaperStyles = makeStyles({
   noteError: {
     color: tokens.colorNeutralForeground3,
     fontSize: tokens.fontSizeBase200,
-  },
-  /**
-   * 欣赏壁纸时的「液态玻璃」热开关。
-   *
-   * 悬浮在右上角，不参与任何布局测量（H_p 不变）。材质与说明条同源，
-   * 只是没有 hover 缩放——它是常驻控件，不是按钮列表的一部分。
-   */
-  galleryToggle: {
-    appearance: 'none',
-    boxSizing: 'border-box',
-    position: 'fixed',
-    top: tokens.spacingVerticalL,
-    right: tokens.spacingHorizontalL,
-    zIndex: 'var(--wtsl-layer-overlay)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: TOUCH_TARGET_CSS,
-    paddingInline: tokens.spacingHorizontalL,
-    margin: 0,
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 72%, transparent)`,
-    backdropFilter: 'blur(var(--wtsl-material-blur))',
-    boxShadow: tokens.shadow4,
-    color: tokens.colorNeutralForeground2,
-    fontFamily: 'inherit',
-    fontSize: tokens.fontSizeBase200,
-    lineHeight: tokens.lineHeightBase200,
-    cursor: 'pointer',
-    ':hover': {
-      color: tokens.colorNeutralForeground1,
-      border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
-      boxShadow: tokens.shadow8,
-    },
-    ':active': {
-      backgroundColor: `color-mix(in srgb, ${tokens.colorNeutralBackground1} 84%, transparent)`,
-    },
-    ':focus-visible': {
-      outline: `${tokens.strokeWidthThick} solid ${tokens.colorStrokeFocus2}`,
-      outlineOffset: tokens.strokeWidthThin,
-    },
-  },
-  galleryToggleOn: {
-    color: tokens.colorNeutralForeground1,
-    border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
   },
 });
 
@@ -567,6 +525,8 @@ export function WallpaperCredit({
   }, [captionHidden, credit, expanded, gallery, wallpaper.current, wallpaper.mode]);
 
   const { text: noteText, status: noteStatus } = useWallpaperNote(noteInput);
+  // 玻璃开关和说明条共用同一份偏好，改哪边另一边立刻跟上
+  const { liquidGlass, setLiquidGlass } = useWallpaperUi();
 
   // 欣赏模式 = 默认展开；退出 = 收起
   useEffect(() => {
@@ -682,6 +642,19 @@ export function WallpaperCredit({
               <div className={styles.noteDetail} data-wallpaper-note="true" aria-live="polite">
                 {dateLabel ? <div className={styles.noteDate}>{dateLabel}</div> : null}
                 {body}
+                {gallery ? (
+                  /*
+                   * 液态玻璃开关放在详情卡里，跟着说明一起折叠：
+                   * 收起说明 = 收起开关，不会有一块控件孤零零留在壁纸上。
+                   * 欣赏态默认展开，所以进来就能看到。
+                   */
+                  <Switch
+                    className={styles.noteSwitch}
+                    label="液态玻璃"
+                    checked={liquidGlass}
+                    onChange={(_event, data) => setLiquidGlass(data.checked)}
+                  />
+                ) : null}
               </div>
             </div>
           </div>
@@ -722,28 +695,5 @@ export function WallpaperCredit({
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * 欣赏壁纸时的「液态玻璃」热开关。
- *
- * 自己读写 wallpaperUi，不经过 props：桌面层、设置页、这里三处共用同一份偏好，
- * 谁改都会立刻反映到另外两处（同文档事件 + storage 事件都监听）。
- */
-export function GalleryGlassToggle() {
-  const styles = useWallpaperStyles();
-  const { liquidGlass, setLiquidGlass } = useWallpaperUi();
-  return (
-    <button
-      type="button"
-      className={mergeClasses(styles.galleryToggle, liquidGlass && styles.galleryToggleOn)}
-      aria-pressed={liquidGlass}
-      aria-label="液态玻璃"
-      data-gallery-glass-toggle="true"
-      onClick={() => setLiquidGlass(!liquidGlass)}
-    >
-      液态玻璃
-    </button>
   );
 }
