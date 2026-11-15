@@ -25,6 +25,7 @@ mod power;
 mod protocol;
 mod settings_win;
 mod system_status;
+mod wallpaper_texture;
 mod window;
 mod zip;
 
@@ -712,6 +713,7 @@ pub fn run() {
             get_location,
             ip_locate,
             bingarchive::fetch_bing_archive,
+            wallpaper_texture::fetch_wallpaper_texture,
             ensure_mic_permission,
             open_mic_privacy_settings,
             bt_audio_snapshot,

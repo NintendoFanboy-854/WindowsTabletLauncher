@@ -16,10 +16,13 @@ export const WALLPAPER_UI_KEY = 'wtsl.wallpaper.ui';
 export interface WallpaperUiPrefs {
   /** 桌面左下角的壁纸说明条是否显示（本机图片时用户可能只想看纯壁纸） */
   captionHidden: boolean;
+  /** 壁纸上是否叠一层液态玻璃（折射/反射底图；只在桌面壁纸上，不影响任何控件） */
+  liquidGlass: boolean;
 }
 
 const DEFAULTS: WallpaperUiPrefs = {
   captionHidden: false,
+  liquidGlass: false,
 };
 
 /** 同一文档内的同步事件：设置页改了，桌面层立刻跟着变（storage 事件只在跨 window 时触发） */
@@ -44,6 +47,7 @@ export function readWallpaperUi(): WallpaperUiPrefs {
     if (!parsed || typeof parsed !== 'object') return { ...DEFAULTS };
     return {
       captionHidden: typeof parsed.captionHidden === 'boolean' ? parsed.captionHidden : DEFAULTS.captionHidden,
+      liquidGlass: typeof parsed.liquidGlass === 'boolean' ? parsed.liquidGlass : DEFAULTS.liquidGlass,
     };
   } catch {
     return { ...DEFAULTS };
@@ -65,6 +69,8 @@ export function writeWallpaperUi(next: WallpaperUiPrefs): void {
 export function useWallpaperUi(): {
   captionHidden: boolean;
   setCaptionHidden: (next: boolean) => void;
+  liquidGlass: boolean;
+  setLiquidGlass: (next: boolean) => void;
 } {
   const [prefs, setPrefs] = useState<WallpaperUiPrefs>(readWallpaperUi);
 
@@ -83,5 +89,14 @@ export function useWallpaperUi(): {
     writeWallpaperUi({ ...readWallpaperUi(), captionHidden: next });
   }, []);
 
-  return { captionHidden: prefs.captionHidden, setCaptionHidden };
+  const setLiquidGlass = useCallback((next: boolean) => {
+    writeWallpaperUi({ ...readWallpaperUi(), liquidGlass: next });
+  }, []);
+
+  return {
+    captionHidden: prefs.captionHidden,
+    setCaptionHidden,
+    liquidGlass: prefs.liquidGlass,
+    setLiquidGlass,
+  };
 }

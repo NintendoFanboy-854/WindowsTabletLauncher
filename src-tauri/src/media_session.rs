@@ -385,7 +385,7 @@ fn normalize_mime(value: &str) -> String {
 }
 
 /// 标准 base64（含 `=` 补齐）。不引第三方 crate：封面是 SMTC 缩略图，几十到几百 KB。
-fn base64_encode(bytes: &[u8]) -> String {
+pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);

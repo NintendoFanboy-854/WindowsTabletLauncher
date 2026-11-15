@@ -26,6 +26,7 @@
  * `::after` 外扩，不占布局、不改 padding。说明刷新在设置页，不在这里。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LiquidGlassLayer } from './LiquidGlassLayer';
 import type { CSSProperties, ReactNode } from 'react';
 import { makeStyles, mergeClasses, motionTokens, Spinner, tokens } from '@fluentui/react-components';
 import { ChevronDown20Regular, ChevronUp20Regular } from '@fluentui/react-icons';
@@ -347,6 +348,8 @@ const useWallpaperStyles = makeStyles({
 export interface WallpaperLayerProps {
   wallpaper: WallpaperState;
   colorScheme: ColorScheme;
+  /** 是否在壁纸上叠液态玻璃（设置 → 外观 → 壁纸） */
+  liquidGlass?: boolean;
 }
 
 interface WallpaperImage {
@@ -366,7 +369,7 @@ function resolveImage(wallpaper: WallpaperState): WallpaperImage | null {
 }
 
 /** 全屏壁纸层：画在桌面内容下方，不拦指针。 */
-export function WallpaperLayer({ wallpaper, colorScheme }: WallpaperLayerProps) {
+export function WallpaperLayer({ wallpaper, colorScheme, liquidGlass = false }: WallpaperLayerProps) {
   const styles = useWallpaperStyles();
   const image = resolveImage(wallpaper);
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -387,6 +390,9 @@ export function WallpaperLayer({ wallpaper, colorScheme }: WallpaperLayerProps) 
           onError={handleError}
           data-wallpaper-mode={image.mode}
         />
+      ) : null}
+      {liquidGlass && visible && image ? (
+        <LiquidGlassLayer url={image.url} kind={image.mode} identity={image.key} />
       ) : null}
       {/* 暗色压暗以保证小组件上的文字可读；亮色只做极轻的压暗 */}
       <div className={styles.scrim} style={{ opacity: colorScheme === 'light' ? 0.06 : 0.24 }} />

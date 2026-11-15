@@ -183,7 +183,7 @@ export function WallpaperSettings() {
     setLocalCaption,
     clearLocal,
   } = useWallpaper();
-  const { captionHidden, setCaptionHidden } = useWallpaperUi();
+  const { captionHidden, setCaptionHidden, liquidGlass, setLiquidGlass } = useWallpaperUi();
 
   /**
    * 壁纸说明（A2）：刷新是低频操作，从桌面的说明条移到设置页——只针对当前/选中的图片。
@@ -482,6 +482,14 @@ export function WallpaperSettings() {
           checked={captionHidden}
           aria-label="隐藏说明条"
           onChange={(_event, data) => setCaptionHidden(data.checked)}
+        />
+      </SettingsRow>
+
+      <SettingsRow label="液态玻璃">
+        <Switch
+          checked={liquidGlass}
+          aria-label="液态玻璃"
+          onChange={(_event, data) => setLiquidGlass(data.checked)}
         />
       </SettingsRow>
     </SettingsGroup>

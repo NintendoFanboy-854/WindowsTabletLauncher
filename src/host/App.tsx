@@ -59,7 +59,7 @@ export default function App() {
   /** 壁纸数据层（v0.6.0）：自动 / 固定 / 本机三态统一从这里取 */
   const wallpaper = useWallpaper();
   /** 说明条显示偏好（设置页写、桌面层读） */
-  const { captionHidden } = useWallpaperUi();
+  const { captionHidden, liquidGlass } = useWallpaperUi();
 
   // 跟随系统：订阅 Windows 亮暗模式变化
   useEffect(() => onSystemColorSchemeChange(setSystemScheme), []);
@@ -118,6 +118,7 @@ export default function App() {
             bridge={bridge}
             wallpaper={wallpaper.state}
             captionHidden={captionHidden}
+            liquidGlass={liquidGlass}
             themeMode={themeMode}
             colorScheme={colorScheme}
             onThemeModeChange={changeTheme}
@@ -132,6 +133,7 @@ interface HostShellProps {
   bridge: HostBridge;
   wallpaper: WallpaperState;
   captionHidden: boolean;
+  liquidGlass: boolean;
   themeMode: ThemeMode;
   /** 解析后的亮暗（system 模式下跟随系统），桌面层据此重新读 token 下发给插件 */
   colorScheme: ColorScheme;
@@ -142,6 +144,7 @@ function HostShell({
   bridge,
   wallpaper,
   captionHidden,
+  liquidGlass,
   themeMode,
   colorScheme,
   onThemeModeChange,
@@ -268,7 +271,7 @@ function HostShell({
   return (
     <div className="host-root">
       {/* 壁纸层：必应每日壁纸（4K，object-fit: cover），画在所有桌面内容下方 */}
-      <WallpaperLayer wallpaper={wallpaper} colorScheme={colorScheme} />
+      <WallpaperLayer wallpaper={wallpaper} colorScheme={colorScheme} liquidGlass={liquidGlass} />
       {/*
         桌面层永远挂载：插件 iframe 与 background 运行时是 HostBridge 工具路由的
         接收方，切到设置/复盘/插件页时整棵卸载会让 todo.stats / pomodoro.stats
