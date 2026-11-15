@@ -22,7 +22,7 @@ export interface WallpaperUiPrefs {
 
 const DEFAULTS: WallpaperUiPrefs = {
   captionHidden: false,
-  liquidGlass: false,
+  liquidGlass: true,
 };
 
 /** 同一文档内的同步事件：设置页改了，桌面层立刻跟着变（storage 事件只在跨 window 时触发） */

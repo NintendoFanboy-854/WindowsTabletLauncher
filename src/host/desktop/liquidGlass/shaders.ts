@@ -11,25 +11,24 @@ export const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
-export const ADV_FRAG = `#version 300 es
+/**
+ * 几何层：把液滴拼成一张距离场。
+ *
+ * 纯解析 —— 位置由 CPU 每帧算好传进来，这里只做并集和平滑最大厚度，
+ * 不读背景、不做流场输运、没有历史状态。
+ *
+ *   r        smin 并集的距离场（轮廓）
+ *   g        平滑最大的体厚（决定倒角落在哪里）
+ */
+export const FIELD_FRAG = `#version 300 es
 precision highp float;
-precision highp sampler2D;
 
 out vec4 outColor;
 
-uniform sampler2D uPrev;
 uniform vec2  uRes;
-uniform sampler2D uBg;
-uniform vec2  uUvScale;
-uniform vec2  uUvOffset;
 uniform int   uNum;
 uniform float uMerge;
 uniform float uRadius;
-uniform float uMaskLod;
-uniform float uFlow;
-uniform float uGuide;
-uniform float uDt;
-uniform float uInit;
 uniform vec2  uPos[9];
 
 float smin(float a, float b, float k) {
@@ -43,32 +42,24 @@ float sdSeg(vec2 p, vec2 a, vec2 b) {
   return length(pa - ba * h);
 }
 
-float maskAt(vec2 p, float lod) {
-  vec2 frag = p * uRes.y + 0.5 * uRes;
-  vec2 uv   = (frag / uRes) * uUvScale + uUvOffset;
-  return dot(textureLod(uBg, uv, lod).rgb, vec3(0.2126, 0.7152, 0.0722));
-}
-
 void main() {
-  vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 p  = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
 
-  float d    = 1e9;
+  float d = 1e9;
   float inside = 0.0;
 
   for (int i = 0; i < 9; i++) {
     if (i >= uNum) break;
     float di = length(p - uPos[i]) - uRadius;
     d = smin(d, di, uMerge);
-    // 体厚用平滑最大算：脖子处两滴都贡献，厚度依然大，倒角只出现在真正的轮廓上。
-    // 这一项原来在合成里算，等于在全分辨率上跑 9 次 length；挪到这里几乎免费。
+
+    // 平滑最大：融合处两滴都贡献厚度，倒角只出现在真正的轮廓上
     float v = uRadius - (di + uRadius);
     float h = max(0.10 - abs(inside - v), 0.0) / 0.10;
     inside = max(inside, v) + h * h * 0.10 * 0.25;
   }
 
-  // 液丝：两滴快要分开时，中间会先拉出一根细颈，然后才断。
-  // 半径按间距衰减，间距一超过 2.7R 就彻底消失 —— 这就是"啪"的那一下。
+  // 液丝：两滴快要分开时先拉出一根细颈，超过 2.7R 才断
   for (int i = 0; i < 9; i++) {
     if (i >= uNum) break;
     for (int j = i + 1; j < 9; j++) {
@@ -81,28 +72,7 @@ void main() {
     }
   }
 
-  if (uInit > 0.5) { outColor = vec4(d, inside, 0.0, 1.0); return; }
-
-  float dP = texture(uPrev, uv).r;
-
-  if (uFlow > 0.0001) {
-    float mw = uMaskLod + 1.0;
-    float em = 0.02;
-    vec2 mg = vec2(
-      maskAt(p + vec2(em, 0.0), mw) - maskAt(p - vec2(em, 0.0), mw),
-      maskAt(p + vec2(0.0, em), mw) - maskAt(p - vec2(0.0, em), mw)
-    ) / (2.0 * em);
-
-    vec2 v = vec2(mg.y, -mg.x);
-    v *= 1.0 / (1.0 + length(v) * 1.2);
-
-    vec2 back = p - v * uFlow * uDt;
-    vec2 tuv  = vec2(back.x * (uRes.y / uRes.x) + 0.5, back.y + 0.5);
-    dP = texture(uPrev, tuv).r;
-  }
-
-  float g = 1.0 - exp(-uGuide * uDt);
-  outColor = vec4(mix(dP, d, g), inside, 0.0, 1.0);
+  outColor = vec4(d, inside, 0.0, 1.0);
 }`;
 
 export const GEO_FRAG = `#version 300 es
@@ -151,7 +121,6 @@ uniform float     uLod;
 uniform float     uSpec;
 uniform float     uTint;
 uniform float     uPhase;
-uniform sampler2D uPrev;
 
 // Liquid Glass 的材质模型：
 // 平面玻璃板 + 一圈倒角。中间是平的（法线朝你，几乎不折射），
@@ -228,7 +197,7 @@ void main() {
     // 平面处 F ≈ 0.04（几乎全透），倒角处 F → 1（像镜面）
     float F = 0.04 + 0.96 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
     // 屏幕空间反射：采样上一帧的画面，所以倒角能照出旁边的另一滴玻璃
-    vec3 refl = texture(uPrev, uv + N.xy * 0.09).rgb;
+    vec3 refl = textureLod(uBg, tUv + N.xy * 0.09, lod + 1.5).rgb;
 
     // ---- 倒角高光 ----------------------------------------------------
     // 指数不能太高：倒角法线是绕着形状转的，太紧就只剩一个点，应该是一段弧。

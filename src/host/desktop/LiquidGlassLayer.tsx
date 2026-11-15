@@ -22,16 +22,13 @@ const useStyles = makeStyles({
     height: '100%',
     // 壁纸是纯背景：所有指针事件都要透到桌面层
     pointerEvents: 'none',
-    opacity: 0,
+    opacity: 1,
     transitionProperty: 'opacity',
     transitionDuration: '480ms',
     transitionTimingFunction: 'ease-out',
     '@media (prefers-reduced-motion: reduce)': {
       transitionDuration: '0ms',
     },
-  },
-  ready: {
-    opacity: 1,
   },
 });
 
@@ -86,8 +83,11 @@ export function LiquidGlassLayer({ url, kind, identity }: LiquidGlassLayerProps)
       image.decoding = 'async';
       image.onload = () => {
         if (cancelled) return;
-        handle.setImage(image);
-        canvas.classList.add(styles.ready);
+        try {
+          handle.setImage(image);
+        } catch {
+          /* 纹理上传失败：整层不出现，底图照常显示 */
+        }
       };
       image.src = src;
     };
@@ -109,7 +109,7 @@ export function LiquidGlassLayer({ url, kind, identity }: LiquidGlassLayerProps)
     return () => {
       cancelled = true;
     };
-  }, [identity, kind, styles.ready, url]);
+  }, [identity, kind, url]);
 
   return <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" data-liquid-glass="true" />;
 }

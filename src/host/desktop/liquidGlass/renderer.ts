@@ -2,17 +2,17 @@
  * Liquid Glass 渲染器（无 UI、无调试信息）。
  *
  * 三趟管线：
- *   ① 流场输运（低分辨率 ping-pong）—— 距离场沿照片亮度的旋度回溯，形变带惯性
- *   ② 几何（同一分辨率）—— 从距离场取法线、体厚
+ *   ① 几何（低分辨率）—— 解析地把液滴拼成距离场 + 体厚
+ *   ② 法线（同一分辨率）—— 对距离场做中心差分
  *   ③ 合成（全分辨率，渲到离屏 ping-pong）—— 折射 / 色散 / 菲涅尔 / 倒角高光
  *      再把结果 blit 到画布；离屏那份留给下一帧做屏幕空间反射
  *
  * 质量是自适应的：读 GPU 计时器，按 120fps 的预算定档，输出钉在 60fps。
  * 调用方只需要 `setImage()` / `destroy()`。
  */
-import { ADV_FRAG, COMP_FRAG, GEO_FRAG, VERT } from './shaders';
+import { COMP_FRAG, FIELD_FRAG, GEO_FRAG, VERT } from './shaders';
 
-/* ---- 观感常量：与 demo 调好的那组一致 ---- */
+/* ---- 观感常量 ---- */
 const BLOB_COUNT = 5;
 const BLOB_RADIUS = 0.155;
 const MERGE_K = 0.14;
@@ -22,9 +22,6 @@ const FROST_LOD = 0.5;
 const SPECULAR = 1.0;
 const TINT = 0.35;
 const SHADOW = 0.16;
-const FLOW = 0.06;
-const GUIDE = 4.0;
-const MASK_LOD = 6.5;
 const SPEED = 0.35;
 const LOOP_SECONDS = 47;
 
@@ -54,16 +51,17 @@ interface Target {
 
 export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle | null {
   const gl = canvas.getContext('webgl2', {
-    alpha: false,
+    alpha: true,
     antialias: false,
     depth: false,
     stencil: false,
     premultipliedAlpha: false,
     preserveDrawingBuffer: false,
     powerPreference: 'high-performance',
-    desynchronized: true,
   });
-  if (!gl) return null;
+  if (!gl) {
+    return null;
+  }
 
   /* ---------------- 着色器 ---------------- */
   function compile(type: number, src: string): WebGLShader {
@@ -89,15 +87,14 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     return program;
   }
 
-  let progAdv: WebGLProgram;
+  let progField: WebGLProgram;
   let progGeo: WebGLProgram;
   let progComp: WebGLProgram;
   try {
-    progAdv = link(ADV_FRAG);
+    progField = link(FIELD_FRAG);
     progGeo = link(GEO_FRAG);
     progComp = link(COMP_FRAG);
   } catch (error) {
-    console.error('[liquid-glass] 着色器编译失败', error);
     return null;
   }
 
@@ -113,14 +110,11 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     return out;
   }
 
-  const UA = uniforms(progAdv, [
-    'uPrev', 'uRes', 'uBg', 'uUvScale', 'uUvOffset', 'uNum', 'uMerge',
-    'uRadius', 'uMaskLod', 'uFlow', 'uGuide', 'uDt', 'uInit', 'uPos',
-  ]);
+  const UF = uniforms(progField, ['uRes', 'uNum', 'uMerge', 'uRadius', 'uPos']);
   const UG = uniforms(progGeo, ['uD', 'uRes']);
   const UC = uniforms(progComp, [
     'uGlass', 'uBg', 'uRes', 'uUvScale', 'uUvOffset', 'uShadow', 'uOn',
-    'uRadius', 'uRefract', 'uDisp', 'uLod', 'uSpec', 'uTint', 'uPhase', 'uPrev',
+    'uRadius', 'uRefract', 'uDisp', 'uLod', 'uSpec', 'uTint', 'uPhase',
   ]);
 
   /* ---------------- 缓冲 ---------------- */
@@ -160,12 +154,8 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
   let bgAspect = 16 / 9;
   let hasImage = false;
 
+  let fieldBuf: Target = makeTarget(2, 2, COLOR_FMT, COLOR_TYPE);
   let glassBuf: Target = makeTarget(2, 2, COLOR_FMT, COLOR_TYPE);
-  let advBuf: [Target, Target] = [
-    makeTarget(2, 2, COLOR_FMT, COLOR_TYPE),
-    makeTarget(2, 2, COLOR_FMT, COLOR_TYPE),
-  ];
-  let prevBuf: [Target, Target] | null = null;
 
   let glassW = 2;
   let glassH = 2;
@@ -173,9 +163,6 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
   let outH = 2;
 
   let level = LEVEL_DPR.length - 1;
-  let advCur = 0;
-  let prevCur = 0;
-  let advInit = true;
 
   function maxLevel(): number {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -196,29 +183,16 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
       outH = h;
       canvas.width = w;
       canvas.height = h;
-      if (prevBuf) {
-        disposeTarget(prevBuf[0]);
-        disposeTarget(prevBuf[1]);
-        prevBuf = null;
-      }
-      prevBuf = [makeTarget(w, h, gl!.RGBA8, gl!.UNSIGNED_BYTE), makeTarget(w, h, gl!.RGBA8, gl!.UNSIGNED_BYTE)];
-      prevCur = 0;
     }
-
     const gW = Math.max(2, Math.round(cssW * GLASS_SCALE));
     const gH = Math.max(2, Math.round(cssH * GLASS_SCALE));
     if (gW !== glassW || gH !== glassH) {
       glassW = gW;
       glassH = gH;
+      disposeTarget(fieldBuf);
       disposeTarget(glassBuf);
-      disposeTarget(advBuf[0]);
-      disposeTarget(advBuf[1]);
+      fieldBuf = makeTarget(gW, gH, COLOR_FMT, COLOR_TYPE);
       glassBuf = makeTarget(gW, gH, COLOR_FMT, COLOR_TYPE);
-      advBuf = [
-        makeTarget(gW, gH, COLOR_FMT, COLOR_TYPE),
-        makeTarget(gW, gH, COLOR_FMT, COLOR_TYPE),
-      ];
-      advInit = true;
     }
   }
 
@@ -265,7 +239,6 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     }
   }
 
-  // 首帧直接就位，避免从原点飞出来
   updateBlobs(0);
   for (let i = 0; i < 18; i += 1) pos[i] = tgt[i];
 
@@ -308,7 +281,6 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     if (destroyed) return;
     raf = requestAnimationFrame(render);
 
-    // 输出钉在 60fps（120Hz 屏上隔帧丢一次）
     if (now - lastPresent < 15.2) return;
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
@@ -320,7 +292,8 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
       updateBlobs(dt);
     }
 
-    if (!hasImage || !prevBuf) return;
+    // 纹理没到就什么都不画，画布保持透明（alpha: true），底图照常显示
+    if (!hasImage) return;
 
     const [sx, sy, ox, oy] = uvRect();
 
@@ -329,53 +302,31 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
       if (gpuQuery) gl!.beginQuery(timerExt.TIME_ELAPSED_EXT, gpuQuery);
     }
 
-    /* ① 输运 */
-    const advSrc = advCur;
-    const advDst = 1 - advCur;
-    gl!.bindFramebuffer(gl!.FRAMEBUFFER, advBuf[advDst].fbo);
+    /* ① 几何 */
+    gl!.bindFramebuffer(gl!.FRAMEBUFFER, fieldBuf.fbo);
     gl!.viewport(0, 0, glassW, glassH);
-    gl!.useProgram(progAdv);
-    gl!.activeTexture(gl!.TEXTURE1);
-    gl!.bindTexture(gl!.TEXTURE_2D, bgTex);
-    gl!.uniform1i(UA.uBg, 1);
-    gl!.activeTexture(gl!.TEXTURE0);
-    gl!.bindTexture(gl!.TEXTURE_2D, advBuf[advSrc].tex);
-    gl!.uniform1i(UA.uPrev, 0);
-    gl!.uniform2f(UA.uRes, glassW, glassH);
-    gl!.uniform2f(UA.uUvScale, sx, sy);
-    gl!.uniform2f(UA.uUvOffset, ox, oy);
-    gl!.uniform1i(UA.uNum, BLOB_COUNT);
-    gl!.uniform1f(UA.uMerge, MERGE_K);
-    gl!.uniform1f(UA.uRadius, BLOB_RADIUS);
-    gl!.uniform1f(UA.uMaskLod, MASK_LOD);
-    gl!.uniform1f(UA.uFlow, FLOW);
-    gl!.uniform1f(UA.uGuide, GUIDE);
-    gl!.uniform1f(UA.uDt, Math.min(dt, 0.05));
-    gl!.uniform1f(UA.uInit, advInit ? 1 : 0);
-    gl!.uniform2fv(UA.uPos, pos);
+    gl!.useProgram(progField);
+    gl!.uniform2f(UF.uRes, glassW, glassH);
+    gl!.uniform1i(UF.uNum, BLOB_COUNT);
+    gl!.uniform1f(UF.uMerge, MERGE_K);
+    gl!.uniform1f(UF.uRadius, BLOB_RADIUS);
+    gl!.uniform2fv(UF.uPos, pos);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
-    advInit = false;
-    advCur = advDst;
 
-    /* ② 几何 */
+    /* ② 法线 */
     gl!.bindFramebuffer(gl!.FRAMEBUFFER, glassBuf.fbo);
     gl!.viewport(0, 0, glassW, glassH);
     gl!.useProgram(progGeo);
     gl!.activeTexture(gl!.TEXTURE0);
-    gl!.bindTexture(gl!.TEXTURE_2D, advBuf[advCur].tex);
+    gl!.bindTexture(gl!.TEXTURE_2D, fieldBuf.tex);
     gl!.uniform1i(UG.uD, 0);
     gl!.uniform2f(UG.uRes, glassW, glassH);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
     /* ③ 合成 → 离屏 */
-    const prevSrc = prevCur;
-    const prevDst = 1 - prevCur;
-    gl!.bindFramebuffer(gl!.FRAMEBUFFER, prevBuf[prevDst].fbo);
+    gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
     gl!.viewport(0, 0, outW, outH);
     gl!.useProgram(progComp);
-    gl!.activeTexture(gl!.TEXTURE2);
-    gl!.bindTexture(gl!.TEXTURE_2D, prevBuf[prevSrc].tex);
-    gl!.uniform1i(UC.uPrev, 2);
     gl!.activeTexture(gl!.TEXTURE1);
     gl!.bindTexture(gl!.TEXTURE_2D, bgTex);
     gl!.uniform1i(UC.uBg, 1);
@@ -396,12 +347,6 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.uniform1f(UC.uPhase, phase);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
-    // 搬到屏幕
-    gl!.bindFramebuffer(gl!.READ_FRAMEBUFFER, prevBuf[prevDst].fbo);
-    gl!.bindFramebuffer(gl!.DRAW_FRAMEBUFFER, null);
-    gl!.blitFramebuffer(0, 0, outW, outH, 0, 0, outW, outH, gl!.COLOR_BUFFER_BIT, gl!.NEAREST);
-    gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
-    prevCur = prevDst;
 
     /* 计时结算 */
     if (timerExt && gpuQuery) {
@@ -457,7 +402,6 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.generateMipmap(gl!.TEXTURE_2D);
     gl!.pixelStorei(gl!.UNPACK_FLIP_Y_WEBGL, false);
     hasImage = true;
-    advInit = true;
   }
 
   level = maxLevel();
@@ -473,15 +417,10 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     destroy() {
       destroyed = true;
       cancelAnimationFrame(raf);
+      disposeTarget(fieldBuf);
       disposeTarget(glassBuf);
-      disposeTarget(advBuf[0]);
-      disposeTarget(advBuf[1]);
-      if (prevBuf) {
-        disposeTarget(prevBuf[0]);
-        disposeTarget(prevBuf[1]);
-      }
       gl!.deleteTexture(bgTex);
-      gl!.deleteProgram(progAdv);
+      gl!.deleteProgram(progField);
       gl!.deleteProgram(progGeo);
       gl!.deleteProgram(progComp);
       gl!.deleteBuffer(quad);
