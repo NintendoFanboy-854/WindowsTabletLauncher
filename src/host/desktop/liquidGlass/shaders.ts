@@ -18,7 +18,7 @@ void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
  * 不读背景、不做流场输运、没有历史状态。
  *
  *   r        smin 并集的距离场（轮廓）
- *   g        平滑最大的体厚（决定倒角落在哪里）
+ *   g        平滑最大的体厚，按液滴半径归一化到 0..1
  */
 export const FIELD_FRAG = `#version 300 es
 precision highp float;
@@ -72,7 +72,7 @@ void main() {
     }
   }
 
-  outColor = vec4(d, inside, 0.0, 1.0);
+  outColor = vec4(d, clamp(inside / max(uRadius, 1e-3), 0.0, 1.0), 0.0, 1.0);
 }`;
 
 export const GEO_FRAG = `#version 300 es
@@ -97,7 +97,7 @@ void main() {
   float gl = length(g);
   vec2  n2 = g / sqrt(gl * gl + 0.012);
 
-  // alpha 带出这一像素属于哪一滴的"深度"，给合成做景深
+  // alpha 带出归一化体厚，交给合成算球冠高度和吸收
   outColor = vec4(n2 * 0.5 + 0.5, clamp(d / 0.25, -1.0, 1.0) * 0.5 + 0.5, s.g);
 }`;
 
@@ -114,17 +114,19 @@ uniform vec2      uUvScale;
 uniform vec2      uUvOffset;
 uniform float     uShadow;
 uniform float     uOn;
-uniform float     uRadius;
 uniform float     uRefract;
 uniform float     uDisp;
 uniform float     uLod;
 uniform float     uSpec;
 uniform float     uTint;
 uniform float     uPhase;
+uniform vec3      uFill;
+uniform float     uFillAlpha;
 
-// Liquid Glass 的材质模型：
-// 平面玻璃板 + 一圈倒角。中间是平的（法线朝你，几乎不折射），
-// 只在倒角上产生折射、菲涅尔和高光 —— 这就是它看起来像"厚玻璃边缘"的原因。
+// 液滴的材质模型：
+// 整个表面是一个球冠，法线从顶点到接触线连续倾斜。
+// 折射从中心就开始（中心为 0，向外增强），菲涅尔/高光也在曲面上连续过渡，
+// 内部不再有"平面 + 倒角"的分界。
 void main() {
   vec2 uv  = gl_FragCoord.xy / uRes;
   vec2 tUv = uv * uUvScale + uUvOffset;
@@ -157,27 +159,31 @@ void main() {
   if (mask > 0.001) {
     // ---- 单层液体 ----------------------------------------------------
     // 所有液滴共面。融合之后不是"两颗叠在一起"，而是同一个体变厚了，
-    // 光线只穿一次。厚度用平滑最大算，它决定倒角落在哪里：
-    // 脖子处两滴都贡献厚度 → 依然是厚的 → 不出倒角 → 读起来是一体。
-    // 体厚直接读几何缓冲（低分辨率算好、双线性放大），不用在全分辨率上重算
-    float inside = gbuf.a;
+    // 光线只穿一次。体厚从几何缓冲读，已经按液滴半径归一化：
+    // 中心 1，接触线 0。
+    float u = clamp(gbuf.a, 0.0, 1.0);
 
-    // ---- 倒角剖面 ----------------------------------------------------
-    // dd: 0 在轮廓线上，1 在倒角内侧边缘。hh 是四分之一圆的高度。
-    float b  = max(uRadius * 0.34, 0.010);
-    float dd = clamp(inside / b, 0.0, 1.0);
-    float t  = 1.0 - dd;
-    float hh = sqrt(max(1.0 - t * t, 0.0));
+    // ---- 球冠剖面 ----------------------------------------------------
+    // 接触角 80°，接近玻璃上水珠的形态。q 是从顶点算起的半径比例。
+    // hgt 是球冠高度（0 在接触线，1 在顶点），slope 是表面斜率。
+    const float SIN_CA2_INV = 1.03109; // 1 / sin²80°
+    const float COT_CA      = 0.17633; // cot 80°
+    const float CROWN       = 0.83910; // tan 40°
+    float q     = 1.0 - u;
+    float dome  = sqrt(max(SIN_CA2_INV - q * q, 1e-6));
+    float hgt   = clamp((dome - COT_CA) / CROWN, 0.0, 1.0);
+    float slope = q / dome;
 
-    // 表面法线：平面处 (0,0,1)，倒角上向外倾斜
-    vec3 N = normalize(vec3(n2 * (t / max(hh, 0.06)), 1.0));
+    // n2 是距离场梯度方向（低分辨率、朝外）；斜率由球冠解析给出。
+    vec2 dir = n2 / max(length(n2), 1e-4);
+    vec3 N   = normalize(vec3(dir * slope, 1.0));
 
     // ---- 折射 --------------------------------------------------------
-    // 只有倒角会偏折光线；中间是平面，背景原样透过来。
-    // 景深：越"远"的那一滴，内部越糊、越暗
-    // 所有液滴共面，没有前后可言：一次折射，不叠后层
-    vec2  off = N.xy * uRefract;
-    float lod = uLod;
+    // 球冠是一个凸透镜：把壁纸放大。所以采样点向中心收，而不是向外推——
+    // 向外推会把背景压进边缘，看起来像一圈玻璃边（也就是"两层"的观感）。
+    // 边缘按斜率加一点虚化，模拟厚玻璃边缘的散焦。
+    vec2  off = -N.xy * uRefract;
+    float lod = uLod + clamp(slope, 0.0, 2.5) * 0.3;
 
     float r  = textureLod(uBg, tUv + off * (1.0 + uDisp * 0.42), lod).r;
     float gg = textureLod(uBg, tUv + off, lod).g;
@@ -185,7 +191,7 @@ void main() {
     vec3 trans = vec3(r, gg, bb);
 
     // 厚的地方吸得多一点（比尔-朗伯）
-    trans *= exp(-vec3(0.22, 0.06, 0.18) * max(inside, 0.0) / max(uRadius, 1e-3) * 0.9);
+    trans *= exp(-vec3(0.22, 0.06, 0.18) * hgt * 0.9);
 
     // ---- 自适应色调 --------------------------------------------------
     // 材质把周围环境的颜色吸一点进来，这正是指南里说的
@@ -193,21 +199,26 @@ void main() {
     vec3 env = textureLod(uBg, tUv, 6.0).rgb;
     trans = mix(trans, trans * env * 1.7, uTint * 0.55);
 
-    // ---- 菲涅尔 + 环境反射 -------------------------------------------
-    // 平面处 F ≈ 0.04（几乎全透），倒角处 F → 1（像镜面）
-    float F = 0.04 + 0.96 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
-    // 屏幕空间反射：采样上一帧的画面，所以倒角能照出旁边的另一滴玻璃
-    vec3 refl = textureLod(uBg, tUv + N.xy * 0.09, lod + 1.5).rgb;
+    // ---- 主题底色 ----------------------------------------------------
+    // Fluent 2 的中性面颜色由外层按亮暗主题传进来。乘 hgt 是因为它属于
+    // 液滴的体：顶点最浓、接触线归零，不会在内部多出一圈"背景层"。
+    trans = mix(trans, uFill, hgt * uFillAlpha);
 
-    // ---- 倒角高光 ----------------------------------------------------
-    // 指数不能太高：倒角法线是绕着形状转的，太紧就只剩一个点，应该是一段弧。
+    // ---- 菲涅尔 + 环境反射 -------------------------------------------
+    // 顶点 F ≈ 0.04（几乎全透），接触线 F ≈ 0.41（像镜面）
+    float F = 0.04 + 0.96 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
+    // 反射位移小、LOD 更糊：如果把壁纸平移一份叠在透射上，看起来就是第二层
+    vec3 refl = textureLod(uBg, tUv + N.xy * 0.06, lod + 2.5).rgb;
+
+    // ---- 高光 --------------------------------------------------------
+    // 曲面会把光自然聚成一个小点，不再是一整圈倒角弧。
     // 高光按 ndl 自己的菲涅尔加权 —— 掠射进来的光反射率更高，这是能量守恒。
     float ndl  = max(dot(N, L), 0.0);
     float Fspec = 0.04 + 0.96 * pow(1.0 - ndl, 5.0);
-    float spec = pow(ndl, 48.0);
+    float spec = pow(ndl, 64.0);
 
     vec3 col = mix(trans, refl, F);
-    col += spec * Fspec * uSpec * 18.0;   // 18 是光源辐亮度，不是作弊
+    col += spec * Fspec * uSpec * 8.0;   // 水珠高光不该过曝
 
     bg = mix(bg, col, mask);
   }

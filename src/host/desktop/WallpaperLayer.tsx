@@ -399,7 +399,7 @@ export function WallpaperLayer({ wallpaper, colorScheme, liquidGlass = false }: 
         />
       ) : null}
       {liquidGlass && visible && image ? (
-        <LiquidGlassLayer url={image.textureUrl} kind={image.mode} identity={image.key} />
+        <LiquidGlassLayer url={image.textureUrl} kind={image.mode} identity={image.key} colorScheme={colorScheme} />
       ) : null}
       {/* 暗色压暗以保证小组件上的文字可读；亮色只做极轻的压暗 */}
       <div className={styles.scrim} style={{ opacity: colorScheme === 'light' ? 0.06 : 0.24 }} />

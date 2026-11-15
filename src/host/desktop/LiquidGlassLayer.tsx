@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { makeStyles } from '@fluentui/react-components';
 
 import { invokeCommand, isTauriRuntime } from '../plugins/tauri';
+import type { ColorScheme } from '../shell/themeMode';
 import { createLiquidGlass, type LiquidGlassHandle } from './liquidGlass/renderer';
 
 const useStyles = makeStyles({
@@ -38,9 +39,39 @@ export interface LiquidGlassLayerProps {
   kind: 'local' | 'remote';
   /** 壁纸身份（内容哈希或条目 key），变化时才重新取纹理 */
   identity: string | null;
+  /** 当前生效的亮暗：液滴体内的主题底色跟着 Fluent 主题走 */
+  colorScheme: ColorScheme;
 }
 
-export function LiquidGlassLayer({ url, kind, identity }: LiquidGlassLayerProps) {
+/**
+ * 读 FluentProvider 注入的中性面颜色。
+ *
+ * token 挂在 provider 自己的根上（不是 html），所以用宿主元素里的临时 probe
+ * 让浏览器把 `var()` 解析成 rgb()。取不到就按亮暗回退，不影响玻璃层。
+ */
+function readNeutralFill(host: HTMLElement, scheme: ColorScheme): [number, number, number] {
+  const fallback: [number, number, number] = scheme === 'light' ? [1, 1, 1] : [0.12, 0.12, 0.12];
+  try {
+    const probe = document.createElement('span');
+    probe.style.cssText =
+      'position:absolute;width:0;height:0;visibility:hidden;pointer-events:none;' +
+      'background-color:var(--colorNeutralBackground1)';
+    host.appendChild(probe);
+    const value = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const match = value.match(
+      /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?/i,
+    );
+    if (!match) return fallback;
+    const alpha = match[4] === undefined ? 1 : Number(match[4]);
+    if (!(alpha > 0.05)) return fallback;
+    return [Number(match[1]) / 255, Number(match[2]) / 255, Number(match[3]) / 255];
+  } catch {
+    return fallback;
+  }
+}
+
+export function LiquidGlassLayer({ url, kind, identity, colorScheme }: LiquidGlassLayerProps) {
   const styles = useStyles();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handleRef = useRef<LiquidGlassHandle | null>(null);
@@ -110,6 +141,16 @@ export function LiquidGlassLayer({ url, kind, identity }: LiquidGlassLayerProps)
       cancelled = true;
     };
   }, [identity, kind, url]);
+
+  // 主题底色：只改 uniform，不重建 GL，也不重新取纹理
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const handle = handleRef.current;
+    if (!canvas || !handle) return;
+    const host = canvas.parentElement ?? canvas;
+    const [r, g, b] = readNeutralFill(host, colorScheme);
+    handle.setFill(r, g, b);
+  }, [colorScheme]);
 
   return <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" data-liquid-glass="true" />;
 }

@@ -2,13 +2,12 @@
  * Liquid Glass 渲染器（无 UI、无调试信息）。
  *
  * 三趟管线：
- *   ① 几何（低分辨率）—— 解析地把液滴拼成距离场 + 体厚
+ *   ① 几何（低分辨率）—— 解析地把液滴拼成距离场 + 归一化体厚
  *   ② 法线（同一分辨率）—— 对距离场做中心差分
- *   ③ 合成（全分辨率，渲到离屏 ping-pong）—— 折射 / 色散 / 菲涅尔 / 倒角高光
- *      再把结果 blit 到画布；离屏那份留给下一帧做屏幕空间反射
+ *   ③ 合成（全分辨率）—— 球冠折射 / 色散 / 菲涅尔 / 高光 + 主题底色
  *
  * 质量是自适应的：读 GPU 计时器，按 120fps 的预算定档，输出钉在 60fps。
- * 调用方只需要 `setImage()` / `destroy()`。
+ * 调用方用 `setImage()` / `setFill()` / `destroy()`。
  */
 import { COMP_FRAG, FIELD_FRAG, GEO_FRAG, VERT } from './shaders';
 
@@ -16,11 +15,12 @@ import { COMP_FRAG, FIELD_FRAG, GEO_FRAG, VERT } from './shaders';
 const BLOB_COUNT = 5;
 const BLOB_RADIUS = 0.155;
 const MERGE_K = 0.14;
-const REFRACT = 0.055;
-const DISPERSION = 0.8;
-const FROST_LOD = 0.5;
+const REFRACT = 0.04;
+const DISPERSION = 0.35;
+const FROST_LOD = 0.15;
 const SPECULAR = 1.0;
 const TINT = 0.35;
+const FILL_ALPHA = 0.3;
 const SHADOW = 0.16;
 const SPEED = 0.35;
 const LOOP_SECONDS = 47;
@@ -37,6 +37,8 @@ const BUDGET_LO = 6.0;
 
 export interface LiquidGlassHandle {
   setImage(image: HTMLImageElement | null): void;
+  /** Fluent 主题底色（sRGB，0..1）：深色偏烟灰、亮色偏乳白 */
+  setFill(r: number, g: number, b: number): void;
   resize(): void;
   setPaused(paused: boolean): void;
   destroy(): void;
@@ -114,7 +116,7 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
   const UG = uniforms(progGeo, ['uD', 'uRes']);
   const UC = uniforms(progComp, [
     'uGlass', 'uBg', 'uRes', 'uUvScale', 'uUvOffset', 'uShadow', 'uOn',
-    'uRadius', 'uRefract', 'uDisp', 'uLod', 'uSpec', 'uTint', 'uPhase',
+    'uRefract', 'uDisp', 'uLod', 'uSpec', 'uTint', 'uPhase', 'uFill', 'uFillAlpha',
   ]);
 
   /* ---------------- 缓冲 ---------------- */
@@ -201,6 +203,12 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
   const vel = new Float32Array(18);
   const tgt = new Float32Array(18);
   let phase = 0;
+
+  /**
+   * 主题底色。外层按 Fluent 亮/暗主题传入；默认值只是深色兜底，
+   * 纹理到达前或读取失败时用。
+   */
+  const fill = new Float32Array([0.12, 0.12, 0.12]);
 
   function updateBlobs(dt: number) {
     const n = BLOB_COUNT;
@@ -323,7 +331,7 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.uniform2f(UG.uRes, glassW, glassH);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
-    /* ③ 合成 → 离屏 */
+    /* ③ 合成 */
     gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
     gl!.viewport(0, 0, outW, outH);
     gl!.useProgram(progComp);
@@ -338,13 +346,14 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.uniform2f(UC.uUvOffset, ox, oy);
     gl!.uniform1f(UC.uShadow, SHADOW);
     gl!.uniform1f(UC.uOn, 1);
-    gl!.uniform1f(UC.uRadius, BLOB_RADIUS);
     gl!.uniform1f(UC.uRefract, REFRACT);
     gl!.uniform1f(UC.uDisp, DISPERSION);
     gl!.uniform1f(UC.uLod, FROST_LOD);
     gl!.uniform1f(UC.uSpec, SPECULAR);
     gl!.uniform1f(UC.uTint, TINT);
     gl!.uniform1f(UC.uPhase, phase);
+    gl!.uniform3fv(UC.uFill, fill);
+    gl!.uniform1f(UC.uFillAlpha, FILL_ALPHA);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
 
@@ -410,6 +419,11 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
 
   return {
     setImage,
+    setFill(r: number, g: number, b: number) {
+      fill[0] = r;
+      fill[1] = g;
+      fill[2] = b;
+    },
     resize,
     setPaused(next: boolean) {
       paused = next;
