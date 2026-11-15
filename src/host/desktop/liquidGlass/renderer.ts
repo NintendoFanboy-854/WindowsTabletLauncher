@@ -2,9 +2,9 @@
  * Liquid Glass 渲染器（无 UI、无调试信息）。
  *
  * 三趟管线：
- *   ① 几何（低分辨率）—— 解析地把液滴拼成距离场 + 归一化体厚
- *   ② 法线（同一分辨率）—— 对距离场做中心差分
- *   ③ 合成（全分辨率）—— 球冠折射 / 色散 / 菲涅尔 / 高光 + 主题底色
+ *   ① 几何（低分辨率）—— 距离场 + 按接触角算出的球冠高度场
+ *   ② 法线（同一分辨率）—— 对高度场做中心差分
+ *   ③ 合成（全分辨率）—— 透镜成像 / 菲涅尔 / 低频环境 / 高光 + 主题底色
  *
  * 质量是自适应的：读 GPU 计时器，按 120fps 的预算定档，输出钉在 60fps。
  * 调用方用 `setImage()` / `setFill()` / `destroy()`。
@@ -14,14 +14,22 @@ import { COMP_FRAG, FIELD_FRAG, GEO_FRAG, VERT } from './shaders';
 /* ---- 观感常量 ---- */
 const BLOB_COUNT = 5;
 const BLOB_RADIUS = 0.155;
-const MERGE_K = 0.14;
-const REFRACT = 0.04;
-const DISPERSION = 0.35;
+
+/** 接触角：80° 是"珠"的形态；50–60° 会更摊、更像屏幕上的水。 */
+const CONTACT_DEG = 80;
+const CONTACT_RAD = (CONTACT_DEG * Math.PI) / 180;
+/** 球冠高度 H = R·tan(θ/2)，和 uRadius 同一单位（屏高） */
+const BLOB_HEIGHT = BLOB_RADIUS * Math.tan(CONTACT_RAD / 2);
+
+const MERGE_K = 0.08;
+
+/** 水的折射率；色散相对差约 1%，不再用油膜的 35%。 */
+const IOR = 1.333;
+const DISPERSION = 0.01;
 const FROST_LOD = 0.15;
 const SPECULAR = 1.0;
-const TINT = 0.35;
 const FILL_ALPHA = 0.3;
-const SHADOW = 0.16;
+const SHADOW = 0.14;
 const SPEED = 0.35;
 const LOOP_SECONDS = 47;
 
@@ -112,11 +120,14 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     return out;
   }
 
-  const UF = uniforms(progField, ['uRes', 'uNum', 'uMerge', 'uRadius', 'uPos']);
-  const UG = uniforms(progGeo, ['uD', 'uRes']);
+  const UF = uniforms(progField, [
+    'uRes', 'uNum', 'uMerge', 'uRadius', 'uSinCA', 'uCosCA', 'uPos',
+  ]);
+  const UG = uniforms(progGeo, ['uD', 'uRes', 'uHeight']);
   const UC = uniforms(progComp, [
     'uGlass', 'uBg', 'uRes', 'uUvScale', 'uUvOffset', 'uShadow', 'uOn',
-    'uRefract', 'uDisp', 'uLod', 'uSpec', 'uTint', 'uPhase', 'uFill', 'uFillAlpha',
+    'uLod', 'uSpec', 'uFill', 'uFillAlpha', 'uPhase', 'uIOR', 'uDisp',
+    'uHeight', 'uEnvTop', 'uEnvBottom', 'uEnvAvg',
   ]);
 
   /* ---------------- 缓冲 ---------------- */
@@ -209,6 +220,58 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
    * 纹理到达前或读取失败时用。
    */
   const fill = new Float32Array([0.12, 0.12, 0.12]);
+
+  /**
+   * 环境反射色：只保留壁纸的低频颜色，不要细节。
+   * 上/下两色让珠子的曲面读得出方向，平均色负责整体色调。
+   */
+  const envTop = new Float32Array([0.55, 0.62, 0.72]);
+  const envBottom = new Float32Array([0.18, 0.18, 0.22]);
+  const envAvg = new Float32Array([0.36, 0.38, 0.44]);
+
+  function computeEnvironment(image: HTMLImageElement) {
+    try {
+      const size = 24;
+      const board = document.createElement('canvas');
+      board.width = size;
+      board.height = size;
+      const ctx = board.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(image, 0, 0, size, size);
+      const data = ctx.getImageData(0, 0, size, size).data;
+
+      let tr = 0, tg = 0, tb = 0, tn = 0;
+      let br = 0, bg = 0, bb = 0, bn = 0;
+      let ar = 0, ag = 0, ab = 0, an = 0;
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          const i = (y * size + x) * 4;
+          const r = data[i] / 255;
+          const g = data[i + 1] / 255;
+          const b = data[i + 2] / 255;
+          ar += r; ag += g; ab += b; an += 1;
+          if (y < size / 2) {
+            tr += r; tg += g; tb += b; tn += 1;
+          } else {
+            br += r; bg += g; bb += b; bn += 1;
+          }
+        }
+      }
+
+      // 上方提亮、下方压暗：环境光本来就有方向，边缘才不会读成一层膜。
+      envTop[0] = Math.min(1, (tr / tn) * 1.12 + 0.02);
+      envTop[1] = Math.min(1, (tg / tn) * 1.12 + 0.02);
+      envTop[2] = Math.min(1, (tb / tn) * 1.12 + 0.02);
+      envBottom[0] = Math.max(0, (br / bn) * 0.78);
+      envBottom[1] = Math.max(0, (bg / bn) * 0.78);
+      envBottom[2] = Math.max(0, (bb / bn) * 0.78);
+      envAvg[0] = ar / an;
+      envAvg[1] = ag / an;
+      envAvg[2] = ab / an;
+    } catch {
+      /* 跨源或读像素失败：保留深色兜底，不影响玻璃层 */
+    }
+  }
 
   function updateBlobs(dt: number) {
     const n = BLOB_COUNT;
@@ -318,6 +381,8 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.uniform1i(UF.uNum, BLOB_COUNT);
     gl!.uniform1f(UF.uMerge, MERGE_K);
     gl!.uniform1f(UF.uRadius, BLOB_RADIUS);
+    gl!.uniform1f(UF.uSinCA, Math.sin(CONTACT_RAD));
+    gl!.uniform1f(UF.uCosCA, Math.cos(CONTACT_RAD));
     gl!.uniform2fv(UF.uPos, pos);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
@@ -329,6 +394,7 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.bindTexture(gl!.TEXTURE_2D, fieldBuf.tex);
     gl!.uniform1i(UG.uD, 0);
     gl!.uniform2f(UG.uRes, glassW, glassH);
+    gl!.uniform1f(UG.uHeight, BLOB_HEIGHT);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
     /* ③ 合成 */
@@ -346,14 +412,17 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.uniform2f(UC.uUvOffset, ox, oy);
     gl!.uniform1f(UC.uShadow, SHADOW);
     gl!.uniform1f(UC.uOn, 1);
-    gl!.uniform1f(UC.uRefract, REFRACT);
-    gl!.uniform1f(UC.uDisp, DISPERSION);
     gl!.uniform1f(UC.uLod, FROST_LOD);
     gl!.uniform1f(UC.uSpec, SPECULAR);
-    gl!.uniform1f(UC.uTint, TINT);
-    gl!.uniform1f(UC.uPhase, phase);
-    gl!.uniform3fv(UC.uFill, fill);
     gl!.uniform1f(UC.uFillAlpha, FILL_ALPHA);
+    gl!.uniform1f(UC.uPhase, phase);
+    gl!.uniform1f(UC.uIOR, IOR);
+    gl!.uniform1f(UC.uDisp, DISPERSION);
+    gl!.uniform1f(UC.uHeight, BLOB_HEIGHT);
+    gl!.uniform3fv(UC.uFill, fill);
+    gl!.uniform3fv(UC.uEnvTop, envTop);
+    gl!.uniform3fv(UC.uEnvBottom, envBottom);
+    gl!.uniform3fv(UC.uEnvAvg, envAvg);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
 
@@ -410,6 +479,7 @@ export function createLiquidGlass(canvas: HTMLCanvasElement): LiquidGlassHandle 
     gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA8, gl!.RGBA, gl!.UNSIGNED_BYTE, image);
     gl!.generateMipmap(gl!.TEXTURE_2D);
     gl!.pixelStorei(gl!.UNPACK_FLIP_Y_WEBGL, false);
+    computeEnvironment(image);
     hasImage = true;
   }
 

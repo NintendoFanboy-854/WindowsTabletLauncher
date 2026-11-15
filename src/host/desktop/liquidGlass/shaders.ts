@@ -1,24 +1,22 @@
 /**
  * Liquid Glass 的着色器源码。
  *
- * 与 `demo/liquid-glass/index.html` 同一套：几何层算距离场与法线，
- * 合成层在全分辨率上用清晰的底图做折射、菲涅尔、倒角高光。
- *
- * 为什么单独放一个文件：这几段是纯 GLSL，没有 React 依赖，
- * 和渲染器分开容易对照，也方便以后替换。
+ * 与 `demo/liquid-glass/index.html` 的旧版不同：这里已经是球冠高度场 + 透镜成像，
+ * 不再是"平面玻璃板 + 倒角"。三段纯 GLSL，没有 React 依赖。
  */
 export const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
 /**
- * 几何层：把液滴拼成一张距离场。
+ * 几何层：距离场 → 球冠高度场。
  *
- * 纯解析 —— 位置由 CPU 每帧算好传进来，这里只做并集和平滑最大厚度，
- * 不读背景、不做流场输运、没有历史状态。
+ *   r        smin 并集的距离场（轮廓，用于遮罩和接触阴影）
+ *   g        球冠高度，归一化到 0..1（顶点 1，接触线 0）
  *
- *   r        smin 并集的距离场（轮廓）
- *   g        平滑最大的体厚，按液滴半径归一化到 0..1
+ * 高度不是距离场的线性映射，而是把"到接触线的归一化距离" u 过一个
+ * 球冠剖面：h = cap(u)。这样接触线、遮罩、高度场三者严格一致，
+ * 合并处的颈也自动是液体，而不是 SDF 的锥。
  */
 export const FIELD_FRAG = `#version 300 es
 precision highp float;
@@ -29,6 +27,8 @@ uniform vec2  uRes;
 uniform int   uNum;
 uniform float uMerge;
 uniform float uRadius;
+uniform float uSinCA;
+uniform float uCosCA;
 uniform vec2  uPos[9];
 
 float smin(float a, float b, float k) {
@@ -42,39 +42,49 @@ float sdSeg(vec2 p, vec2 a, vec2 b) {
   return length(pa - ba * h);
 }
 
+// u=1 顶点，u=0 接触线。斜率在接触线处正好是 tanθ。
+float capFromU(float u) {
+  float q = 1.0 - clamp(u, 0.0, 1.0);
+  float s = uSinCA;
+  return (sqrt(max(1.0 - q * q * s * s, 0.0)) - uCosCA) / (1.0 - uCosCA);
+}
+
 void main() {
   vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
 
   float d = 1e9;
-  float inside = 0.0;
 
   for (int i = 0; i < 9; i++) {
     if (i >= uNum) break;
     float di = length(p - uPos[i]) - uRadius;
     d = smin(d, di, uMerge);
-
-    // 平滑最大：融合处两滴都贡献厚度，倒角只出现在真正的轮廓上
-    float v = uRadius - (di + uRadius);
-    float h = max(0.10 - abs(inside - v), 0.0) / 0.10;
-    inside = max(inside, v) + h * h * 0.10 * 0.25;
   }
 
-  // 液丝：两滴快要分开时先拉出一根细颈，超过 2.7R 才断
+  // 液丝：两滴快要分开时先拉出一根细颈。它同时也进入高度场，
+  // 所以颈是低矮的液体桥，不是一张平的膜。
   for (int i = 0; i < 9; i++) {
     if (i >= uNum) break;
     for (int j = i + 1; j < 9; j++) {
       if (j >= uNum) break;
       float dist = length(uPos[j] - uPos[i]);
-      float w = smoothstep(2.7 * uRadius, 2.0 * uRadius, dist);
+      float w = 1.0 - smoothstep(2.0 * uRadius, 2.7 * uRadius, dist);
       if (w > 0.002) {
-        d = min(d, sdSeg(p, uPos[i], uPos[j]) - uRadius * 0.13 * w);
+        float ds = sdSeg(p, uPos[i], uPos[j]);
+        d = min(d, ds - uRadius * 0.12 * w);
       }
     }
   }
 
-  outColor = vec4(d, clamp(inside / max(uRadius, 1e-3), 0.0, 1.0), 0.0, 1.0);
+  float u = clamp(-d / uRadius, 0.0, 1.0);
+  outColor = vec4(d, capFromU(u), 0.0, 1.0);
 }`;
 
+/**
+ * 法线层：对高度场做中心差分。
+ *
+ * p 的单位是屏高，所以梯度要乘绝对冠高 uHeight；法线朝外，
+ * 因此是 normalize(vec3(-grad, 1))。
+ */
 export const GEO_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -83,6 +93,7 @@ out vec4 outColor;
 
 uniform sampler2D uD;
 uniform vec2      uRes;
+uniform float     uHeight;
 
 void main() {
   vec2  uv = gl_FragCoord.xy / uRes;
@@ -90,17 +101,26 @@ void main() {
 
   vec4  s  = texture(uD, uv);
   float d  = s.r;
-  float dx = texture(uD, uv + vec2(tx.x, 0.0)).r - texture(uD, uv - vec2(tx.x, 0.0)).r;
-  float dy = texture(uD, uv + vec2(0.0, tx.y)).r - texture(uD, uv - vec2(0.0, tx.y)).r;
+  float h  = s.g;
+  float hx = texture(uD, uv + vec2(tx.x, 0.0)).g - texture(uD, uv - vec2(tx.x, 0.0)).g;
+  float hy = texture(uD, uv + vec2(0.0, tx.y)).g - texture(uD, uv - vec2(0.0, tx.y)).g;
 
-  vec2  g  = vec2(dx, dy) * uRes.y * 0.5;
-  float gl = length(g);
-  vec2  n2 = g / sqrt(gl * gl + 0.012);
+  vec2  g  = vec2(hx, hy) * uRes.y * 0.5 * uHeight;
+  vec3  N  = normalize(vec3(-g, 1.0));
 
-  // alpha 带出归一化体厚，交给合成算球冠高度和吸收
-  outColor = vec4(n2 * 0.5 + 0.5, clamp(d / 0.25, -1.0, 1.0) * 0.5 + 0.5, s.g);
+  outColor = vec4(N.xy * 0.5 + 0.5, clamp(d / 0.25, -1.0, 1.0) * 0.5 + 0.5, h);
 }`;
 
+/**
+ * 合成层：液滴当成一块凸透镜。
+ *
+ * 视线竖直向下，在球冠表面折射后打到 z=0 的壁纸：
+ *   Q = P + d1 * h / (-d1.z)
+ * 接触线处 h=0，所以折射位移自然归零；中心 h 最大但法线竖直，位移也是 0。
+ * 位移在 q≈0.7–0.8 最大，边缘被压缩成一条窄环——这就是"包边"。
+ *
+ * 反射只取壁纸的低频颜色 + 上下渐变，不采样平移的壁纸，避免第二层。
+ */
 export const COMP_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -114,111 +134,101 @@ uniform vec2      uUvScale;
 uniform vec2      uUvOffset;
 uniform float     uShadow;
 uniform float     uOn;
-uniform float     uRefract;
-uniform float     uDisp;
 uniform float     uLod;
 uniform float     uSpec;
-uniform float     uTint;
-uniform float     uPhase;
-uniform vec3      uFill;
 uniform float     uFillAlpha;
+uniform float     uPhase;
+uniform float     uIOR;
+uniform float     uDisp;
+uniform float     uHeight;
+uniform vec3      uFill;
+uniform vec3      uEnvTop;
+uniform vec3      uEnvBottom;
+uniform vec3      uEnvAvg;
 
-// 液滴的材质模型：
-// 整个表面是一个球冠，法线从顶点到接触线连续倾斜。
-// 折射从中心就开始（中心为 0，向外增强），菲涅尔/高光也在曲面上连续过渡，
-// 内部不再有"平面 + 倒角"的分界。
 void main() {
   vec2 uv  = gl_FragCoord.xy / uRes;
   vec2 tUv = uv * uUvScale + uUvOffset;
-  vec2 p   = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
 
   vec4  gbuf = texture(uGlass, uv);
-  vec2  n2   = gbuf.rg * 2.0 - 1.0;
+  vec2  nxy  = gbuf.rg * 2.0 - 1.0;
   float d    = (gbuf.b * 2.0 - 1.0) * 0.25;
+  float hn   = gbuf.a;
+  vec3  N    = vec3(nxy, sqrt(max(1.0 - dot(nxy, nxy), 0.0)));
 
   float aa   = 1.5 / uRes.y;
   float mask = (1.0 - smoothstep(-aa, aa, d)) * uOn;
 
   vec3 bg = textureLod(uBg, tUv, 0.0).rgb;
 
-  // 光源在一条固定仰角的圆轨道上匀速绕行。两个不同频率会得到"乱走"，
-  // 那不是光源，是闪烁。
+  // 光源在一条固定仰角的圆轨道上匀速绕行；两个频率会得到"乱走"。
   const float ELEV = 0.72;
   vec3 L = normalize(vec3(cos(uPhase * 0.09) * 0.69,
                           sin(uPhase * 0.09) * 0.69,
                           ELEV));
 
-  // 体积阴影：玻璃把身后的光吃掉一部分，厚的偏绿（钠钙玻璃）
+  // 接触阴影：用高度场，落在光的反方向。水珠的阴影是中性灰，不是绿色。
   if (uShadow > 0.001 && mask < 0.999) {
-    vec2  suv = uv - L.xy * 0.018;
-    float ds  = (texture(uGlass, suv).b * 2.0 - 1.0) * 0.25;
-    float sh  = (1.0 - smoothstep(-0.005, 0.085, ds)) * (1.0 - mask);
-    bg *= exp(-vec3(0.55, 0.16, 0.40) * sh * uShadow * 2.2);
+    vec2  suv = uv - L.xy * 0.012;
+    float hs  = texture(uGlass, suv).a;
+    float sh  = smoothstep(0.0, 0.45, hs) * (1.0 - mask);
+    bg *= exp(-vec3(0.55, 0.55, 0.60) * sh * uShadow * 1.8);
   }
 
   if (mask > 0.001) {
-    // ---- 单层液体 ----------------------------------------------------
-    // 所有液滴共面。融合之后不是"两颗叠在一起"，而是同一个体变厚了，
-    // 光线只穿一次。体厚从几何缓冲读，已经按液滴半径归一化：
-    // 中心 1，接触线 0。
-    float u = clamp(gbuf.a, 0.0, 1.0);
+    // ---- 透镜成像 ----------------------------------------------------
+    // 从像素沿视线向下，在表面折射，打到衬底 z=0。
+    // 所有液滴共面，所以只追一次；没有后层可叠。
+    vec3  I      = vec3(0.0, 0.0, -1.0);
+    vec3  T      = refract(I, N, 1.0 / uIOR);
+    float hAbs   = hn * uHeight;
+    float tHit   = hAbs / max(-T.z, 1e-4);
+    vec2  dp     = T.xy * tHit;
+    float aspect = uRes.x / max(uRes.y, 1.0);
+    vec2  duv    = vec2(dp.x / aspect, dp.y) * uUvScale;
 
-    // ---- 球冠剖面 ----------------------------------------------------
-    // 接触角 80°，接近玻璃上水珠的形态。q 是从顶点算起的半径比例。
-    // hgt 是球冠高度（0 在接触线，1 在顶点），slope 是表面斜率。
-    const float SIN_CA2_INV = 1.03109; // 1 / sin²80°
-    const float COT_CA      = 0.17633; // cot 80°
-    const float CROWN       = 0.83910; // tan 40°
-    float q     = 1.0 - u;
-    float dome  = sqrt(max(SIN_CA2_INV - q * q, 1e-6));
-    float hgt   = clamp((dome - COT_CA) / CROWN, 0.0, 1.0);
-    float slope = q / dome;
+    // 边缘压缩得最厉害，LOD 拉高一点，既避免锯齿也像厚边的散焦。
+    float lod = uLod + (1.0 - N.z) * 1.2;
 
-    // n2 是距离场梯度方向（低分辨率、朝外）；斜率由球冠解析给出。
-    vec2 dir = n2 / max(length(n2), 1e-4);
-    vec3 N   = normalize(vec3(dir * slope, 1.0));
+    // 水的色散很小：n 从 1.331 到 1.344，相对差 ~1%。
+    float disp = uDisp;
+    vec3 trans;
+    trans.r = textureLod(uBg, tUv + duv * (1.0 + disp), lod).r;
+    trans.g = textureLod(uBg, tUv + duv, lod).g;
+    trans.b = textureLod(uBg, tUv + duv * (1.0 - disp), lod).b;
 
-    // ---- 折射 --------------------------------------------------------
-    // 球冠是一个凸透镜：把壁纸放大。所以采样点向中心收，而不是向外推——
-    // 向外推会把背景压进边缘，看起来像一圈玻璃边（也就是"两层"的观感）。
-    // 边缘按斜率加一点虚化，模拟厚玻璃边缘的散焦。
-    vec2  off = -N.xy * uRefract;
-    float lod = uLod + clamp(slope, 0.0, 2.5) * 0.3;
-
-    float r  = textureLod(uBg, tUv + off * (1.0 + uDisp * 0.42), lod).r;
-    float gg = textureLod(uBg, tUv + off, lod).g;
-    float bb = textureLod(uBg, tUv + off * (1.0 - uDisp * 0.42), lod).b;
-    vec3 trans = vec3(r, gg, bb);
-
-    // 厚的地方吸得多一点（比尔-朗伯）
-    trans *= exp(-vec3(0.22, 0.06, 0.18) * hgt * 0.9);
-
-    // ---- 自适应色调 --------------------------------------------------
-    // 材质把周围环境的颜色吸一点进来，这正是指南里说的
-    // "translucent elements that adapt to their environment"
-    vec3 env = textureLod(uBg, tUv, 6.0).rgb;
-    trans = mix(trans, trans * env * 1.7, uTint * 0.55);
+    // 毫米级水珠在可见光下几乎不吸收；只留一丝冷色让体积读得出来。
+    trans *= exp(-vec3(0.035, 0.012, 0.045) * hn);
 
     // ---- 主题底色 ----------------------------------------------------
-    // Fluent 2 的中性面颜色由外层按亮暗主题传进来。乘 hgt 是因为它属于
-    // 液滴的体：顶点最浓、接触线归零，不会在内部多出一圈"背景层"。
-    trans = mix(trans, uFill, hgt * uFillAlpha);
+    // 跟着 Fluent 的 --colorNeutralBackground1 走：暗色烟灰、亮色乳白。
+    trans = mix(trans, uFill, clamp(hn, 0.0, 1.0) * uFillAlpha);
 
-    // ---- 菲涅尔 + 环境反射 -------------------------------------------
-    // 顶点 F ≈ 0.04（几乎全透），接触线 F ≈ 0.41（像镜面）
-    float F = 0.04 + 0.96 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
-    // 反射位移小、LOD 更糊：如果把壁纸平移一份叠在透射上，看起来就是第二层
-    vec3 refl = textureLod(uBg, tUv + N.xy * 0.06, lod + 2.5).rgb;
+    // ---- 菲涅尔 ------------------------------------------------------
+    // 水的 F0 = 0.02；接触线处 N.z 很小，反射率升到 ~0.40。
+    float F = 0.02 + 0.98 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
+
+    // ---- 环境反射 ----------------------------------------------------
+    // 只取低频：壁纸上下半球的平均色 + 5 级 mip 的局部色。
+    // 不采样平移后的清晰壁纸，所以不会出现"第二层"。
+    vec3  R   = 2.0 * N.z * N - vec3(0.0, 0.0, 1.0);
+    float gy  = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
+    vec3  env = mix(uEnvBottom, uEnvTop, gy);
+    env = mix(env, uEnvAvg, 0.18);
+    vec3  local = textureLod(uBg, tUv, 5.0).rgb;
+    env = mix(env, local, 0.35);
 
     // ---- 高光 --------------------------------------------------------
-    // 曲面会把光自然聚成一个小点，不再是一整圈倒角弧。
-    // 高光按 ndl 自己的菲涅尔加权 —— 掠射进来的光反射率更高，这是能量守恒。
+    // 曲面把光聚成一个小点；指数要够高，否则又变成一圈亮边。
     float ndl  = max(dot(N, L), 0.0);
-    float Fspec = 0.04 + 0.96 * pow(1.0 - ndl, 5.0);
-    float spec = pow(ndl, 64.0);
+    float spec = pow(ndl, 256.0);
 
-    vec3 col = mix(trans, refl, F);
-    col += spec * Fspec * uSpec * 8.0;   // 水珠高光不该过曝
+    vec3 col = trans * (1.0 - F) + env * F;
+    col += spec * (0.02 + 0.98 * pow(1.0 - ndl, 5.0)) * uSpec * 12.0;
+
+    // ---- 接触线 ------------------------------------------------------
+    // 最后 ~1% 半径压暗一点，把珠子"按"在壁纸上。
+    col *= mix(0.84, 1.0, smoothstep(0.0, 0.05, hn));
 
     bg = mix(bg, col, mask);
   }
