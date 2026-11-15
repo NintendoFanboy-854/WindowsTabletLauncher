@@ -8,23 +8,26 @@
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #07090c; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-
+  canvas { display: block; }
+  #gl { width: 100vw; height: 100vh; }
+  #flow {
+    position: fixed; inset: 0; width: 100vw; height: 100vh;
+    pointer-events: none; display: none; z-index: 4;
+  }
   #hud {
-    position: fixed; top: 12px; right: 14px;
+    position: fixed; top: 12px; right: 14px; z-index: 10;
     font: 500 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
     color: #cfe3ff; text-shadow: 0 1px 3px #000a;
     text-align: right; pointer-events: none; user-select: none;
   }
   #hud b { font-weight: 700; color: #fff; }
-
   #panel {
-    position: fixed; top: 12px; left: 12px; width: 268px;
+    position: fixed; top: 12px; left: 12px; width: 276px; z-index: 10;
     max-height: calc(100vh - 24px);
     display: flex; flex-direction: column;
     padding: 12px 14px 14px;
     border-radius: 14px;
-    background: rgba(14, 18, 24, 0.72);
+    background: rgba(14, 18, 24, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(18px) saturate(140%);
@@ -33,7 +36,6 @@
   }
   #panel.collapsed { width: auto; padding: 8px 12px; }
   #panel.collapsed .body { display: none; }
-
   .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .head h1 { margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .02em; }
   #toggle {
@@ -41,12 +43,11 @@
     font-size: 11px; color: #9fb3cc; background: rgba(255,255,255,.07);
   }
   #toggle:hover { background: rgba(255,255,255,.13); color: #dbe7f7; }
-
   .body { margin-top: 10px; display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
   #sliders { overflow-y: auto; min-height: 0; padding-right: 4px; }
   #sliders::-webkit-scrollbar { width: 6px; }
   #sliders::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
-  .row { margin: 9px 0; }
+  .row { margin: 8px 0; }
   .row label { display: flex; justify-content: space-between; gap: 8px; color: #a8b8cc; font-size: 11px; }
   .row label span:last-child { color: #e8f1ff; font-variant-numeric: tabular-nums; }
   .desc { margin-top: 1px; font-size: 10px; line-height: 1.35; color: #8395ab; }
@@ -61,7 +62,7 @@
     -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4.5px;
     border-radius: 50%; background: #e9f2ff; box-shadow: 0 0 0 1px #0006, 0 2px 6px #0007;
   }
-  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .btns button, .btns label {
     all: unset; cursor: pointer; padding: 5px 9px; border-radius: 8px;
     font-size: 11px; color: #cfe0f5; background: rgba(255,255,255,.08);
@@ -72,7 +73,6 @@
   input[type=file] { display: none; }
   .hint { margin-top: 10px; color: #7f90a6; font-size: 10.5px; line-height: 1.5; }
   kbd { font: inherit; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.1); }
-
   #drop {
     position: fixed; inset: 0; display: none; place-items: center;
     background: rgba(8, 12, 18, .72); z-index: 20;
@@ -84,11 +84,12 @@
 </head>
 <body>
 <canvas id="gl"></canvas>
+<canvas id="flow"></canvas>
 
 <div id="hud">
   <div><b id="fps">–</b> fps · <span id="ms">–</span> ms</div>
-  <div style="opacity:.65"><span id="res">–</span> · <span id="nblob">–</span> 滴</div>
-  <div style="opacity:.45">GPU <span id="gpu">–</span> ms</div>
+  <div style="opacity:.65"><span id="res">–</span> · <span id="ncomp">–</span> 珠 · <span id="nlobe">–</span> 滴</div>
+  <div style="opacity:.45">GPU <span id="gpu">–</span> ms · Bo <span id="bo">–</span></div>
 </div>
 
 <div id="panel">
@@ -103,6 +104,7 @@
       <button id="btnCompare">对比原图</button>
       <button id="btnReset">重置</button>
       <button id="btnFill">底色：暗</button>
+      <button id="btnFlow">流场</button>
     </div>
     <div class="btns">
       <button id="btnPhoto" class="on">风景</button>
@@ -118,47 +120,66 @@
 
 <div id="drop">松手载入图片</div>
 
+<script src="hdri.js"></script>
 <script>
 "use strict";
+
+/* ------------------------------------------------------------------ *
+ * 物理常量
+ * ------------------------------------------------------------------ */
+const GAMMA = 0.0728;              // N/m，20°C 水
+const RHO = 998;                   // kg/m³
+const GRAV = 9.81;                 // m/s²
+const LC_MM = Math.sqrt(GAMMA / (RHO * GRAV)) * 1000; // 毛细长度 ≈ 2.727mm
+const WORLD_MM = 10;               // 画面高度对应的物理尺寸（微距）
+const TAU = Math.PI * 2;
+const NW = [1.331, 1.333, 1.344];  // 水，RGB 三波长
+const NG = [1.514, 1.520, 1.528];  // 屏幕玻璃，RGB 三波长
+const LIGHT0 = (() => {
+  const az = 0.62, el = 0.30;
+  return [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+})();
 
 /* ------------------------------------------------------------------ *
  * 状态
  * ------------------------------------------------------------------ */
 const DEFAULTS = {
   num: 5,
-  merge: 0.08,
-  contact: 80,
-  ior: 1.333,
-  disp: 0.01,
+  size: 1.5,       // 物理接触半径，mm
+  contact: 80,     // 接触角，度
+  flow: 0.04,      // 全局流场强度，屏幕高/秒
+  pin: 0.012,      // 接触线钉扎阈值
+  neck: 0.008,     // 合并/分裂过渡的视觉颈宽
   lod: 0.15,
-  radius: 0.155,
   spec: 1.0,
   fill: 0.30,
-  env: 0.35,
-  shadow: 0.14,
-  speed: 0.35,
+  env: 1.0,
+  envRot: 0,       // 环境旋转，度
+  glass: 0.20,     // 屏幕玻璃厚度，mm
+  speed: 1.0,
 };
 
 const SLIDERS = [
-  ["num",     "液滴数量", 2,    9,    1,     "同时存在几滴"],
-  ["merge",   "融合",     0,    0.20, 0.005, "平滑并集的宽度；0 = 硬边相交，越大脖子越粗"],
-  ["contact", "接触角",   50,   90,   1,     "球冠在接触线处的角度；80° 是珠子，60° 更摊"],
-  ["ior",     "折射率",   1.30, 1.40, 0.001, "水 1.333；越大透镜越强"],
-  ["disp",    "色散",     0,    0.05, 0.001, "红蓝折射率差；水的实际相对差约 1%"],
+  ["num",     "液滴数量", 2,    9,    1,     "初始滴数；合并/分裂后实际珠数会变"],
+  ["size",    "尺寸",     0.5,  4.0,  0.05,  "物理接触半径（mm）；调大后会按重力摊成水洼"],
+  ["contact", "接触角",   50,   90,   1,     "球冠在接触线处的角度；80° 是疏水屏，60° 更摊"],
+  ["flow",    "流场",     0,    0.20, 0.005, "全局无散度速度场的强度；驱动漂移和分裂"],
+  ["pin",     "钉扎",     0,    0.05, 0.001, "接触线静摩擦阈值；流场低于它时液滴不动"],
+  ["neck",    "颈宽",     0,    0.03, 0.001, "合并/分裂过渡时的视觉颈宽，不是物理量"],
   ["lod",     "模糊",    -2,    3,    0.1,   "0 = 清透，往上加磨砂"],
-  ["radius",  "尺寸",     0.06, 0.20, 0.002, "每一滴的半径"],
-  ["spec",    "高光",     0,    2.5,  0.02,  "曲面把光聚成的小点"],
-  ["fill",    "底色",     0,    1,    0.01,  "Fluent 中性面颜色混入液滴本体的比例；0 = 全透"],
-  ["env",     "环境反射", 0,    1,    0.01,  "低频环境色混入反射的比例；只取颜色，不取细节"],
-  ["shadow",  "投影",     0,    0.5,  0.01,  "液滴落在壁纸上的接触阴影"],
-  ["speed",   "速度",     0,    3,    0.02,  "整体漂移速度"],
+  ["spec",    "高光",     0,    2.5,  0.02,  "曲面把环境光聚成的小点"],
+  ["fill",    "底色",     0,    1,    0.01,  "介质光学厚度；暗色吸收、亮色散射"],
+  ["env",     "环境亮度", 0,    2,    0.05,  "HDR 环境反射的强度"],
+  ["envRot",  "环境旋转", 0,    360,  1,     "旋转 HDR 环境，改变窗光方向"],
+  ["glass",   "玻璃厚度", 0,    1.5,  0.05,  "屏幕玻璃层厚度（mm）"],
+  ["speed",   "速度",     0,    3,    0.02,  "整体时间倍率"],
 ];
 
 const state = Object.assign({}, DEFAULTS);
-let off = false;          // 对比原图
-let fillLight = false;    // 底色：暗 / 亮
-
+let off = false;
 let paused = false;
+let fillLight = false;
+let showFlow = false;
 
 /* ------------------------------------------------------------------ *
  * WebGL
@@ -173,83 +194,388 @@ const gl = canvas.getContext("webgl2", {
   preserveDrawingBuffer: false,
   powerPreference: "high-performance",
 });
-
 if (!gl) {
   document.body.innerHTML =
     '<div style="padding:40px;font:16px system-ui;color:#dde">这个浏览器/机器没有 WebGL2，跑不了。</div>';
   throw new Error("no webgl2");
 }
 
+const flowCanvas = document.getElementById("flow");
+const fctx = flowCanvas.getContext("2d");
+
+/* ------------------------------------------------------------------ *
+ * 1D 轴对称 Young-Laplace
+ * 无量纲化：长度单位 = 毛细长度；z 从顶点向下
+ *   r' = cosφ, z' = sinφ, φ' = P + z - sinφ/r, V' = πr²sinφ
+ * ------------------------------------------------------------------ */
+function integrateProfile(P, thetaDeg, ds = 0.003, sMax = 80) {
+  const theta = (thetaDeg * Math.PI) / 180;
+  const pts = [];
+  let r = 0, z = 0, phi = 0, V = 0, s = 0;
+  const s0 = 1e-4;
+  r = s0;
+  z = (P * s0 * s0) / 4;
+  phi = (P * s0) / 2;
+
+  const deriv = (r, z, phi) => [
+    Math.cos(phi),
+    Math.sin(phi),
+    P + z - (r > 1e-9 ? Math.sin(phi) / r : 0),
+    Math.PI * r * r * Math.sin(phi),
+  ];
+
+  while (s < sMax) {
+    const prev = [r, z, phi, V];
+    pts.push([r, z]);
+    const k1 = deriv(r, z, phi);
+    const k2 = deriv(r + (ds / 2) * k1[0], z + (ds / 2) * k1[1], phi + (ds / 2) * k1[2]);
+    const k3 = deriv(r + (ds / 2) * k2[0], z + (ds / 2) * k2[1], phi + (ds / 2) * k2[2]);
+    const k4 = deriv(r + ds * k3[0], z + ds * k3[1], phi + ds * k3[2]);
+    r += (ds / 6) * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+    z += (ds / 6) * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+    phi += (ds / 6) * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+    V += (ds / 6) * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+    s += ds;
+    if (phi >= theta) {
+      const t = (theta - prev[2]) / Math.max(phi - prev[2], 1e-9);
+      const rr = prev[0] + t * (r - prev[0]);
+      const zz = prev[1] + t * (z - prev[1]);
+      const vv = prev[3] + t * (V - prev[3]);
+      pts.push([rr, zz]);
+      return { R: rr, H: zz, V: vv, Bo: rr * rr, pts };
+    }
+  }
+  return null;
+}
+
+function profileAt(q, R, H, pts) {
+  const r = q * R;
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i][0] >= r) {
+      const a = pts[i - 1], b = pts[i];
+      const t = (r - a[0]) / Math.max(b[0] - a[0], 1e-9);
+      const z = a[1] + t * (b[1] - a[1]);
+      return (H - z) / H;
+    }
+  }
+  return 0;
+}
+
+let profileTable = [];
+let profileTex = null;
+let profileN = 0;
+
+function buildProfiles(thetaDeg) {
+  const entries = [];
+  const Pmin = 0.03, Pmax = 60;
+  const count = 52;
+  for (let i = 0; i < count; i += 1) {
+    const P = Pmin * Math.pow(Pmax / Pmin, i / (count - 1));
+    const s = integrateProfile(P, thetaDeg);
+    if (!s || !isFinite(s.R) || s.R <= 0 || s.H <= 0) continue;
+    const prof = new Float32Array(64);
+    for (let k = 0; k < 64; k += 1) {
+      prof[k] = Math.max(0, Math.min(1, profileAt(k / 63, s.R, s.H, s.pts)));
+    }
+    entries.push({
+      V: s.V * LC_MM ** 3,
+      R: s.R * LC_MM,
+      H: s.H * LC_MM,
+      Bo: s.Bo,
+      prof,
+    });
+  }
+  entries.sort((a, b) => a.V - b.V);
+  profileTable = entries;
+  profileN = entries.length;
+  if (!profileN) return;
+
+  const data = new Float32Array(64 * profileN * 4);
+  for (let j = 0; j < profileN; j += 1) {
+    for (let k = 0; k < 64; k += 1) {
+      const idx = (j * 64 + k) * 4;
+      data[idx] = entries[j].prof[k];
+      data[idx + 3] = 1;
+    }
+  }
+
+  if (!profileTex) profileTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, profileTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 64, profileN, 0, gl.RGBA, gl.FLOAT, data);
+}
+
+function findEntryByV(v) {
+  const t = profileTable;
+  if (!t.length) return null;
+  if (v <= t[0].V) return { ...t[0], pv: 0.5 / t.length, i: 0, f: 0 };
+  if (v >= t[t.length - 1].V) {
+    const last = t[t.length - 1];
+    return { ...last, pv: (t.length - 0.5) / t.length, i: t.length - 1, f: 0 };
+  }
+  let lo = 0, hi = t.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (t[mid].V <= v) lo = mid;
+    else hi = mid;
+  }
+  const f = (v - t[lo].V) / Math.max(t[hi].V - t[lo].V, 1e-9);
+  return {
+    V: v,
+    R: t[lo].R + f * (t[hi].R - t[lo].R),
+    H: t[lo].H + f * (t[hi].H - t[lo].H),
+    Bo: t[lo].Bo + f * (t[hi].Bo - t[lo].Bo),
+    pv: (lo + f + 0.5) / t.length,
+  };
+}
+
+function findVByR(Rmm) {
+  const t = profileTable;
+  if (!t.length) return 1;
+  if (Rmm <= t[0].R) return t[0].V;
+  if (Rmm >= t[t.length - 1].R) return t[t.length - 1].V;
+  let lo = 0, hi = t.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (t[mid].R <= Rmm) lo = mid;
+    else hi = mid;
+  }
+  const f = (Rmm - t[lo].R) / Math.max(t[hi].R - t[lo].R, 1e-9);
+  return t[lo].V + f * (t[hi].V - t[lo].V);
+}
+
+/* ------------------------------------------------------------------ *
+ * 程序化 HDR 环境（等距柱状）+ cubemap
+ * ------------------------------------------------------------------ */
+const ENV_W = 256;
+const ENV_H = 128;
+const ENV_SIZE = 128;
+
+function smoothstep(a, b, x) {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+function makeHDR() {
+  const data = new Float32Array(ENV_W * ENV_H * 3);
+  const sun = LIGHT0;
+  for (let y = 0; y < ENV_H; y += 1) {
+    const v = (y + 0.5) / ENV_H;
+    const phi = v * Math.PI;
+    const cy = Math.cos(phi);
+    const sy = Math.sin(phi);
+    for (let x = 0; x < ENV_W; x += 1) {
+      const u = (x + 0.5) / ENV_W;
+      const th = u * TAU;
+      const dx = sy * Math.cos(th);
+      const dz = sy * Math.sin(th);
+      const dy = cy;
+
+      let r, g, b;
+      if (dy >= 0) {
+        const t = Math.pow(dy, 0.65);
+        r = 0.055 + (0.90 - 0.055) * Math.pow(1 - t, 2.0) * 0.45;
+        g = 0.075 + (0.93 - 0.075) * Math.pow(1 - t, 2.0) * 0.45;
+        b = 0.16 + (0.96 - 0.16) * Math.pow(1 - t, 2.0) * 0.45;
+        const glow = Math.exp(-dy * 7.0);
+        r += glow * 0.22;
+        g += glow * 0.11;
+        b += glow * 0.03;
+      } else {
+        const t = Math.pow(-dy, 0.65);
+        r = 0.075 * (1 - t) + 0.020 * t;
+        g = 0.080 * (1 - t) + 0.021 * t;
+        b = 0.090 * (1 - t) + 0.024 * t;
+      }
+
+      const cd = dx * sun[0] + dy * sun[1] + dz * sun[2];
+      if (cd > 0.995) {
+        const s = smoothstep(0.995, 0.9995, cd);
+        r += s * 24;
+        g += s * 20;
+        b += s * 14;
+      }
+      const glowS = Math.exp(-(1 - cd) * 26) * 2.2;
+      r += glowS * 1.00;
+      g += glowS * 0.68;
+      b += glowS * 0.34;
+
+      const az = Math.atan2(dz, dx);
+      const el = Math.asin(Math.max(-1, Math.min(1, dy)));
+
+      const win1 = smoothstep(0.18, 0.32, az) * smoothstep(1.18, 1.00, az) *
+                   smoothstep(-0.02, 0.08, el) * smoothstep(0.62, 0.46, el);
+      if (win1 > 0) {
+        r += win1 * 8.5;
+        g += win1 * 7.0;
+        b += win1 * 5.2;
+      }
+      const win2 = smoothstep(-1.38, -1.22, az) * smoothstep(-0.58, -0.74, az) *
+                   smoothstep(0.02, 0.12, el) * smoothstep(0.40, 0.26, el);
+      if (win2 > 0) {
+        r += win2 * 2.2;
+        g += win2 * 3.0;
+        b += win2 * 3.8;
+      }
+      const win3 = smoothstep(2.10, 2.26, az) * smoothstep(2.85, 2.68, az) *
+                   smoothstep(0.20, 0.28, el) * smoothstep(0.48, 0.36, el);
+      if (win3 > 0) {
+        r += win3 * 3.2;
+        g += win3 * 2.8;
+        b += win3 * 2.3;
+      }
+
+      const idx = (y * ENV_W + x) * 3;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+    }
+  }
+  return data;
+}
+
+function sampleEquirect(data, u, v, w, h) {
+  const x = (((u % 1) + 1) % 1) * w - 0.5;
+  const y = Math.max(0, Math.min(h - 1, v * h - 0.5));
+  const x0 = Math.floor(x), x1 = (x0 + 1 + w) % w;
+  const y0 = Math.floor(y), y1 = Math.min(h - 1, y0 + 1);
+  const fx = x - Math.floor(x), fy = y - y0;
+  const a = (y0 * w + x0) * 3;
+  const b = (y0 * w + x1) * 3;
+  const c = (y1 * w + x0) * 3;
+  const d = (y1 * w + x1) * 3;
+  const out = [0, 0, 0];
+  for (let k = 0; k < 3; k += 1) {
+    const top = data[a + k] * (1 - fx) + data[b + k] * fx;
+    const bot = data[c + k] * (1 - fx) + data[d + k] * fx;
+    out[k] = top * (1 - fy) + bot * fy;
+  }
+  return out;
+}
+
+let envTex = null;
+let envLight = LIGHT0.slice();
+
+/** 解析 hdri.js 里的 256×128 RGBE；失败时回退到程序化 HDR。 */
+function decodeHDRI() {
+  if (!window.HDRI_RGBE || !window.HDRI_W || !window.HDRI_H) return null;
+  try {
+    const bin = atob(window.HDRI_RGBE);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    const w = window.HDRI_W, h = window.HDRI_H;
+    if (bytes.length < w * h * 4) return null;
+    const data = new Float32Array(w * h * 3);
+    for (let i = 0; i < w * h; i += 1) {
+      const e = bytes[i * 4 + 3];
+      if (e !== 0) {
+        const f = Math.pow(2, e - 136);
+        data[i * 3] = bytes[i * 4] * f;
+        data[i * 3 + 1] = bytes[i * 4 + 1] * f;
+        data[i * 3 + 2] = bytes[i * 4 + 2] * f;
+      }
+    }
+    return { w, h, data };
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildEnvironment() {
+  const decoded = decodeHDRI();
+  const hdr = decoded ? decoded.data : makeHDR();
+  const hdrW = decoded ? decoded.w : ENV_W;
+  const hdrH = decoded ? decoded.h : ENV_H;
+  if (decoded && Array.isArray(window.HDRI_LIGHT)) envLight = window.HDRI_LIGHT.slice();
+  else envLight = LIGHT0.slice();
+
+  if (!envTex) envTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, envTex);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const face = new Float32Array(ENV_SIZE * ENV_SIZE * 4);
+  for (let f = 0; f < 6; f += 1) {
+    for (let y = 0; y < ENV_SIZE; y += 1) {
+      for (let x = 0; x < ENV_SIZE; x += 1) {
+        const u = (2 * (x + 0.5)) / ENV_SIZE - 1;
+        const v = (2 * (y + 0.5)) / ENV_SIZE - 1;
+        let dx, dy, dz;
+        if (f === 0) { dx = 1; dy = -v; dz = -u; }
+        else if (f === 1) { dx = -1; dy = -v; dz = u; }
+        else if (f === 2) { dx = u; dy = 1; dz = v; }
+        else if (f === 3) { dx = u; dy = -1; dz = -v; }
+        else if (f === 4) { dx = u; dy = -v; dz = 1; }
+        else { dx = -u; dy = -v; dz = -1; }
+        const len = Math.hypot(dx, dy, dz) || 1;
+        dx /= len; dy /= len; dz /= len;
+        const eu = Math.atan2(dz, dx) / TAU + 0.5;
+        const ev = Math.acos(Math.max(-1, Math.min(1, dy))) / Math.PI;
+        const c = sampleEquirect(hdr, eu, ev, hdrW, hdrH);
+        const idx = (y * ENV_SIZE + x) * 4;
+        face[idx] = c[0];
+        face[idx + 1] = c[1];
+        face[idx + 2] = c[2];
+        face[idx + 3] = 1;
+      }
+    }
+    gl.texImage2D(
+      gl.TEXTURE_CUBE_MAP_POSITIVE_X + f, 0, gl.RGBA16F, ENV_SIZE, ENV_SIZE, 0,
+      gl.RGBA, gl.FLOAT, face,
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * 着色器
+ * ------------------------------------------------------------------ */
 const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
 
-
-
-// ---- 几何（低分辨率）------------------------------------------------
-// 距离场 → 球冠高度场。u=1 顶点、u=0 接触线，斜率在接触线正好 tanθ。
 const FIELD_FRAG = `#version 300 es
 precision highp float;
+precision highp sampler2D;
 
 out vec4 outColor;
 
-uniform vec2  uRes;
-uniform int   uNum;
-uniform float uMerge;
-uniform float uRadius;
-uniform float uSinCA;
-uniform float uCosCA;
-uniform vec2  uPos[9];
+uniform vec2      uRes;
+uniform int       uNum;
+uniform float     uNeck;
+uniform vec2      uPos[9];
+uniform float     uR[9];
+uniform float     uH[9];
+uniform float     uPV[9];
+uniform sampler2D uProfile;
 
 float smin(float a, float b, float k) {
+  if (k <= 1e-5) return min(a, b);
   float h = max(k - abs(a - b), 0.0) / k;
   return min(a, b) - h * h * k * 0.25;
 }
 
-float sdSeg(vec2 p, vec2 a, vec2 b) {
-  vec2 pa = p - a, ba = b - a;
-  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
-  return length(pa - ba * h);
-}
-
-float capFromU(float u) {
-  float q = 1.0 - clamp(u, 0.0, 1.0);
-  float s = uSinCA;
-  return (sqrt(max(1.0 - q * q * s * s, 0.0)) - uCosCA) / (1.0 - uCosCA);
-}
-
 void main() {
   vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-
   float d = 1e9;
+  float h = 0.0;
 
   for (int i = 0; i < 9; i++) {
     if (i >= uNum) break;
-    float di = length(p - uPos[i]) - uRadius;
-    d = smin(d, di, uMerge);
+    float di = length(p - uPos[i]) - uR[i];
+    d = smin(d, di, uNeck);
+    float q = clamp(1.0 + di / max(uR[i], 1e-4), 0.0, 1.0);
+    float hi = uH[i] * texture(uProfile, vec2(q, uPV[i])).r;
+    h = max(h, hi);
   }
 
-  // 液丝：两滴快要分开时先拉出一根细颈。
-  // 它同时也进入高度场，所以颈是低矮的液体桥，不是一张平的膜。
-  for (int i = 0; i < 9; i++) {
-    if (i >= uNum) break;
-    for (int j = i + 1; j < 9; j++) {
-      if (j >= uNum) break;
-      float dist = length(uPos[j] - uPos[i]);
-      float w = 1.0 - smoothstep(2.0 * uRadius, 2.7 * uRadius, dist);
-      if (w > 0.002) {
-        float ds = sdSeg(p, uPos[i], uPos[j]);
-        d = min(d, ds - uRadius * 0.12 * w);
-      }
-    }
-  }
-
-  float u = clamp(-d / uRadius, 0.0, 1.0);
-  outColor = vec4(d, capFromU(u), 0.0, 1.0);
+  outColor = vec4(d, h, 0.0, 1.0);
 }`;
 
-// ---- 法线（低分辨率）------------------------------------------------
-// 对高度场做中心差分；p 的单位是屏高，梯度乘绝对冠高 uHeight。
 const GEO_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -258,7 +584,6 @@ out vec4 outColor;
 
 uniform sampler2D uD;
 uniform vec2      uRes;
-uniform float     uHeight;
 
 void main() {
   vec2  uv = gl_FragCoord.xy / uRes;
@@ -270,40 +595,64 @@ void main() {
   float hx = texture(uD, uv + vec2(tx.x, 0.0)).g - texture(uD, uv - vec2(tx.x, 0.0)).g;
   float hy = texture(uD, uv + vec2(0.0, tx.y)).g - texture(uD, uv - vec2(0.0, tx.y)).g;
 
-  vec2  g  = vec2(hx, hy) * uRes.y * 0.5 * uHeight;
+  vec2  g  = vec2(hx, hy) * uRes.y * 0.5;
   vec3  N  = normalize(vec3(-g, 1.0));
 
   outColor = vec4(N.xy * 0.5 + 0.5, clamp(d / 0.25, -1.0, 1.0) * 0.5 + 0.5, h);
 }`;
 
-// ---- 合成（全分辨率）------------------------------------------------
-// 液滴是一块凸透镜：视线在表面折射后打到 z=0 的壁纸，
-// 采样 Q = P + d1·h/(-d1.z)。接触线 h=0，位移自然归零。
 const COMP_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2D;
+precision highp samplerCube;
 
 out vec4 outColor;
 
-uniform sampler2D uGlass;
-uniform sampler2D uBg;
-uniform vec2      uRes;
-uniform vec2      uUvScale;
-uniform vec2      uUvOffset;
-uniform float     uShadow;
-uniform float     uOn;
-uniform float     uLod;
-uniform float     uSpec;
-uniform float     uFillAlpha;
-uniform float     uEnvMix;
-uniform float     uPhase;
-uniform float     uIOR;
-uniform float     uDisp;
-uniform float     uHeight;
-uniform vec3      uFill;
-uniform vec3      uEnvTop;
-uniform vec3      uEnvBottom;
-uniform vec3      uEnvAvg;
+uniform sampler2D   uGlass;
+uniform sampler2D   uBg;
+uniform samplerCube uEnv;
+uniform sampler2D   uSRGB;
+uniform vec2        uRes;
+uniform vec2        uUvScale;
+uniform vec2        uUvOffset;
+uniform float       uOn;
+uniform float       uLod;
+uniform float       uSpec;
+uniform float       uFillAlpha;
+uniform float       uEnvRot;
+uniform float       uEnvIntensity;
+uniform float       uHref;
+uniform float       uGlassT;
+uniform vec3        uFill;
+uniform vec3        uLightDir;
+
+const vec3 NW = vec3(1.331, 1.333, 1.344);
+const vec3 NG = vec3(1.514, 1.520, 1.528);
+
+vec3 rotY(vec3 p, float a) {
+  float c = cos(a), s = sin(a);
+  return vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
+}
+
+float fresnel(float cosI, float n1, float n2) {
+  float sinI2 = max(0.0, 1.0 - cosI * cosI);
+  float eta = n1 / n2;
+  float sinT2 = eta * eta * sinI2;
+  if (sinT2 >= 1.0) return 1.0;
+  float cosT = sqrt(1.0 - sinT2);
+  float rs = (n1 * cosI - n2 * cosT) / (n1 * cosI + n2 * cosT);
+  float rp = (n1 * cosT - n2 * cosI) / (n1 * cosT + n2 * cosI);
+  return 0.5 * (rs * rs + rp * rp);
+}
+
+vec3 encodeSRGB(vec3 c) {
+  c = clamp(c, 0.0, 1.0);
+  return vec3(
+    texture(uSRGB, vec2(c.r, 0.5)).r,
+    texture(uSRGB, vec2(c.g, 0.5)).r,
+    texture(uSRGB, vec2(c.b, 0.5)).r
+  );
+}
 
 void main() {
   vec2 uv  = gl_FragCoord.xy / uRes;
@@ -311,83 +660,78 @@ void main() {
 
   vec4  gbuf = texture(uGlass, uv);
   vec2  nxy  = gbuf.rg * 2.0 - 1.0;
-  float d    = (gbuf.b * 2.0 - 1.0) * 0.25;
-  float hn   = gbuf.a;
   vec3  N    = vec3(nxy, sqrt(max(1.0 - dot(nxy, nxy), 0.0)));
+  float d    = (gbuf.b * 2.0 - 1.0) * 0.25;
+  float h    = gbuf.a;
 
   float aa   = 1.5 / uRes.y;
   float mask = (1.0 - smoothstep(-aa, aa, d)) * uOn;
 
-  vec3 bg = textureLod(uBg, tUv, 0.0).rgb;
-
-  const float ELEV = 0.72;
-  vec3 L = normalize(vec3(cos(uPhase * 0.09) * 0.69,
-                          sin(uPhase * 0.09) * 0.69,
-                          ELEV));
-
-  // 接触阴影：用高度场，落在光的反方向；水珠的阴影是中性灰。
-  if (uShadow > 0.001 && mask < 0.999) {
-    vec2  suv = uv - L.xy * 0.012;
-    float hs  = texture(uGlass, suv).a;
-    float sh  = smoothstep(0.0, 0.45, hs) * (1.0 - mask);
-    bg *= exp(-vec3(0.55, 0.55, 0.60) * sh * uShadow * 1.8);
-  }
+  vec3 bg  = textureLod(uBg, tUv, 0.0).rgb;
+  vec3 R   = 2.0 * N.z * N - vec3(0.0, 0.0, 1.0);
+  vec3 env = texture(uEnv, rotY(R, uEnvRot)).rgb * uEnvIntensity;
+  vec3 L   = rotY(normalize(uLightDir), uEnvRot);
 
   if (mask > 0.001) {
-    // ---- 透镜成像 ----------------------------------------------------
-    vec3  I      = vec3(0.0, 0.0, -1.0);
-    vec3  T      = refract(I, N, 1.0 / uIOR);
-    float hAbs   = hn * uHeight;
-    float tHit   = hAbs / max(-T.z, 1e-4);
-    vec2  dp     = T.xy * tHit;
     float aspect = uRes.x / max(uRes.y, 1.0);
-    vec2  duv    = vec2(dp.x / aspect, dp.y) * uUvScale;
-
     float lod = uLod + (1.0 - N.z) * 1.2;
+    vec3  trans = vec3(0.0);
+    float tGreen = 0.0;
 
-    // 水的色散很小：n 从 1.331 到 1.344，相对差 ~1%。
-    float disp = uDisp;
-    vec3 trans;
-    trans.r = textureLod(uBg, tUv + duv * (1.0 + disp), lod).r;
-    trans.g = textureLod(uBg, tUv + duv, lod).g;
-    trans.b = textureLod(uBg, tUv + duv * (1.0 - disp), lod).b;
+    for (int c = 0; c < 3; c++) {
+      float nw = c == 0 ? NW.r : (c == 1 ? NW.g : NW.b);
+      float ng = c == 0 ? NG.r : (c == 1 ? NG.g : NG.b);
+      vec3  T  = refract(vec3(0.0, 0.0, -1.0), N, 1.0 / nw);
+      float tw = h / max(-T.z, 1e-4);
+      vec2  dp = T.xy * tw;
+      if (uGlassT > 1e-6) {
+        vec3  Tg = refract(T, vec3(0.0, 0.0, 1.0), nw / ng);
+        float tg = uGlassT / max(-Tg.z, 1e-4);
+        dp += Tg.xy * tg * smoothstep(0.0, 0.02 * uHref, h);
+      }
+      vec2 duv = vec2(dp.x / aspect, dp.y) * uUvScale;
+      vec3 s = textureLod(uBg, tUv + duv, lod).rgb;
+      if (c == 0) trans.r = s.r;
+      else if (c == 1) { trans.g = s.g; tGreen = tw; }
+      else trans.b = s.b;
+    }
 
-    trans *= exp(-vec3(0.035, 0.012, 0.045) * hn);
+    float tau = uFillAlpha * (tGreen / max(uHref, 1e-4));
+    float Tmed = exp(-tau);
+    trans = Tmed * trans + (1.0 - Tmed) * uFill;
 
-    // ---- 主题底色 ----------------------------------------------------
-    trans = mix(trans, uFill, clamp(hn, 0.0, 1.0) * uFillAlpha);
+    float F = fresnel(clamp(N.z, 0.0, 1.0), 1.0, NW.g);
+    float Fgw = uGlassT > 1e-6
+      ? fresnel(clamp(-refract(vec3(0.0, 0.0, -1.0), N, 1.0 / NW.g).z, 0.0, 1.0), NW.g, NG.g)
+      : 0.0;
 
-    // ---- 菲涅尔 ------------------------------------------------------
-    float F = 0.02 + 0.98 * pow(1.0 - clamp(N.z, 0.0, 1.0), 5.0);
-
-    // ---- 环境反射 ----------------------------------------------------
-    // 只取低频：壁纸上下半球平均色 + 高 mip 的局部色。
-    vec3  R   = 2.0 * N.z * N - vec3(0.0, 0.0, 1.0);
-    float gy  = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
-    vec3  env = mix(uEnvBottom, uEnvTop, gy);
-    env = mix(env, uEnvAvg, 0.18);
-    vec3  local = textureLod(uBg, tUv, 5.0).rgb;
-    env = mix(env, local, uEnvMix);
-
-    // ---- 高光 --------------------------------------------------------
     float ndl  = max(dot(N, L), 0.0);
-    float spec = pow(ndl, 256.0);
+    // 高次 pow 在部分驱动上会在 ndl≈1 时出 NaN；用平方链代替。
+    float k2 = ndl * ndl;
+    float k4 = k2 * k2;
+    float k8 = k4 * k4;
+    float k16 = k8 * k8;
+    float k32 = k16 * k16;
+    float k64 = k32 * k32;
+    float k128 = k64 * k64;
+    float k256 = k128 * k128;
+    float spec = k256;
 
-    vec3 col = trans * (1.0 - F) + env * F;
-    col += spec * (0.02 + 0.98 * pow(1.0 - ndl, 5.0)) * uSpec * 12.0;
-
-    // ---- 接触线 ------------------------------------------------------
-    col *= mix(0.84, 1.0, smoothstep(0.0, 0.05, hn));
+    vec3 col = trans * (1.0 - F) * (1.0 - Fgw) + env * F;
+    col += vec3(1.0, 0.95, 0.88) * spec * uSpec * 12.0;
 
     bg = mix(bg, col, mask);
   }
 
-  outColor = vec4(bg, 1.0);
+  outColor = vec4(encodeSRGB(bg), 1.0);
 
   float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
   outColor.rgb += (ign - 0.5) * (1.0 / 255.0);
 }`;
 
+/* ------------------------------------------------------------------ *
+ * 编译 / 链接 / 目标
+ * ------------------------------------------------------------------ */
 function compile(type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -417,9 +761,9 @@ function linkProgram(fragSrc) {
   return p;
 }
 
-const progField = linkProgram(FIELD_FRAG);  // 低分辨率：距离场 → 球冠高度
-const progGeo   = linkProgram(GEO_FRAG);    // 低分辨率：高度场 → 法线
-const progComp  = linkProgram(COMP_FRAG);   // 全分辨率：透镜成像
+const progField = linkProgram(FIELD_FRAG);
+const progGeo   = linkProgram(GEO_FRAG);
+const progComp  = linkProgram(COMP_FRAG);
 
 const buf = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -428,27 +772,18 @@ gl.enableVertexAttribArray(0);
 gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 const UF = {};
-for (const n of ["uRes", "uNum", "uMerge", "uRadius", "uSinCA", "uCosCA", "uPos"]) {
+for (const n of ["uRes", "uNum", "uNeck", "uPos", "uR", "uH", "uPV", "uProfile"]) {
   UF[n] = gl.getUniformLocation(progField, n);
 }
-
 const UG = {};
-for (const n of ["uD", "uRes", "uHeight"]) {
-  UG[n] = gl.getUniformLocation(progGeo, n);
-}
-
+for (const n of ["uD", "uRes"]) UG[n] = gl.getUniformLocation(progGeo, n);
 const UC = {};
 for (const n of [
-  "uGlass", "uBg", "uRes", "uUvScale", "uUvOffset", "uShadow", "uOn",
-  "uLod", "uSpec", "uFill", "uFillAlpha", "uEnvMix", "uPhase", "uIOR", "uDisp",
-  "uHeight", "uEnvTop", "uEnvBottom", "uEnvAvg",
-]) {
-  UC[n] = gl.getUniformLocation(progComp, n);
-}
+  "uGlass", "uBg", "uEnv", "uSRGB", "uRes", "uUvScale", "uUvOffset", "uOn",
+  "uLod", "uSpec", "uFillAlpha", "uEnvRot", "uEnvIntensity", "uHref",
+  "uGlassT", "uFill", "uLightDir",
+]) UC[n] = gl.getUniformLocation(progComp, n);
 
-/* ------------------------------------------------------------------ *
- * 低分辨率的玻璃缓冲
- * ------------------------------------------------------------------ */
 const canFloat = !!gl.getExtension("EXT_color_buffer_float");
 const GLASS_FMT = canFloat ? gl.RGBA16F : gl.RGBA8;
 const GLASS_TYPE = canFloat ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
@@ -461,7 +796,6 @@ function makeTarget() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, GLASS_FMT, 1, 1, 0, gl.RGBA, GLASS_TYPE, null);
-
   const f = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, f);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
@@ -469,18 +803,28 @@ function makeTarget() {
   return { tex: t, fbo: f };
 }
 
-const fieldBuf = makeTarget();   // 输出：距离场 + 球冠高度
-const glassBuf = makeTarget();   // 输出：法线 + 距离 + 高度
+const fieldBuf = makeTarget();
+const glassBuf = makeTarget();
 
-function allocTargets() {
-  for (const b of [fieldBuf, glassBuf]) {
-    gl.bindTexture(gl.TEXTURE_2D, b.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, GLASS_FMT, glassW, glassH, 0, gl.RGBA, GLASS_TYPE, null);
+/* sRGB 编码 LUT */
+const srgbTex = gl.createTexture();
+{
+  const lut = new Uint8Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    const c = i / 255;
+    const s = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    lut[i] = Math.round(Math.max(0, Math.min(1, s)) * 255);
   }
+  gl.bindTexture(gl.TEXTURE_2D, srgbTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, lut);
 }
 
 /* ------------------------------------------------------------------ *
- * 背景纹理
+ * 背景
  * ------------------------------------------------------------------ */
 const tex = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -492,64 +836,16 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 let bgAspect = 3 / 2;
 let bgPixelW = 1920;
 
-const envTop = [0.55, 0.62, 0.72];
-const envBottom = [0.18, 0.18, 0.22];
-const envAvg = [0.36, 0.38, 0.44];
-
-// 只取壁纸的低频颜色：上下半球平均 + 全局平均。
-// 环境反射因此只有颜色变化，不会有"第二层壁纸"的细节。
-function computeEnvironment(img) {
-  try {
-    const size = 24;
-    const board = newCanvas(size, size);
-    const ctx = board.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-    ctx.drawImage(img, 0, 0, size, size);
-    const data = ctx.getImageData(0, 0, size, size).data;
-
-    let tr = 0, tg = 0, tb = 0, tn = 0;
-    let br = 0, bg = 0, bb = 0, bn = 0;
-    let ar = 0, ag = 0, ab = 0, an = 0;
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        const i = (y * size + x) * 4;
-        const r = data[i] / 255;
-        const g = data[i + 1] / 255;
-        const b = data[i + 2] / 255;
-        ar += r; ag += g; ab += b; an += 1;
-        if (y < size / 2) { tr += r; tg += g; tb += b; tn += 1; }
-        else { br += r; bg += g; bb += b; bn += 1; }
-      }
-    }
-
-    envTop[0] = Math.min(1, (tr / tn) * 1.12 + 0.02);
-    envTop[1] = Math.min(1, (tg / tn) * 1.12 + 0.02);
-    envTop[2] = Math.min(1, (tb / tn) * 1.12 + 0.02);
-    envBottom[0] = Math.max(0, (br / bn) * 0.78);
-    envBottom[1] = Math.max(0, (bg / bn) * 0.78);
-    envBottom[2] = Math.max(0, (bb / bn) * 0.78);
-    envAvg[0] = ar / an;
-    envAvg[1] = ag / an;
-    envAvg[2] = ab / an;
-  } catch (_) {
-    /* 跨源或读像素失败：保留深色兜底 */
-  }
-}
-
 function uploadImage(img) {
   bgAspect = img.width / img.height;
   bgPixelW = img.width;
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-  computeEnvironment(img);
 }
 
-/* ------------------------------------------------------------------ *
- * 程序化背景（不依赖任何外部文件，双击就能跑）
- * ------------------------------------------------------------------ */
 function newCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
@@ -578,8 +874,7 @@ function hill(ctx, w, h, baseY, amp, freq, phase, color) {
   ctx.beginPath();
   ctx.moveTo(0, h);
   for (let x = 0; x <= w; x += 4) {
-    const y =
-      baseY +
+    const y = baseY +
       Math.sin((x / w) * Math.PI * freq + phase) * amp +
       Math.sin((x / w) * Math.PI * freq * 2.7 + phase * 2.1) * amp * 0.34;
     ctx.lineTo(x, y);
@@ -593,7 +888,6 @@ function hill(ctx, w, h, baseY, amp, freq, phase, color) {
 function makePhoto(w, h) {
   const c = newCanvas(w, h);
   const x = c.getContext("2d");
-
   const sky = x.createLinearGradient(0, 0, 0, h * 0.82);
   sky.addColorStop(0.00, "#0a1730");
   sky.addColorStop(0.34, "#22386b");
@@ -637,10 +931,8 @@ function makePhoto(w, h) {
 function makeChart(w, h) {
   const c = newCanvas(w, h);
   const x = c.getContext("2d");
-
   x.fillStyle = "#0d1117";
   x.fillRect(0, 0, w, h);
-
   for (let i = 0; i <= w / 64; i++) {
     x.fillStyle = i % 4 === 0 ? "rgba(120,180,255,.28)" : "rgba(120,180,255,.11)";
     x.fillRect(i * 64, 0, i % 4 === 0 ? 2 : 1, h);
@@ -649,7 +941,6 @@ function makeChart(w, h) {
     x.fillStyle = j % 4 === 0 ? "rgba(120,180,255,.28)" : "rgba(120,180,255,.11)";
     x.fillRect(0, j * 64, w, j % 4 === 0 ? 2 : 1);
   }
-
   const colors = ["#ff5d5d", "#ffb23f", "#ffe14a", "#5ddc7a", "#4fc3f7", "#9b7bff", "#ff6fd8"];
   for (let i = 0; i < 26; i++) {
     x.globalAlpha = 0.85;
@@ -659,7 +950,6 @@ function makeChart(w, h) {
     x.fillRect(Math.random() * (w - bw), Math.random() * (h - bh), bw, bh);
   }
   x.globalAlpha = 1;
-
   for (let i = 0; i < 9; i++) {
     x.strokeStyle = colors[i % colors.length];
     x.lineWidth = 2 + (i % 3);
@@ -667,13 +957,11 @@ function makeChart(w, h) {
     x.arc(w * (0.12 + i * 0.095), h * (0.18 + (i % 3) * 0.30), 34 + i * 13, 0, Math.PI * 2);
     x.stroke();
   }
-
   x.fillStyle = "#f2f6ff";
   x.font = "600 92px ui-sans-serif, system-ui, sans-serif";
   x.fillText("LIQUID", w * 0.07, h * 0.80);
   x.font = "600 92px ui-monospace, Consolas, monospace";
   x.fillText("GLASS", w * 0.07, h * 0.90);
-
   addGrain(x, w, h, 0.05);
   return c;
 }
@@ -684,17 +972,255 @@ function setBackground(kind) {
 }
 
 /* ------------------------------------------------------------------ *
- * 尺寸 / cover 映射
+ * 全局速度场：流函数 ψ，u = (∂ψ/∂y, -∂ψ/∂x)
+ * 窗口函数让流场在屏幕边缘归零；无散度，面积守恒。
+ * ------------------------------------------------------------------ */
+function flowPsi(x, y, t) {
+  const win =
+    smoothstep(0.86, 0.58, Math.abs(x)) *
+    smoothstep(0.56, 0.36, Math.abs(y));
+  if (win <= 0) return 0;
+  const k1 = 2.6, k2 = 3.7, k3 = 5.1;
+  const w1 = (TAU / 47) * 1, w2 = (TAU / 47) * 2, w3 = (TAU / 47) * 3;
+  const m1 = Math.sin(k1 * x + w1 * t + 0.7) * Math.cos(k1 * y + 0.3);
+  const m2 = Math.cos(k2 * x - 0.4) * Math.sin(k2 * y + w2 * t + 1.1);
+  const m3 = Math.sin(k3 * (x + y) + w3 * t + 2.0) * Math.cos(k3 * (x - y) - 0.8);
+  return win * (0.55 * m1 + 0.35 * m2 + 0.22 * m3);
+}
+
+function flowAt(x, y, t) {
+  const e = 1e-3;
+  const ux = (flowPsi(x, y + e, t) - flowPsi(x, y - e, t)) / (2 * e);
+  const uy = -(flowPsi(x + e, y, t) - flowPsi(x - e, y, t)) / (2 * e);
+  return [ux * state.flow, uy * state.flow];
+}
+
+/* ------------------------------------------------------------------ *
+ * 液滴 / 珠 / 过渡
+ * ------------------------------------------------------------------ */
+let lobes = [];
+let comps = [];
+let transitions = [];
+let renderCaps = [];
+let baseVol = 1;
+let flowTime = 0;
+
+function makeLobe(x, y, vol) {
+  return { x, y, vol };
+}
+
+function recomputeComp(c) {
+  let vol = 0, cx = 0, cy = 0;
+  for (const li of c.lobes) {
+    const L = lobes[li];
+    vol += L.vol;
+    cx += L.x * L.vol;
+    cy += L.y * L.vol;
+  }
+  c.vol = Math.max(vol, 1e-9);
+  c.cx = cx / c.vol;
+  c.cy = cy / c.vol;
+}
+
+function shapeOf(comp) {
+  const s = findEntryByV(comp.vol);
+  return {
+    x: comp.cx,
+    y: comp.cy,
+    r: s.R / WORLD_MM,
+    h: s.H / WORLD_MM,
+    pv: s.pv,
+    Rmm: s.R,
+    Hmm: s.H,
+    Bo: s.Bo,
+  };
+}
+
+function capOf(comp) {
+  const s = shapeOf(comp);
+  return { x: s.x, y: s.y, r: s.r, h: s.h, pv: s.pv };
+}
+
+function lerpCap(a, b, t) {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    r: a.r + (b.r - a.r) * t,
+    h: a.h + (b.h - a.h) * t,
+    pv: a.pv + (b.pv - a.pv) * t,
+  };
+}
+
+function resetScene() {
+  lobes = [];
+  comps = [];
+  transitions = [];
+  renderCaps = [];
+  flowTime = 0;
+
+  const n = Math.round(state.num);
+  baseVol = findVByR(state.size);
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * TAU + 0.4;
+    const x = 0.52 * Math.cos(a);
+    const y = 0.34 * Math.sin(a);
+    lobes.push(makeLobe(x, y, baseVol));
+    const c = { lobes: [lobes.length - 1], vol: baseVol, cx: x, cy: y, hidden: false };
+    comps.push(c);
+  }
+}
+
+function findBestSplit(c) {
+  if (c.lobes.length < 2) return null;
+  const pts = c.lobes.map((li) => lobes[li]);
+  let a = 0, b = 1, bestD = -1;
+  for (let i = 0; i < pts.length; i += 1) {
+    for (let j = i + 1; j < pts.length; j += 1) {
+      const d = Math.hypot(pts[j].x - pts[i].x, pts[j].y - pts[i].y);
+      if (d > bestD) { bestD = d; a = i; b = j; }
+    }
+  }
+  if (bestD < 1e-6) return null;
+  const ax = (pts[b].x - pts[a].x) / bestD;
+  const ay = (pts[b].y - pts[a].y) / bestD;
+  const order = c.lobes
+    .map((li) => ({ li, p: (lobes[li].x - pts[a].x) * ax + (lobes[li].y - pts[a].y) * ay }))
+    .sort((u, v) => u.p - v.p);
+
+  const total = c.vol;
+  const cp = shapeOf(c);
+  let best = null;
+  for (let k = 1; k < order.length; k += 1) {
+    const groupA = order.slice(0, k).map((o) => o.li);
+    const groupB = order.slice(k).map((o) => o.li);
+    const va = groupA.reduce((s, li) => s + lobes[li].vol, 0);
+    const vb = groupB.reduce((s, li) => s + lobes[li].vol, 0);
+    if (va < 0.18 * total || vb < 0.18 * total) continue;
+    const ca = { lobes: groupA, vol: va, cx: 0, cy: 0, hidden: true };
+    const cb = { lobes: groupB, vol: vb, cx: 0, cy: 0, hidden: true };
+    recomputeComp(ca);
+    recomputeComp(cb);
+    const sa = shapeOf(ca), sb = shapeOf(cb);
+    const dist = Math.hypot(sa.x - sb.x, sa.y - sb.y);
+    const sep = dist - (sa.r + sb.r);
+    const spread = bestD / Math.max(cp.r, 1e-6);
+    if (sep > 0.02 && spread > 1.15) {
+      const score = sep + 0.1 * Math.min(va, vb) / total;
+      if (!best || score > best.score) best = { groupA, groupB, ca, cb, score };
+    }
+  }
+  return best;
+}
+
+function updateLobes(dt) {
+  const sdt = dt * state.speed;
+  flowTime += sdt;
+  for (const L of lobes) {
+    const u = flowAt(L.x, L.y, flowTime);
+    const speed = Math.hypot(u[0], u[1]);
+    const eff = smoothstep(state.pin, state.pin * 2.0 + 1e-6, speed);
+    L.x += u[0] * eff * sdt;
+    L.y += u[1] * eff * sdt;
+  }
+}
+
+function updateTopology(dt) {
+  const sdt = dt * state.speed;
+
+  for (const tr of transitions) {
+    tr.t += sdt;
+    if (tr.t >= tr.dur) {
+      if (tr.type === "merge") tr.comp.hidden = false;
+      else {
+        tr.comps[0].hidden = false;
+        tr.comps[1].hidden = false;
+      }
+      tr.done = true;
+    }
+  }
+  transitions = transitions.filter((tr) => !tr.done);
+
+  for (const c of comps) if (!c.hidden) recomputeComp(c);
+
+  // 先检查分裂：一个被流场拉长的珠
+  for (const c of comps) {
+    if (c.hidden || c.lobes.length < 2) continue;
+    const split = findBestSplit(c);
+    if (!split) continue;
+    const capC = capOf(c);
+    const ca = { lobes: split.groupA, vol: 0, cx: 0, cy: 0, hidden: true };
+    const cb = { lobes: split.groupB, vol: 0, cx: 0, cy: 0, hidden: true };
+    recomputeComp(ca);
+    recomputeComp(cb);
+    transitions.push({
+      type: "split", t: 0, dur: 0.75, from: capC, comps: [ca, cb], done: false,
+    });
+    comps = comps.filter((x) => x !== c);
+    comps.push(ca, cb);
+    break;
+  }
+
+  // 再检查合并：两个珠的接触圆相交
+  let merged = false;
+  for (let i = 0; i < comps.length && !merged; i += 1) {
+    const A = comps[i];
+    if (A.hidden) continue;
+    const sa = shapeOf(A);
+    for (let j = i + 1; j < comps.length; j += 1) {
+      const B = comps[j];
+      if (B.hidden) continue;
+      const sb = shapeOf(B);
+      if (Math.hypot(sa.x - sb.x, sa.y - sb.y) < 0.98 * (sa.r + sb.r)) {
+        const capA = capOf(A);
+        const capB = capOf(B);
+        const C = { lobes: [...A.lobes, ...B.lobes], vol: 0, cx: 0, cy: 0, hidden: true };
+        recomputeComp(C);
+        transitions.push({
+          type: "merge", t: 0, dur: 0.75, from: [capA, capB], comp: C, done: false,
+        });
+        comps = comps.filter((x) => x !== A && x !== B);
+        comps.push(C);
+        merged = true;
+        break;
+      }
+    }
+  }
+}
+
+function updateRenderCaps() {
+  renderCaps = [];
+  let bo = 0;
+  for (const c of comps) {
+    if (c.hidden) continue;
+    const s = shapeOf(c);
+    renderCaps.push({ x: s.x, y: s.y, r: s.r, h: s.h, pv: s.pv });
+    bo = Math.max(bo, s.Bo);
+  }
+
+  for (const tr of transitions) {
+    const s = smoothstep(0, 1, Math.min(1, tr.t / tr.dur));
+    if (tr.type === "merge") {
+      const to = capOf(tr.comp);
+      renderCaps.push(lerpCap(tr.from[0], to, s));
+      renderCaps.push(lerpCap(tr.from[1], to, s));
+    } else {
+      const a = capOf(tr.comps[0]);
+      const b = capOf(tr.comps[1]);
+      renderCaps.push(lerpCap(tr.from, a, s));
+      renderCaps.push(lerpCap(tr.from, b, s));
+    }
+  }
+
+  if (renderCaps.length > 9) renderCaps.length = 9;
+  return bo;
+}
+
+/* ------------------------------------------------------------------ *
+ * 尺寸 / cover / 自适应
  * ------------------------------------------------------------------ */
 let cssW = 1, cssH = 1;
-
 let glassW = 1, glassH = 1;
-
-// 质量档位 —— 唯一需要"调"的东西，交给控制器。
-// dpr = 输出画布相对 CSS 像素的倍率（全分辨率合成是唯一的大头）
-// 质量档位只改"输出分辨率"。几何层固定 0.18 屏宽 —— 在 ~160×110 上
-// 几乎不花钱；换档时不重建，形状不会跳。
-const GLASS_SCALE = 0.18;
+const GLASS_SCALE = 0.24;
 const LEVELS = [
   { dpr: 0.70 },
   { dpr: 0.85 },
@@ -707,25 +1233,27 @@ let level = 2;
 function maxLevel() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   let i = 0;
-  for (let k = 0; k < LEVELS.length; k++) if (LEVELS[k].dpr <= dpr + 0.001) i = k;
+  for (let k = 0; k < LEVELS.length; k += 1) if (LEVELS[k].dpr <= dpr + 0.001) i = k;
   return i;
+}
+
+function allocTargets() {
+  for (const b of [fieldBuf, glassBuf]) {
+    gl.bindTexture(gl.TEXTURE_2D, b.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, GLASS_FMT, glassW, glassH, 0, gl.RGBA, GLASS_TYPE, null);
+  }
 }
 
 function resize() {
   cssW = Math.max(1, window.innerWidth);
   cssH = Math.max(1, window.innerHeight);
   const L = LEVELS[level];
-
-  // 输出画布：照片在这里是清晰的
   const w = Math.max(2, Math.round(cssW * L.dpr));
   const h = Math.max(2, Math.round(cssH * L.dpr));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
   }
-
-  // 几何层：只影响液滴的形状精度，不影响清晰度。
-  // 只有尺寸真的变了才重建缓冲；换输出档时不重建，形状不会跳。
   const gW = Math.max(2, Math.round(cssW * GLASS_SCALE));
   const gH = Math.max(2, Math.round(cssH * GLASS_SCALE));
   if (gW !== glassW || gH !== glassH) {
@@ -733,10 +1261,11 @@ function resize() {
     glassH = gH;
     allocTargets();
   }
-
+  flowCanvas.width = Math.max(2, Math.round(cssW));
+  flowCanvas.height = Math.max(2, Math.round(cssH));
   elRes.textContent =
     "质量 " + (level + 1) + "/" + LEVELS.length + " · " +
-    w + "×" + h + " · 玻璃 " + glassW + "×" + glassH;
+    w + "×" + h + " · 几何 " + glassW + "×" + glassH;
 }
 
 function uvRect() {
@@ -758,134 +1287,132 @@ function uvRect() {
 const elFps = document.getElementById("fps");
 const elMs = document.getElementById("ms");
 const elGpu = document.getElementById("gpu");
-const elBlob = document.getElementById("nblob");
 const elRes = document.getElementById("res");
+const elComp = document.getElementById("ncomp");
+const elLobe = document.getElementById("nlobe");
+const elBo = document.getElementById("bo");
 
-let phase = 0;
-const blobPosArr = new Float32Array(18);
-const blobVel = new Float32Array(18);   // 每滴的速度（带惯性）
-const blobTgt = new Float32Array(18);   // 目标路径
+const posArr = new Float32Array(18);
+const rArr = new Float32Array(9);
+const hArr = new Float32Array(9);
+const pvArr = new Float32Array(9);
 
-// 液滴的运动是有惯性的：它们被一条缓慢的路径牵着走，但不是刚性地绑在上面。
-// 用二阶阻尼振子（弹簧 + 阻尼）积分，于是它们会滞后、会有一点过冲 ——
-// 这是"漂"和"被拖着走"的区别。
-function updateBlobs(ph, dt) {
-  const n = Math.round(state.num);
-  const R = Math.max(0.02, state.radius);
-
-  for (let i = 0; i < n; i++) {
-    const a = i * 2.39996323;
-    const w1 = 3 + (i % 3);
-    const w2 = 4 + ((i * 2) % 3);
-    blobTgt[i * 2]     = 0.55 * Math.sin(ph * w1 + a);
-    blobTgt[i * 2 + 1] = 0.30 * Math.cos(ph * w2 + a * 1.7);
-  }
-
-  // 表面张力：靠近的两滴互相拉，目标点因此偏向对方
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const dx = blobTgt[j * 2] - blobTgt[i * 2];
-      const dy = blobTgt[j * 2 + 1] - blobTgt[i * 2 + 1];
-      const dist = Math.hypot(dx, dy) || 1e-6;
-      const near = Math.max(0, 1 - dist / (2.6 * R));
-      const pull = near * near * 0.012;
-      const ux = dx / dist, uy = dy / dist;
-      blobTgt[i * 2]     += ux * pull;
-      blobTgt[i * 2 + 1] += uy * pull;
-      blobTgt[j * 2]     -= ux * pull;
-      blobTgt[j * 2 + 1] -= uy * pull;
-    }
-  }
-
-  // 阻尼振子：K 是刚度，D 是阻尼。ζ ≈ 0.46，轻微过冲，像黏性液体。
-  const K = 3.0, D = 1.6, h = Math.min(dt, 0.05);
-  for (let i = 0; i < n; i++) {
-    const ix = i * 2, iy = ix + 1;
-    if (blobPosArr[ix] === 0 && blobPosArr[iy] === 0 && blobVel[ix] === 0 && blobVel[iy] === 0) {
-      blobPosArr[ix] = blobTgt[ix];               // 起始帧直接就位，不要从原点飞出来
-      blobPosArr[iy] = blobTgt[iy];
-    }
-    blobVel[ix] += ((blobTgt[ix] - blobPosArr[ix]) * K - blobVel[ix] * D) * h;
-    blobVel[iy] += ((blobTgt[iy] - blobPosArr[iy]) * K - blobVel[iy] * D) * h;
-    blobPosArr[ix] += blobVel[ix] * h;
-    blobPosArr[iy] += blobVel[iy] * h;
-  }
-
-}
 let last = performance.now();
 let lastPresent = 0;
 let acc = 0, frames = 0, fps = 0, ms = 0;
-
-// GPU 计时器：拿真实渲染耗时。rAF 的帧间隔被 vsync 量化过，看不出余量，
-// 而这个能告诉我们"其实只花了 4ms"。没有这个扩展就退回帧间隔估算。
 const timerExt = gl.getExtension("EXT_disjoint_timer_query_webgl2");
 let gpuQuery = null;
 const gpuPending = [];
 let gpuMs = 8.0;
+const BUDGET_HI = 9.0, BUDGET_LO = 6.0;
+let lastAdjust = 0, justDown = false;
+let hudBo = 0;
 
-// 预算按 120fps（8.3ms）定，留一倍余量，钉在 60 就绝对稳。
-const BUDGET_HI = 9.0;   // 超过就降一档
-const BUDGET_LO = 6.0;   // 低于就试着升一档
-let lastAdjust = 0;
-let justDown = false;
+function fillPalette() {
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return fillLight
+    ? [lin(1), lin(1), lin(1)]
+    : [lin(0.12), lin(0.12), lin(0.12)];
+}
+
+function drawFlowOverlay(t) {
+  const w = flowCanvas.width, h = flowCanvas.height;
+  fctx.clearRect(0, 0, w, h);
+  if (!showFlow) return;
+  fctx.strokeStyle = "rgba(150,195,255,0.34)";
+  fctx.fillStyle = "rgba(150,195,255,0.34)";
+  fctx.lineWidth = 1;
+  const cols = 16, rows = 10;
+  for (let j = 0; j < rows; j += 1) {
+    for (let i = 0; i < cols; i += 1) {
+      const px = ((i + 0.5) / cols - 0.5) * (w / h);
+      const py = (0.5 - (j + 0.5) / rows);
+      const u = flowAt(px, py, t);
+      const sx = w * 0.5 + px * h;
+      const sy = h * 0.5 - py * h;
+      const scale = h * 1.1;
+      const ex = sx + u[0] * scale;
+      const ey = sy - u[1] * scale;
+      fctx.beginPath();
+      fctx.moveTo(sx, sy);
+      fctx.lineTo(ex, ey);
+      fctx.stroke();
+      const a = Math.atan2(ey - sy, ex - sx);
+      fctx.beginPath();
+      fctx.moveTo(ex, ey);
+      fctx.lineTo(ex - 4 * Math.cos(a - 0.5), ey - 4 * Math.sin(a - 0.5));
+      fctx.lineTo(ex - 4 * Math.cos(a + 0.5), ey - 4 * Math.sin(a + 0.5));
+      fctx.closePath();
+      fctx.fill();
+    }
+  }
+}
 
 function frame(now) {
-  // 先排下一帧：后面任何 early return 都不会断链
   requestAnimationFrame(frame);
-
-  // 输出钉在 60fps。120Hz 屏上隔帧丢一次；60Hz 屏上这个条件永远不成立。
   if (now - lastPresent < 15.2) return;
-
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   lastPresent = now;
 
   if (!paused) {
-    phase += dt * state.speed * (Math.PI * 2 / 47);
+    updateLobes(dt);
+    updateTopology(dt);
   }
-  if (phase > Math.PI * 2 * 1000) phase -= Math.PI * 2 * 1000;
+  hudBo = updateRenderCaps();
 
   const [sx, sy, ox, oy] = uvRect();
+  drawFlowOverlay(flowTime);
+
+  for (let i = 0; i < 9; i += 1) {
+    const c = renderCaps[i];
+    if (c) {
+      posArr[i * 2] = c.x;
+      posArr[i * 2 + 1] = c.y;
+      rArr[i] = c.r;
+      hArr[i] = c.h;
+      pvArr[i] = c.pv;
+    } else {
+      posArr[i * 2] = 0;
+      posArr[i * 2 + 1] = 0;
+      rArr[i] = 0;
+      hArr[i] = 0;
+      pvArr[i] = 0;
+    }
+  }
 
   if (timerExt && !gpuQuery) {
     gpuQuery = gl.createQuery();
     gl.beginQuery(timerExt.TIME_ELAPSED_EXT, gpuQuery);
   }
 
-  const R = Math.max(0.02, state.radius);
-  const ca = state.contact * Math.PI / 180;
-  const H = R * Math.tan(ca / 2);
-
-  /* ---- 第一趟：几何（距离场 + 球冠高度）---- */
+  /* ① 几何：SDF + 重力轮廓高度 */
   gl.bindFramebuffer(gl.FRAMEBUFFER, fieldBuf.fbo);
   gl.viewport(0, 0, glassW, glassH);
   gl.useProgram(progField);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, profileTex);
+  gl.uniform1i(UF.uProfile, 0);
   gl.uniform2f(UF.uRes, glassW, glassH);
-  gl.uniform1i(UF.uNum, Math.round(state.num));
-  gl.uniform1f(UF.uMerge, state.merge);
-  gl.uniform1f(UF.uRadius, R);
-  gl.uniform1f(UF.uSinCA, Math.sin(ca));
-  gl.uniform1f(UF.uCosCA, Math.cos(ca));
-
-  updateBlobs(phase, Math.min(dt, 0.05));
-  gl.uniform2fv(UF.uPos, blobPosArr);
-
+  gl.uniform1i(UF.uNum, renderCaps.length);
+  gl.uniform1f(UF.uNeck, transitions.length ? state.neck : 0);
+  gl.uniform2fv(UF.uPos, posArr);
+  gl.uniform1fv(UF.uR, rArr);
+  gl.uniform1fv(UF.uH, hArr);
+  gl.uniform1fv(UF.uPV, pvArr);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  /* ---- 第二趟：高度场 → 法线 ---- */
+  /* ② 法线 */
   gl.bindFramebuffer(gl.FRAMEBUFFER, glassBuf.fbo);
   gl.viewport(0, 0, glassW, glassH);
   gl.useProgram(progGeo);
-
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, fieldBuf.tex);
   gl.uniform1i(UG.uD, 0);
   gl.uniform2f(UG.uRes, glassW, glassH);
-  gl.uniform1f(UG.uHeight, H);
-
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  /* ---- 第三趟：全分辨率合成 → 屏幕 ---- */
+  /* ③ 合成 → 屏幕 */
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.useProgram(progComp);
@@ -894,6 +1421,14 @@ function frame(now) {
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.uniform1i(UC.uBg, 1);
 
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, envTex);
+  gl.uniform1i(UC.uEnv, 2);
+
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, srgbTex);
+  gl.uniform1i(UC.uSRGB, 3);
+
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, glassBuf.tex);
   gl.uniform1i(UC.uGlass, 0);
@@ -901,35 +1436,27 @@ function frame(now) {
   gl.uniform2f(UC.uRes, canvas.width, canvas.height);
   gl.uniform2f(UC.uUvScale, sx, sy);
   gl.uniform2f(UC.uUvOffset, ox, oy);
-  gl.uniform1f(UC.uShadow, off ? 0 : state.shadow);
   gl.uniform1f(UC.uOn, off ? 0 : 1);
   gl.uniform1f(UC.uLod, state.lod);
   gl.uniform1f(UC.uSpec, state.spec);
   gl.uniform1f(UC.uFillAlpha, state.fill);
-  gl.uniform1f(UC.uEnvMix, state.env);
-  gl.uniform1f(UC.uPhase, phase);
-  gl.uniform1f(UC.uIOR, state.ior);
-  gl.uniform1f(UC.uDisp, state.disp);
-  gl.uniform1f(UC.uHeight, H);
-  gl.uniform3f(UC.uFill, fillLight ? 1 : 0.12, fillLight ? 1 : 0.12, fillLight ? 1 : 0.12);
-  gl.uniform3fv(UC.uEnvTop, envTop);
-  gl.uniform3fv(UC.uEnvBottom, envBottom);
-  gl.uniform3fv(UC.uEnvAvg, envAvg);
-
+  gl.uniform1f(UC.uEnvRot, (state.envRot * Math.PI) / 180);
+  gl.uniform1f(UC.uEnvIntensity, state.env);
+  gl.uniform1f(UC.uHref, Math.max(0.02, baseVol > 0 ? findEntryByV(baseVol).H / WORLD_MM : 0.1));
+  gl.uniform1f(UC.uGlassT, state.glass / WORLD_MM);
+  gl.uniform3fv(UC.uFill, fillPalette());
+  gl.uniform3fv(UC.uLightDir, envLight);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-  // ---- 收工时：结账 ------------------------------------------------
   if (timerExt && gpuQuery) {
     gl.endQuery(timerExt.TIME_ELAPSED_EXT);
     gpuPending.push(gpuQuery);
     gpuQuery = null;
   }
-
   if (timerExt) {
     while (gpuPending.length) {
       const q = gpuPending[0];
       if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
-      // 只有真的取到结果时才查 disjoint，省掉每帧一次状态查询
       if (!gl.getParameter(timerExt.GPU_DISJOINT_EXT)) {
         const ns = gl.getQueryParameter(q, gl.QUERY_RESULT);
         gpuMs = gpuMs * 0.88 + (ns / 1e6) * 0.12;
@@ -937,31 +1464,29 @@ function frame(now) {
       gl.deleteQuery(q);
       gpuPending.shift();
     }
-    while (gpuPending.length > 8) { gl.deleteQuery(gpuPending.shift()); }
+    while (gpuPending.length > 8) gl.deleteQuery(gpuPending.shift());
   } else {
-    // 没有计时器就退回帧间隔估算（被 vsync 量化，只能测到"掉帧"，测不到余量）
     gpuMs = gpuMs * 0.95 + Math.min(dt * 1000, 33) * 0.05;
   }
 
-  // ---- 控制器：目标 120fps 预算 -------------------------------------
-  // 降档要快、升档要慢：掉帧一眼就看得出，来回跳档反而更难受
   if (now - lastAdjust > (justDown ? 1500 : 6000) && now > 4000 && !document.hidden) {
     if (gpuMs > BUDGET_HI && level > 0) {
-      level--; resize(); lastAdjust = now; justDown = true;
+      level -= 1; resize(); lastAdjust = now; justDown = true;
     } else if (gpuMs < BUDGET_LO && level < maxLevel()) {
-      level++; resize(); lastAdjust = now; justDown = false;
+      level += 1; resize(); lastAdjust = now; justDown = false;
     }
   }
 
-  // 统计
-  acc += dt; frames++;
+  acc += dt; frames += 1;
   if (acc >= 0.5) {
     fps = frames / acc;
     ms = (acc / frames) * 1000;
     elFps.textContent = fps.toFixed(0);
     elMs.textContent = ms.toFixed(1);
-    elBlob.textContent = Math.round(state.num);
     elGpu.textContent = gpuMs.toFixed(1);
+    elComp.textContent = String(comps.filter((c) => !c.hidden).length + transitions.length);
+    elLobe.textContent = String(lobes.length);
+    elBo.textContent = hudBo < 10 ? hudBo.toFixed(2) : hudBo.toFixed(1);
     acc = 0; frames = 0;
   }
 }
@@ -971,6 +1496,12 @@ function frame(now) {
  * ------------------------------------------------------------------ */
 const slidersEl = document.getElementById("sliders");
 const inputs = {};
+
+function rebuildAndReset() {
+  buildProfiles(state.contact);
+  resetScene();
+  updateRenderCaps();
+}
 
 for (const [key, label, min, max, step, desc] of SLIDERS) {
   const row = document.createElement("div");
@@ -989,13 +1520,16 @@ for (const [key, label, min, max, step, desc] of SLIDERS) {
 
   const show = () => {
     const v = Number(input.value);
-    if (key === "num") { val.textContent = v.toFixed(0); return; }
+    if (key === "num" || key === "envRot") { val.textContent = v.toFixed(0); return; }
     const dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
     val.textContent = v.toFixed(dp);
   };
   input.addEventListener("input", () => {
     state[key] = Number(input.value);
     show();
+  });
+  input.addEventListener("change", () => {
+    if (key === "num" || key === "size" || key === "contact") rebuildAndReset();
   });
 
   show();
@@ -1027,9 +1561,7 @@ function setCollapsed(v) {
 }
 
 toggleEl.addEventListener("click", () => setCollapsed(!panelEl.classList.contains("collapsed")));
-
 try {
-  // 第一次打开默认收起：不用调，看就行
   if (localStorage.getItem("lg.panel") !== "0") setCollapsed(true);
 } catch (_) {
   setCollapsed(true);
@@ -1055,13 +1587,20 @@ btnCompare.addEventListener("pointerleave", () => { off = false; btnCompare.clas
 document.getElementById("btnReset").addEventListener("click", () => {
   Object.assign(state, DEFAULTS);
   syncInputs();
-  resize();
+  rebuildAndReset();
 });
 
 const btnFill = document.getElementById("btnFill");
 btnFill.addEventListener("click", () => {
   fillLight = !fillLight;
   btnFill.textContent = fillLight ? "底色：亮" : "底色：暗";
+});
+
+const btnFlow = document.getElementById("btnFlow");
+btnFlow.addEventListener("click", () => {
+  showFlow = !showFlow;
+  flowCanvas.style.display = showFlow ? "block" : "none";
+  btnFlow.classList.toggle("on", showFlow);
 });
 
 const btnPhoto = document.getElementById("btnPhoto");
@@ -1093,7 +1632,6 @@ function loadFile(file) {
   img.src = url;
 }
 
-/* 空格对比 */
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space" && !e.repeat) { e.preventDefault(); off = true; }
 });
@@ -1101,7 +1639,6 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "Space") { e.preventDefault(); off = false; }
 });
 
-/* 拖放 */
 const dropEl = document.getElementById("drop");
 let dragDepth = 0;
 window.addEventListener("dragenter", (e) => {
@@ -1131,10 +1668,6 @@ if (startChart) {
   btnPhoto.classList.remove("on");
 }
 
-// 支持 hash 覆盖任意参数，方便 A/B 对比：
-//   #chart             网格测试图
-//   #contact=85        覆盖任意参数
-//   #chart&fill=0.45   组合
 location.hash.slice(1).split("&").forEach((kv) => {
   const [k, v] = kv.split("=");
   if (k && Object.prototype.hasOwnProperty.call(state, k)) {
@@ -1143,6 +1676,11 @@ location.hash.slice(1).split("&").forEach((kv) => {
   }
 });
 syncInputs();
+
+buildProfiles(state.contact);
+buildEnvironment();
+resetScene();
+updateRenderCaps();
 
 level = maxLevel();
 resize();
