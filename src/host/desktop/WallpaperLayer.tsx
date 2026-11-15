@@ -355,17 +355,19 @@ export interface WallpaperLayerProps {
 interface WallpaperImage {
   key: string;
   url: string;
+  /** 给 WebGL 当纹理的地址：必应取 1080p（	humbUrl），4K 原图太大 */
+  textureUrl: string;
   mode: 'local' | 'remote';
 }
 
 function resolveImage(wallpaper: WallpaperState): WallpaperImage | null {
   if (wallpaper.mode === 'local') {
     if (!wallpaper.local?.url) return null;
-    return { key: wallpaper.local.key, url: wallpaper.local.url, mode: 'local' };
+    return { key: wallpaper.local.key, url: wallpaper.local.url, textureUrl: wallpaper.local.url, mode: 'local' };
   }
   const entry = wallpaper.current;
   if (!entry) return null;
-  return { key: entry.key, url: entry.imageUrl, mode: 'remote' };
+  return { key: entry.key, url: entry.imageUrl, textureUrl: entry.thumbUrl || entry.imageUrl, mode: 'remote' };
 }
 
 /** 全屏壁纸层：画在桌面内容下方，不拦指针。 */
@@ -392,7 +394,7 @@ export function WallpaperLayer({ wallpaper, colorScheme, liquidGlass = false }: 
         />
       ) : null}
       {liquidGlass && visible && image ? (
-        <LiquidGlassLayer url={image.url} kind={image.mode} identity={image.key} />
+        <LiquidGlassLayer url={image.textureUrl} kind={image.mode} identity={image.key} />
       ) : null}
       {/* 暗色压暗以保证小组件上的文字可读；亮色只做极轻的压暗 */}
       <div className={styles.scrim} style={{ opacity: colorScheme === 'light' ? 0.06 : 0.24 }} />
