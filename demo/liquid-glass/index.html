@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>液态玻璃 · 相场水珠</title>
+<title>液态玻璃 · 动态引力场</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -102,14 +102,13 @@
 
 <div id="hud">
   <div><b id="fps">–</b> fps · <span id="ms">–</span> ms</div>
-  <div class="dim"><span id="res">–</span> · 相场 <span id="phi">–</span></div>
-  <div class="dim">GPU <span id="gpu">–</span> ms · φ <span id="mass">–</span> · 滴 <span id="comps">–</span></div>
-  <div class="dim">质量漂移 <span id="drift">–</span> · 体积系数 <span id="vol">–</span></div>
+  <div class="dim"><span id="res">–</span> · 液体 <span id="blobs">–</span></div>
+  <div class="dim">GPU <span id="gpu">–</span> ms · 引点 <span id="grav">–</span> · 质量 <span id="mass">–</span></div>
 </div>
 
 <div id="panel">
   <div class="head">
-    <h1>液态玻璃 · 相场水珠</h1>
+    <h1>液态玻璃 · 动态引力场</h1>
     <button id="toggle">收起</button>
   </div>
   <div class="body">
@@ -119,10 +118,9 @@
       <button id="btnCompare">对比原图</button>
       <button id="btnReset">重置</button>
       <button id="btnFill">底色：暗</button>
-      <button id="btnFlow">流场</button>
+      <button id="btnFlow">流场 / 引点</button>
     </div>
     <div class="btns">
-      <button id="btnMass" class="on">质量校正</button>
       <button id="btnPhoto" class="on">风景</button>
       <button id="btnChart">测试图</button>
       <label for="file">上传照片…</label>
@@ -144,47 +142,49 @@
 /* ================================================================== *
  * 0. 常量与状态
  *
- * 这里没有“几只水滴、每只多大”的手工参数。初始液体由随机平滑场 + 总
- * 液体量生成；之后只由通量形式相场和外部无散流场演化。相场平流和界面
- * 通量本身是守恒的；clamp 后的少量数值漂移由探针上的乘法校正拉回。
- * 渲染再把 φ / Poisson 容量场变成 3D 高度。
+ * 这一版是一个“动态液体团块 + metaball 界面”模型：
+ *   - 团块（blob）有位置、可见半径、质量；总质量固定；
+ *   - 当前分布做加权 k-means，取 k 个质量簇中心作为 top-k 引力点；
+ *   - 引力把团块吸向这些中心；
+ *   - 低频速度场平流团块，并在局部应变大时把团块拉裂；
+ *   - 团块靠近会合并，质量在合并/分裂中守恒；
+ *   - 渲染时把所有团块加成 metaball 场，得到光滑液面和折射。
+ *
+ * 团块不是固定水滴：数量、位置、半径、质量都在变，引力点也在变。
  * ================================================================== */
 const TAU = Math.PI * 2;
-const WORLD_MM = 10;               // 屏幕高度对应的物理尺寸
-const NW = [1.331, 1.333, 1.344];
-const NG = [1.514, 1.520, 1.528];
-
-const PHI_SCALE = 0.22;            // 相场/高度解算分辨率
-const FLOW_W = 64, FLOW_H = 40;
+const WORLD_MM = 10;
+const BLOB_MAX = 16;
+const GLASS_SCALE = 0.18;          // 液面/法线纹理分辨率（屏幕高）
 const MAX_DPR_LEVELS = [0.55, 0.70, 0.85, 1.00, 1.20, 1.40];
-const PSI_ITERS = 6;               // 每帧红黑 SOR 迭代（暖启动）
-const PSI_ITERS_RESET = 96;        // 重置时的收敛迭代
-let cacSubsteps = 2;
+const GRAV_SIGMA = 0.22;
 
 const DEFAULTS = {
-  amount: 0.155,     // 初始液体量（φ 平均）
-  flow: 0.020,       // 外部无散流场强度
-  eps: 3.0,          // 相场界面宽度（格）
-  mobility: 0.5,     // 保守 Allen-Cahn 迁移率（格²/秒）
-  contact: 78,       // 接触角（度，仅渲染）
+  amount: 0.14,
+  flow: 0.05,
+  gravity: 0.35,
+  gravityR: 0.20,
+  k: 4,
+  height: 0.12,
   lod: 0.15,
-  spec: 1.0,
-  density: 0.15,     // 介质光学厚度
+  spec: 1.1,
+  density: 0.20,
   env: 1.0,
   envRot: 0,
-  glass: 0.20,       // 屏幕玻璃厚度 mm
+  glass: 0.20,
   speed: 1.0,
 };
 
 const SLIDERS = [
-  ["amount",   "液体量",   0.04, 0.30, 0.005, "初始 φ 平均值；只决定总液体量，不决定滴数和位置"],
-  ["flow",     "流场",     0,    0.20, 0.005, "外部无散速度场强度；液滴被它平流、拉长、合并"],
-  ["eps",      "界面宽度", 1.5,  4.5,  0.1,   "保守相场的界面宽度 ε（相场格）"],
-  ["mobility", "迁移率",   0.2,  2.0,  0.05,  "保守 Allen-Cahn 迁移率（格²/秒）"],
-  ["contact",  "接触角",   35,   88,   1,     "渲染球冠的接触角；从面积等效半径和容量场重建高度"],
+  ["amount",   "液体量",   0.05, 0.30, 0.005, "初始团块尺寸/覆盖；重置后生效"],
+  ["flow",     "搅动",     0,    0.12, 0.005, "低频速度场强度；局部应变会把团块拉裂"],
+  ["gravity",  "引力",     0,    2.0,  0.02,  "top-k 引力点对团块的吸引强度"],
+  ["gravityR", "引力半径", 0.08, 0.35, 0.01,  "高斯引力核尺度"],
+  ["k",        "引力点数", 1,    5,    1,     "从当前团块分布取多少个质量簇中心"],
+  ["height",   "水滴高度", 0.04, 0.20, 0.005, "metaball 场到屏幕高度的缩放"],
   ["lod",      "模糊",     -2,   3,    0.1,   "0 = 清透，往上加磨砂"],
   ["spec",     "高光",     0,    2.5,  0.02,  "曲面把环境光聚成的小点"],
-  ["density",  "介质浓度", 0,    1,    0.01,  "参与介质的光学厚度；暗色吸收、亮色散射"],
+  ["density",  "介质浓度", 0,    1,    0.01,  "参与介质光学厚度；暗色吸收、亮色散射"],
   ["env",      "环境亮度", 0,    2,    0.05,  "HDR 环境反射强度"],
   ["envRot",   "环境旋转", 0,    360,  1,     "旋转 HDR 环境"],
   ["glass",    "玻璃厚度", 0,    1.5,  0.05,  "屏幕玻璃层厚度（mm）"],
@@ -192,12 +192,15 @@ const SLIDERS = [
 ];
 
 const state = Object.assign({}, DEFAULTS);
-state.massFix = true;
 let paused = false;
 let off = false;
 let fillLight = false;
 let showFlow = false;
 let flowTime = 0;
+let blobs = [];
+let gravityPoints = [];
+let resetSeed = 1;
+let fixedSeed = null;
 
 /* ================================================================== *
  * 1. WebGL / DOM / 基础工具
@@ -210,7 +213,6 @@ const gl = canvas.getContext("webgl2", {
   depth: false,
   stencil: false,
   premultipliedAlpha: false,
-  /* 截图/自动验收用；正常 RAF 模式不保留 drawing buffer。 */
   preserveDrawingBuffer: IS_STILL,
   powerPreference: "high-performance",
 });
@@ -231,7 +233,6 @@ function fail(msg) {
   errEl.textContent = "液态玻璃 demo 启动失败\n\n" + msg;
   throw new Error(msg);
 }
-
 const VERT = `#version 300 es
 layout(location = 0) in vec2 aPos;
 void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
@@ -245,7 +246,6 @@ function compile(type, src) {
   }
   return s;
 }
-
 function linkProgram(fragSrc) {
   const p = gl.createProgram();
   gl.attachShader(p, compile(gl.VERTEX_SHADER, VERT));
@@ -256,22 +256,17 @@ function linkProgram(fragSrc) {
   }
   return p;
 }
-
 function uniforms(program, names) {
   const out = {};
   for (const n of names) out[n] = gl.getUniformLocation(program, n);
   return out;
 }
-
 const buf = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buf);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);
 gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-function drawQuad() {
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
-}
+function drawQuad() { gl.drawArrays(gl.TRIANGLES, 0, 3); }
 
 /* sRGB 编码 LUT */
 const srgbTex = gl.createTexture();
@@ -316,7 +311,6 @@ function makeTarget(w, h, fmt, type, minFilter, magFilter) {
   }
   return { tex, fbo, w, h };
 }
-
 function disposeTarget(t) {
   if (!t) return;
   gl.deleteTexture(t.tex);
@@ -324,210 +318,42 @@ function disposeTarget(t) {
 }
 
 /* ================================================================== *
- * 3. 相场、Poisson 容量场、高度 / 法线、合成着色器
+ * 3. 着色器：metaball 液面 + 光学合成
  * ================================================================== */
-const CAC_FRAG = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-
-out vec4 outColor;
-
-uniform sampler2D uPhi;
-uniform sampler2D uFlow;
-uniform vec2  uRes;
-uniform float uDt;       // 秒
-uniform float uEps;      // 格
-uniform float uM;        // 格^2 / 秒
-
-float P(vec2 uv) { return texture(uPhi, uv).r; }
-vec2  U(vec2 uv) { return texture(uFlow, uv).xy * uRes.y; } // 格/秒
-
-void main() {
-  vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 tx = 1.0 / uRes;
-
-  float pc  = P(uv);
-  float pL  = P(uv - vec2(tx.x, 0.0));
-  float pR  = P(uv + vec2(tx.x, 0.0));
-  float pD  = P(uv - vec2(0.0, tx.y));
-  float pU  = P(uv + vec2(0.0, tx.y));
-  float pLU = P(uv + vec2(-tx.x,  tx.y));
-  float pRU = P(uv + vec2( tx.x,  tx.y));
-  float pLD = P(uv + vec2(-tx.x, -tx.y));
-  float pRD = P(uv + vec2( tx.x, -tx.y));
-
-  vec2 vR = U(uv + vec2( 0.5 * tx.x, 0.0));
-  vec2 vL = U(uv - vec2( 0.5 * tx.x, 0.0));
-  vec2 vU = U(uv + vec2(0.0,  0.5 * tx.y));
-  vec2 vD = U(uv - vec2(0.0,  0.5 * tx.y));
-
-  /* 通量形式平流：∂tφ + ∇·(uφ)。一阶迎风，虽然数值扩散大一点，
-     但每个面的通量由相邻两格共享，整场求和严格望远镜抵消。 */
-  float fR = vR.x > 0.0 ? vR.x * pc : vR.x * pR;
-  float fL = vL.x > 0.0 ? vL.x * pL : vL.x * pc;
-  float fU = vU.y > 0.0 ? vU.y * pc : vU.y * pU;
-  float fD = vD.y > 0.0 ? vD.y * pD : vD.y * pc;
-  float divAdv = (fR - fL) + (fU - fD);
-
-  /* 保守 Allen-Cahn 界面通量：
-     ∇·( M [ ∇φ − (4/ε) φ(1−φ) n ] )
-     界面通量也是面通量；不往空气里加 λ。 */
-  float eps = max(uEps, 0.6);
-  float s = 4.0 / eps;
-
-  vec2 gR = vec2(pR - pc, 0.25 * (pU + pRU - pD - pRD));
-  vec2 gL = vec2(pc - pL, 0.25 * (pU + pLU - pD - pLD));
-  vec2 gU = vec2(0.25 * (pR + pRU - pL - pLU), pU - pc);
-  vec2 gD = vec2(0.25 * (pR + pRD - pL - pLD), pc - pD);
-
-  float pfR = 0.5 * (pc + pR);
-  float pfL = 0.5 * (pL + pc);
-  float pfU = 0.5 * (pc + pU);
-  float pfD = 0.5 * (pD + pc);
-
-  vec2 nR = gR / (length(gR) + 1e-7);
-  vec2 nL = gL / (length(gL) + 1e-7);
-  vec2 nU = gU / (length(gU) + 1e-7);
-  vec2 nD = gD / (length(gD) + 1e-7);
-
-  float aR = uM * (gR.x - s * pfR * (1.0 - pfR) * nR.x);
-  float aL = uM * (gL.x - s * pfL * (1.0 - pfL) * nL.x);
-  float aU = uM * (gU.y - s * pfU * (1.0 - pfU) * nU.y);
-  float aD = uM * (gD.y - s * pfD * (1.0 - pfD) * nD.y);
-  float divAc = (aR - aL) + (aU - aD);
-
-  float next = pc + uDt * (divAc - divAdv);
-  outColor = vec4(clamp(next, 0.0, 1.0), 0.0, 0.0, 1.0);
-}`;
-
-const MASS_FIX_FRAG = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-out vec4 outColor;
-uniform sampler2D uPhi;
-uniform vec2 uRes;
-uniform float uScale;
-void main() {
-  vec2 uv = gl_FragCoord.xy / uRes;
-  float p = texture(uPhi, uv).r;
-  outColor = vec4(clamp(p * uScale, 0.0, 1.0), 0.0, 0.0, 1.0);
-}`;
-
-const PROBE_FRAG = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-out vec4 outColor;
-uniform sampler2D uPhi;
-uniform vec2 uSrcRes;
-uniform vec2 uDstRes;
-void main() {
-  ivec2 base = ivec2(floor(gl_FragCoord.xy)) * 4;
-  int sxMax = int(uSrcRes.x) - 1;
-  int syMax = int(uSrcRes.y) - 1;
-  float sum = 0.0;
-  for (int j = 0; j < 4; j++) {
-    for (int i = 0; i < 4; i++) {
-      int sx = min(base.x + i, sxMax);
-      int sy = min(base.y + j, syMax);
-      vec2 suv = (vec2(float(sx), float(sy)) + 0.5) / uSrcRes;
-      sum += texture(uPhi, suv).r;
-    }
-  }
-  outColor = vec4(sum / 16.0, 0.0, 0.0, 1.0);
-}`;
-
-const PSI_FRAG = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-out vec4 outColor;
-uniform sampler2D uPsi;
-uniform sampler2D uPhi;
-uniform vec2  uRes;
-uniform float uOmega;
-uniform int   uParity;
-
-float wetPhi(vec2 uv) { return texture(uPhi, uv).r; }
-float wetPsi(vec2 uv) {
-  return wetPhi(uv) >= 0.5 ? texture(uPsi, uv).r : 0.0;
-}
-
-void main() {
-  vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 tx = 1.0 / uRes;
-  ivec2 ip = ivec2(gl_FragCoord.xy);
-  float psi = texture(uPsi, uv).r;
-
-  if (((ip.x + ip.y) & 1) != uParity) {
-    outColor = vec4(psi, 0.0, 0.0, 1.0);
-    return;
-  }
-  if (wetPhi(uv) < 0.5) {
-    outColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
-
-  /* ∇²ψ = −1，ψ=0 在接触线上。ψ 是“容量场”，不是距离场；
-     它没有中轴折痕，圆滴中心的 ψ = R²/4。 */
-  float l = wetPsi(uv - vec2(tx.x, 0.0));
-  float r = wetPsi(uv + vec2(tx.x, 0.0));
-  float d = wetPsi(uv - vec2(0.0, tx.y));
-  float u = wetPsi(uv + vec2(0.0, tx.y));
-  float gs = 0.25 * (l + r + d + u + 1.0);
-  float next = mix(psi, gs, uOmega);
-  outColor = vec4(max(next, 0.0), 0.0, 0.0, 1.0);
-}`;
-
 const GEO_FRAG = `#version 300 es
 precision highp float;
 precision highp sampler2D;
 out vec4 outColor;
-uniform sampler2D uPsi;
-uniform sampler2D uPhi;
-uniform sampler2D uScale;
+
+uniform vec4  uBlob[${BLOB_MAX}]; // xy = 位置（屏幕坐标系），z = 半径，w = 质量
+uniform int   uBlobCount;
 uniform vec2  uRes;
-uniform float uPH;       // PHI_H，格/屏幕高
-uniform float uTheta;    // 接触角，弧度
-uniform float uVolScale;
+uniform float uAspect;
+uniform float uHeight;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  vec2 tx = 1.0 / uRes;
-  float phi = texture(uPhi, uv).r;
-  float psi = texture(uPsi, uv).r;
-  float R = max(texture(uScale, uv).r, 0.008); // 屏幕高为单位
-  float Rc = R * uPH;
+  vec2 p = vec2((uv.x - 0.5) * uAspect, uv.y - 0.5);
 
-  /* q = 1 − (r/R)²：由 Poisson 容量场给出的归一化径向坐标。 */
-  float q = clamp(4.0 * psi / max(Rc * Rc, 1e-8), 0.0, 1.0);
+  float F = 0.0;
+  vec2 G = vec2(0.0);
+  for (int i = 0; i < ${BLOB_MAX}; i++) {
+    if (i >= uBlobCount) break;
+    vec4 b = uBlob[i];
+    vec2 d = p - b.xy;
+    float r = max(b.z, 0.01);
+    float r2 = dot(d, d) / (2.0 * r * r);
+    if (r2 > 14.0) continue;
+    float e = exp(-r2);
+    F += e;
+    G += -e * d / (r * r);
+  }
 
-  /* 球冠高度剖面，写成 q 的函数：
-       h/H = (sqrt(cos²θ + sin²θ q) − cosθ) / (1 − cosθ)
-     在 q=0 处斜率为 tanθ，在 q=1 处回到顶点高度 H。 */
-  float c = cos(uTheta);
-  float s2 = max(0.0, 1.0 - c * c);
-  float root = sqrt(max(c * c + s2 * q, 0.0));
-  float shape = (root - c) / max(1.0 - c, 1e-4);
-  float dshape = s2 / (2.0 * max(root, 1e-5) * max(1.0 - c, 1e-4));
-  float H = R * tan(0.5 * uTheta) * uVolScale;
-  float wet = step(0.5, phi);
-  float h = H * clamp(shape, 0.0, 1.0) * wet;
-
-  /* 法线直接用 ∇ψ 的解析链式法则，不再对 h 做跨接触线的中心差分。
-     ψ 在接触线内部光滑，避免了高度在干/湿格之间跳变造成的锯齿和脊线。 */
-  float pl = texture(uPsi, uv - vec2(tx.x, 0.0)).r;
-  float pr = texture(uPsi, uv + vec2(tx.x, 0.0)).r;
-  float pd = texture(uPsi, uv - vec2(0.0, tx.y)).r;
-  float pu = texture(uPsi, uv + vec2(0.0, tx.y)).r;
-  float gpx = (pr - pl) * 0.5;
-  float gpy = (pu - pd) * 0.5;
-  float gradScale = H * dshape * 4.0 * uPH / max(Rc * Rc, 1e-8);
-  float gx = gradScale * gpx * wet;
-  float gy = gradScale * gpy * wet;
-  vec3 N = normalize(vec3(-gx, -gy, 1.0));
-
-  /* 接触线 alpha 的过渡至少覆盖一格，避免低分辨率相场在近水平边界
-     上留下网格台阶；法线/折射本身是光滑的。 */
-  float mask = smoothstep(0.35, 0.65, phi);
+  float tn = clamp((F - 0.12) / 0.88, 0.0, 1.0);
+  float h = uHeight * pow(tn, 0.70);
+  float dh = uHeight * 0.70 * pow(max(tn, 1e-4), -0.30) / 0.88;
+  vec3 N = normalize(vec3(-dh * G, 1.0));
+  float mask = smoothstep(0.06, 0.24, F);
   outColor = vec4(N.xy * 0.5 + 0.5, mask, h);
 }`;
 
@@ -537,7 +363,6 @@ precision highp sampler2D;
 precision highp samplerCube;
 
 out vec4 outColor;
-
 uniform sampler2D   uGlass;
 uniform sampler2D   uBg;
 uniform samplerCube uEnv;
@@ -601,8 +426,7 @@ void main() {
   vec3 L = rotY(normalize(uLightDir), uEnvRot);
 
   float aspect = uRes.x / max(uRes.y, 1.0);
-  /* 越靠近接触线，法线越陡，折射会把远处的一大片背景压进几个像素。
-     用更高的 mip 做面积预滤波，避免高对比壁纸在边缘被压成矩形锯齿。 */
+  /* 接触线附近压缩了远处背景；用更高 mip 做面积预滤波。 */
   float lod = uLod + (1.0 - N.z) * 3.2;
   vec3 trans = vec3(0.0);
   float tGreen = 0.0;
@@ -676,19 +500,11 @@ void main() {
   }
 }`;
 
-const progCac = linkProgram(CAC_FRAG);
-const progMassFix = linkProgram(MASS_FIX_FRAG);
-const progProbe = linkProgram(PROBE_FRAG);
-const progPsi = linkProgram(PSI_FRAG);
 const progGeo = linkProgram(GEO_FRAG);
 const progComp = linkProgram(COMP_FRAG);
 const progDebug = linkProgram(DEBUG_FRAG);
 
-const UCac = uniforms(progCac, ["uPhi", "uFlow", "uRes", "uDt", "uEps", "uM"]);
-const UMass = uniforms(progMassFix, ["uPhi", "uRes", "uScale"]);
-const UProbe = uniforms(progProbe, ["uPhi", "uSrcRes", "uDstRes"]);
-const UPsi = uniforms(progPsi, ["uPsi", "uPhi", "uRes", "uOmega", "uParity"]);
-const UG = uniforms(progGeo, ["uPsi", "uPhi", "uScale", "uRes", "uPH", "uTheta", "uVolScale"]);
+const UG = uniforms(progGeo, ["uBlob[0]", "uBlobCount", "uRes", "uAspect", "uHeight"]);
 const UC = uniforms(progComp, [
   "uGlass", "uBg", "uEnv", "uSRGB", "uRes", "uUvScale", "uUvOffset", "uOn",
   "uLod", "uSpec", "uFillAlpha", "uEnvRot", "uEnvIntensity", "uHref",
@@ -727,7 +543,6 @@ function decodeHDRI() {
     return null;
   }
 }
-
 function sampleEquirect(data, u, v, w, h) {
   const x = (((u % 1) + 1) % 1) * w - 0.5;
   const y = Math.max(0, Math.min(h - 1, v * h - 0.5));
@@ -744,7 +559,6 @@ function sampleEquirect(data, u, v, w, h) {
   }
   return out;
 }
-
 function buildEnvironment() {
   const dec = decodeHDRI();
   let hdr, hdrW, hdrH;
@@ -792,7 +606,6 @@ function buildEnvironment() {
         const ev = Math.acos(Math.max(-1, Math.min(1, dy))) / Math.PI;
         const c = sampleEquirect(hdr, eu, ev, hdrW, hdrH);
         const idx = (y * ENV_SIZE + x) * 4;
-        /* RGBA16F 上限 65504；太阳原值会溢出成 Inf。 */
         face[idx]     = Math.min(c[0], 60000);
         face[idx + 1] = Math.min(c[1], 60000);
         face[idx + 2] = Math.min(c[2], 60000);
@@ -807,62 +620,7 @@ function buildEnvironment() {
 }
 
 /* ================================================================== *
- * 5. 外部无散流场
- * ================================================================== */
-function smoothstep(a, b, x) {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-}
-
-function flowPsi(x, y, t) {
-  /* 流场在屏幕边缘之前就衰减到 0：液滴不会被推到画面外再被裁掉。
-     只用低波数、慢时间的模态：大尺度漂移 + 轻微剪切，避免高频流场
-     把液滴拉成薄膜。 */
-  const win = smoothstep(0.68, 0.44, Math.abs(x)) * smoothstep(0.54, 0.32, Math.abs(y));
-  if (win <= 0) return 0;
-  const k1 = 1.35, k2 = 1.75, k3 = 2.15;
-  const w1 = TAU / 78, w2 = TAU / 95, w3 = TAU / 63;
-  const m1 = Math.sin(k1 * x + w1 * t + 0.7) * Math.cos(k1 * y + 0.3);
-  const m2 = Math.cos(k2 * x - 0.4) * Math.sin(k2 * y + w2 * t + 1.1);
-  const m3 = Math.sin(k3 * (x + y) + w3 * t + 2.0) * Math.cos(k3 * (x - y) - 0.8);
-  return win * (0.70 * m1 + 0.45 * m2 + 0.25 * m3);
-}
-
-function flowAt(x, y, t) {
-  const e = 1e-3;
-  const ux = (flowPsi(x, y + e, t) - flowPsi(x, y - e, t)) / (2 * e);
-  const uy = -(flowPsi(x + e, y, t) - flowPsi(x - e, y, t)) / (2 * e);
-  return [ux * state.flow, uy * state.flow];
-}
-
-let flowTex = null;
-const flowData = new Float32Array(FLOW_W * FLOW_H * 4);
-
-function updateFlowTexture() {
-  const aspect = Math.max(1e-3, cssW / Math.max(1, cssH));
-  for (let y = 0; y < FLOW_H; y += 1) {
-    const py = (y + 0.5) / FLOW_H - 0.5;
-    for (let x = 0; x < FLOW_W; x += 1) {
-      const px = ((x + 0.5) / FLOW_W - 0.5) * aspect;
-      const u = flowAt(px, py, flowTime);
-      const i = (y * FLOW_W + x) * 4;
-      flowData[i] = u[0];
-      flowData[i + 1] = u[1];
-      flowData[i + 2] = 0;
-      flowData[i + 3] = 1;
-    }
-  }
-  if (!flowTex) flowTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, flowTex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, FLOW_W, FLOW_H, 0, gl.RGBA, gl.FLOAT, flowData);
-}
-
-/* ================================================================== *
- * 6. 背景（页面原生 img + WebGL 折射纹理）
+ * 5. 背景
  * ================================================================== */
 let bgTex = null;
 let bgAspect = 3 / 2;
@@ -949,7 +707,7 @@ function makeChart(w, h) {
   }
   for (let j = 0; j <= h / 64; j++) {
     x.fillStyle = j % 4 === 0 ? "rgba(120,180,255,.28)" : "rgba(120,180,255,.11)";
-    x.fillRect(0, j * 64, j % 4 === 0 ? 2 : 1, h);
+    x.fillRect(0, j * 64, w, j % 4 === 0 ? 2 : 1);
   }
   const colors = ["#ff5d5d", "#ffb23f", "#ffe14a", "#5ddc7a", "#4fc3f7", "#9b7bff", "#ff6fd8"];
   for (let i = 0; i < 26; i++) {
@@ -985,7 +743,6 @@ function ensureBgTex() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
-
 function uploadImage(img) {
   ensureBgTex();
   bgAspect = img.width / Math.max(1, img.height);
@@ -995,7 +752,6 @@ function uploadImage(img) {
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 }
-
 function setBackground(kind) {
   const img = kind === "chart" ? makeChart(1920, 1280) : makePhoto(1920, 1280);
   pageBg.src = img.toDataURL("image/jpeg", 0.92);
@@ -1003,293 +759,189 @@ function setBackground(kind) {
 }
 
 /* ================================================================== *
- * 7. 相场 / 容量场 / 高度 / 玻璃层目标
+ * 6. 流场 + 引力
  * ================================================================== */
-let cssW = 1, cssH = 1;
-let PHI_W = 2, PHI_H = 2;
-let phiTargets = [];
-let psiTargets = [];
-let glassBuf = null;
-let phiCur = 0;
-let psiCur = 0;
-let psiAllocated = false;
-
-function allocSim() {
-  for (const t of phiTargets) disposeTarget(t);
-  for (const t of psiTargets) disposeTarget(t);
-  disposeTarget(glassBuf);
-
-  phiTargets = [];
-  psiTargets = [];
-  for (let i = 0; i < 2; i += 1) {
-    const p = makeTarget(PHI_W, PHI_H, FIELD_FMT, FIELD_TYPE, gl.LINEAR, gl.LINEAR);
-    if (!p) fail("无法创建相场渲染目标（RGBA16F / RGBA8）");
-    phiTargets.push(p);
-    const q = makeTarget(PHI_W, PHI_H, FIELD_FMT, FIELD_TYPE, gl.LINEAR, gl.LINEAR);
-    if (!q) fail("无法创建容量场渲染目标");
-    psiTargets.push(q);
-  }
-  glassBuf = makeTarget(PHI_W, PHI_H, FIELD_FMT, FIELD_TYPE, gl.LINEAR, gl.LINEAR);
-  if (!glassBuf) fail("无法创建玻璃层渲染目标");
-
-  phiCur = 0;
-  psiCur = 0;
-  psiAllocated = true;
-  allocProbe();
+function smoothstep(a, b, x) {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
 }
 
-function clearTarget(t, r, g, b, a) {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
-  gl.viewport(0, 0, t.w, t.h);
-  gl.clearColor(r, g, b, a);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+function flowPsi(x, y, t) {
+  const win = smoothstep(0.66, 0.40, Math.abs(x)) * smoothstep(0.52, 0.28, Math.abs(y));
+  if (win <= 0) return 0;
+  const k1 = 1.55, k2 = 2.15, k3 = 2.85;
+  const w1 = TAU / 61, w2 = TAU / 83, w3 = TAU / 47;
+  const m1 = Math.sin(k1 * x + w1 * t + 0.7) * Math.cos(k1 * y + 0.3);
+  const m2 = Math.cos(k2 * x - 0.4) * Math.sin(k2 * y + w2 * t + 1.1);
+  const m3 = Math.sin(k3 * (x + y) + w3 * t + 2.0) * Math.cos(k3 * (x - y) - 0.8);
+  return win * (0.70 * m1 + 0.45 * m2 + 0.25 * m3);
+}
+function flowAt(x, y, t) {
+  const e = 1e-3;
+  const ux = (flowPsi(x, y + e, t) - flowPsi(x, y - e, t)) / (2 * e);
+  const uy = -(flowPsi(x + e, y, t) - flowPsi(x - e, y, t)) / (2 * e);
+  return [ux * state.flow, uy * state.flow];
+}
+function gravityAt(x, y) {
+  /* 每个团块只被最近的引力点吸引；否则多个点会一起把液体拖成一个大团。 */
+  let best = null, bd = Infinity;
+  for (const g of gravityPoints) {
+    const d = (g.x - x) ** 2 + (g.y - y) ** 2;
+    if (d < bd) { bd = d; best = g; }
+  }
+  if (!best) return [0, 0];
+  const R = Math.max(0.03, state.gravityR);
+  const dx = best.x - x;
+  const dy = best.y - y;
+  const r = Math.hypot(dx, dy) + 1e-6;
+  const rn = r / R;
+  /* 高斯导数核：r=0 时为零，r≈R 时最强，然后衰减。 */
+  const pull = state.gravity * best.w * rn * Math.exp(-0.5 * rn * rn);
+  return [(dx / r) * pull, (dy / r) * pull];
 }
 
 /* ================================================================== *
- * 8. 探针：GPU 降采样 + 异步回读；CPU 连通域 + 每滴等效半径
- *
- * 渲染高度需要每只液滴的“面积等效半径” R。这个量不能在像素着色器里
- * 从距离场得到（那正是脊线的来源），所以在 1/4 分辨率的探针上做连通域
- * 标记。它只影响渲染，不参与流体推进。
+ * 7. top-k 引力点：对当前团块做加权 k-means
  * ================================================================== */
-let PROBE_W = 2, PROBE_H = 2;
-let probeTex = null, probeFbo = null, probeBuf = null;
-let probeData = new Uint8Array(4);
-let probeFence = null;
-let scaleTex = null;
-let scaleData = new Float32Array(4);
-let scalePrev = new Float32Array(1);
-let scaleFirst = true;
-let massTarget = 0;
-let massCurrent = 0;
-let massFixScale = 1;
-let volumeTarget = 0;
-let volumeScale = 1;
-let compCount = 0;
-let lastMaxR = 0;
-
-function allocProbe() {
-  if (probeTex) gl.deleteTexture(probeTex);
-  if (probeFbo) gl.deleteFramebuffer(probeFbo);
-  if (probeBuf) gl.deleteBuffer(probeBuf);
-
-  PROBE_W = Math.max(8, Math.round(PHI_W / 4));
-  PROBE_H = Math.max(6, Math.round(PHI_H / 4));
-  probeTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, probeTex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PROBE_W, PROBE_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  probeFbo = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, probeFbo);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, probeTex, 0);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-  probeData = new Uint8Array(PROBE_W * PROBE_H * 4);
-  probeBuf = gl.createBuffer();
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, probeBuf);
-  gl.bufferData(gl.PIXEL_PACK_BUFFER, probeData.byteLength, gl.STREAM_READ);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-
-  if (probeFence) {
-    gl.deleteSync(probeFence);
-    probeFence = null;
-  }
-
-  if (scaleTex) gl.deleteTexture(scaleTex);
-  scaleTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, scaleTex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  scaleData = new Float32Array(PROBE_W * PROBE_H * 4);
-  scalePrev = new Float32Array(PROBE_W * PROBE_H);
-  scaleData.fill(0.12);
-  for (let i = 0; i < PROBE_W * PROBE_H; i += 1) {
-    scaleData[i * 4] = 0.12;
-    scaleData[i * 4 + 3] = 1;
-  }
-  gl.texImage2D(
-    gl.TEXTURE_2D, 0, gl.RGBA16F, PROBE_W, PROBE_H, 0, gl.RGBA, gl.FLOAT, scaleData,
-  );
-  scaleFirst = true;
-}
-
-function drawProbe(sync) {
-  /* 同步探针会覆盖 GPU 上尚未完成的旧异步读回，先丢旧 fence。 */
-  if (probeFence) {
-    gl.deleteSync(probeFence);
-    probeFence = null;
-  }
-
-  gl.bindFramebuffer(gl.FRAMEBUFFER, probeFbo);
-  gl.viewport(0, 0, PROBE_W, PROBE_H);
-  gl.useProgram(progProbe);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[phiCur].tex);
-  gl.uniform1i(UProbe.uPhi, 0);
-  gl.uniform2f(UProbe.uSrcRes, PHI_W, PHI_H);
-  gl.uniform2f(UProbe.uDstRes, PROBE_W, PROBE_H);
-  drawQuad();
-
-  /* readPixels 必须从 probeFbo 读，不能先绑回默认帧缓冲。 */
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, probeBuf);
-  gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-  if (sync) {
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, probeBuf);
-    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, probeData);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-    onProbeData();
-  } else {
-    probeFence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    gl.flush();
-  }
-}
-
-function pollProbe() {
-  if (!probeFence) return;
-  const status = gl.clientWaitSync(probeFence, 0, 0);
-  if (status === gl.WAIT_FAILED) {
-    gl.deleteSync(probeFence);
-    probeFence = null;
+function updateGravityPoints() {
+  const k = Math.max(1, Math.min(BLOB_MAX, Math.round(state.k)));
+  if (blobs.length === 0) {
+    gravityPoints = [];
     return;
   }
-  if (status !== gl.ALREADY_SIGNALED && status !== gl.CONDITION_SATISFIED) return;
-  gl.deleteSync(probeFence);
-  probeFence = null;
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, probeBuf);
-  gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, probeData);
-  gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-  onProbeData();
-}
-
-function onProbeData() {
-  const W = PROBE_W, H = PROBE_H;
-  const N = W * H;
-  let sum = 0;
-  for (let i = 0; i < N; i += 1) sum += probeData[i * 4];
-  const mass = sum / (N * 255);
-  massCurrent = mass;
-
-  const wet = new Uint8Array(N);
-  for (let i = 0; i < N; i += 1) wet[i] = probeData[i * 4] > 127 ? 1 : 0;
-
-  const label = new Int32Array(N).fill(-1);
-  const comps = [];
-  const stack = new Int32Array(N);
-  for (let i = 0; i < N; i += 1) {
-    if (!wet[i] || label[i] >= 0) continue;
-    const id = comps.length;
-    let sp = 0;
-    stack[sp++] = i;
-    label[i] = id;
-    let area = 0;
-    while (sp > 0) {
-      const k = stack[--sp];
-      area += 1;
-      const x = k % W, y = (k / W) | 0;
-      if (x > 0 && wet[k - 1] && label[k - 1] < 0) { label[k - 1] = id; stack[sp++] = k - 1; }
-      if (x + 1 < W && wet[k + 1] && label[k + 1] < 0) { label[k + 1] = id; stack[sp++] = k + 1; }
-      if (y > 0 && wet[k - W] && label[k - W] < 0) { label[k - W] = id; stack[sp++] = k - W; }
-      if (y + 1 < H && wet[k + W] && label[k + W] < 0) { label[k + W] = id; stack[sp++] = k + W; }
-    }
-    comps.push({ area });
-  }
-  compCount = comps.length;
-
-  const aspect = Math.max(1e-3, PHI_W / Math.max(1, PHI_H));
-  const cellArea = (4 * aspect / Math.max(1, PHI_W)) * (4 / Math.max(1, PHI_H));
-  const radii = new Float32Array(comps.length);
-  for (let i = 0; i < comps.length; i += 1) {
-    const A = comps[i].area * cellArea;
-    radii[i] = Math.max(0.015, Math.min(0.8, Math.sqrt(A / Math.PI)));
-  }
-
-  /* 每只液滴的 R 扩散到全屏，供高度着色器双线性采样。
-     这样液滴合并/分裂时 R 会平滑过渡，不会在接触线处出现矩形或台阶。 */
-  const rMap = new Float32Array(N);
-  const queue = new Int32Array(N);
-  let qh = 0, qt = 0;
-  for (let i = 0; i < N; i += 1) {
-    const id = label[i];
-    if (id >= 0) {
-      rMap[i] = radii[id];
-      queue[qt++] = i;
-    }
-  }
-  if (qt === 0) {
-    rMap.fill(0.12);
+  const totalM = blobs.reduce((s, b) => s + b.m, 0) || 1;
+  const centers = [];
+  const n = Math.min(k, blobs.length);
+  if (gravityPoints.length >= n) {
+    for (let i = 0; i < n; i += 1) centers.push({ x: gravityPoints[i].x, y: gravityPoints[i].y, w: 1 });
   } else {
-    while (qh < qt) {
-      const k = queue[qh++];
-      const r = rMap[k];
-      const x = k % W, y = (k / W) | 0;
-      if (x > 0 && rMap[k - 1] === 0) { rMap[k - 1] = r; queue[qt++] = k - 1; }
-      if (x + 1 < W && rMap[k + 1] === 0) { rMap[k + 1] = r; queue[qt++] = k + 1; }
-      if (y > 0 && rMap[k - W] === 0) { rMap[k - W] = r; queue[qt++] = k - W; }
-      if (y + 1 < H && rMap[k + W] === 0) { rMap[k + W] = r; queue[qt++] = k + W; }
+    const sorted = blobs.slice().sort((a, b) => b.m - a.m);
+    for (let i = 0; i < n; i += 1) {
+      centers.push({ x: sorted[i].x, y: sorted[i].y, w: 1 });
     }
   }
-
-  const blend = scaleFirst ? 1 : 0.35;
-  for (let i = 0; i < N; i += 1) {
-    const v = rMap[i] || 0.12;
-    const prev = scalePrev[i] || 0.12;
-    const next = prev + (v - prev) * blend;
-    scalePrev[i] = next;
-    scaleData[i * 4] = next;
-    scaleData[i * 4 + 1] = 0;
-    scaleData[i * 4 + 2] = 0;
-    scaleData[i * 4 + 3] = 1;
-  }
-  scaleFirst = false;
-
-  gl.bindTexture(gl.TEXTURE_2D, scaleTex);
-  gl.texImage2D(
-    gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.FLOAT, scaleData,
-  );
-
-  /* 体积：把和面积等效半径 R 对应的球冠体积加起来。总面积变化时用
-     volumeScale 做一次全局重标定，保证 3D 体积不随合并/分裂漂移。 */
-  const tanHalf = Math.tan(0.5 * (state.contact * Math.PI) / 180);
-  const capK = Math.PI * tanHalf * (3 + tanHalf * tanHalf) / 6;
-  let sumR3 = 0;
-  lastMaxR = 0;
-  for (let i = 0; i < radii.length; i += 1) {
-    sumR3 += radii[i] ** 3;
-    if (radii[i] > lastMaxR) lastMaxR = radii[i];
-  }
-  const capVol = Math.max(capK * sumR3, 1e-9);
-
-  if (radii.length > 0) {
-    if (volumeTarget <= 0) {
-      volumeTarget = capVol;
-      volumeScale = 1;
-    } else {
-      const target = Math.max(0.3, Math.min(3.0, volumeTarget / capVol));
-      volumeScale += (target - volumeScale) * 0.2;
+  for (let iter = 0; iter < 5; iter += 1) {
+    const sx = new Float64Array(centers.length);
+    const sy = new Float64Array(centers.length);
+    const sw = new Float64Array(centers.length);
+    for (const b of blobs) {
+      let bi = 0, bd = 1e9;
+      for (let i = 0; i < centers.length; i += 1) {
+        const d = (b.x - centers[i].x) ** 2 + (b.y - centers[i].y) ** 2;
+        if (d < bd) { bd = d; bi = i; }
+      }
+      sx[bi] += b.x * b.m;
+      sy[bi] += b.y * b.m;
+      sw[bi] += b.m;
+    }
+    for (let i = 0; i < centers.length; i += 1) {
+      if (sw[i] > 1e-6) {
+        centers[i].x = sx[i] / sw[i];
+        centers[i].y = sy[i] / sw[i];
+        centers[i].w = Math.max(0.25, Math.min(1.5, (sw[i] / totalM) * centers.length));
+      }
     }
   }
-
-  if (massTarget <= 0 && mass > 1e-5) massTarget = mass;
-
-  if (state.massFix && massTarget > 1e-5) {
-    const drift = mass / massTarget - 1;
-    if (Math.abs(drift) > 0.0015) {
-      massFixScale = Math.max(0.98, Math.min(1.02, massTarget / mass));
-    }
-  }
+  gravityPoints = centers;
 }
 
 /* ================================================================== *
- * 9. 初始场：随机低频场 + 总液体量阈值
+ * 8. 团块演化：平流、合并、应变分裂
+ * ================================================================== */
+function updateBlobs(dt) {
+  const aspect = Math.max(1e-3, cssW / Math.max(1, cssH));
+  const xLim = aspect * 0.38;
+  const yLim = 0.36;
+
+  for (const b of blobs) {
+    const u = flowAt(b.x, b.y, flowTime);
+    const g = gravityAt(b.x, b.y);
+    b.x += (u[0] + g[0]) * dt;
+    b.y += (u[1] + g[1]) * dt;
+    b.x = Math.max(-xLim, Math.min(xLim, b.x));
+    b.y = Math.max(-yLim, Math.min(yLim, b.y));
+    b.cool = Math.max(0, (b.cool || 0) - dt);
+  }
+
+  /* 短程排斥：让团块保持独立，不会因为引力全部并成一个大水团。
+     这是很便宜的“分离压”，不参与光学。 */
+  for (let i = 0; i < blobs.length; i += 1) {
+    for (let j = i + 1; j < blobs.length; j += 1) {
+      const a = blobs[i], b = blobs[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const d = Math.hypot(dx, dy) + 1e-6;
+      const minD = (a.r + b.r) * 3.0;
+      if (d >= minD) continue;
+      const f = ((minD - d) / minD) * 0.9 * dt;
+      const nx = dx / d, ny = dy / d;
+      a.x += nx * f * 0.5;
+      a.y += ny * f * 0.5;
+      b.x -= nx * f * 0.5;
+      b.y -= ny * f * 0.5;
+    }
+  }
+
+  /* 合并：距离足够近时质量、面积相加；总质量守恒。 */
+  for (let i = 0; i < blobs.length; i += 1) {
+    for (let j = i + 1; j < blobs.length; j += 1) {
+      const a = blobs[i], b = blobs[j];
+      if ((a.cool || 0) > 0.2 || (b.cool || 0) > 0.2) continue;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < (a.r + b.r) * 0.55) {
+        const m = a.m + b.m;
+        a.x = (a.x * a.m + b.x * b.m) / m;
+        a.y = (a.y * a.m + b.y * b.m) / m;
+        a.m = m;
+        a.r = Math.sqrt(a.r * a.r + b.r * b.r);
+        blobs.splice(j, 1);
+        j -= 1;
+      }
+    }
+  }
+
+  /* 分裂：局部速度梯度大时，把团块沿拉伸方向拉成两个。 */
+  for (let i = 0; i < blobs.length && blobs.length < 8; i += 1) {
+    const b = blobs[i];
+    if (b.r < 0.030 || (b.cool || 0) > 0) continue;
+    const r = b.r;
+    const uR = flowAt(b.x + r, b.y, flowTime);
+    const uL = flowAt(b.x - r, b.y, flowTime);
+    const uU = flowAt(b.x, b.y + r, flowTime);
+    const uD = flowAt(b.x, b.y - r, flowTime);
+    const gR = gravityAt(b.x + r, b.y);
+    const gL = gravityAt(b.x - r, b.y);
+    const gU = gravityAt(b.x, b.y + r);
+    const gD = gravityAt(b.x, b.y - r);
+    const vx = (uR[0] + gR[0]) - (uL[0] + gL[0]);
+    const vy = (uU[1] + gU[1]) - (uD[1] + gD[1]);
+    const strain = Math.hypot(vx, vy) / (2 * r);
+    if (strain < 2.2) continue;
+    const len = Math.hypot(vx, vy) || 1;
+    const nx = vx / len, ny = vy / len;
+    const m2 = b.m * 0.5;
+    const r2 = b.r / Math.SQRT2;
+    const cx = b.x, cy = b.y;
+    const off = r * 0.95;
+    b.m = m2; b.r = r2;
+    b.x = cx + nx * off;
+    b.y = cy + ny * off;
+    b.cool = 1.2;
+    blobs.push({
+      x: cx - nx * off,
+      y: cy - ny * off,
+      r: r2,
+      m: m2,
+      cool: 1.2,
+    });
+  }
+
+  const total = blobs.reduce((s, b) => s + b.m, 0) || 1;
+  for (const b of blobs) b.m /= total;
+  updateGravityPoints();
+}
+
+/* ================================================================== *
+ * 9. 初始团块
  * ================================================================== */
 function mulberry32(a) {
   return function () {
@@ -1299,195 +951,76 @@ function mulberry32(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-let resetSeed = 1;
-let fixedSeed = null;
 
-function makeInitialField() {
-  const W = PHI_W, H = PHI_H;
-  const aspect = W / H;
+function makeBlobs() {
   const rng = mulberry32(resetSeed);
-
-  /* 随机“元球”初始场：不在代码里摆固定的水滴，也不规定滴数。
-     只随机撒一些平滑的液体核，再用总液体量做全局阈值；核之间可以
-     自然重叠/合并。这个场只决定 t=0，之后完全交给相场。 */
-  const centers = [];
-  const targetN = 5 + Math.floor(rng() * 2);
-  for (let tries = 0; tries < 420 && centers.length < targetN; tries += 1) {
-    const cx = (rng() * 2 - 1) * 0.37;
-    const cy = (rng() * 2 - 1) * 0.29;
-    const s = 0.045 + rng() * 0.020;
+  const aspect = Math.max(1e-3, cssW / Math.max(1, cssH));
+  const n = 6 + Math.floor(rng() * 2);
+  const scale = Math.sqrt(state.amount / 0.14);
+  const list = [];
+  let guard = 0;
+  while (list.length < n && guard < 500) {
+    guard += 1;
+    const x = (rng() * 2 - 1) * aspect * 0.34;
+    const y = (rng() * 2 - 1) * 0.30;
+    const r = (0.026 + rng() * 0.026) * scale;
     let ok = true;
-    for (const c of centers) {
-      if (Math.hypot(c.x - cx, c.y - cy) < 0.225) { ok = false; break; }
+    for (const b of list) {
+      if (Math.hypot(b.x - x, b.y - y) < (b.r + r) * 2.2) { ok = false; break; }
     }
     if (!ok) continue;
-    centers.push({ x: cx, y: cy, s, w: 0.78 + rng() * 0.32 });
+    list.push({ x, y, r, m: r * r, cool: 0 });
   }
-  if (centers.length === 0) centers.push({ x: 0, y: 0, s: 0.07, w: 1 });
-
-  const noise = [];
-  for (let k = 0; k < 3; k += 1) {
-    const ang = rng() * TAU;
-    const freq = 2.5 + rng() * 4.0;
-    noise.push({
-      cx: Math.cos(ang) * freq,
-      cy: Math.sin(ang) * freq,
-      phase: rng() * TAU,
-      amp: 0.025 + rng() * 0.025,
-    });
-  }
-
-  const f = new Float32Array(W * H);
-  let fmax = 0;
-  for (let y = 0; y < H; y += 1) {
-    const sy = (y + 0.5) / H - 0.5;
-    for (let x = 0; x < W; x += 1) {
-      const sx = ((x + 0.5) / W - 0.5) * aspect;
-      let v = 0;
-      for (const c of centers) {
-        const dx = sx - c.x;
-        const dy = sy - c.y;
-        v += c.w * Math.exp(-(dx * dx + dy * dy) / (2 * c.s * c.s));
-      }
-      let wobble = 0;
-      for (const n of noise) wobble += n.amp * Math.cos(n.cx * sx + n.cy * sy + n.phase);
-      v += wobble * Math.min(1, v * 2.5);
-      f[y * W + x] = v;
-      if (v > fmax) fmax = v;
-    }
-  }
-
-  /* 阈值只由总液体量决定；软边只控制初始界面宽度。 */
-  const soft = Math.max(0.02, fmax * 0.055);
-  let lo = -1e-3, hi = fmax + 1e-3;
-  for (let it = 0; it < 34; it += 1) {
-    const mid = 0.5 * (lo + hi);
-    let sum = 0;
-    for (let i = 0; i < W * H; i += 1) {
-      sum += 0.5 * (1 + Math.tanh((f[i] - mid) / soft));
-    }
-    const avg = sum / (W * H);
-    if (avg > state.amount) lo = mid; else hi = mid;
-  }
-  const thr = 0.5 * (lo + hi);
-
-  if (FIELD_FMT === gl.RGBA8) {
-    const data = new Uint8Array(W * H * 4);
-    for (let i = 0; i < W * H; i += 1) {
-      const phi = 0.5 * (1 + Math.tanh((f[i] - thr) / soft));
-      data[i * 4] = Math.round(phi * 255);
-      data[i * 4 + 3] = 255;
-    }
-    return data;
-  }
-  const data = new Float32Array(W * H * 4);
-  for (let i = 0; i < W * H; i += 1) {
-    data[i * 4] = 0.5 * (1 + Math.tanh((f[i] - thr) / soft));
-    data[i * 4 + 3] = 1;
-  }
-  return data;
+  if (list.length === 0) list.push({ x: 0, y: 0, r: 0.07 * scale, m: 1, cool: 0 });
+  const total = list.reduce((s, b) => s + b.m, 0) || 1;
+  for (const b of list) b.m /= total;
+  return list;
 }
 
-function uploadField(data) {
-  /* RGBA16F 上传 Float32Array 时必须用 gl.FLOAT；gl.HALF_FLOAT 只接受
-     Uint16Array 的半精度位模式。渲染目标分配时用 HALF_FLOAT + null 没问题。 */
-  const uploadType = FIELD_FMT === gl.RGBA8 ? gl.UNSIGNED_BYTE : gl.FLOAT;
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[0].tex);
-  gl.texImage2D(
-    gl.TEXTURE_2D, 0, FIELD_FMT, PHI_W, PHI_H, 0, gl.RGBA, uploadType, data,
-  );
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[1].tex);
-  gl.texImage2D(
-    gl.TEXTURE_2D, 0, FIELD_FMT, PHI_W, PHI_H, 0, gl.RGBA, uploadType,
-    FIELD_FMT === gl.RGBA8 ? new Uint8Array(PHI_W * PHI_H * 4) : new Float32Array(PHI_W * PHI_H * 4),
-  );
-  phiCur = 0;
+function resetScene() {
+  resetSeed = fixedSeed !== null ? fixedSeed : ((Math.random() * 1e9) | 0);
+  blobs = makeBlobs();
+  gravityPoints = [];
+  flowTime = 0;
+  updateGravityPoints();
 }
 
 /* ================================================================== *
- * 10. 每一步 GPU pass
+ * 10. 液面 pass / 合成
  * ================================================================== */
-function cacStep(dt) {
-  const dst = 1 - phiCur;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, phiTargets[dst].fbo);
-  gl.viewport(0, 0, PHI_W, PHI_H);
-  gl.useProgram(progCac);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[phiCur].tex);
-  gl.uniform1i(UCac.uPhi, 0);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, flowTex);
-  gl.uniform1i(UCac.uFlow, 1);
-  gl.uniform2f(UCac.uRes, PHI_W, PHI_H);
-  gl.uniform1f(UCac.uDt, dt);
-  gl.uniform1f(UCac.uEps, state.eps);
-  gl.uniform1f(UCac.uM, state.mobility);
-  drawQuad();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  phiCur = dst;
-}
+let cssW = 1, cssH = 1;
+let GLASS_W = 2, GLASS_H = 2;
+let glassBuf = null;
+let outW = 2, outH = 2;
+let dprLevel = 3;
+let dpr = MAX_DPR_LEVELS[dprLevel];
+const blobData = new Float32Array(BLOB_MAX * 4);
 
-function applyMassFix() {
-  const dst = 1 - phiCur;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, phiTargets[dst].fbo);
-  gl.viewport(0, 0, PHI_W, PHI_H);
-  gl.useProgram(progMassFix);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[phiCur].tex);
-  gl.uniform1i(UMass.uPhi, 0);
-  gl.uniform2f(UMass.uRes, PHI_W, PHI_H);
-  gl.uniform1f(UMass.uScale, massFixScale);
-  drawQuad();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  phiCur = dst;
-  massFixScale = 1;
-}
-
-function psiIterations(n) {
-  if (!psiAllocated) return;
-  gl.useProgram(progPsi);
-  gl.viewport(0, 0, PHI_W, PHI_H);
-  gl.uniform2f(UPsi.uRes, PHI_W, PHI_H);
-  gl.uniform1f(UPsi.uOmega, 1.82);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[phiCur].tex);
-  gl.uniform1i(UPsi.uPhi, 1);
-  for (let i = 0; i < n; i += 1) {
-    /* 红：psiA -> psiB */
-    gl.bindFramebuffer(gl.FRAMEBUFFER, psiTargets[1].fbo);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, psiTargets[0].tex);
-    gl.uniform1i(UPsi.uPsi, 0);
-    gl.uniform1i(UPsi.uParity, 0);
-    drawQuad();
-    /* 黑：psiB -> psiA */
-    gl.bindFramebuffer(gl.FRAMEBUFFER, psiTargets[0].fbo);
-    gl.bindTexture(gl.TEXTURE_2D, psiTargets[1].tex);
-    gl.uniform1i(UPsi.uPsi, 0);
-    gl.uniform1i(UPsi.uParity, 1);
-    drawQuad();
-  }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  psiCur = 0;
+function allocGlass() {
+  disposeTarget(glassBuf);
+  GLASS_W = Math.max(64, Math.round(cssW * GLASS_SCALE));
+  GLASS_H = Math.max(48, Math.round(cssH * GLASS_SCALE));
+  glassBuf = makeTarget(GLASS_W, GLASS_H, FIELD_FMT, FIELD_TYPE, gl.LINEAR, gl.LINEAR);
+  if (!glassBuf) fail("无法创建液面渲染目标");
 }
 
 function geoPass() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, glassBuf.fbo);
-  gl.viewport(0, 0, PHI_W, PHI_H);
+  gl.viewport(0, 0, GLASS_W, GLASS_H);
   gl.useProgram(progGeo);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, psiTargets[psiCur].tex);
-  gl.uniform1i(UG.uPsi, 0);
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, phiTargets[phiCur].tex);
-  gl.uniform1i(UG.uPhi, 1);
-  gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_2D, scaleTex);
-  gl.uniform1i(UG.uScale, 2);
-  gl.uniform2f(UG.uRes, PHI_W, PHI_H);
-  gl.uniform1f(UG.uPH, PHI_H);
-  gl.uniform1f(UG.uTheta, (state.contact * Math.PI) / 180);
-  gl.uniform1f(UG.uVolScale, volumeScale);
+  const n = Math.min(BLOB_MAX, blobs.length);
+  for (let i = 0; i < BLOB_MAX; i += 1) {
+    const b = blobs[i];
+    blobData[i * 4] = b ? b.x : 0;
+    blobData[i * 4 + 1] = b ? b.y : 0;
+    blobData[i * 4 + 2] = b ? b.r : 0;
+    blobData[i * 4 + 3] = b ? b.m : 0;
+  }
+  gl.uniform4fv(UG["uBlob[0]"], blobData);
+  gl.uniform1i(UG.uBlobCount, n);
+  gl.uniform2f(UG.uRes, GLASS_W, GLASS_H);
+  gl.uniform1f(UG.uAspect, GLASS_W / Math.max(1, GLASS_H));
+  gl.uniform1f(UG.uHeight, state.height);
   drawQuad();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
@@ -1541,46 +1074,45 @@ function composite() {
   gl.uniform1f(UC.uFillAlpha, state.density);
   gl.uniform1f(UC.uEnvRot, (state.envRot * Math.PI) / 180);
   gl.uniform1f(UC.uEnvIntensity, state.env);
-  gl.uniform1f(UC.uHref, 0.08);
+  gl.uniform1f(UC.uHref, Math.max(0.04, state.height * 0.7));
   gl.uniform1f(UC.uGlassT, state.glass / WORLD_MM);
   gl.uniform3fv(UC.uFill, fillPalette());
   gl.uniform3fv(UC.uLightDir, envLight);
   drawQuad();
 }
 
+function drawDebug() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, outW, outH);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(progDebug);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, glassBuf.tex);
+  gl.uniform1i(UDebug.uTex, 0);
+  gl.uniform2f(UDebug.uRes, outW, outH);
+  if (debugMode === "h") {
+    gl.uniform1i(UDebug.uMode, 2);
+    gl.uniform1f(UDebug.uScale, 5);
+  } else {
+    gl.uniform1i(UDebug.uMode, 1);
+    gl.uniform1f(UDebug.uScale, 1);
+  }
+  drawQuad();
+}
+
 /* ================================================================== *
  * 11. 尺寸 / 自适应
  * ================================================================== */
-let outW = 2, outH = 2;
-let dprLevel = 3;
-let dpr = MAX_DPR_LEVELS[dprLevel];
-
-function outSize() {
-  return [
-    Math.max(2, Math.round(cssW * dpr)),
-    Math.max(2, Math.round(cssH * dpr)),
-  ];
-}
-
 function resizeOutput() {
-  const [w, h] = outSize();
+  const w = Math.max(2, Math.round(cssW * dpr));
+  const h = Math.max(2, Math.round(cssH * dpr));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
   }
   outW = w; outH = h;
   elRes.textContent = "输出 " + w + "×" + h + " · DPR " + dpr.toFixed(2);
-}
-
-function initSimSize() {
-  const gW = Math.max(48, Math.round(cssW * PHI_SCALE));
-  const gH = Math.max(32, Math.round(cssH * PHI_SCALE));
-  const changed = gW !== PHI_W || gH !== PHI_H;
-  if (changed) {
-    PHI_W = gW; PHI_H = gH;
-    allocSim();
-  }
-  return changed;
 }
 
 function resizeLayout() {
@@ -1591,43 +1123,15 @@ function resizeLayout() {
   dprLevel = Math.min(MAX_DPR_LEVELS.length - 1, Math.max(0, dprLevel));
   dpr = MAX_DPR_LEVELS[dprLevel];
   resizeOutput();
-  const changed = initSimSize();
-  elPhi.textContent = PHI_W + "×" + PHI_H;
-  if (changed) resetScene(false);
+  allocGlass();
+  resetScene();
 }
 
 /* ================================================================== *
- * 12. 重置 / 渲染循环
+ * 12. 循环
  * ================================================================== */
-function resetScene(skipProbe) {
-  resetSeed = fixedSeed !== null ? fixedSeed : ((Math.random() * 1e9) | 0);
-  const data = makeInitialField();
-  uploadField(data);
-  for (const t of psiTargets) clearTarget(t, 0, 0, 0, 0);
-  psiCur = 0;
-  massTarget = 0;
-  massCurrent = 0;
-  massFixScale = 1;
-  volumeTarget = 0;
-  volumeScale = 1;
-  compCount = 0;
-  scaleFirst = true;
-  scalePrev.fill(0.12);
-  flowTime = 0;
-  updateFlowTexture();
-  psiIterations(PSI_ITERS_RESET);
-  if (!skipProbe) {
-    drawProbe(true);
-    /* 探针已经给出初始 R 和总质量；再解几轮让高度贴合新的 R。 */
-    psiIterations(4);
-  }
-  lastProbeAt = performance.now();
-}
-
 let last = performance.now();
-let lastPresent = 0;
 let acc = 0, frames = 0, fps = 0, frameMs = 0;
-let lastProbeAt = 0;
 let lastAdjust = 0;
 let justDown = false;
 let gpuMs = 6.0;
@@ -1640,18 +1144,16 @@ const elFps = document.getElementById("fps");
 const elMs = document.getElementById("ms");
 const elGpu = document.getElementById("gpu");
 const elRes = document.getElementById("res");
-const elPhi = document.getElementById("phi");
+const elBlobs = document.getElementById("blobs");
+const elGrav = document.getElementById("grav");
 const elMass = document.getElementById("mass");
-const elComps = document.getElementById("comps");
-const elDrift = document.getElementById("drift");
-const elVol = document.getElementById("vol");
 
 function drawFlowOverlay() {
   const w = flowCanvas.width, h = flowCanvas.height;
   fctx.clearRect(0, 0, w, h);
   if (!showFlow) return;
-  fctx.strokeStyle = "rgba(150,195,255,0.34)";
-  fctx.fillStyle = "rgba(150,195,255,0.34)";
+  fctx.strokeStyle = "rgba(150,195,255,0.30)";
+  fctx.fillStyle = "rgba(150,195,255,0.30)";
   fctx.lineWidth = 1;
   const cols = 16, rows = 10;
   for (let j = 0; j < rows; j += 1) {
@@ -1659,11 +1161,12 @@ function drawFlowOverlay() {
       const px = ((i + 0.5) / cols - 0.5) * (w / h);
       const py = 0.5 - (j + 0.5) / rows;
       const u = flowAt(px, py, flowTime);
+      const g = gravityAt(px, py);
       const sx = w * 0.5 + px * h;
       const sy = h * 0.5 - py * h;
       const scale = h * 1.1;
-      const ex = sx + u[0] * scale;
-      const ey = sy - u[1] * scale;
+      const ex = sx + (u[0] + g[0]) * scale;
+      const ey = sy - (u[1] + g[1]) * scale;
       fctx.beginPath(); fctx.moveTo(sx, sy); fctx.lineTo(ex, ey); fctx.stroke();
       const a = Math.atan2(ey - sy, ex - sx);
       fctx.beginPath();
@@ -1673,54 +1176,22 @@ function drawFlowOverlay() {
       fctx.closePath(); fctx.fill();
     }
   }
-}
-
-function advanceSim(dt) {
-  flowTime += dt;
-  updateFlowTexture();
-  const sub = Math.min(Math.max(dt, 0), 0.033) / cacSubsteps;
-  for (let i = 0; i < cacSubsteps; i += 1) cacStep(sub);
-  if (massFixScale !== 1) applyMassFix();
-  psiIterations(PSI_ITERS);
-}
-
-function drawDebug() {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, outW, outH);
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.useProgram(progDebug);
-  gl.activeTexture(gl.TEXTURE0);
-  let tex = phiTargets[phiCur].tex;
-  let mode = 0;
-  let scale = 1;
-  if (debugMode === "psi") {
-    tex = psiTargets[psiCur].tex;
-    scale = 1 / 200;
-  } else if (debugMode === "h") {
-    tex = glassBuf.tex;
-    mode = 2;
-    scale = 5;
-  } else if (debugMode === "glass") {
-    tex = glassBuf.tex;
-    mode = 1;
+  for (const g of gravityPoints) {
+    const sx = w * 0.5 + g.x * h;
+    const sy = h * 0.5 - g.y * h;
+    const r = 5 + g.w * 8;
+    fctx.strokeStyle = "rgba(255,190,120,0.9)";
+    fctx.lineWidth = 1.5;
+    fctx.beginPath(); fctx.arc(sx, sy, r, 0, TAU); fctx.stroke();
+    fctx.fillStyle = "rgba(255,220,170,0.9)";
+    fctx.beginPath(); fctx.arc(sx, sy, 2, 0, TAU); fctx.fill();
   }
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.uniform1i(UDebug.uTex, 0);
-  gl.uniform2f(UDebug.uRes, outW, outH);
-  gl.uniform1i(UDebug.uMode, mode);
-  gl.uniform1f(UDebug.uScale, scale);
-  drawQuad();
-}
-
-function renderFrame() {
-  geoPass();
-  if (debugMode) {
-    drawDebug();
-  } else {
-    composite();
+  fctx.fillStyle = "rgba(150,220,255,0.45)";
+  for (const b of blobs) {
+    const sx = w * 0.5 + b.x * h;
+    const sy = h * 0.5 - b.y * h;
+    fctx.beginPath(); fctx.arc(sx, sy, 1.6, 0, TAU); fctx.fill();
   }
-  drawFlowOverlay();
 }
 
 function frame(now) {
@@ -1734,15 +1205,13 @@ function frame(now) {
     gl.beginQuery(timerExt.TIME_ELAPSED_EXT, gpuQuery);
   }
 
-  pollProbe();
-  if (!paused) advanceSim(dt);
-
-  if (now - lastProbeAt > 220 && !probeFence) {
-    lastProbeAt = now;
-    drawProbe(false);
+  if (!paused) {
+    flowTime += dt;
+    updateBlobs(Math.min(dt, 0.033));
   }
-
-  renderFrame();
+  geoPass();
+  if (debugMode) drawDebug(); else composite();
+  drawFlowOverlay();
 
   if (timerExt && gpuQuery) {
     gl.endQuery(timerExt.TIME_ELAPSED_EXT);
@@ -1765,8 +1234,6 @@ function frame(now) {
     gpuMs = gpuMs * 0.92 + Math.min(rawDt * 1000, 33) * 0.08;
   }
 
-  /* 有 GPU timer 时按 120fps 的 8ms 预算；没有 timer 时帧间隔含 vsync，
-     用 60Hz 的宽松预算，避免在 60Hz 屏上无意义地降 DPR。 */
   const budgetHi = timerExt ? BUDGET_HI : 19.0;
   const budgetLo = timerExt ? BUDGET_LO : 17.4;
   if (now - lastAdjust > (justDown ? 1600 : 5000) && now > 2500 && !document.hidden) {
@@ -1786,11 +1253,10 @@ function frame(now) {
     elFps.textContent = fps.toFixed(0);
     elMs.textContent = frameMs.toFixed(1);
     elGpu.textContent = gpuMs.toFixed(1);
-    elMass.textContent = (massCurrent * 100).toFixed(2) + "%";
-    elComps.textContent = String(compCount);
-    const md = massTarget > 1e-5 ? (massCurrent / massTarget - 1) * 100 : 0;
-    elDrift.textContent = (md >= 0 ? "+" : "") + md.toFixed(2) + "%";
-    elVol.textContent = volumeScale.toFixed(2);
+    elBlobs.textContent = String(blobs.length);
+    elGrav.textContent = String(gravityPoints.length);
+    const total = blobs.reduce((s, b) => s + b.m, 0);
+    elMass.textContent = total.toFixed(2);
     acc = 0; frames = 0;
   }
 }
@@ -1800,11 +1266,6 @@ function frame(now) {
  * ================================================================== */
 const slidersEl = document.getElementById("sliders");
 const inputs = {};
-
-function rebuildAndReset() {
-  resetScene(false);
-}
-
 for (const [key, label, min, max, step, desc] of SLIDERS) {
   const row = document.createElement("div");
   row.className = "row";
@@ -1820,20 +1281,17 @@ for (const [key, label, min, max, step, desc] of SLIDERS) {
   input.title = desc || "";
   const show = () => {
     const v = Number(input.value);
-    if (key === "envRot" || key === "contact") { val.textContent = v.toFixed(0); return; }
+    if (key === "k" || key === "envRot") { val.textContent = v.toFixed(0); return; }
     const dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
     val.textContent = v.toFixed(dp);
   };
   input.addEventListener("input", () => {
     state[key] = Number(input.value);
+    if (key === "k") state.k = Math.round(state.k);
     show();
   });
   input.addEventListener("change", () => {
-    if (key === "amount") rebuildAndReset();
-    if (key === "contact") {
-      volumeTarget = 0;
-      volumeScale = 1;
-    }
+    if (key === "amount") resetScene();
   });
   show();
   row.append(lab, input);
@@ -1846,7 +1304,6 @@ for (const [key, label, min, max, step, desc] of SLIDERS) {
   slidersEl.append(row);
   inputs[key] = { input, show };
 }
-
 function syncInputs() {
   for (const [key] of SLIDERS) {
     inputs[key].input.value = state[key];
@@ -1859,15 +1316,14 @@ const toggleEl = document.getElementById("toggle");
 function setCollapsed(v) {
   panelEl.classList.toggle("collapsed", v);
   toggleEl.textContent = v ? "展开" : "收起";
-  try { localStorage.setItem("lg.panel2", v ? "1" : "0"); } catch (_) {}
+  try { localStorage.setItem("lg.panel4", v ? "1" : "0"); } catch (_) {}
 }
 toggleEl.addEventListener("click", () => setCollapsed(!panelEl.classList.contains("collapsed")));
 try {
-  if (localStorage.getItem("lg.panel2") !== "0") setCollapsed(true);
+  if (localStorage.getItem("lg.panel4") !== "0") setCollapsed(true);
 } catch (_) {
   setCollapsed(true);
 }
-
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyH") setCollapsed(!panelEl.classList.contains("collapsed"));
   if (e.code === "Escape") setCollapsed(true);
@@ -1879,35 +1335,23 @@ btnPause.addEventListener("click", () => {
   btnPause.classList.toggle("on", paused);
   btnPause.textContent = paused ? "继续" : "暂停";
 });
-
 const btnCompare = document.getElementById("btnCompare");
 btnCompare.addEventListener("pointerdown", () => { off = true; btnCompare.classList.add("on"); });
 btnCompare.addEventListener("pointerup", () => { off = false; btnCompare.classList.remove("on"); });
 btnCompare.addEventListener("pointerleave", () => { off = false; btnCompare.classList.remove("on"); });
-
-document.getElementById("btnReset").addEventListener("click", () => {
-  resetScene(false);
-});
+document.getElementById("btnReset").addEventListener("click", () => resetScene());
 
 const btnFill = document.getElementById("btnFill");
 btnFill.addEventListener("click", () => {
   fillLight = !fillLight;
   btnFill.textContent = fillLight ? "底色：亮" : "底色：暗";
 });
-
-const btnMass = document.getElementById("btnMass");
-btnMass.addEventListener("click", () => {
-  state.massFix = !state.massFix;
-  btnMass.classList.toggle("on", state.massFix);
-});
-
 const btnFlow = document.getElementById("btnFlow");
 btnFlow.addEventListener("click", () => {
   showFlow = !showFlow;
   flowCanvas.style.display = showFlow ? "block" : "none";
   btnFlow.classList.toggle("on", showFlow);
 });
-
 const btnPhoto = document.getElementById("btnPhoto");
 const btnChart = document.getElementById("btnChart");
 btnPhoto.addEventListener("click", () => {
@@ -1918,12 +1362,10 @@ btnChart.addEventListener("click", () => {
   setBackground("chart");
   btnChart.classList.add("on"); btnPhoto.classList.remove("on");
 });
-
 document.getElementById("file").addEventListener("change", (e) => {
   const f = e.target.files && e.target.files[0];
   if (f) loadFile(f);
 });
-
 function loadFile(file) {
   if (!file.type.startsWith("image/")) return;
   const url = URL.createObjectURL(file);
@@ -1936,14 +1378,12 @@ function loadFile(file) {
   };
   img.src = url;
 }
-
 window.addEventListener("keydown", (e) => {
   if (e.code === "Space" && !e.repeat) { e.preventDefault(); off = true; }
 });
 window.addEventListener("keyup", (e) => {
   if (e.code === "Space") { e.preventDefault(); off = false; }
 });
-
 const dropEl = document.getElementById("drop");
 let dragDepth = 0;
 window.addEventListener("dragenter", (e) => {
@@ -1960,14 +1400,13 @@ window.addEventListener("drop", (e) => {
   const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   if (f) loadFile(f);
 });
-
 window.addEventListener("resize", () => {
   clearTimeout(window.__lgResizeTimer);
   window.__lgResizeTimer = setTimeout(resizeLayout, 180);
 });
 
 /* ================================================================== *
- * 14. 启动 / hash 参数
+ * 14. 启动 / hash
  * ================================================================== */
 const hash = location.hash.slice(1);
 const hashParts = hash.split("&").filter(Boolean);
@@ -1989,10 +1428,7 @@ if (hashMap.seed !== undefined) {
   const s = parseInt(hashMap.seed, 10);
   if (isFinite(s)) fixedSeed = s;
 }
-if (hashMap.substeps !== undefined) {
-  const s = parseInt(hashMap.substeps, 10);
-  if (isFinite(s)) cacSubsteps = Math.max(1, Math.min(12, s));
-}
+state.k = Math.max(1, Math.min(5, Math.round(state.k)));
 
 setBackground(hashMap.chart ? "chart" : "photo");
 if (hashMap.chart) {
@@ -2006,52 +1442,44 @@ cssW = Math.max(1, window.innerWidth);
 cssH = Math.max(1, window.innerHeight);
 flowCanvas.width = Math.max(2, Math.round(cssW));
 flowCanvas.height = Math.max(2, Math.round(cssH));
-initSimSize();
 resizeOutput();
-resetScene(false);
+allocGlass();
+resetScene();
 
-/* 开发/自动验收接口；产品里不会出现。 */
 window.__lg = {
   state,
-  reset: () => resetScene(false),
-  probe: () => drawProbe(true),
+  reset: resetScene,
   step: (n) => {
     for (let i = 0; i < n; i += 1) {
-      advanceSim(1 / 60);
+      flowTime += 1 / 60;
+      updateBlobs(1 / 60);
     }
   },
-  render: renderFrame,
-  mass: () => ({ mass: massCurrent, target: massTarget, comps: compCount, volumeScale }),
+  render: () => { geoPass(); if (debugMode) drawDebug(); else composite(); drawFlowOverlay(); },
+  info: () => ({
+    blobs: blobs.length,
+    gravity: gravityPoints.length,
+    mass: blobs.reduce((s, b) => s + b.m, 0),
+    points: gravityPoints.map((g) => ({ x: g.x, y: g.y, w: g.w })),
+    radii: blobs.map((b) => b.r),
+  }),
   gl,
-  targets: () => ({ phiW: PHI_W, phiH: PHI_H, phiCur, probeW: PROBE_W, probeH: PROBE_H }),
 };
 
 if (hashMap.still) {
-  const steps = Math.max(1, Math.min(600, parseInt(hashMap.steps || "90", 10) || 90));
-  const probeEvery = Math.max(0, parseInt(hashMap.probeEvery || "0", 10) || 0);
-  if (probeEvery > 0) {
-    for (let i = 0; i < steps; i += 1) {
-      advanceSim(1 / 60);
-      if ((i + 1) % probeEvery === 0) {
-        drawProbe(true);
-        if (massFixScale !== 1) applyMassFix();
-      }
-    }
-  } else {
-    window.__lg.step(steps);
-  }
-  drawProbe(true);
-  psiIterations(6);
-  renderFrame();
-  document.title = "STILL mass=" + massCurrent.toFixed(4) +
-    " comps=" + compCount + " drift=" +
-    (massTarget > 0 ? ((massCurrent / massTarget - 1) * 100).toFixed(2) : "0") + "%" +
-    " vol=" + volumeScale.toFixed(2) +
-    " R=" + lastMaxR.toFixed(3) +
-    " hmax=" + (lastMaxR * Math.tan(0.5 * state.contact * Math.PI / 180) * volumeScale).toFixed(3);
-  /* 只重画、不推进模拟；让截图/合成器稳定拿到 WebGL 画布。 */
+  const steps = Math.max(1, Math.min(1200, parseInt(hashMap.steps || "180", 10) || 180));
+  window.__lg.step(steps);
+  window.__lg.render();
+  const info = window.__lg.info();
+  document.title = "STILL blobs=" + info.blobs +
+    " grav=" + info.gravity +
+    " mass=" + info.mass.toFixed(3) +
+    " rmax=" + Math.max(...info.radii).toFixed(3) +
+    " glass=" + GLASS_W + "x" + GLASS_H;
   const stillLoop = () => {
-    renderFrame();
+    geoPass();
+    if (debugMode) drawDebug(); else composite();
+    drawFlowOverlay();
     requestAnimationFrame(stillLoop);
   };
   requestAnimationFrame(stillLoop);
